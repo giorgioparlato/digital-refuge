@@ -311,6 +311,32 @@ class ScreenshotTest {
     }
 
     @Test
+    fun widgetPicker() = shot {
+        app.bedtime.ui.widget.WidgetBlockPickerContent(blocks = listOf(Samples.focus, Samples.deepWork), onPick = {}, onCreate = {}, onBack = {})
+    }
+
+    @Test
+    fun widget() {
+        val context = paparazzi.context
+        val column = android.widget.LinearLayout(context).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            setBackgroundColor(0xFFF8F5F1.toInt())
+            setPadding(48, 48, 48, 48)
+        }
+        listOf(
+            Triple("focus", "60 min · tap to start", R.drawable.widget_background),
+            Triple("focus", "on · until 4:10 pm", R.drawable.widget_background_on),
+        ).forEach { (title, subtitle, background) ->
+            val widget = paparazzi.inflate<android.view.View>(R.layout.widget_block)
+            widget.setBackgroundResource(background)
+            widget.findViewById<android.widget.TextView>(R.id.widget_title).text = title
+            widget.findViewById<android.widget.TextView>(R.id.widget_subtitle).text = subtitle
+            column.addView(widget, android.widget.LinearLayout.LayoutParams(720, 190).apply { bottomMargin = 40 })
+        }
+        paparazzi.snapshot(column)
+    }
+
+    @Test
     fun unlockWait() = shot {
         Screen {
             UnlockLayout("Bedtime", "This ends the current session.", listOf("Wait", "Type"), current = 0, showCancel = true, onCancel = {}) {

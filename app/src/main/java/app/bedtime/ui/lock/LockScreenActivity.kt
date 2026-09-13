@@ -31,7 +31,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -66,9 +65,6 @@ class LockScreenActivity : ComponentActivity() {
         override fun onReceive(context: Context, intent: Intent) = finish()
     }
 
-    /** Times the screen went off over this lock screen; each wake shows the next quote. */
-    private var wakes by mutableIntStateOf(0)
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
@@ -81,7 +77,7 @@ class LockScreenActivity : ComponentActivity() {
         onBackPressedDispatcher.addCallback(this) { /* Stay; unlocking is the way out. */ }
         ContextCompat.registerReceiver(this, unlocked, IntentFilter(Intent.ACTION_USER_PRESENT), ContextCompat.RECEIVER_NOT_EXPORTED)
         setContent {
-            BedtimeTheme { LockScreen(quoteOffset = wakes, onOpen = ::openPhone, onFinish = ::finish, onLightBackground = ::useLightSystemBars) }
+            BedtimeTheme { LockScreen(onOpen = ::openPhone, onFinish = ::finish, onLightBackground = ::useLightSystemBars) }
         }
     }
 
@@ -90,11 +86,6 @@ class LockScreenActivity : ComponentActivity() {
         // Screen on without a keyguard (no lock set, or still inside the lock delay): nothing to cover.
         val interactive = getSystemService(PowerManager::class.java).isInteractive
         if (interactive && !getSystemService(KeyguardManager::class.java).isKeyguardLocked) finish()
-    }
-
-    override fun onStop() {
-        super.onStop()
-        wakes++
     }
 
     override fun onDestroy() {
@@ -125,7 +116,7 @@ class LockScreenActivity : ComponentActivity() {
 }
 
 @Composable
-private fun LockScreen(quoteOffset: Int, onOpen: () -> Unit, onFinish: () -> Unit, onLightBackground: (Boolean) -> Unit) {
+private fun LockScreen(onOpen: () -> Unit, onFinish: () -> Unit, onLightBackground: (Boolean) -> Unit) {
     val context = LocalContext.current
     val repo = remember { Repository.get(context) }
     val state by Engine.state(context).collectAsStateWithLifecycle()
@@ -157,7 +148,7 @@ private fun LockScreen(quoteOffset: Int, onOpen: () -> Unit, onFinish: () -> Uni
         until = formatTime(context, occurrence.end),
         style = style,
         onOpen = onOpen,
-        quote = Quotes.forDay(now.toLocalDate(), quoteOffset),
+        quote = Quotes.forDay(now.toLocalDate()),
     )
 }
 

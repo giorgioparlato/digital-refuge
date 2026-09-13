@@ -16,7 +16,8 @@ import kotlinx.coroutines.sync.withLock
 /**
  * System-wide greyscale through the colour-correction ("daltonizer") filter in monochrome mode.
  * There is no public API for this; writing these secure settings needs WRITE_SECURE_SETTINGS,
- * which can only be granted over ADB.
+ * which can only be granted over ADB. Without it, Android 15+ can do greyscale through an Android mode
+ * instead ([ModeGreyscale]), which only needs Do Not Disturb access.
  */
 object GreyscaleController {
     const val ADB_GRANT_COMMAND = "adb shell pm grant app.bedtime android.permission.WRITE_SECURE_SETTINGS"
@@ -35,6 +36,9 @@ object GreyscaleController {
         ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_SECURE_SETTINGS) ==
             PackageManager.PERMISSION_GRANTED
 
+    /** Greyscale can be switched on: through the ADB grant, or on Android 15+ through an Android mode. */
+    fun isAvailable(context: Context): Boolean = hasPermission(context) || ModeGreyscale.isSupported(context)
+
     /**
      * Turns greyscale on or off. Only ever turns off greyscale that we turned on ourselves.
      * [pausedForHome] shows the user's normal colours on the minimal home screen while a session
@@ -42,7 +46,10 @@ object GreyscaleController {
      * session and was turned back on.
      */
     suspend fun apply(context: Context, wanted: Boolean, pausedForHome: Boolean = false): Boolean {
-        if (!hasPermission(context)) return false
+        if (!hasPermission(context)) {
+            ModeGreyscale.apply(context, on = wanted && !pausedForHome)
+            return false
+        }
         return mutex.withLock { applyLocked(context, wanted, pausedForHome) }
     }
 

@@ -147,6 +147,8 @@ data class AppSettings(
     /** Apps no session blocks, reached from the Emergency screen (maps, rides, an authenticator…). */
     val alwaysAvailable: Set<String> = emptySet(),
     val alwaysAvailableSeeded: Boolean = false,
+    /** Which block each home-screen widget starts, by widget id; missing means the tile's block, then the first. */
+    val widgetBlocks: Map<String, String> = emptyMap(),
 )
 
 /** A named set of apps for ticking many at once in the app picker. Copied into schedules, never linked. */

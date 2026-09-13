@@ -4,4 +4,7 @@
     <color name="ic_launcher_accent">#2EA873</color>
     <color name="ic_launcher_glow">#F2D8A7</color>
     <color name="ic_launcher_deep">#1C6B48</color>
+    <!-- Block widget text: the dark theme's normal and muted text. -->
+    <color name="widget_text">#D7C0A3</color>
+    <color name="widget_muted">#AB916D</color>
 </resources>

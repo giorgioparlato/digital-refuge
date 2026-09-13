@@ -79,7 +79,7 @@ fun SetupScreen(onBack: () -> Unit, onAlwaysAvailable: () -> Unit) {
     }
     LifecycleResumeEffect(Unit) {
         serviceOn = SystemApps.isAccessibilityServiceEnabled(context)
-        greyscaleOk = GreyscaleController.hasPermission(context)
+        greyscaleOk = GreyscaleController.isAvailable(context)
         dndOk = DndController.hasAccess(context)
         notificationsOk = NotificationManagerCompat.from(context).areNotificationsEnabled()
         onPauseOrDispose { }
@@ -111,6 +111,7 @@ fun SetupScreen(onBack: () -> Unit, onAlwaysAvailable: () -> Unit) {
         alwaysAvailableCount = settings.alwaysAvailable.size,
         onAlwaysAvailable = onAlwaysAvailable,
         notificationsOk = notificationsOk,
+        greyscaleViaModes = Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM,
         onAllowNotifications = {
             // Ask once; after that (or before Android 13) the switch lives in the app's notification settings.
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !askedNotifications) {
@@ -141,6 +142,7 @@ internal fun SetupContent(
     onAlwaysAvailable: () -> Unit = {},
     notificationsOk: Boolean = true,
     onAllowNotifications: () -> Unit = {},
+    greyscaleViaModes: Boolean = false,
 ) {
     val c = Obsidian.colors
     Scaffold(containerColor = c.bgPrimary, topBar = { ObsidianTopBar("Setup", onBack = onBack) }) { padding ->
@@ -172,11 +174,15 @@ internal fun SetupContent(
             }
 
             StepCard(2, "Allow greyscale", done = greyscaleOk, badge = "Optional") {
-                Body("Android doesn't let apps switch on greyscale by themselves, so this needs a computer, just once:")
-                NumberedLine(1, "On your phone, turn on Developer options → USB debugging.")
-                NumberedLine(2, "Plug it into a computer that has Android Studio installed.")
-                NumberedLine(3, "Run this command:")
-                CodeBlock(GreyscaleController.ADB_GRANT_COMMAND, onCopy = onCopyCommand)
+                if (greyscaleViaModes) {
+                    Body("On Android 15 and newer, greyscale works through Do Not Disturb access (step 3). No computer needed.")
+                } else {
+                    Body("Android doesn't let apps switch on greyscale by themselves, so this needs a computer, just once:")
+                    NumberedLine(1, "On your phone, turn on Developer options → USB debugging.")
+                    NumberedLine(2, "Plug it into a computer that has Android Studio installed.")
+                    NumberedLine(3, "Run this command:")
+                    CodeBlock(GreyscaleController.ADB_GRANT_COMMAND, onCopy = onCopyCommand)
+                }
                 if (greyscaleOk) {
                     PlainButton(
                         if (previewing) "Previewing…" else "Try it for 5 seconds",

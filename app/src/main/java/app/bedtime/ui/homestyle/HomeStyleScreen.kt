@@ -165,7 +165,7 @@ internal fun HomeStyleContent(
                 OptionRow(BedtimeIcons.Grid, "App icons", description = "Small icons next to app names") {
                     ObsidianToggle(style.showIcons, { onChange(style.copy(showIcons = it)) })
                 }
-                OptionRow(BedtimeIcons.Leaf, "Quote of the day", description = "Here and on the lock screen. A new one each day, when you tap it, and each time you wake the phone") {
+                OptionRow(BedtimeIcons.Leaf, "Quote of the day", description = "Here and on the lock screen, a new one each day. Tap it on the home screen for another") {
                     ObsidianToggle(style.showQuote, { onChange(style.copy(showQuote = it)) })
                 }
             }

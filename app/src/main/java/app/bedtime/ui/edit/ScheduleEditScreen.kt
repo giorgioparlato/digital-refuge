@@ -139,10 +139,10 @@ fun ScheduleEditScreen(
     var confirmDiscard by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var saving by remember { mutableStateOf(false) }
-    var greyscaleAvailable by remember { mutableStateOf(GreyscaleController.hasPermission(context)) }
+    var greyscaleAvailable by remember { mutableStateOf(GreyscaleController.isAvailable(context)) }
     var dndAvailable by remember { mutableStateOf(DndController.hasAccess(context)) }
     LifecycleResumeEffect(Unit) {
-        greyscaleAvailable = GreyscaleController.hasPermission(context)
+        greyscaleAvailable = GreyscaleController.isAvailable(context)
         dndAvailable = DndController.hasAccess(context)
         onPauseOrDispose { }
     }
@@ -448,7 +448,7 @@ internal fun ScheduleEditContent(
                 OptionRow(
                     BedtimeIcons.Contrast,
                     "Greyscale",
-                    description = if (greyscaleAvailable) "Fade apps to black and white" else "Needs a one-time step from a computer (see Setup)",
+                    description = if (greyscaleAvailable) "Fade apps to black and white" else "Needs a one-time step (see Setup)",
                     enabled = editable,
                 ) { ObsidianToggle(draft.greyscale, { onDraftChange(draft.copy(greyscale = it)) }, enabled = editable) }
                 OptionRow(

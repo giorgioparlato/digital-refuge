@@ -16,7 +16,9 @@ import app.bedtime.ui.formatTime
 
 /** A quiet, ongoing notification (a lotus in the status bar) while any session runs. */
 object SessionNotifier {
-    private const val CHANNEL = "session"
+    /** Normal importance: Android hides "silent" (low-importance) notifications from the status bar. */
+    private const val CHANNEL = "session_running"
+    private const val OLD_CHANNEL = "session"
     private const val ID = 1
     private const val ACCENT = 0xFF2EA873.toInt()
 
@@ -54,7 +56,6 @@ object SessionNotifier {
             .setContentText(text)
             .setContentIntent(open)
             .setOngoing(true)
-            .setSilent(true)
             .setOnlyAlertOnce(true)
             .setShowWhen(true)
             .setWhen(main.end)
@@ -71,10 +72,16 @@ object SessionNotifier {
 
     private fun ensureChannel(context: Context) {
         val manager = context.getSystemService(NotificationManager::class.java)
+        manager.deleteNotificationChannel(OLD_CHANNEL)
         if (manager.getNotificationChannel(CHANNEL) != null) return
-        val channel = NotificationChannel(CHANNEL, "session running", NotificationManager.IMPORTANCE_LOW).apply {
+        // Never makes a sound or vibrates; only the icon and the countdown.
+        val channel = NotificationChannel(CHANNEL, "session running", NotificationManager.IMPORTANCE_DEFAULT).apply {
             description = "a lotus in the status bar while a schedule or block is on"
+            setSound(null, null)
+            enableVibration(false)
             setShowBadge(false)
+            // Only honoured with Do Not Disturb access, which sessions that hide notifications have anyway.
+            setBypassDnd(true)
         }
         manager.createNotificationChannel(channel)
     }

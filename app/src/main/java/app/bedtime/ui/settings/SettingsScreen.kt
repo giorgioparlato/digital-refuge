@@ -66,7 +66,7 @@ fun SettingsScreen(
     LifecycleResumeEffect(Unit) {
         stepsLeft = listOf(
             SystemApps.isAccessibilityServiceEnabled(context),
-            GreyscaleController.hasPermission(context),
+            GreyscaleController.isAvailable(context),
             DndController.hasAccess(context),
         ).count { !it }
         onPauseOrDispose { }

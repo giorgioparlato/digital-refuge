@@ -1,5 +1,6 @@
 package app.bedtime.unlock
 
+import android.os.SystemClock
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -54,6 +55,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.bedtime.data.Repository
 import app.bedtime.data.Schedule
@@ -208,23 +210,30 @@ internal fun UnlockSuccess(message: String) {
     }
 }
 
+/**
+ * Counts only while this screen is open and in front: leaving the app pauses it, and backing out
+ * ("I'll stay focused") drops it, so the next attempt starts from scratch.
+ */
 @Composable
 private fun WaitChallenge(occurrence: Occurrence, onPassed: () -> Unit) {
-    val context = LocalContext.current
-    var readyAt by remember { mutableStateOf<Long?>(null) }
-    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
-    LaunchedEffect(occurrence.start) { readyAt = UnlockManager.startOrResumeWait(context, occurrence) }
-    LaunchedEffect(Unit) {
-        while (true) {
-            now = System.currentTimeMillis()
+    val total = occurrence.schedule.unlock.waitMinutes * 60_000L
+    var elapsed by rememberSaveable(occurrence.start) { mutableLongStateOf(0L) }
+    var inFront by remember { mutableStateOf(false) }
+    LifecycleResumeEffect(Unit) {
+        inFront = true
+        onPauseOrDispose { inFront = false }
+    }
+    LaunchedEffect(inFront) {
+        if (!inFront) return@LaunchedEffect
+        var last = SystemClock.elapsedRealtime()
+        while (elapsed < total) {
             delay(250)
+            val tick = SystemClock.elapsedRealtime()
+            elapsed = (elapsed + tick - last).coerceAtMost(total)
+            last = tick
         }
     }
-    WaitChallengeContent(
-        remaining = readyAt?.let { (it - now).coerceAtLeast(0L) },
-        total = occurrence.schedule.unlock.waitMinutes * 60_000L,
-        onContinue = onPassed,
-    )
+    WaitChallengeContent(remaining = total - elapsed, total = total, onContinue = onPassed)
 }
 
 @Composable
@@ -237,7 +246,7 @@ internal fun WaitChallengeContent(remaining: Long?, total: Long, onContinue: () 
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
         Text(
-            if (done) "Time's up. Still want to unlock?" else "Take a breath. The timer keeps running even if you leave this screen.",
+            if (done) "Time's up. Still want to unlock?" else "Take a breath. The timer only runs while this screen is open, and starts over if you back out.",
             style = MaterialTheme.typography.bodyLarge,
             color = c.textMuted,
             textAlign = TextAlign.Center,

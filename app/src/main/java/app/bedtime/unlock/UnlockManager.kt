@@ -1,7 +1,6 @@
 package app.bedtime.unlock
 
 import android.content.Context
-import app.bedtime.data.PendingWait
 import app.bedtime.data.Repository
 import app.bedtime.data.ScheduleOverride
 import app.bedtime.data.UnlockMode
@@ -28,22 +27,5 @@ object UnlockManager {
             }
         }
         repo.recordUnlock(occurrence, endedEarly = endsSession, at = now)
-    }
-
-    /** Returns when the wait challenge for [occurrence] finishes, starting the timer if needed. */
-    suspend fun startOrResumeWait(context: Context, occurrence: Occurrence): Long {
-        val id = occurrence.schedule.id
-        var readyAt = 0L
-        Repository.get(context).updateRuntime { runtime ->
-            val existing = runtime.pendingWaits[id]
-            if (existing != null && existing.occurrenceStart == occurrence.start) {
-                readyAt = existing.readyAt
-                runtime
-            } else {
-                readyAt = System.currentTimeMillis() + occurrence.schedule.unlock.waitMinutes * 60_000L
-                runtime.copy(pendingWaits = runtime.pendingWaits + (id to PendingWait(occurrence.start, readyAt)))
-            }
-        }
-        return readyAt
     }
 }

@@ -24,14 +24,14 @@ A calm, [primary](https://primary-theme.github.io/start-here/)-styled Android ap
   - schedules: Bedtime, Work focus, Slow morning, Weekend detox;
   - blocks: Focus 60, Deep work 90, Pomodoro 25, Study 45.
 - **Leaving early takes effort**, Cold Turkey style. Stack any mix of steps, completed in this order:
-  1. wait out a timer;
+  1. wait out a timer (it only runs while its screen is open, and starts over if you back out);
   2. type random text (no pasting, no typos);
   3. enter a password.
 
   Each schedule decides whether unlocking **ends the session** or **pauses it for N minutes**. Optionally, the text gets 50% longer with each early unlock in a day.
 - **No quick escapes mid-session.** While a session is running, you can't edit or delete its schedule. If Do Not Disturb is switched off from quick settings, the app switches it straight back on and tells you why.
 - **A calm lock screen.** During a session, the lock screen shows your home style's clock, date and session, without the apps. Tap it to unlock as usual (PIN, fingerprint…). You can switch it off in the minimal home screen settings.
-- **A quote of the day** on the minimal home and lock screen: 34 lines on attention, nature and the sacred, from Thoreau, Emerson, the Buddha, Kimmerer, Weil, Dillard and others, each checked against its source ([docs/quotes-review.md](docs/quotes-review.md)). Tap it on the home screen for another; the lock screen shows the next one each time you wake the phone. Switch it off in the minimal home screen settings.
+- **A quote of the day** on the minimal home and lock screen: 34 lines on attention, nature and the sacred, from Thoreau, Emerson, the Buddha, Kimmerer, Weil, Dillard and others, each checked against its source ([docs/quotes-review.md](docs/quotes-review.md)). A new one each day; tap it on the home screen for another. Switch it off in the minimal home screen settings.
 - **A lotus in the status bar** while a session runs, with a countdown in the notification. It's silent and stays visible even when notifications are hidden.
 - **Emergency button** on the minimal home screen, which keeps the session in place. It offers calling someone, and your **always-available apps** (maps, rides, authenticators…), which no session ever blocks.
 - **Easy number picking:** tap − or + for one step, hold to keep going faster, or tap the number to type a value or pick a preset.
@@ -39,6 +39,7 @@ A calm, [primary](https://primary-theme.github.io/start-here/)-styled Android ap
 - **App groups** ("Social & feeds", "Essentials", or your own) let you tick many apps in one tap.
 - **Stats:** a streak, time spent in refuge this week, and early unlocks.
 - **Quick Settings tile** that starts your favourite focus block.
+- **Home-screen widget** that starts a chosen block with one tap, and shows how long is left while it runs. Long-press your home screen → widgets → digital refuge.
 - **Design:** based on the [Primary](https://primary-theme.github.io/start-here/) Obsidian theme, with green accents and the Inter font. Dark mode uses neutral grays around `#282828`; light mode uses Primary's cream palette. All text in the app is lowercase, and the icon is a lotus, the Buddhist image of calm, with a warm centre petal rising from the water.
 
 ## Install
@@ -59,7 +60,7 @@ Open the app and follow **settings → permissions & setup**, which shows the st
    1. Go to App info → digital refuge → ⋮.
    2. Tap **Allow restricted settings**.
    3. Try the switch again.
-2. **Do Not Disturb access (optional):** needed for silencing the phone and holding notifications back.
+2. **Do Not Disturb access (optional):** needed for silencing the phone and holding notifications back. On Android 15 and newer it also enables greyscale.
 3. **Notifications (optional):** lets the lotus appear in the status bar during sessions.
 4. **Always-available apps (recommended):** choose the few apps that stay usable during every session, like maps, rides or your authenticator. You reach them from the emergency button, and can change them later in settings → emergency.
 5. **Battery:** if blocking stops after a while, set the app's battery usage to *Unrestricted*. Some phone makers aggressively stop background apps.
@@ -70,7 +71,9 @@ Open the app and follow **settings → permissions & setup**, which shows the st
 
 Sessions can also fade apps to black and white, while your minimal home screen stays in colour. Everything else works without it.
 
-Android doesn't let apps switch greyscale on by themselves, so this one feature needs a permission granted once from a computer:
+**On Android 15 and newer, no computer is needed:** once Do Not Disturb access is allowed, greyscale runs through a "digital refuge greyscale" mode (Settings → Modes, the same system as Do Not Disturb and Bedtime).
+
+On older versions, Android doesn't let apps switch greyscale on by themselves, so this one feature needs a permission granted once from a computer:
 
 1. On the phone, turn on USB debugging (Settings → About phone → tap *Build number* 7 times → Developer options → USB debugging).
 2. On the computer, get Google's small [platform-tools](https://developer.android.com/tools/releases/platform-tools) download, which contains `adb`.
@@ -105,9 +108,10 @@ The screens are checked with [Paparazzi](https://github.com/cashapp/paparazzi) s
 | Live state, re-evaluated at each boundary | `engine/Engine.kt` |
 | Stats and streaks | `engine/Stats.kt` |
 | Foreground-app watcher: blocking, minimal mode, greyscale, Do Not Disturb | `service/BlockerService.kt` |
-| Greyscale and Do Not Disturb | `service/GreyscaleController.kt`, `service/DndController.kt` |
+| Greyscale and Do Not Disturb | `service/GreyscaleController.kt`, `service/ModeGreyscale.kt` (Android 15+), `service/DndController.kt` |
 | Quick Settings tile | `service/FocusTileService.kt` |
 | Lock screen during sessions, status-bar notification | `ui/lock/LockScreenActivity.kt`, `service/SessionNotifier.kt` |
+| Home-screen widget | `ui/widget/` |
 | Unlock challenges and escalation | `unlock/` |
 | Screens and the Primary-based theme | `ui/` |
 

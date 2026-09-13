@@ -132,7 +132,7 @@ fun HomeScreen(
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LifecycleResumeEffect(Unit) {
         serviceOn = SystemApps.isAccessibilityServiceEnabled(context)
-        greyscaleOk = GreyscaleController.hasPermission(context)
+        greyscaleOk = GreyscaleController.isAvailable(context)
         dndOk = DndController.hasAccess(context)
         now = System.currentTimeMillis()
         onPauseOrDispose { }
@@ -262,7 +262,7 @@ private fun Heading(text: String) {
 private fun SetupChecklist(serviceOn: Boolean, greyscaleOk: Boolean, dndOk: Boolean?, onSetup: () -> Unit) {
     SectionCard(title = "Finish setting up", subtitle = "A few one-time steps and digital refuge is ready.") {
         ChecklistRow(serviceOn, "Let digital refuge see which app is open", "Needed for blocking and minimal mode")
-        ChecklistRow(greyscaleOk, "Allow greyscale", "Optional · needs a computer, just once")
+        ChecklistRow(greyscaleOk, "Allow greyscale", "Optional · a one-time step")
         if (dndOk != null) ChecklistRow(dndOk, "Allow Do Not Disturb", "Lets sessions quiet your phone and hold notifications")
         Spacer(Modifier.height(10.dp))
         CtaButton("Continue setup", onClick = onSetup, modifier = Modifier.fillMaxWidth())

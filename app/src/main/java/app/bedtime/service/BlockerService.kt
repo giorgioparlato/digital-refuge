@@ -3,6 +3,7 @@ package app.bedtime.service
 import android.accessibilityservice.AccessibilityService
 import android.app.NotificationManager
 import android.database.ContentObserver
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.widget.Toast
@@ -20,6 +21,7 @@ import app.bedtime.engine.Engine
 import app.bedtime.ui.blocked.BlockedActivity
 import app.bedtime.ui.lock.LockScreenActivity
 import app.bedtime.ui.minimal.MinimalHomeActivity
+import app.bedtime.ui.widget.BlockWidget
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -71,6 +73,18 @@ class BlockerService : AccessibilityService() {
         }
     }
 
+    /** Our greyscale mode (Android 15+) switched off by hand mid-session: switch it straight back on. */
+    private val modeReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            val owner = state?.active?.firstOrNull { it.schedule.greyscale } ?: return
+            if (homeInFront && settings.homeStyle.keepInColour) return
+            if (GreyscaleController.hasPermission(context) || !ModeGreyscale.isUserDeactivation(context, intent)) return
+            ModeGreyscale.apply(context, on = true, reassert = true)
+            notice("Greyscale stays on during ${owner.schedule.name}.")
+        }
+    }
+    private var modeReceiverRegistered = false
+
     /** Not cancelled on destroy, so restoring colours and sound can finish after the service stops. */
     private val releaseScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -82,6 +96,8 @@ class BlockerService : AccessibilityService() {
             }
             Engine.refresh()
             refreshSystemPackages()
+            // Catches up if notifications were allowed after the session started.
+            SessionNotifier.update(this@BlockerService, state)
             // Re-assert greyscale in case it was switched off from quick settings.
             scope.launch { applyGreyscale() }
         }
@@ -106,6 +122,15 @@ class BlockerService : AccessibilityService() {
         )
         GreyscaleController.observedUris.forEach { contentResolver.registerContentObserver(it, false, greyscaleObserver) }
         watchersRegistered = true
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+            ContextCompat.registerReceiver(
+                this,
+                modeReceiver,
+                IntentFilter(NotificationManager.ACTION_AUTOMATIC_ZEN_RULE_STATUS_CHANGED),
+                ContextCompat.RECEIVER_NOT_EXPORTED,
+            )
+            modeReceiverRegistered = true
+        }
 
         val repo = Repository.get(this)
         scope.launch {
@@ -120,6 +145,7 @@ class BlockerService : AccessibilityService() {
                 applyGreyscale()
                 DndController.apply(this@BlockerService, next.dnd, next.hideNotifications)
                 SessionNotifier.update(this@BlockerService, next)
+                BlockWidget.updateAll(this@BlockerService)
                 if (next.isActive) {
                     enforce(rootInActiveWindow?.packageName?.toString() ?: lastPackage)
                     repo.recordOccurrences(next.active)
@@ -198,6 +224,7 @@ class BlockerService : AccessibilityService() {
             unregisterReceiver(zenReceiver)
             contentResolver.unregisterContentObserver(greyscaleObserver)
         }
+        if (modeReceiverRegistered) unregisterReceiver(modeReceiver)
         scope.cancel()
         super.onDestroy()
     }
