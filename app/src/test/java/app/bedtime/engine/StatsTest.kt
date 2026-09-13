@@ -1,6 +1,5 @@
 package app.bedtime.engine
 
-import app.bedtime.data.EmergencyEntry
 import app.bedtime.data.SessionLog
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -34,17 +33,6 @@ class StatsTest {
     fun pauseUnlockBreaksTheStreak() {
         val history = listOf(log(now - 2 * day, now - 2 * day + hour), log(now - day, now - day + hour, unlocks = listOf(now - day + 1)))
         assertEquals(0, Stats.streak(history, now))
-    }
-
-    @Test
-    fun emergencyBreakBreaksTheStreakAndIsCounted() {
-        val history = listOf(
-            log(now - 2 * day, now - 2 * day + hour),
-            SessionLog("s", "S", now - day, now - day + hour, emergencies = listOf(EmergencyEntry(now - day + 1, "call"))),
-        )
-        assertEquals(0, Stats.streak(history, now))
-        assertEquals(1, Stats.week(history, now).emergencyBreaks)
-        assertEquals(1, Stats.week(history, now).kept)
     }
 
     @Test

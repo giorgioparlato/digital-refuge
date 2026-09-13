@@ -9,11 +9,15 @@ import androidx.compose.ui.unit.dp
 
 /** Small custom icons that aren't in material-icons-core (24×24 viewport, tinted by Icon). */
 object BedtimeIcons {
-    /** The app's mark: a shelter with an arched doorway (same shape as the launcher icon). */
+    /** The app's mark: a small classical temple (same shape as the launcher icon). */
     val Refuge: ImageVector by lazy {
         icon("Refuge") {
-            path("M12,2.5 L22,11 L19.5,11 L19.5,21 L4.5,21 L4.5,11 L2,11 Z M12,6.2 L17.5,10.9 L17.5,19 L6.5,19 L6.5,10.9 Z", evenOdd = true)
-            path("M9.5,19 L9.5,15 A2.5,2.5 0 0,1 14.5,15 L14.5,19 Z")
+            path(
+                "M12,2.5 L22,8 L2,8 Z M12,4.3 L18.6,7.2 L5.4,7.2 Z M2.5,8.8 H21.5 V10.3 H2.5 Z " +
+                    "M4,11 H5.8 V18.5 H4 Z M8.2,11 H10 V18.5 H8.2 Z M14,11 H15.8 V18.5 H14 Z M18.2,11 H20 V18.5 H18.2 Z " +
+                    "M3,19 H21 V20.3 H3 Z M1.5,20.8 H22.5 V22 H1.5 Z",
+                evenOdd = true,
+            )
         }
     }
 

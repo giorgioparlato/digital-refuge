@@ -33,7 +33,7 @@ import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import app.bedtime.ui.components.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -41,7 +41,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -69,12 +68,9 @@ import app.bedtime.ui.homestyle.palette
 import app.bedtime.ui.theme.BedtimeTheme
 import app.bedtime.ui.theme.Obsidian
 import app.bedtime.ui.timeFormatter
-import app.bedtime.unlock.EmergencyBreaks
 import app.bedtime.unlock.UnlockFlow
-import app.bedtime.unlock.UnlockManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -111,10 +107,8 @@ private fun MinimalHomeScreen(onFinish: () -> Unit, onLightBackground: (Boolean)
     val context = LocalContext.current
     val c = Obsidian.colors
     val repo = remember { Repository.get(context) }
-    val scope = rememberCoroutineScope()
     val state by Engine.state(context).collectAsStateWithLifecycle()
     val settings by repo.settings.collectAsStateWithLifecycle(initialValue = AppSettings())
-    val history by repo.history.collectAsStateWithLifecycle(initialValue = emptyList())
     val occurrence = state?.minimalOccurrence
     var unlocking by rememberSaveable { mutableStateOf(false) }
     var emergency by rememberSaveable { mutableStateOf(false) }
@@ -153,9 +147,6 @@ private fun MinimalHomeScreen(onFinish: () -> Unit, onLightBackground: (Boolean)
                 onCall = { SystemApps.dialerPackage(context)?.let { AppCatalog.launch(context, it) } },
                 alwaysAvailable = alwaysAvailableApps,
                 onOpenApp = { AppCatalog.launch(context, it) },
-                breaksLeft = EmergencyBreaks.remaining(history, System.currentTimeMillis()),
-                // The pause ends minimal mode, which closes this screen by itself.
-                onBreak = { reason -> scope.launch { UnlockManager.emergencyBreak(context, state?.active.orEmpty(), reason) } },
             )
         }
         unlocking -> Surface(Modifier.fillMaxSize(), color = c.bgPrimary) {
@@ -256,7 +247,7 @@ internal fun MinimalHomeContent(
                     Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(8.dp))
-                        .clickable(onClickLabel = "Open ${app.label}") { onLaunch(app.packageName) }
+                        .clickable(onClickLabel = "open ${app.label}") { onLaunch(app.packageName) }
                         .padding(vertical = (12 * scale).dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -268,20 +259,20 @@ internal fun MinimalHomeContent(
                 }
             }
             if (apps.isEmpty()) {
-                item { Text("Nothing to open right now. Enjoy the quiet.", fontSize = (18 * scale).sp, color = p.faint) }
+                item { Text("nothing to open right now. enjoy the quiet.", fontSize = (18 * scale).sp, color = p.faint) }
             }
         }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             TextButton(onClick = onUnlock) {
                 Icon(Icons.Default.Lock, contentDescription = null, tint = p.faint, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("Unlock", color = p.faint)
+                Text("unlock", color = p.faint)
             }
             Spacer(Modifier.weight(1f))
             TextButton(onClick = onEmergency) {
                 Icon(Icons.Default.Warning, contentDescription = null, tint = p.faint, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("Emergency", color = p.faint)
+                Text("emergency", color = p.faint)
             }
         }
     }

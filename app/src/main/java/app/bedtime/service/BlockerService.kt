@@ -142,7 +142,7 @@ class BlockerService : AccessibilityService() {
         )
 
     private fun notice(message: String) {
-        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, message.lowercase(), Toast.LENGTH_SHORT).show()
     }
 
     private fun refreshSystemPackages() {

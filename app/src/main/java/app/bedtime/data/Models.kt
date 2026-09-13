@@ -157,11 +157,6 @@ data class SessionLog(
     val end: Long,
     val unlockTimes: List<Long> = emptyList(),
     val endedEarlyAt: Long? = null,
-    val emergencies: List<EmergencyEntry> = emptyList(),
 ) {
     val unlocks: Int get() = unlockTimes.size
 }
-
-/** An emergency break taken from the minimal home screen, with the reason the user gave. */
-@Serializable
-data class EmergencyEntry(val at: Long, val reason: String)

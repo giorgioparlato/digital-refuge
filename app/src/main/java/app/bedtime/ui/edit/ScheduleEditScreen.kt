@@ -20,17 +20,15 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import app.bedtime.ui.components.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TimePicker
-import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -43,7 +41,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.bedtime.apps.AppCatalog
@@ -392,6 +389,8 @@ internal fun ScheduleEditContent(
                             step = 5,
                             suffix = " min",
                             enabled = editable,
+                            presets = listOf(15, 25, 30, 45, 60, 90, 120, 180),
+                            title = "default length",
                         )
                     }
                     Text(
@@ -522,7 +521,15 @@ internal fun ScheduleEditContent(
                 }
                 AnimatedVisibility(unlock.waitEnabled) {
                     SubOptionRow("Timer") {
-                        NumberStepper(unlock.waitMinutes, { v -> setUnlock { it.copy(waitMinutes = v) } }, 1..240, step = 5, suffix = " min", enabled = editable)
+                        NumberStepper(
+                            unlock.waitMinutes,
+                            { v -> setUnlock { it.copy(waitMinutes = v) } },
+                            1..240,
+                            suffix = " min",
+                            enabled = editable,
+                            presets = listOf(1, 2, 5, 10, 15, 20, 30, 45, 60),
+                            title = "timer",
+                        )
                     }
                 }
                 OptionRow(Icons.Default.Edit, "Type random text", description = "No pasting, typos don't count", enabled = editable) {
@@ -531,7 +538,15 @@ internal fun ScheduleEditContent(
                 AnimatedVisibility(unlock.textEnabled) {
                     Column {
                         SubOptionRow("Characters") {
-                            NumberStepper(unlock.textLength, { v -> setUnlock { it.copy(textLength = v) } }, 25..2000, step = 25, enabled = editable)
+                            NumberStepper(
+                                unlock.textLength,
+                                { v -> setUnlock { it.copy(textLength = v) } },
+                                25..2000,
+                                step = 25,
+                                enabled = editable,
+                                presets = listOf(50, 100, 150, 200, 300, 500, 1000),
+                                title = "characters",
+                            )
                         }
                         OptionRow(
                             Icons.Default.Refresh,
@@ -587,10 +602,11 @@ internal fun ScheduleEditContent(
                         NumberStepper(
                             draft.unlockAction.pauseMinutes,
                             { v -> onDraftChange(draft.copy(unlockAction = draft.unlockAction.copy(pauseMinutes = v))) },
-                            5..240,
-                            step = 5,
+                            1..240,
                             suffix = " min",
                             enabled = editable,
+                            presets = listOf(5, 10, 15, 20, 30, 45, 60),
+                            title = "break length",
                         )
                     }
                 }
@@ -606,33 +622,48 @@ internal fun ScheduleEditContent(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+/** Start/end time: hour and minute steppers (hold to scroll, tap to type), plus am/pm on 12-hour phones. */
 @Composable
 private fun TimePickerDialog(title: String, initialMinute: Int, onDismiss: () -> Unit, onConfirm: (Int) -> Unit) {
     val context = LocalContext.current
     val c = Obsidian.colors
-    val state = rememberTimePickerState(
-        initialHour = initialMinute / 60,
-        initialMinute = initialMinute % 60,
-        is24Hour = is24Hour(context),
-    )
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    val twentyFourHour = is24Hour(context)
+    var hour by remember { mutableIntStateOf(initialMinute / 60) }
+    var minute by remember { mutableIntStateOf(initialMinute % 60) }
+    val pm = hour >= 12
+    val twoDigits: (Int) -> String = { "%02d".format(it) }
+    Dialog(onDismissRequest = onDismiss) {
         Surface(shape = RoundedCornerShape(20.dp), color = c.bgSecondary) {
-            Column(Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    title,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = c.textNormal,
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp),
-                )
-                TimePicker(state = state)
+            Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text(title, style = MaterialTheme.typography.titleMedium, color = c.textNormal)
+                TimeRow("hour") {
+                    if (twentyFourHour) {
+                        NumberStepper(hour, { hour = it }, 0..23, title = "hour", wrap = true, format = twoDigits)
+                    } else {
+                        NumberStepper(if (hour % 12 == 0) 12 else hour % 12, { h -> hour = h % 12 + if (pm) 12 else 0 }, 1..12, title = "hour", wrap = true)
+                    }
+                }
+                TimeRow("minutes") {
+                    NumberStepper(minute, { minute = it }, 0..59, title = "minutes", wrap = true, presets = listOf(0, 15, 30, 45), format = twoDigits)
+                }
+                if (!twentyFourHour) {
+                    SegmentedChoice(listOf("am", "pm"), selected = if (pm) 1 else 0, onSelect = { hour = hour % 12 + if (it == 1) 12 else 0 })
+                }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    TextButton(onClick = onDismiss) { Text("Cancel", color = c.textMuted) }
-                    TextButton(onClick = { onConfirm(state.hour * 60 + state.minute) }) {
-                        Text("Done", color = c.accentText, fontWeight = FontWeight.SemiBold)
+                    TextButton(onClick = onDismiss) { Text("cancel", color = c.textMuted) }
+                    TextButton(onClick = { onConfirm(hour * 60 + minute) }) {
+                        Text("done", color = c.accentText, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun TimeRow(label: String, content: @Composable () -> Unit) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = Obsidian.colors.textMuted, modifier = Modifier.weight(1f))
+        content()
     }
 }

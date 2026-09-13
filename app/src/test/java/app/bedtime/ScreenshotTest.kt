@@ -21,7 +21,6 @@ import androidx.compose.ui.unit.dp
 import app.bedtime.apps.AppEntry
 import app.bedtime.data.AppGroup
 import app.bedtime.data.DndMode
-import app.bedtime.data.EmergencyEntry
 import app.bedtime.ui.apps.PickerMode
 import app.bedtime.ui.groups.GroupsContent
 import app.bedtime.ui.minimal.EmergencyContent
@@ -176,8 +175,6 @@ class ScreenshotTest {
             onCall = {},
             alwaysAvailable = Samples.apps.filter { it.packageName in setOf(Samples.MAPS, Samples.SPOTIFY) },
             onOpenApp = {},
-            breaksLeft = 2,
-            onBreak = {},
             preview = true,
         )
     }
@@ -442,6 +439,5 @@ private object Samples {
         (1..5).map { d -> SessionLog("bedtime", "Bedtime", now - d * DAY - 2 * HOUR, now - d * DAY + 7 * HOUR) } +
             SessionLog(
                 "focus", "Focus", now - 6 * DAY, now - 6 * DAY + HOUR, listOf(now - 6 * DAY + 30 * MIN), now - 6 * DAY + 30 * MIN,
-                emergencies = listOf(EmergencyEntry(now - 6 * DAY + 20 * MIN, "Waiting for a call")),
             )
 }

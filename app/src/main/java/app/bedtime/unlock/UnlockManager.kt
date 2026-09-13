@@ -6,7 +6,6 @@ import app.bedtime.data.Repository
 import app.bedtime.data.ScheduleOverride
 import app.bedtime.data.UnlockMode
 import app.bedtime.engine.Occurrence
-import kotlinx.coroutines.flow.first
 
 object UnlockManager {
     /** Applies the schedule's unlock action once every challenge is passed, and logs the unlock. */
@@ -29,23 +28,6 @@ object UnlockManager {
             }
         }
         repo.recordUnlock(occurrence, endedEarly = endsSession, at = now)
-    }
-
-    /**
-     * Pauses every active session for [EmergencyBreaks.MINUTES] without a challenge, and logs it with
-     * the user's reason. Returns false if this week's breaks are used up.
-     */
-    suspend fun emergencyBreak(context: Context, active: List<Occurrence>, reason: String): Boolean {
-        if (active.isEmpty()) return false
-        val repo = Repository.get(context)
-        val now = System.currentTimeMillis()
-        if (EmergencyBreaks.remaining(repo.history.first(), now) <= 0) return false
-        val until = now + EmergencyBreaks.MINUTES * 60_000L
-        repo.updateRuntime { runtime ->
-            runtime.copy(overrides = runtime.overrides + active.associate { it.schedule.id to ScheduleOverride(pausedUntil = until) })
-        }
-        repo.recordEmergency(active.first(), reason, now)
-        return true
     }
 
     /** Returns when the wait challenge for [occurrence] finishes, starting the timer if needed. */

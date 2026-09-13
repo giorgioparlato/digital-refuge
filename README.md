@@ -30,15 +30,13 @@ A calm, Obsidian-styled Android app that gives you a refuge from your phone. On 
 
   Each schedule decides whether unlocking **ends the session** or **pauses it for N minutes**. Optionally, the text gets 50% longer with each early unlock in a day.
 - **No quick escapes mid-session.** While a session is running, you can't edit or delete its schedule. If Do Not Disturb or colour correction is switched off from quick settings, the app switches it straight back on and tells you why.
-- **Emergency button** on the minimal home screen, which keeps the session in place. It offers:
-  - calling someone;
-  - your **always-available apps** (maps, rides, authenticators…), never blocked by any session;
-  - a **15-minute emergency break** that asks for a one-line reason, limited to 3 a week.
+- **Emergency button** on the minimal home screen, which keeps the session in place. It offers calling someone, and your **always-available apps** (maps, rides, authenticators…), which no session ever blocks.
+- **Easy number picking:** tap − or + for one step, hold to keep going faster, or tap the number to type a value or pick a preset.
 - **Safer defaults:** Settings, Phone and Messages start out allowed in minimal mode, and the app picker explains why.
 - **App groups** ("Social & feeds", "Essentials", or your own) let you tick many apps in one tap.
-- **Stats:** a streak, time spent in refuge this week, early unlocks and emergency breaks.
+- **Stats:** a streak, time spent in refuge this week, and early unlocks.
 - **Quick Settings tile** that starts your favourite focus block.
-- **Design:** based on the [Primary](https://primary-theme.github.io/start-here/) Obsidian theme, with green accents and the Inter font. Dark mode uses neutral grays around `#282828`; light mode uses Primary's cream palette.
+- **Design:** based on the [Primary](https://primary-theme.github.io/start-here/) Obsidian theme, with green accents and the Inter font. Dark mode uses neutral grays around `#282828`; light mode uses Primary's cream palette. All text in the app is lowercase, and the icon is a small temple with a warmly lit doorway.
 
 ## Install
 
@@ -95,7 +93,7 @@ The screens are checked with [Paparazzi](https://github.com/cashapp/paparazzi) s
 | Foreground-app watcher: blocking, minimal mode, greyscale, Do Not Disturb | `service/BlockerService.kt` |
 | Greyscale and Do Not Disturb | `service/GreyscaleController.kt`, `service/DndController.kt` |
 | Quick Settings tile | `service/FocusTileService.kt` |
-| Unlock challenges, escalation, emergency breaks | `unlock/` |
+| Unlock challenges and escalation | `unlock/` |
 | Screens and the Primary-based theme | `ui/` |
 
 The internal package name is still `app.bedtime`, from the app's first name, so updates install over existing copies.

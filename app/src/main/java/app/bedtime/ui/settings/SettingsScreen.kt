@@ -16,12 +16,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Warning
-import app.bedtime.unlock.EmergencyBreaks
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
+import app.bedtime.ui.components.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -160,13 +159,6 @@ internal fun SettingsContent(
                     },
                     onClick = onAlwaysAvailable,
                 ) { Chevron() }
-                Text(
-                    "Emergency breaks: ${EmergencyBreaks.PER_WEEK} a week, ${EmergencyBreaks.MINUTES} minutes each, with a reason. " +
-                        "Your session picks up again afterwards.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = c.textMuted,
-                    modifier = Modifier.padding(top = 8.dp),
-                )
             }
 
             SectionCard(

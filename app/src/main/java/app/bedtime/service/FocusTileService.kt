@@ -91,7 +91,9 @@ class FocusTileService : TileService() {
             tile.label = block?.name ?: getString(R.string.tile_label)
             subtitle = block?.let { formatMinutes(it.durationMinutes.toLong()) } ?: "add a block"
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) tile.subtitle = subtitle
+        // The app's text is all lowercase, the tile included.
+        tile.label = tile.label?.toString()?.lowercase()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) tile.subtitle = subtitle.lowercase()
         tile.updateTile()
     }
 

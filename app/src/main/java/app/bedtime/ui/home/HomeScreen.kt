@@ -33,7 +33,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import app.bedtime.ui.components.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -395,14 +395,6 @@ private fun StatsCard(week: WeekStats, streak: Int) {
             StatTile(protectedTime, "of refuge", Modifier.weight(1f))
             StatTile("${week.earlyUnlocks}", if (week.earlyUnlocks == 1) "early unlock" else "early unlocks", Modifier.weight(1f))
         }
-        if (week.emergencyBreaks > 0) {
-            Text(
-                if (week.emergencyBreaks == 1) "Plus 1 emergency break" else "Plus ${week.emergencyBreaks} emergency breaks",
-                style = MaterialTheme.typography.labelMedium,
-                color = Obsidian.colors.textMuted,
-                modifier = Modifier.padding(top = 10.dp),
-            )
-        }
     }
 }
 
@@ -574,7 +566,15 @@ private fun StartBlockDialog(block: Schedule, onDismiss: () -> Unit, onStart: (I
             Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
                 Text("Start ${block.name}?", style = MaterialTheme.typography.titleLarge, color = c.textNormal)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                    NumberStepper(minutes, { minutes = it }, 5..480, step = 5, suffix = " min")
+                    NumberStepper(
+                        minutes,
+                        { minutes = it },
+                        5..480,
+                        step = 5,
+                        suffix = " min",
+                        presets = listOf(15, 25, 30, 45, 60, 90, 120, 180),
+                        title = "length",
+                    )
                 }
                 Text(
                     "Runs until ${formatTime(context, System.currentTimeMillis() + minutes * 60_000L)}. Stopping early takes the unlock steps.",

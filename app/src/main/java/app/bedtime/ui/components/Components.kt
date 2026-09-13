@@ -43,7 +43,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
-import androidx.compose.material3.Text
+import app.bedtime.ui.components.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -535,7 +535,7 @@ fun ObsidianTextField(
         leadingIcon = leadingIcon,
         isError = isError,
         supportingText = supportingText?.let { { Text(it) } },
-        visualTransformation = if (password) PasswordVisualTransformation() else VisualTransformation.None,
+        visualTransformation = if (password) PasswordVisualTransformation() else LowercaseTransformation,
         keyboardOptions = if (password) KeyboardOptions(keyboardType = KeyboardType.Password) else keyboardOptions,
         singleLine = singleLine,
         maxLines = maxLines,
@@ -556,44 +556,6 @@ fun ObsidianTextField(
             disabledLabelColor = c.textFaint,
         ),
     )
-}
-
-@Composable
-fun NumberStepper(
-    value: Int,
-    onValueChange: (Int) -> Unit,
-    range: IntRange,
-    step: Int = 1,
-    suffix: String = "",
-    enabled: Boolean = true,
-) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        StepButton("−", "Decrease", enabled && value - step >= range.first) { onValueChange((value - step).coerceIn(range)) }
-        Text(
-            "$value$suffix",
-            modifier = Modifier.widthIn(min = 76.dp),
-            textAlign = TextAlign.Center,
-            style = MaterialTheme.typography.bodyLarge,
-            fontWeight = FontWeight.Medium,
-            color = Obsidian.colors.textNormal,
-        )
-        StepButton("+", "Increase", enabled && value + step <= range.last) { onValueChange((value + step).coerceIn(range)) }
-    }
-}
-
-@Composable
-private fun StepButton(label: String, description: String, enabled: Boolean, onClick: () -> Unit) {
-    val c = Obsidian.colors
-    Box(
-        Modifier
-            .size(44.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(c.interactive)
-            .clickable(enabled = enabled, onClickLabel = description, onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(label, color = if (enabled) c.textNormal else c.textFaint, fontSize = 20.sp)
-    }
 }
 
 @Composable
