@@ -125,6 +125,8 @@ data class HomeStyle(
     val showIcons: Boolean = false,
     /** When greyscale is on, keep the home screen itself in colour. */
     val keepInColour: Boolean = true,
+    /** During sessions, show the clock and session over the lock screen. */
+    val lockScreen: Boolean = true,
 )
 
 @Serializable

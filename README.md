@@ -30,6 +30,8 @@ A calm, [primary](https://primary-theme.github.io/start-here/)-styled Android ap
 
   Each schedule decides whether unlocking **ends the session** or **pauses it for N minutes**. Optionally, the text gets 50% longer with each early unlock in a day.
 - **No quick escapes mid-session.** While a session is running, you can't edit or delete its schedule. If Do Not Disturb is switched off from quick settings, the app switches it straight back on and tells you why.
+- **A calm lock screen.** During a session, the lock screen shows your home style's clock, date and session, without the apps. Tap it to unlock as usual (PIN, fingerprint…). You can switch it off in the minimal home screen settings.
+- **A lotus in the status bar** while a session runs, with a countdown in the notification. It's silent and stays visible even when notifications are hidden.
 - **Emergency button** on the minimal home screen, which keeps the session in place. It offers calling someone, and your **always-available apps** (maps, rides, authenticators…), which no session ever blocks.
 - **Easy number picking:** tap − or + for one step, hold to keep going faster, or tap the number to type a value or pick a preset.
 - **Safer defaults:** Settings, Phone and Messages start out allowed in minimal mode, and the app picker explains why.
@@ -57,8 +59,9 @@ Open the app and follow **settings → permissions & setup**, which shows the st
    2. Tap **Allow restricted settings**.
    3. Try the switch again.
 2. **Do Not Disturb access (optional):** needed for silencing the phone and holding notifications back.
-3. **Always-available apps (recommended):** choose the few apps that stay usable during every session, like maps, rides or your authenticator. You reach them from the emergency button, and can change them later in settings → emergency.
-4. **Battery:** if blocking stops after a while, set the app's battery usage to *Unrestricted*. Some phone makers aggressively stop background apps.
+3. **Notifications (optional):** lets the lotus appear in the status bar during sessions.
+4. **Always-available apps (recommended):** choose the few apps that stay usable during every session, like maps, rides or your authenticator. You reach them from the emergency button, and can change them later in settings → emergency.
+5. **Battery:** if blocking stops after a while, set the app's battery usage to *Unrestricted*. Some phone makers aggressively stop background apps.
 
 **Last resort,** if you're ever truly stuck: restart the phone in safe mode (power menu → press and hold *Power off*). Downloaded apps don't run there, so you can uninstall digital refuge like any other app.
 
@@ -103,6 +106,7 @@ The screens are checked with [Paparazzi](https://github.com/cashapp/paparazzi) s
 | Foreground-app watcher: blocking, minimal mode, greyscale, Do Not Disturb | `service/BlockerService.kt` |
 | Greyscale and Do Not Disturb | `service/GreyscaleController.kt`, `service/DndController.kt` |
 | Quick Settings tile | `service/FocusTileService.kt` |
+| Lock screen during sessions, status-bar notification | `ui/lock/LockScreenActivity.kt`, `service/SessionNotifier.kt` |
 | Unlock challenges and escalation | `unlock/` |
 | Screens and the Primary-based theme | `ui/` |
 

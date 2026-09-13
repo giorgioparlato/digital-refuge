@@ -47,7 +47,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -59,22 +58,16 @@ import app.bedtime.data.Repository
 import app.bedtime.engine.Engine
 import app.bedtime.service.SystemApps
 import app.bedtime.ui.components.AppIcon
-import app.bedtime.ui.components.BedtimeIcons
 import app.bedtime.ui.components.ProvideAppIcons
-import app.bedtime.ui.components.styledTime
 import app.bedtime.ui.formatTime
-import app.bedtime.ui.greeting
 import app.bedtime.ui.homestyle.palette
 import app.bedtime.ui.theme.BedtimeTheme
 import app.bedtime.ui.theme.Obsidian
-import app.bedtime.ui.timeFormatter
 import app.bedtime.unlock.UnlockFlow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 
 /** The minimal launcher: a clock and a plain list of allowed apps, styled by the user's [HomeStyle]. */
 class MinimalHomeActivity : ComponentActivity() {
@@ -196,7 +189,6 @@ internal fun MinimalHomeContent(
     onEmergency: () -> Unit = {},
     preview: Boolean = false,
 ) {
-    val context = LocalContext.current
     val p = style.palette()
     val scale = style.textSize.scale
     Column(
@@ -207,39 +199,7 @@ internal fun MinimalHomeContent(
             .padding(horizontal = 28.dp, vertical = 24.dp),
     ) {
         Spacer(Modifier.height(if (preview) 12.dp else 32.dp))
-        if (style.showGreeting) {
-            Text(greeting(now.hour), style = MaterialTheme.typography.titleMedium, color = p.accent)
-        }
-        Text(
-            styledTime(timeFormatter(context).format(now), suffixSize = (30 * scale).sp),
-            style = MaterialTheme.typography.displayLarge.copy(
-                fontSize = (76 * scale).sp,
-                lineHeight = (84 * scale).sp,
-                fontFeatureSettings = "tnum",
-            ),
-            color = p.text,
-            maxLines = 1,
-        )
-        if (style.showDate) {
-            Text(
-                DateTimeFormatter.ofPattern("EEEE, d MMMM", Locale.getDefault()).format(now),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Normal,
-                color = p.muted,
-            )
-        }
-        Spacer(Modifier.height(16.dp))
-        Row(
-            Modifier
-                .clip(RoundedCornerShape(50))
-                .background(p.chip)
-                .padding(horizontal = 12.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(BedtimeIcons.Moon, contentDescription = null, tint = p.accent, modifier = Modifier.size(14.dp))
-            Spacer(Modifier.width(6.dp))
-            Text("$scheduleName · until $until", style = MaterialTheme.typography.labelLarge, color = p.muted)
-        }
+        SessionHeader(now, scheduleName, until, style)
         Spacer(Modifier.height(if (preview) 28.dp else 44.dp))
         LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
             items(apps, key = { it.packageName }) { app ->

@@ -18,6 +18,7 @@ import app.bedtime.data.Repository
 import app.bedtime.engine.ActiveState
 import app.bedtime.engine.Engine
 import app.bedtime.ui.blocked.BlockedActivity
+import app.bedtime.ui.lock.LockScreenActivity
 import app.bedtime.ui.minimal.MinimalHomeActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -28,8 +29,8 @@ import kotlinx.coroutines.launch
 
 /**
  * Watches which app comes to the foreground and covers it with our own screen when a schedule
- * forbids it. Also drives greyscale, Do Not Disturb and session history, since this service is the
- * long-lived part of the app.
+ * forbids it. Also drives greyscale, Do Not Disturb, the lock screen, the session notification and
+ * session history, since this service is the long-lived part of the app.
  */
 class BlockerService : AccessibilityService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -43,6 +44,9 @@ class BlockerService : AccessibilityService() {
     private var homeInFront = false
     private var receiverRegistered = false
     private var watchersRegistered = false
+
+    /** Our screens that stay in colour while greyscale is on (if the home style says so). */
+    private val colourScreens = setOf(MinimalHomeActivity::class.java.name, LockScreenActivity::class.java.name)
 
     /** Do Not Disturb switched off from quick settings mid-session: switch it straight back on. */
     private val zenReceiver = object : BroadcastReceiver() {
@@ -72,6 +76,10 @@ class BlockerService : AccessibilityService() {
 
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
+            if (intent.action == Intent.ACTION_SCREEN_OFF) {
+                showLockScreen()
+                return
+            }
             Engine.refresh()
             refreshSystemPackages()
             // Re-assert greyscale in case it was switched off from quick settings.
@@ -83,6 +91,7 @@ class BlockerService : AccessibilityService() {
         refreshSystemPackages()
         val filter = IntentFilter().apply {
             addAction(Intent.ACTION_SCREEN_ON)
+            addAction(Intent.ACTION_SCREEN_OFF)
             addAction(Intent.ACTION_USER_PRESENT)
             addAction(Intent.ACTION_TIME_CHANGED)
             addAction(Intent.ACTION_TIMEZONE_CHANGED)
@@ -110,6 +119,7 @@ class BlockerService : AccessibilityService() {
                 state = next
                 applyGreyscale()
                 DndController.apply(this@BlockerService, next.dnd, next.hideNotifications)
+                SessionNotifier.update(this@BlockerService, next)
                 if (next.isActive) {
                     enforce(rootInActiveWindow?.packageName?.toString() ?: lastPackage)
                     repo.recordOccurrences(next.active)
@@ -122,7 +132,7 @@ class BlockerService : AccessibilityService() {
         if (event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
         val pkg = event.packageName?.toString() ?: return
         if (pkg !in overlays) {
-            val home = pkg == packageName && event.className?.toString() == MinimalHomeActivity::class.java.name
+            val home = pkg == packageName && event.className?.toString() in colourScreens
             if (home != homeInFront) {
                 homeInFront = home
                 scope.launch { applyGreyscale() }
@@ -140,6 +150,12 @@ class BlockerService : AccessibilityService() {
             wanted = state?.greyscale == true,
             pausedForHome = homeInFront && settings.homeStyle.keepInColour,
         )
+
+    /** Screen just went off mid-session: put the session's clock over the lock screen for next time. */
+    private fun showLockScreen() {
+        if (state?.isActive != true || !settings.homeStyle.lockScreen) return
+        runCatching { startActivity(LockScreenActivity.intent(this)) }
+    }
 
     private fun notice(message: String) {
         Toast.makeText(this, message.lowercase(), Toast.LENGTH_SHORT).show()
@@ -168,6 +184,7 @@ class BlockerService : AccessibilityService() {
     /** Switched off (e.g. through the emergency exit): give the phone its normal colours and sounds back. */
     override fun onUnbind(intent: Intent?): Boolean {
         val context = applicationContext
+        SessionNotifier.cancel(context)
         releaseScope.launch {
             GreyscaleController.apply(context, wanted = false)
             DndController.apply(context, DndMode.OFF, hide = false)

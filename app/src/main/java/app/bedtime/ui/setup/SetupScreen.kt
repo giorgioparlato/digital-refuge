@@ -1,9 +1,13 @@
 package app.bedtime.ui.setup
 
+import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -24,6 +28,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -32,6 +37,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.bedtime.data.AppSettings
@@ -65,11 +71,17 @@ fun SetupScreen(onBack: () -> Unit, onAlwaysAvailable: () -> Unit) {
     var serviceOn by remember { mutableStateOf(false) }
     var greyscaleOk by remember { mutableStateOf(false) }
     var dndOk by remember { mutableStateOf(false) }
+    var notificationsOk by remember { mutableStateOf(true) }
+    var askedNotifications by rememberSaveable { mutableStateOf(false) }
     var previewing by remember { mutableStateOf(false) }
+    val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        notificationsOk = granted
+    }
     LifecycleResumeEffect(Unit) {
         serviceOn = SystemApps.isAccessibilityServiceEnabled(context)
         greyscaleOk = GreyscaleController.hasPermission(context)
         dndOk = DndController.hasAccess(context)
+        notificationsOk = NotificationManagerCompat.from(context).areNotificationsEnabled()
         onPauseOrDispose { }
     }
 
@@ -98,6 +110,16 @@ fun SetupScreen(onBack: () -> Unit, onAlwaysAvailable: () -> Unit) {
         onOpenBattery = { context.tryStart(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) },
         alwaysAvailableCount = settings.alwaysAvailable.size,
         onAlwaysAvailable = onAlwaysAvailable,
+        notificationsOk = notificationsOk,
+        onAllowNotifications = {
+            // Ask once; after that (or before Android 13) the switch lives in the app's notification settings.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !askedNotifications) {
+                askedNotifications = true
+                notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+            } else {
+                context.tryStart(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName))
+            }
+        },
     )
 }
 
@@ -117,6 +139,8 @@ internal fun SetupContent(
     onOpenBattery: () -> Unit,
     alwaysAvailableCount: Int = 0,
     onAlwaysAvailable: () -> Unit = {},
+    notificationsOk: Boolean = true,
+    onAllowNotifications: () -> Unit = {},
 ) {
     val c = Obsidian.colors
     Scaffold(containerColor = c.bgPrimary, topBar = { ObsidianTopBar("Setup", onBack = onBack) }) { padding ->
@@ -168,7 +192,14 @@ internal fun SetupContent(
                 PlainButton("Open Do Not Disturb access", onClick = onOpenDnd, modifier = Modifier.fillMaxWidth())
             }
 
-            StepCard(4, "Choose always-available apps", done = alwaysAvailableCount > 0, badge = "Recommended") {
+            StepCard(4, "Show a lotus while a session runs", done = notificationsOk, badge = "Optional") {
+                Body("A quiet notification puts a small lotus in the status bar during schedules and blocks, with the time left. It never makes a sound.")
+                if (!notificationsOk) {
+                    PlainButton("Allow notifications", onClick = onAllowNotifications, modifier = Modifier.fillMaxWidth())
+                }
+            }
+
+            StepCard(5, "Choose always-available apps", done = alwaysAvailableCount > 0, badge = "Recommended") {
                 Body(
                     "Apps that stay usable during every session, reached from the emergency button: maps, rides, your authenticator. " +
                         "Keep the list short. You can change it later in settings → emergency.",
@@ -180,7 +211,7 @@ internal fun SetupContent(
                 )
             }
 
-            StepCard(5, "Keep digital refuge running", done = false, badge = "Recommended") {
+            StepCard(6, "Keep digital refuge running", done = false, badge = "Recommended") {
                 Body("Some phones (Samsung, Xiaomi, OnePlus…) put background apps to sleep. If blocking ever stops working, set digital refuge's battery usage to Unrestricted.")
                 PlainButton("Open battery settings", onClick = onOpenBattery, modifier = Modifier.fillMaxWidth())
             }

@@ -262,6 +262,21 @@ class ScreenshotTest {
     }
 
     @Test
+    fun lockScreen() = shot {
+        app.bedtime.ui.lock.LockScreenContent(now = Samples.lateEvening, scheduleName = "Bedtime", until = "07:00", style = HomeStyle())
+    }
+
+    @Test
+    fun lockScreenCustom() = shot {
+        app.bedtime.ui.lock.LockScreenContent(
+            now = Samples.lateEvening,
+            scheduleName = "Focus",
+            until = "16:10",
+            style = HomeStyle(background = 0xFFF8F5F1, accent = 0xFFE0B243, showGreeting = false),
+        )
+    }
+
+    @Test
     fun unlockWait() = shot {
         Screen {
             UnlockLayout("Bedtime", "This ends the current session.", listOf("Wait", "Type"), current = 0, showCancel = true, onCancel = {}) {

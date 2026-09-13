@@ -158,6 +158,11 @@ internal fun HomeStyleContent(
                     "Keep home screen in colour",
                     description = "When greyscale is on, only apps turn grey",
                 ) { ObsidianToggle(style.keepInColour, { onChange(style.copy(keepInColour = it)) }) }
+                OptionRow(
+                    BedtimeIcons.Refuge,
+                    "Show on the lock screen",
+                    description = "During any session, the lock screen shows this clock and the session, without the apps",
+                ) { ObsidianToggle(style.lockScreen, { onChange(style.copy(lockScreen = it)) }) }
             }
             TextButton(onClick = { onChange(HomeStyle()) }, modifier = Modifier.align(Alignment.CenterHorizontally)) {
                 Text("Reset to default", color = c.textMuted)
