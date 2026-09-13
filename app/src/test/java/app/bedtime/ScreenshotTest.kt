@@ -149,6 +149,22 @@ class ScreenshotTest {
     @Test
     fun editReadOnly() = shot { Edit(Samples.bedtime, readOnly = true) }
 
+    @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+    @Test
+    fun timeDial() = shot {
+        Screen {
+            app.bedtime.ui.edit.TimeDialContent("Starts at", androidx.compose.material3.rememberTimePickerState(22, 30, is24Hour = false), {}, {})
+        }
+    }
+
+    @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+    @Test
+    fun timeDial24() = shot {
+        Screen {
+            app.bedtime.ui.edit.TimeDialContent("Ends at", androidx.compose.material3.rememberTimePickerState(7, 0, is24Hour = true), {}, {})
+        }
+    }
+
     @Test
     fun appPicker() = shot {
         AppPickerContent(
@@ -258,6 +274,20 @@ class ScreenshotTest {
             until = "07:00",
             apps = Samples.minimalApps,
             style = HomeStyle(background = 0xFFF8F5F1, accent = 0xFFE0B243, textSize = TextSize.LARGE, showIcons = true),
+            onLaunch = {},
+            onUnlock = {},
+            quote = Samples.mediumQuote,
+        )
+    }
+
+    @Test
+    fun minimalHomeVerySmall() = shot {
+        MinimalHomeContent(
+            now = Samples.lateEvening,
+            scheduleName = "Bedtime",
+            until = "07:00",
+            apps = Samples.apps,
+            style = HomeStyle(appNameSize = app.bedtime.data.AppNameSize.VERY_SMALL, showIcons = true),
             onLaunch = {},
             onUnlock = {},
             quote = Samples.mediumQuote,

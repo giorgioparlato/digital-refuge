@@ -20,15 +20,19 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import app.bedtime.ui.components.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.TimePickerDefaults
+import androidx.compose.material3.TimePickerState
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -37,6 +41,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -65,6 +70,7 @@ import app.bedtime.ui.components.CalloutKind
 import app.bedtime.ui.components.Chevron
 import app.bedtime.ui.components.CtaButton
 import app.bedtime.ui.components.DaySelector
+import app.bedtime.ui.components.LowercaseStrings
 import app.bedtime.ui.components.NumberStepper
 import app.bedtime.ui.components.ObsidianTextField
 import app.bedtime.ui.components.ObsidianToggle
@@ -622,48 +628,55 @@ internal fun ScheduleEditContent(
     }
 }
 
-/** Start/end time: hour and minute steppers (hold to scroll, tap to type), plus am/pm on 12-hour phones. */
+/** Start/end time: Android's clock dial (hour first, then minutes), following the phone's 12/24-hour setting. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun TimePickerDialog(title: String, initialMinute: Int, onDismiss: () -> Unit, onConfirm: (Int) -> Unit) {
     val context = LocalContext.current
-    val c = Obsidian.colors
-    val twentyFourHour = is24Hour(context)
-    var hour by remember { mutableIntStateOf(initialMinute / 60) }
-    var minute by remember { mutableIntStateOf(initialMinute % 60) }
-    val pm = hour >= 12
-    val twoDigits: (Int) -> String = { "%02d".format(it) }
+    val state = rememberTimePickerState(initialMinute / 60, initialMinute % 60, is24Hour(context))
     Dialog(onDismissRequest = onDismiss) {
-        Surface(shape = RoundedCornerShape(20.dp), color = c.bgSecondary) {
-            Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Text(title, style = MaterialTheme.typography.titleMedium, color = c.textNormal)
-                TimeRow("hour") {
-                    if (twentyFourHour) {
-                        NumberStepper(hour, { hour = it }, 0..23, title = "hour", wrap = true, format = twoDigits)
-                    } else {
-                        NumberStepper(if (hour % 12 == 0) 12 else hour % 12, { h -> hour = h % 12 + if (pm) 12 else 0 }, 1..12, title = "hour", wrap = true)
-                    }
-                }
-                TimeRow("minutes") {
-                    NumberStepper(minute, { minute = it }, 0..59, title = "minutes", wrap = true, presets = listOf(0, 15, 30, 45), format = twoDigits)
-                }
-                if (!twentyFourHour) {
-                    SegmentedChoice(listOf("am", "pm"), selected = if (pm) 1 else 0, onSelect = { hour = hour % 12 + if (it == 1) 12 else 0 })
-                }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    TextButton(onClick = onDismiss) { Text("cancel", color = c.textMuted) }
-                    TextButton(onClick = { onConfirm(hour * 60 + minute) }) {
-                        Text("done", color = c.accentText, fontWeight = FontWeight.SemiBold)
-                    }
-                }
-            }
-        }
+        TimeDialContent(title, state, onDismiss, onConfirm = { onConfirm(state.hour * 60 + state.minute) })
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun TimeRow(label: String, content: @Composable () -> Unit) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(label, style = MaterialTheme.typography.bodyMedium, color = Obsidian.colors.textMuted, modifier = Modifier.weight(1f))
-        content()
+internal fun TimeDialContent(title: String, state: TimePickerState, onDismiss: () -> Unit, onConfirm: () -> Unit) {
+    val c = Obsidian.colors
+    Surface(shape = RoundedCornerShape(20.dp), color = c.bgSecondary) {
+        Column(
+            Modifier.padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Text(title, style = MaterialTheme.typography.titleMedium, color = c.textNormal, modifier = Modifier.fillMaxWidth())
+            LowercaseStrings {
+                TimePicker(
+                    state = state,
+                    colors = TimePickerDefaults.colors(
+                        clockDialColor = c.bgPrimaryAlt,
+                        clockDialSelectedContentColor = c.textOnAccent,
+                        clockDialUnselectedContentColor = c.textNormal,
+                        selectorColor = c.accentFill,
+                        containerColor = c.bgSecondary,
+                        periodSelectorBorderColor = c.border,
+                        periodSelectorSelectedContainerColor = c.accentFill,
+                        periodSelectorUnselectedContainerColor = Color.Transparent,
+                        periodSelectorSelectedContentColor = c.textOnAccent,
+                        periodSelectorUnselectedContentColor = c.textMuted,
+                        timeSelectorSelectedContainerColor = c.accentFill,
+                        timeSelectorUnselectedContainerColor = c.bgPrimaryAlt,
+                        timeSelectorSelectedContentColor = c.textOnAccent,
+                        timeSelectorUnselectedContentColor = c.textNormal,
+                    ),
+                )
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = onDismiss) { Text("cancel", color = c.textMuted) }
+                TextButton(onClick = onConfirm) {
+                    Text("done", color = c.accentText, fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
     }
 }

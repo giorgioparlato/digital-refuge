@@ -111,6 +111,10 @@ data class RuntimeState(
     val savedZen: SavedZen? = null,
 )
 
+/** Size of app names in the minimal home's list, on top of [TextSize]; small sizes fit many apps and a quote. */
+@Serializable
+enum class AppNameSize(val scale: Float) { VERY_SMALL(0.55f), SMALL(0.75f), MEDIUM(1f), LARGE(1.2f) }
+
 @Serializable
 enum class TextSize(val scale: Float) { SMALL(0.85f), MEDIUM(1f), LARGE(1.2f) }
 
@@ -120,6 +124,7 @@ data class HomeStyle(
     val background: Long = 0xFF282828,
     val accent: Long = 0xFF4EC68E,
     val textSize: TextSize = TextSize.MEDIUM,
+    val appNameSize: AppNameSize = AppNameSize.MEDIUM,
     val showGreeting: Boolean = true,
     val showDate: Boolean = true,
     val showIcons: Boolean = false,

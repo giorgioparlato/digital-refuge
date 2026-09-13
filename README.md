@@ -6,7 +6,7 @@ Contributions from the open-source community of developers are extremely welcome
 A calm, [primary](https://primary-theme.github.io/start-here/)-styled Android app that gives you a refuge from your phone. On a schedule, or for an on-demand focus block, it can:
 
 - **block distracting apps**: a gentle full-screen cover appears over them;
-- **swap your home screen for a minimal launcher** where only the apps you choose can be opened. Its colours, text size and what it shows are yours to customize;
+- **swap your home screen for a minimal launcher** where only the apps you choose can be opened. Its colours, text size (app names down to very small, so many apps fit) and what it shows are yours to customize;
 - **quiet the phone** with Do Not Disturb ("Priority only" or "Silence") and **hold notifications back** until the session ends. Media and alarms are never muted, so music, videos and alarms keep playing.
 
 <p>

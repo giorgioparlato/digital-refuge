@@ -199,6 +199,7 @@ internal fun MinimalHomeContent(
 ) {
     val p = style.palette()
     val scale = style.textSize.scale
+    val names = scale * style.appNameSize.scale
     Column(
         Modifier
             .fillMaxSize()
@@ -224,14 +225,14 @@ internal fun MinimalHomeContent(
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(8.dp))
                         .clickable(onClickLabel = "open ${app.label}") { onLaunch(app.packageName) }
-                        .padding(vertical = (12 * scale).dp),
+                        .padding(vertical = (12 * names).dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     if (style.showIcons) {
-                        AppIcon(app.packageName, app.label, (30 * scale).dp)
+                        AppIcon(app.packageName, app.label, (30 * names).dp)
                         Spacer(Modifier.width(16.dp))
                     }
-                    Text(app.label, fontSize = (26 * scale).sp, color = p.text)
+                    Text(app.label, fontSize = (26 * names).sp, color = p.text)
                 }
             }
             if (apps.isEmpty()) {

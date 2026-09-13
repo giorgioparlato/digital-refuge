@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.bedtime.apps.AppCatalog
 import app.bedtime.apps.AppEntry
+import app.bedtime.data.AppNameSize
 import app.bedtime.data.AppSettings
 import app.bedtime.data.HomeStyle
 import app.bedtime.data.Quote
@@ -141,10 +142,17 @@ internal fun HomeStyleContent(
                 HexField(style.accent) { onChange(style.copy(accent = it)) }
             }
             SectionCard(title = "Text size") {
+                SizeLabel("Clock and text", Modifier.padding(bottom = 8.dp))
                 SegmentedChoice(
                     options = listOf("Small", "Medium", "Large"),
                     selected = style.textSize.ordinal,
                     onSelect = { onChange(style.copy(textSize = TextSize.entries[it])) },
+                )
+                SizeLabel("App names", Modifier.padding(top = 16.dp, bottom = 8.dp))
+                SegmentedChoice(
+                    options = listOf("Very small", "Small", "Medium", "Large"),
+                    selected = style.appNameSize.ordinal,
+                    onSelect = { onChange(style.copy(appNameSize = AppNameSize.entries[it])) },
                 )
             }
             SectionCard(title = "Show") {
@@ -178,6 +186,11 @@ internal fun HomeStyleContent(
             }
         }
     }
+}
+
+@Composable
+private fun SizeLabel(text: String, modifier: Modifier = Modifier) {
+    Text(text, style = MaterialTheme.typography.labelMedium, color = Obsidian.colors.textMuted, modifier = modifier)
 }
 
 @Composable
