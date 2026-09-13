@@ -25,6 +25,7 @@ import app.bedtime.ui.apps.PickerMode
 import app.bedtime.ui.groups.GroupsContent
 import app.bedtime.ui.minimal.EmergencyContent
 import app.bedtime.data.HomeStyle
+import app.bedtime.data.Quote
 import app.bedtime.data.Run
 import app.bedtime.data.RuntimeState
 import app.bedtime.data.Schedule
@@ -229,7 +230,7 @@ class ScreenshotTest {
 
     @Test
     fun homeStyle() = shot(tall = true) {
-        HomeStyleContent(style = HomeStyle(), onChange = {}, previewApps = Samples.minimalApps, now = Samples.lateEvening, onBack = {})
+        HomeStyleContent(style = HomeStyle(), onChange = {}, previewApps = Samples.minimalApps, now = Samples.lateEvening, onBack = {}, quote = Samples.shortQuote)
     }
 
     @Test
@@ -245,6 +246,7 @@ class ScreenshotTest {
             style = HomeStyle(),
             onLaunch = {},
             onUnlock = {},
+            quote = Samples.shortQuote,
         )
     }
 
@@ -258,12 +260,13 @@ class ScreenshotTest {
             style = HomeStyle(background = 0xFFF8F5F1, accent = 0xFFE0B243, textSize = TextSize.LARGE, showIcons = true),
             onLaunch = {},
             onUnlock = {},
+            quote = Samples.mediumQuote,
         )
     }
 
     @Test
     fun lockScreen() = shot {
-        app.bedtime.ui.lock.LockScreenContent(now = Samples.lateEvening, scheduleName = "Bedtime", until = "07:00", style = HomeStyle())
+        app.bedtime.ui.lock.LockScreenContent(now = Samples.lateEvening, scheduleName = "Bedtime", until = "07:00", style = HomeStyle(), quote = Samples.mediumQuote)
     }
 
     @Test
@@ -273,6 +276,7 @@ class ScreenshotTest {
             scheduleName = "Focus",
             until = "16:10",
             style = HomeStyle(background = 0xFFF8F5F1, accent = 0xFFE0B243, showGreeting = false),
+            quote = Samples.longQuote,
         )
     }
 
@@ -365,6 +369,19 @@ private object Samples {
     val minimalApps: List<AppEntry> get() = apps.filter { it.packageName in setOf(MAPS, SPOTIFY, PHONE, KINDLE) }
 
     val lateEvening: LocalDateTime get() = LocalDate.now().atTime(22, 41)
+
+    val shortQuote = Quote("The land knows you, even when you are lost.", "Robin Wall Kimmerer", "Braiding Sweetgrass")
+    val mediumQuote = Quote(
+        "In my walks I would fain return to my senses. What business have I in the woods, if I am thinking of something out of the woods?",
+        "Henry David Thoreau",
+        "Walking",
+    )
+    val longQuote = Quote(
+        "Knowing that you love the earth changes you, activates you to defend and protect and celebrate. But when you feel that the earth " +
+            "loves you in return, that feeling transforms the relationship from a one-way street into a sacred bond.",
+        "Robin Wall Kimmerer",
+        "Braiding Sweetgrass",
+    )
 
     fun label(pkg: String): String = apps.firstOrNull { it.packageName == pkg }?.label ?: pkg
 

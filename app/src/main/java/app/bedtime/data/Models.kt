@@ -123,6 +123,8 @@ data class HomeStyle(
     val showGreeting: Boolean = true,
     val showDate: Boolean = true,
     val showIcons: Boolean = false,
+    /** A quote of the day under the session, on the minimal home and the lock screen. */
+    val showQuote: Boolean = true,
     /** When greyscale is on, keep the home screen itself in colour. */
     val keepInColour: Boolean = true,
     /** During sessions, show the clock and session over the lock screen. */

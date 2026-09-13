@@ -20,6 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.bedtime.data.HomeStyle
+import app.bedtime.data.Quote
 import app.bedtime.ui.components.BedtimeIcons
 import app.bedtime.ui.components.Text
 import app.bedtime.ui.components.styledTime
@@ -70,5 +71,25 @@ internal fun SessionHeader(now: LocalDateTime, scheduleName: String, until: Stri
             Spacer(Modifier.width(6.dp))
             Text("$scheduleName · until $until", style = MaterialTheme.typography.labelLarge, color = p.muted)
         }
+    }
+}
+
+/** A quote in the home style's quieter colours, with its author underneath. */
+@Composable
+internal fun QuoteBlock(quote: Quote, style: HomeStyle, modifier: Modifier = Modifier) {
+    val p = style.palette()
+    val scale = style.textSize.scale
+    Column(modifier) {
+        Text(
+            "“${quote.text}”",
+            style = MaterialTheme.typography.bodyLarge.copy(fontSize = (17 * scale).sp, lineHeight = (25 * scale).sp),
+            color = p.muted,
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "— " + listOfNotNull(quote.author, quote.work).joinToString(", "),
+            style = MaterialTheme.typography.labelMedium,
+            color = p.faint,
+        )
     }
 }

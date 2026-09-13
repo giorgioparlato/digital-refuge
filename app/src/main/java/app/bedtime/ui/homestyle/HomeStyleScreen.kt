@@ -45,6 +45,8 @@ import app.bedtime.apps.AppCatalog
 import app.bedtime.apps.AppEntry
 import app.bedtime.data.AppSettings
 import app.bedtime.data.HomeStyle
+import app.bedtime.data.Quote
+import app.bedtime.data.Quotes
 import app.bedtime.data.Repository
 import app.bedtime.data.TextSize
 import app.bedtime.ui.components.BedtimeIcons
@@ -60,6 +62,7 @@ import app.bedtime.ui.theme.Obsidian
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.time.LocalDate
 import java.time.LocalDateTime
 
 @Composable
@@ -79,6 +82,7 @@ fun HomeStyleScreen(onBack: () -> Unit) {
         previewApps = apps,
         now = LocalDateTime.now(),
         onBack = onBack,
+        quote = Quotes.forDay(LocalDate.now()),
     )
 }
 
@@ -89,6 +93,7 @@ internal fun HomeStyleContent(
     previewApps: List<AppEntry>,
     now: LocalDateTime,
     onBack: () -> Unit,
+    quote: Quote? = null,
 ) {
     val context = LocalContext.current
     val c = Obsidian.colors
@@ -122,6 +127,7 @@ internal fun HomeStyleContent(
                     style = style,
                     onLaunch = {},
                     onUnlock = {},
+                    quote = quote,
                     preview = true,
                 )
             }
@@ -150,6 +156,9 @@ internal fun HomeStyleContent(
                 }
                 OptionRow(BedtimeIcons.Grid, "App icons", description = "Small icons next to app names") {
                     ObsidianToggle(style.showIcons, { onChange(style.copy(showIcons = it)) })
+                }
+                OptionRow(BedtimeIcons.Leaf, "Quote of the day", description = "Here and on the lock screen. A new one each day, when you tap it, and each time you wake the phone") {
+                    ObsidianToggle(style.showQuote, { onChange(style.copy(showQuote = it)) })
                 }
             }
             SectionCard {

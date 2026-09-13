@@ -31,6 +31,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -42,12 +43,15 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.bedtime.data.AppSettings
 import app.bedtime.data.HomeStyle
+import app.bedtime.data.Quote
+import app.bedtime.data.Quotes
 import app.bedtime.data.Repository
 import app.bedtime.engine.Engine
 import app.bedtime.ui.components.BedtimeIcons
 import app.bedtime.ui.components.Text
 import app.bedtime.ui.formatTime
 import app.bedtime.ui.homestyle.palette
+import app.bedtime.ui.minimal.QuoteBlock
 import app.bedtime.ui.minimal.SessionHeader
 import app.bedtime.ui.theme.BedtimeTheme
 import kotlinx.coroutines.delay
@@ -62,6 +66,9 @@ class LockScreenActivity : ComponentActivity() {
         override fun onReceive(context: Context, intent: Intent) = finish()
     }
 
+    /** Times the screen went off over this lock screen; each wake shows the next quote. */
+    private var wakes by mutableIntStateOf(0)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
@@ -74,7 +81,7 @@ class LockScreenActivity : ComponentActivity() {
         onBackPressedDispatcher.addCallback(this) { /* Stay; unlocking is the way out. */ }
         ContextCompat.registerReceiver(this, unlocked, IntentFilter(Intent.ACTION_USER_PRESENT), ContextCompat.RECEIVER_NOT_EXPORTED)
         setContent {
-            BedtimeTheme { LockScreen(onOpen = ::openPhone, onFinish = ::finish, onLightBackground = ::useLightSystemBars) }
+            BedtimeTheme { LockScreen(quoteOffset = wakes, onOpen = ::openPhone, onFinish = ::finish, onLightBackground = ::useLightSystemBars) }
         }
     }
 
@@ -83,6 +90,11 @@ class LockScreenActivity : ComponentActivity() {
         // Screen on without a keyguard (no lock set, or still inside the lock delay): nothing to cover.
         val interactive = getSystemService(PowerManager::class.java).isInteractive
         if (interactive && !getSystemService(KeyguardManager::class.java).isKeyguardLocked) finish()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        wakes++
     }
 
     override fun onDestroy() {
@@ -113,7 +125,7 @@ class LockScreenActivity : ComponentActivity() {
 }
 
 @Composable
-private fun LockScreen(onOpen: () -> Unit, onFinish: () -> Unit, onLightBackground: (Boolean) -> Unit) {
+private fun LockScreen(quoteOffset: Int, onOpen: () -> Unit, onFinish: () -> Unit, onLightBackground: (Boolean) -> Unit) {
     val context = LocalContext.current
     val repo = remember { Repository.get(context) }
     val state by Engine.state(context).collectAsStateWithLifecycle()
@@ -145,6 +157,7 @@ private fun LockScreen(onOpen: () -> Unit, onFinish: () -> Unit, onLightBackgrou
         until = formatTime(context, occurrence.end),
         style = style,
         onOpen = onOpen,
+        quote = Quotes.forDay(now.toLocalDate(), quoteOffset),
     )
 }
 
@@ -155,6 +168,7 @@ internal fun LockScreenContent(
     until: String,
     style: HomeStyle,
     onOpen: () -> Unit = {},
+    quote: Quote? = null,
     preview: Boolean = false,
 ) {
     val p = style.palette()
@@ -174,6 +188,10 @@ internal fun LockScreenContent(
         Spacer(Modifier.height(if (preview) 12.dp else 32.dp))
         SessionHeader(now, scheduleName, until, style)
         Spacer(Modifier.weight(1f))
+        if (quote != null && style.showQuote) {
+            QuoteBlock(quote, style)
+            Spacer(Modifier.height(40.dp))
+        }
         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
             Icon(BedtimeIcons.Refuge, contentDescription = null, tint = p.accent, modifier = Modifier.size(28.dp))
             Spacer(Modifier.height(10.dp))

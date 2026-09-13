@@ -39,6 +39,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -54,6 +55,8 @@ import app.bedtime.apps.AppCatalog
 import app.bedtime.apps.AppEntry
 import app.bedtime.data.AppSettings
 import app.bedtime.data.HomeStyle
+import app.bedtime.data.Quote
+import app.bedtime.data.Quotes
 import app.bedtime.data.Repository
 import app.bedtime.engine.Engine
 import app.bedtime.service.SystemApps
@@ -105,6 +108,7 @@ private fun MinimalHomeScreen(onFinish: () -> Unit, onLightBackground: (Boolean)
     val occurrence = state?.minimalOccurrence
     var unlocking by rememberSaveable { mutableStateOf(false) }
     var emergency by rememberSaveable { mutableStateOf(false) }
+    var quoteOffset by rememberSaveable { mutableIntStateOf(0) }
     val style = settings.homeStyle
     val light = style.palette().isLight
 
@@ -166,6 +170,8 @@ private fun MinimalHomeScreen(onFinish: () -> Unit, onLightBackground: (Boolean)
             onLaunch = { AppCatalog.launch(context, it) },
             onUnlock = { unlocking = true },
             onEmergency = { emergency = true },
+            quote = Quotes.forDay(now.toLocalDate(), quoteOffset),
+            onNextQuote = { quoteOffset++ },
         )
     }
 }
@@ -187,6 +193,8 @@ internal fun MinimalHomeContent(
     onLaunch: (String) -> Unit,
     onUnlock: () -> Unit,
     onEmergency: () -> Unit = {},
+    quote: Quote? = null,
+    onNextQuote: () -> Unit = {},
     preview: Boolean = false,
 ) {
     val p = style.palette()
@@ -200,6 +208,14 @@ internal fun MinimalHomeContent(
     ) {
         Spacer(Modifier.height(if (preview) 12.dp else 32.dp))
         SessionHeader(now, scheduleName, until, style)
+        if (quote != null && style.showQuote) {
+            Spacer(Modifier.height(if (preview) 20.dp else 28.dp))
+            QuoteBlock(
+                quote,
+                style,
+                Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClickLabel = "show another quote", onClick = onNextQuote),
+            )
+        }
         Spacer(Modifier.height(if (preview) 28.dp else 44.dp))
         LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
             items(apps, key = { it.packageName }) { app ->
