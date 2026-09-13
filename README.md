@@ -36,7 +36,7 @@ A calm, Obsidian-styled Android app that gives you a refuge from your phone. On 
 - **App groups** ("Social & feeds", "Essentials", or your own) let you tick many apps in one tap.
 - **Stats:** a streak, time spent in refuge this week, and early unlocks.
 - **Quick Settings tile** that starts your favourite focus block.
-- **Design:** based on the [Primary](https://primary-theme.github.io/start-here/) Obsidian theme, with green accents and the Inter font. Dark mode uses neutral grays around `#282828`; light mode uses Primary's cream palette. All text in the app is lowercase, and the icon is a small temple with a warmly lit doorway.
+- **Design:** based on the [Primary](https://primary-theme.github.io/start-here/) Obsidian theme, with green accents and the Inter font. Dark mode uses neutral grays around `#282828`; light mode uses Primary's cream palette. All text in the app is lowercase, and the icon is a lotus, the Buddhist image of calm, with a warm centre petal rising from the water.
 
 ## Install
 

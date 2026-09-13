@@ -9,15 +9,16 @@ import androidx.compose.ui.unit.dp
 
 /** Small custom icons that aren't in material-icons-core (24×24 viewport, tinted by Icon). */
 object BedtimeIcons {
-    /** The app's mark: a small classical temple (same shape as the launcher icon). */
+    /** The app's mark: a lotus rising from the water (same shape as the launcher icon). */
     val Refuge: ImageVector by lazy {
         icon("Refuge") {
-            path(
-                "M12,2.5 L22,8 L2,8 Z M12,4.3 L18.6,7.2 L5.4,7.2 Z M2.5,8.8 H21.5 V10.3 H2.5 Z " +
-                    "M4,11 H5.8 V18.5 H4 Z M8.2,11 H10 V18.5 H8.2 Z M14,11 H15.8 V18.5 H14 Z M18.2,11 H20 V18.5 H18.2 Z " +
-                    "M3,19 H21 V20.3 H3 Z M1.5,20.8 H22.5 V22 H1.5 Z",
-                evenOdd = true,
-            )
+            path("M12,3.54 C14.5,6.88 14.92,11.04 12,15.21 C9.08,11.04 9.5,6.88 12,3.54 Z")
+            path("M11.17,15.21 C7.83,13.54 6.17,10.21 6.58,6.46 C9.08,7.71 10.75,10.63 11.17,15.21 Z")
+            path("M12.83,15.21 C16.17,13.54 17.83,10.21 17.42,6.46 C14.92,7.71 13.25,10.63 12.83,15.21 Z")
+            path("M11.17,15.63 C7,16.04 3.67,13.96 2,11.04 C5.33,10.63 8.67,11.88 11.17,15.63 Z")
+            path("M12.83,15.63 C17,16.04 20.33,13.96 22,11.04 C18.67,10.63 15.33,11.88 12.83,15.63 Z")
+            path("M5.04,17.29 H18.96 A0.54,0.54 0 0,1 18.96,18.38 H5.04 A0.54,0.54 0 0,1 5.04,17.29 Z")
+            path("M8.37,19.38 H15.63 A0.54,0.54 0 0,1 15.63,20.46 H8.37 A0.54,0.54 0 0,1 8.37,19.38 Z")
         }
     }
 
