@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- digital refuge: a small shelter with a warmly lit doorway, inside the 66dp adaptive-icon safe zone. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="@color/ic_launcher_accent"
+        android:fillType="evenOdd"
+        android:pathData="M54,31.2 L78,51.6 L72,51.6 L72,75.6 L36,75.6 L36,51.6 L30,51.6 Z M54,40.08 L67.2,51.36 L67.2,70.8 L40.8,70.8 L40.8,51.36 Z" />
+    <path
+        android:fillColor="@color/ic_launcher_glow"
+        android:pathData="M48,70.8 L48,61.2 A6,6 0 0,1 60,61.2 L60,70.8 Z" />
+</vector>

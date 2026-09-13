@@ -1,0 +1,187 @@
+package app.bedtime.service
+
+import android.accessibilityservice.AccessibilityService
+import android.app.NotificationManager
+import android.database.ContentObserver
+import android.os.Handler
+import android.os.Looper
+import android.widget.Toast
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.view.accessibility.AccessibilityEvent
+import androidx.core.content.ContextCompat
+import app.bedtime.data.AppSettings
+import app.bedtime.data.DndMode
+import app.bedtime.data.Repository
+import app.bedtime.engine.ActiveState
+import app.bedtime.engine.Engine
+import app.bedtime.ui.blocked.BlockedActivity
+import app.bedtime.ui.minimal.MinimalHomeActivity
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.launch
+
+/**
+ * Watches which app comes to the foreground and covers it with our own screen when a schedule
+ * forbids it. Also drives greyscale, Do Not Disturb and session history, since this service is the
+ * long-lived part of the app.
+ */
+class BlockerService : AccessibilityService() {
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private var state: ActiveState? = null
+    private var settings = AppSettings()
+    private var alwaysAllowed: Set<String> = emptySet()
+
+    /** Windows that float over the current app (shade, keyboards) and don't change what's "in front". */
+    private var overlays: Set<String> = emptySet()
+    private var lastPackage: String? = null
+    private var homeInFront = false
+    private var receiverRegistered = false
+    private var watchersRegistered = false
+
+    /** Do Not Disturb switched off from quick settings mid-session: switch it straight back on. */
+    private val zenReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            val current = state ?: return
+            val owner = current.active.firstOrNull { it.schedule.dnd != DndMode.OFF || it.schedule.hideNotifications } ?: return
+            scope.launch {
+                if (DndController.apply(this@BlockerService, current.dnd, current.hideNotifications)) {
+                    notice("Do Not Disturb stays on during ${owner.schedule.name}.")
+                }
+            }
+        }
+    }
+
+    /** Colour correction switched off mid-session: switch greyscale straight back on. */
+    private val greyscaleObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
+        override fun onChange(selfChange: Boolean) {
+            val owner = state?.active?.firstOrNull { it.schedule.greyscale } ?: return
+            scope.launch {
+                if (applyGreyscale()) notice("Greyscale stays on during ${owner.schedule.name}.")
+            }
+        }
+    }
+
+    /** Not cancelled on destroy, so restoring colours and sound can finish after the service stops. */
+    private val releaseScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    private val receiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            Engine.refresh()
+            refreshSystemPackages()
+            // Re-assert greyscale in case it was switched off from quick settings.
+            scope.launch { applyGreyscale() }
+        }
+    }
+
+    override fun onServiceConnected() {
+        refreshSystemPackages()
+        val filter = IntentFilter().apply {
+            addAction(Intent.ACTION_SCREEN_ON)
+            addAction(Intent.ACTION_USER_PRESENT)
+            addAction(Intent.ACTION_TIME_CHANGED)
+            addAction(Intent.ACTION_TIMEZONE_CHANGED)
+        }
+        ContextCompat.registerReceiver(this, receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
+        receiverRegistered = true
+        ContextCompat.registerReceiver(
+            this,
+            zenReceiver,
+            IntentFilter(NotificationManager.ACTION_INTERRUPTION_FILTER_CHANGED),
+            ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
+        GreyscaleController.observedUris.forEach { contentResolver.registerContentObserver(it, false, greyscaleObserver) }
+        watchersRegistered = true
+
+        val repo = Repository.get(this)
+        scope.launch {
+            repo.settings.collect {
+                settings = it
+                applyGreyscale()
+            }
+        }
+        scope.launch {
+            Engine.state(this@BlockerService).filterNotNull().collect { next ->
+                state = next
+                applyGreyscale()
+                DndController.apply(this@BlockerService, next.dnd, next.hideNotifications)
+                if (next.isActive) {
+                    enforce(rootInActiveWindow?.packageName?.toString() ?: lastPackage)
+                    repo.recordOccurrences(next.active)
+                }
+            }
+        }
+    }
+
+    override fun onAccessibilityEvent(event: AccessibilityEvent) {
+        if (event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
+        val pkg = event.packageName?.toString() ?: return
+        if (pkg !in overlays) {
+            val home = pkg == packageName && event.className?.toString() == MinimalHomeActivity::class.java.name
+            if (home != homeInFront) {
+                homeInFront = home
+                scope.launch { applyGreyscale() }
+            }
+        }
+        lastPackage = pkg
+        val boundary = state?.nextBoundary
+        if (boundary != null && System.currentTimeMillis() >= boundary) Engine.refresh()
+        enforce(pkg)
+    }
+
+    private suspend fun applyGreyscale(): Boolean =
+        GreyscaleController.apply(
+            this,
+            wanted = state?.greyscale == true,
+            pausedForHome = homeInFront && settings.homeStyle.keepInColour,
+        )
+
+    private fun notice(message: String) {
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+    }
+
+    private fun refreshSystemPackages() {
+        alwaysAllowed = SystemApps.alwaysAllowed(this)
+        overlays = SystemApps.keyboards(this) + "com.android.systemui"
+    }
+
+    private fun enforce(pkg: String?) {
+        val current = state ?: return
+        if (pkg == null || !current.isActive || pkg == packageName || pkg in alwaysAllowed) return
+        // Always-available apps (maps, rides, authenticators…) are never blocked by any session.
+        if (pkg in settings.alwaysAvailable) return
+        val minimal = current.minimalAllowlist
+        when {
+            pkg in current.blocked -> startActivity(BlockedActivity.intent(this, pkg))
+            // In minimal mode the stock launcher and recents are "not allowed" too, so Home lands here.
+            minimal != null && pkg !in minimal -> startActivity(MinimalHomeActivity.intent(this))
+        }
+    }
+
+    override fun onInterrupt() = Unit
+
+    /** Switched off (e.g. through the emergency exit): give the phone its normal colours and sounds back. */
+    override fun onUnbind(intent: Intent?): Boolean {
+        val context = applicationContext
+        releaseScope.launch {
+            GreyscaleController.apply(context, wanted = false)
+            DndController.apply(context, DndMode.OFF, hide = false)
+        }
+        return super.onUnbind(intent)
+    }
+
+    override fun onDestroy() {
+        if (receiverRegistered) unregisterReceiver(receiver)
+        if (watchersRegistered) {
+            unregisterReceiver(zenReceiver)
+            contentResolver.unregisterContentObserver(greyscaleObserver)
+        }
+        scope.cancel()
+        super.onDestroy()
+    }
+}
