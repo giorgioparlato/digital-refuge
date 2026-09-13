@@ -6,7 +6,6 @@ Contributions from the open-source community of developers are extremely welcome
 A calm, [primary](https://primary-theme.github.io/start-here/)-styled Android app that gives you a refuge from your phone. On a schedule, or for an on-demand focus block, it can:
 
 - **block distracting apps**: a gentle full-screen cover appears over them;
-- **turn apps greyscale**, while your minimal home screen can stay in colour (this option requires special access to be given through a computer);
 - **swap your home screen for a minimal launcher** where only the apps you choose can be opened. Its colours, text size and what it shows are yours to customize;
 - **quiet the phone** with Do Not Disturb ("Priority only" or "Silence") and **hold notifications back** until the session ends. Media and alarms are never muted, so music, videos and alarms keep playing.
 
@@ -30,7 +29,7 @@ A calm, [primary](https://primary-theme.github.io/start-here/)-styled Android ap
   3. enter a password.
 
   Each schedule decides whether unlocking **ends the session** or **pauses it for N minutes**. Optionally, the text gets 50% longer with each early unlock in a day.
-- **No quick escapes mid-session.** While a session is running, you can't edit or delete its schedule. If Do Not Disturb or colour correction is switched off from quick settings, the app switches it straight back on and tells you why.
+- **No quick escapes mid-session.** While a session is running, you can't edit or delete its schedule. If Do Not Disturb is switched off from quick settings, the app switches it straight back on and tells you why.
 - **Emergency button** on the minimal home screen, which keeps the session in place. It offers calling someone, and your **always-available apps** (maps, rides, authenticators…), which no session ever blocks.
 - **Easy number picking:** tap − or + for one step, hold to keep going faster, or tap the number to type a value or pick a preset.
 - **Safer defaults:** Settings, Phone and Messages start out allowed in minimal mode, and the app picker explains why.
@@ -41,42 +40,51 @@ A calm, [primary](https://primary-theme.github.io/start-here/)-styled Android ap
 
 ## Install
 
-This is a personal, sideloaded app.
+digital refuge installs from an APK file, like any app downloaded outside the Play Store:
 
-1. Install [Android Studio](https://developer.android.com/studio) (or just the Android SDK and a JDK 17).
-2. Turn on USB debugging on the phone (Settings → About phone → tap *Build number* 7× → Developer options → USB debugging).
-3. Build and install:
+1. On your phone, download **digital-refuge.apk** from the [latest release](../../releases/latest).
+2. Open it. If Android asks, allow your browser (or files app) to install unknown apps.
+3. Tap **Install**. Google Play Protect may say it doesn't recognise the app; choose *Install anyway*.
 
-   ```sh
-   ./gradlew installDebug
-   ```
+Updates install the same way, over the previous version, and keep your schedules.
 
-   Or build the APK with `./gradlew assembleDebug` and install `app/build/outputs/apk/debug/app-debug.apk`.
+## First launch
 
-## One-time phone setup
+Open the app and follow **settings → permissions & setup**, which shows the status of each step:
 
-**Settings → Permissions & setup** inside the app shows the live status of each step.
-
-1. **Accessibility service (required):** Settings → Accessibility → *digital refuge blocker* → On. On Android 13+, sideloaded apps are "restricted", so if the toggle is greyed out:
+1. **Let digital refuge see which app is open (required).** This is what lets it block apps and run the minimal home screen. Turn on *digital refuge blocker* in Settings → Accessibility. On Android 13 and newer, apps installed from an APK are "restricted" at first, so if the switch is greyed out:
    1. Go to App info → digital refuge → ⋮.
    2. Tap **Allow restricted settings**.
-   3. Try the toggle again.
-2. **Greyscale (optional):** Android has no public greyscale API, so the app uses the system colour-correction filter in monochrome mode. That needs a permission only ADB can grant:
+   3. Try the switch again.
+2. **Do Not Disturb access (optional):** needed for silencing the phone and holding notifications back.
+3. **Always-available apps (recommended):** choose the few apps that stay usable during every session, like maps, rides or your authenticator. You reach them from the emergency button, and can change them later in settings → emergency.
+4. **Battery:** if blocking stops after a while, set the app's battery usage to *Unrestricted*. Some phone makers aggressively stop background apps.
+
+**Last resort,** if you're ever truly stuck: restart the phone in safe mode (power menu → press and hold *Power off*). Downloaded apps don't run there, so you can uninstall digital refuge like any other app.
+
+## Extra: greyscale
+
+Sessions can also fade apps to black and white, while your minimal home screen stays in colour. Everything else works without it.
+
+Android doesn't let apps switch greyscale on by themselves, so this one feature needs a permission granted once from a computer:
+
+1. On the phone, turn on USB debugging (Settings → About phone → tap *Build number* 7 times → Developer options → USB debugging).
+2. On the computer, get Google's small [platform-tools](https://developer.android.com/tools/releases/platform-tools) download, which contains `adb`.
+3. Plug in the phone and run:
 
    ```sh
    adb shell pm grant app.bedtime android.permission.WRITE_SECURE_SETTINGS
    ```
 
-   The permission survives reboots and updates. If you use colour correction yourself, your setting is restored after each session.
-3. **Do Not Disturb access (optional):** needed for silencing the phone and holding notifications. Grant it from the setup screen.
-4. **Always-available apps (recommended):** choose the few apps that stay usable during every session, like maps, rides and your authenticator. You reach them from the emergency button, and can change them later in Settings → Emergency.
-5. **Battery:** if blocking stops after a while, set the app's battery usage to *Unrestricted*. Some phone makers aggressively stop background apps.
-
-**Last resort,** if you're ever truly stuck: restart the phone in safe mode (power menu → press and hold *Power off*). Downloaded apps don't run there, so you can uninstall the app like any other.
+The permission survives reboots and updates. If you use colour correction yourself, your own setting comes back after each session.
 
 ## Development
 
+Build from source with [Android Studio](https://developer.android.com/studio), or any machine with the Android SDK and JDK 17:
+
 ```sh
+./gradlew installDebug           # build and install on a connected phone
+./gradlew assembleDebug          # just build the APK: app/build/outputs/apk/debug/app-debug.apk
 ./gradlew testDebugUnitTest      # logic tests: schedules, stats, challenges, DND policy…
 ./gradlew recordPaparazziDebug   # renders every screen, dark and light, to app/src/test/snapshots/images/
 ./gradlew verifyPaparazziDebug   # fails if a screen changed unexpectedly
