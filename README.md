@@ -1,4 +1,4 @@
-> **This app was entirely coded by Claude**, under my suggestions and testing of the app.
+> **DISCLAIMER: This app was entirely coded by Claude**, I've primarily been testing the app and provided improvement suggestions.
 Contributions from the open-source community of developers are extremely welcome.
 
 # digital refuge
