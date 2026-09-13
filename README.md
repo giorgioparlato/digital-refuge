@@ -1,11 +1,12 @@
-> **This app was entirely coded by Claude**, Anthropic's AI, working in [Claude Code](https://claude.com/claude-code): every line of Kotlin, the tests, the icon and this README. The idea, the feature requests and the testing on a real phone came from its owner.
+> **This app was entirely coded by Claude**, under my suggestions and testing of the app.
+Contributions from the open-source community of developers are extremely welcome.
 
 # digital refuge
 
-A calm, Obsidian-styled Android app that gives you a refuge from your phone. On a schedule, or for an on-demand focus block, it can:
+A calm, [primary](https://primary-theme.github.io/start-here/)-styled Android app that gives you a refuge from your phone. On a schedule, or for an on-demand focus block, it can:
 
 - **block distracting apps**: a gentle full-screen cover appears over them;
-- **turn apps greyscale**, while your minimal home screen can stay in colour;
+- **turn apps greyscale**, while your minimal home screen can stay in colour (this option requires special access to be given through a computer);
 - **swap your home screen for a minimal launcher** where only the apps you choose can be opened. Its colours, text size and what it shows are yours to customize;
 - **quiet the phone** with Do Not Disturb ("Priority only" or "Silence") and **hold notifications back** until the session ends. Media and alarms are never muted, so music, videos and alarms keep playing.
 
@@ -40,7 +41,7 @@ A calm, Obsidian-styled Android app that gives you a refuge from your phone. On 
 
 ## Install
 
-This is a personal, sideloaded app. Google Play doesn't allow accessibility-based blockers like this one.
+This is a personal, sideloaded app.
 
 1. Install [Android Studio](https://developer.android.com/studio) (or just the Android SDK and a JDK 17).
 2. Turn on USB debugging on the phone (Settings → About phone → tap *Build number* 7× → Developer options → USB debugging).
