@@ -181,7 +181,8 @@ internal fun HomeContent(
         })
     }
     val usesDnd = ui.schedules.any { it.dnd != DndMode.OFF || it.hideNotifications }
-    val needsSetup = !ui.serviceOn || !ui.greyscaleOk || (usesDnd && !ui.dndOk)
+    // Greyscale is optional and needs a computer, so missing it alone doesn't warrant the card.
+    val needsSetup = !ui.serviceOn || (usesDnd && !ui.dndOk)
     val blocks = ui.schedules.filter { it.isBlock }
     val recurring = ui.schedules.filterNot { it.isBlock }
 

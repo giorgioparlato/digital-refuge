@@ -34,7 +34,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.bedtime.data.AppSettings
+import app.bedtime.data.Repository
 import app.bedtime.engine.Engine
+import app.bedtime.ui.pluralApps
 import app.bedtime.service.DndController
 import app.bedtime.service.GreyscaleController
 import app.bedtime.service.SystemApps
@@ -52,11 +55,13 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Composable
-fun SetupScreen(onBack: () -> Unit) {
+fun SetupScreen(onBack: () -> Unit, onAlwaysAvailable: () -> Unit) {
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     val scope = rememberCoroutineScope()
     val state by Engine.state(context).collectAsStateWithLifecycle()
+    val repo = remember { Repository.get(context) }
+    val settings by repo.settings.collectAsStateWithLifecycle(initialValue = AppSettings())
     var serviceOn by remember { mutableStateOf(false) }
     var greyscaleOk by remember { mutableStateOf(false) }
     var dndOk by remember { mutableStateOf(false) }
@@ -91,6 +96,8 @@ fun SetupScreen(onBack: () -> Unit) {
         },
         onOpenDnd = { context.tryStart(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)) },
         onOpenBattery = { context.tryStart(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) },
+        alwaysAvailableCount = settings.alwaysAvailable.size,
+        onAlwaysAvailable = onAlwaysAvailable,
     )
 }
 
@@ -108,6 +115,8 @@ internal fun SetupContent(
     onPreview: () -> Unit,
     onOpenDnd: () -> Unit,
     onOpenBattery: () -> Unit,
+    alwaysAvailableCount: Int = 0,
+    onAlwaysAvailable: () -> Unit = {},
 ) {
     val c = Obsidian.colors
     Scaffold(containerColor = c.bgPrimary, topBar = { ObsidianTopBar("Setup", onBack = onBack) }) { padding ->
@@ -159,7 +168,19 @@ internal fun SetupContent(
                 PlainButton("Open Do Not Disturb access", onClick = onOpenDnd, modifier = Modifier.fillMaxWidth())
             }
 
-            StepCard(4, "Keep digital refuge running", done = false, badge = "Recommended") {
+            StepCard(4, "Choose always-available apps", done = alwaysAvailableCount > 0, badge = "Recommended") {
+                Body(
+                    "Apps that stay usable during every session, reached from the emergency button: maps, rides, your authenticator. " +
+                        "Keep the list short. You can change it later in settings → emergency.",
+                )
+                PlainButton(
+                    if (alwaysAvailableCount == 0) "Choose apps" else "Edit · ${pluralApps(alwaysAvailableCount)}",
+                    onClick = onAlwaysAvailable,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+
+            StepCard(5, "Keep digital refuge running", done = false, badge = "Recommended") {
                 Body("Some phones (Samsung, Xiaomi, OnePlus…) put background apps to sleep. If blocking ever stops working, set digital refuge's battery usage to Unrestricted.")
                 PlainButton("Open battery settings", onClick = onOpenBattery, modifier = Modifier.fillMaxWidth())
             }

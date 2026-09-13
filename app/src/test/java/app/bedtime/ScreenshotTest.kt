@@ -205,6 +205,8 @@ class ScreenshotTest {
             onPreview = {},
             onOpenDnd = {},
             onOpenBattery = {},
+            alwaysAvailableCount = 2,
+            onAlwaysAvailable = {},
         )
     }
 

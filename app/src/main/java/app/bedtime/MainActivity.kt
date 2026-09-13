@@ -152,7 +152,7 @@ private fun BedtimeNavigation(pendingRoute: String?, onRouteConsumed: () -> Unit
                 onGroups = { push(Routes.GROUPS) },
                 onAlwaysAvailable = { push(Routes.ALWAYS_AVAILABLE) },
             )
-            top == Routes.SETUP -> SetupScreen(onBack = { pop(top) })
+            top == Routes.SETUP -> SetupScreen(onBack = { pop(top) }, onAlwaysAvailable = { push(Routes.ALWAYS_AVAILABLE) })
             top == Routes.HOME_STYLE -> HomeStyleScreen(onBack = { pop(top) })
             top == Routes.GROUPS -> GroupsScreen(onBack = { pop(top) })
             top == Routes.ALWAYS_AVAILABLE -> AlwaysAvailableScreen(onBack = { pop(top) })

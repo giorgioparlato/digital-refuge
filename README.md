@@ -68,7 +68,8 @@ This is a personal, sideloaded app. Google Play doesn't allow accessibility-base
 
    The permission survives reboots and updates. If you use colour correction yourself, your setting is restored after each session.
 3. **Do Not Disturb access (optional):** needed for silencing the phone and holding notifications. Grant it from the setup screen.
-4. **Battery:** if blocking stops after a while, set the app's battery usage to *Unrestricted*. Some phone makers aggressively stop background apps.
+4. **Always-available apps (recommended):** choose the few apps that stay usable during every session, like maps, rides and your authenticator. You reach them from the emergency button, and can change them later in Settings → Emergency.
+5. **Battery:** if blocking stops after a while, set the app's battery usage to *Unrestricted*. Some phone makers aggressively stop background apps.
 
 **Last resort,** if you're ever truly stuck: restart the phone in safe mode (power menu → press and hold *Power off*). Downloaded apps don't run there, so you can uninstall the app like any other.
 

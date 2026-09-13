@@ -101,6 +101,28 @@ fun Text(
     )
 }
 
+/** The one exception to lowercase: text whose case matters, like the ADB command. Shown exactly as written. */
+@Composable
+fun VerbatimText(
+    text: String,
+    modifier: Modifier = Modifier,
+    color: Color = Color.Unspecified,
+    fontSize: TextUnit = TextUnit.Unspecified,
+    fontFamily: FontFamily? = null,
+    lineHeight: TextUnit = TextUnit.Unspecified,
+    style: TextStyle = LocalTextStyle.current,
+) {
+    MaterialText(
+        text = text,
+        modifier = modifier,
+        color = color,
+        fontSize = fontSize,
+        fontFamily = fontFamily,
+        lineHeight = lineHeight,
+        style = style,
+    )
+}
+
 /** Lowercases while keeping styled ranges, unless lowercasing changes the length (rare Unicode cases). */
 fun AnnotatedString.lowercased(): AnnotatedString {
     val lower = text.lowercase()

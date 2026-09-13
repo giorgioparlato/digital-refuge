@@ -633,7 +633,8 @@ fun CodeBlock(code: String, onCopy: () -> Unit) {
             .padding(start = 12.dp, top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
+        // Commands are case-sensitive, so they're shown exactly as written.
+        VerbatimText(
             code,
             modifier = Modifier.weight(1f).padding(vertical = 8.dp),
             fontFamily = FontFamily.Monospace,
