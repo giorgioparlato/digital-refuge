@@ -65,6 +65,8 @@ Open the app and follow **settings → permissions & setup**, which shows the st
 4. **Always-available apps (recommended):** choose the few apps that stay usable during every session, like maps, rides or your authenticator. You reach them from the emergency button, and can change them later in settings → emergency.
 5. **Battery:** if blocking stops after a while, set the app's battery usage to *Unrestricted*. Some phone makers aggressively stop background apps.
 
+**Banking and ID apps.** Some, like BankID, refuse to run while an accessibility service is on, because malware abuses that permission. digital refuge's service only sees which app is open and can't read the screen. If an app still refuses, switch *digital refuge blocker* off in Settings → Accessibility while you use it, then back on.
+
 **Last resort,** if you're ever truly stuck: restart the phone in safe mode (power menu → press and hold *Power off*). Downloaded apps don't run there, so you can uninstall digital refuge like any other app.
 
 ## Extra: greyscale

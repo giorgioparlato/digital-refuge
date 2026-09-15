@@ -1,7 +1,7 @@
 <resources>
     <string name="app_name">digital refuge</string>
     <string name="accessibility_label">digital refuge blocker</string>
-    <string name="accessibility_description">lets digital refuge see which app is in front so it can block apps and keep you in minimal mode during your schedules. screen content and typing are never recorded or sent anywhere.</string>
+    <string name="accessibility_description">lets digital refuge see which app is in front, so it can block apps and keep you in minimal mode during your schedules. it can\'t read what\'s on your screen or what you type.</string>
     <string name="tile_label">refuge</string>
     <string name="widget_label">focus block</string>
     <string name="widget_description">start a focus block with one tap</string>

@@ -147,7 +147,7 @@ class BlockerService : AccessibilityService() {
                 SessionNotifier.update(this@BlockerService, next)
                 BlockWidget.updateAll(this@BlockerService)
                 if (next.isActive) {
-                    enforce(rootInActiveWindow?.packageName?.toString() ?: lastPackage)
+                    enforce(lastPackage)
                     repo.recordOccurrences(next.active)
                 }
             }
