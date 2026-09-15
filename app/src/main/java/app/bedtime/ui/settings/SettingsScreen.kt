@@ -20,6 +20,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.TextButton
 import app.bedtime.ui.components.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -30,6 +31,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -47,6 +49,7 @@ import app.bedtime.ui.components.OptionRow
 import app.bedtime.ui.components.SectionCard
 import app.bedtime.ui.formatMinutes
 import app.bedtime.ui.theme.Obsidian
+import app.bedtime.ui.widget.BlockWidget
 import kotlinx.coroutines.launch
 
 @Composable
@@ -63,6 +66,8 @@ fun SettingsScreen(
     val schedules by repo.schedules.collectAsStateWithLifecycle(initialValue = emptyList())
     val settings by repo.settings.collectAsStateWithLifecycle(initialValue = AppSettings())
     var stepsLeft by remember { mutableIntStateOf(0) }
+    val version = remember { runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull().orEmpty() }
+    val canPinWidget = remember { BlockWidget.canPin(context) }
     LifecycleResumeEffect(Unit) {
         stepsLeft = listOf(
             SystemApps.isAccessibilityServiceEnabled(context),
@@ -83,6 +88,9 @@ fun SettingsScreen(
         onGroups = onGroups,
         alwaysAvailableCount = settings.alwaysAvailable.size,
         onAlwaysAvailable = onAlwaysAvailable,
+        version = version,
+        canPinWidget = canPinWidget,
+        onAddWidget = { block -> BlockWidget.requestPin(context, block) },
     )
 }
 
@@ -99,6 +107,9 @@ internal fun SettingsContent(
     onGroups: () -> Unit = {},
     alwaysAvailableCount: Int = 0,
     onAlwaysAvailable: () -> Unit = {},
+    version: String = "1.1",
+    canPinWidget: Boolean = true,
+    onAddWidget: (Schedule) -> Unit = {},
 ) {
     val c = Obsidian.colors
     Scaffold(containerColor = c.bgPrimary, topBar = { ObsidianTopBar("Settings", onBack = onBack) }) { padding ->
@@ -115,7 +126,7 @@ internal fun SettingsContent(
                 Spacer(Modifier.width(16.dp))
                 Column {
                     Text("digital refuge", style = MaterialTheme.typography.titleLarge, color = c.textNormal)
-                    Text("Version 1.0 · everything stays on this phone", style = MaterialTheme.typography.bodySmall, color = c.textMuted)
+                    Text("Version $version · everything stays on this phone", style = MaterialTheme.typography.bodySmall, color = c.textMuted)
                 }
             }
 
@@ -159,6 +170,33 @@ internal fun SettingsContent(
                     },
                     onClick = onAlwaysAvailable,
                 ) { Chevron() }
+            }
+
+            SectionCard(
+                title = "Home-screen widget",
+                subtitle = if (canPinWidget) {
+                    "A one-tap button on your home screen that starts a block. Add one for:"
+                } else {
+                    "Long-press your home screen → widgets → digital refuge, then pick a block."
+                },
+            ) {
+                if (blocks.isEmpty()) {
+                    Text("Create a focus block first.", style = MaterialTheme.typography.bodyMedium, color = c.textMuted)
+                } else if (canPinWidget) {
+                    blocks.forEach { block ->
+                        Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                "${block.name} · ${formatMinutes(block.durationMinutes.toLong())}",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = c.textNormal,
+                                modifier = Modifier.weight(1f),
+                            )
+                            TextButton(onClick = { onAddWidget(block) }) {
+                                Text("Add", color = c.accentText, fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+                    }
+                }
             }
 
             SectionCard(

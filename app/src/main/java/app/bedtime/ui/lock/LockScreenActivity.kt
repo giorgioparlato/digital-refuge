@@ -39,7 +39,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import app.bedtime.data.AppSettings
 import app.bedtime.data.HomeStyle
 import app.bedtime.data.Quote
@@ -54,6 +57,7 @@ import app.bedtime.ui.minimal.QuoteBlock
 import app.bedtime.ui.minimal.SessionHeader
 import app.bedtime.ui.theme.BedtimeTheme
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.time.LocalDateTime
 
 /**
@@ -76,16 +80,28 @@ class LockScreenActivity : ComponentActivity() {
         enableEdgeToEdge()
         onBackPressedDispatcher.addCallback(this) { /* Stay; unlocking is the way out. */ }
         ContextCompat.registerReceiver(this, unlocked, IntentFilter(Intent.ACTION_USER_PRESENT), ContextCompat.RECEIVER_NOT_EXPORTED)
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                while (true) {
+                    leaveIfUnlocked()
+                    delay(300)
+                }
+            }
+        }
         setContent {
             BedtimeTheme { LockScreen(onOpen = ::openPhone, onFinish = ::finish, onLightBackground = ::useLightSystemBars) }
         }
     }
 
-    override fun onResume() {
-        super.onResume()
-        // Screen on without a keyguard (no lock set, or still inside the lock delay): nothing to cover.
-        val interactive = getSystemService(PowerManager::class.java).isInteractive
-        if (interactive && !getSystemService(KeyguardManager::class.java).isKeyguardLocked) finish()
+    /**
+     * Leaves as soon as the phone is unlocked (fingerprint, PIN, no lock set, or still inside the lock
+     * delay). Checked continuously, not only on the "unlocked" broadcast: that can arrive before this
+     * screen exists and leave it stranded over an unlocked phone.
+     */
+    private fun leaveIfUnlocked() {
+        // Screen off: this screen is waiting to be seen at the next wake.
+        if (!getSystemService(PowerManager::class.java).isInteractive) return
+        if (!getSystemService(KeyguardManager::class.java).isKeyguardLocked) finish()
     }
 
     override fun onDestroy() {
@@ -94,10 +110,18 @@ class LockScreenActivity : ComponentActivity() {
     }
 
     private fun openPhone() {
-        getSystemService(KeyguardManager::class.java).requestDismissKeyguard(
+        val keyguard = getSystemService(KeyguardManager::class.java)
+        if (!keyguard.isKeyguardLocked) {
+            finish()
+            return
+        }
+        keyguard.requestDismissKeyguard(
             this,
             object : KeyguardManager.KeyguardDismissCallback() {
                 override fun onDismissSucceeded() = finish()
+
+                // Nothing left to dismiss: never leave this screen stuck in front.
+                override fun onDismissError() = finish()
             },
         )
     }

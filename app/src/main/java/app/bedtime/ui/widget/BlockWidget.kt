@@ -6,6 +6,7 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.widget.RemoteViews
 import app.bedtime.MainActivity
 import app.bedtime.R
@@ -24,8 +25,9 @@ import kotlinx.coroutines.launch
 import java.time.ZoneId
 
 /**
- * Home-screen widget: one tap starts its block. While the block runs it shows the end time, and a tap
- * opens the unlock steps (stopping early always goes through them, as with the Quick Settings tile).
+ * Home-screen widget: the lotus with its block's name underneath; one tap starts the block. While the
+ * block runs it shows the end time, and a tap opens the unlock steps (stopping early always goes through
+ * them, as with the Quick Settings tile).
  */
 class BlockWidget : AppWidgetProvider() {
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
@@ -39,13 +41,23 @@ class BlockWidget : AppWidgetProvider() {
 
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
-        if (intent.action != ACTION_START) return
         val blockId = intent.getStringExtra(EXTRA_BLOCK) ?: return
-        async {
-            val repo = Repository.get(context)
-            val block = repo.schedules.first().firstOrNull { it.id == blockId && it.isBlock }
-            if (block != null) repo.startBlock(block, block.durationMinutes)
-            updateAll(context)
+        when (intent.action) {
+            ACTION_START -> async {
+                val repo = Repository.get(context)
+                val block = repo.schedules.first().firstOrNull { it.id == blockId && it.isBlock }
+                if (block != null) repo.startBlock(block, block.durationMinutes)
+                updateAll(context)
+            }
+            // A widget added from settings: remember which block it belongs to.
+            ACTION_PINNED -> {
+                val widgetId = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
+                if (widgetId == AppWidgetManager.INVALID_APPWIDGET_ID) return
+                async {
+                    Repository.get(context).updateSettings { it.copy(widgetBlocks = it.widgetBlocks + (widgetId.toString() to blockId)) }
+                    updateAll(context)
+                }
+            }
         }
     }
 
@@ -63,7 +75,25 @@ class BlockWidget : AppWidgetProvider() {
 
     companion object {
         private const val ACTION_START = "app.bedtime.widget.START"
+        private const val ACTION_PINNED = "app.bedtime.widget.PINNED"
         private const val EXTRA_BLOCK = "block"
+
+        /** Whether the launcher can add a widget on request (the "add" buttons in settings). */
+        fun canPin(context: Context): Boolean = AppWidgetManager.getInstance(context)?.isRequestPinAppWidgetSupported == true
+
+        /** Asks the launcher to add a widget that starts [block]. */
+        fun requestPin(context: Context, block: Schedule) {
+            val manager = AppWidgetManager.getInstance(context) ?: return
+            // Mutable so the launcher can fill in the new widget's id.
+            val mutable = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0
+            val placed = PendingIntent.getBroadcast(
+                context,
+                block.id.hashCode(),
+                Intent(context, BlockWidget::class.java).setAction(ACTION_PINNED).putExtra(EXTRA_BLOCK, block.id),
+                mutable or PendingIntent.FLAG_UPDATE_CURRENT,
+            )
+            runCatching { manager.requestPinAppWidget(ComponentName(context, BlockWidget::class.java), null, placed) }
+        }
 
         /** Redraws every block widget to match the current blocks and sessions. */
         suspend fun updateAll(context: Context) {
