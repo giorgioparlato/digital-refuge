@@ -6,6 +6,8 @@
 .DS_Store
 /build/
 /app/build/
+# Any other module (e.g. probe/).
+build/
 /captures/
 .externalNativeBuild/
 .cxx/

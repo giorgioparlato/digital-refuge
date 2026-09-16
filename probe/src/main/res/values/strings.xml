@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">refuge probe</string>
+    <string name="accessibility_label">refuge probe</string>
+    <string name="accessibility_description">a test service that does nothing at all. it exists only to find out which apps a banking app objects to.</string>
+</resources>
