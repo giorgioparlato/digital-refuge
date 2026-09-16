@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Variant "covers": the shape digital refuge has and Mindful doesn't - activities meant to appear
+  in front of whatever you are using, each in its own task and hidden from recents. No permissions,
+  no tile, no widget.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <activity
+            android:name=".CoverBlockedActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity="app.refugeprobe.blocked" />
+
+        <activity
+            android:name=".CoverMinimalActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity="app.refugeprobe.minimal" />
+
+        <activity
+            android:name=".CoverLockActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity="app.refugeprobe.lock" />
+    </application>
+</manifest>

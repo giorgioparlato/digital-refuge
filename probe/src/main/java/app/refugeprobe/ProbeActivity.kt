@@ -12,6 +12,7 @@ class ProbeActivity : Activity() {
             TextView(this).apply {
                 text = buildString {
                     appendLine("refuge probe")
+                    appendLine(packageName)
                     appendLine()
                     appendLine("1. settings → accessibility → turn ON \"refuge probe\".")
                     appendLine("2. turn OFF \"digital refuge blocker\".")

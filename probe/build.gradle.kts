@@ -27,6 +27,25 @@ android {
         versionName = "1.0"
     }
 
+    /**
+     * One variant per trait under test, so they install side by side and can be enabled one at a time:
+     * "bare" is the service alone (already tested: BankID says nothing), "covers" adds the activities
+     * that appear in front of other apps, "extras" adds the permissions, tile and widget.
+     */
+    flavorDimensions += "trait"
+
+    productFlavors {
+        create("bare") { dimension = "trait" }
+        create("covers") {
+            dimension = "trait"
+            applicationIdSuffix = ".covers"
+        }
+        create("extras") {
+            dimension = "trait"
+            applicationIdSuffix = ".extras"
+        }
+    }
+
     signingConfigs {
         create("release") {
             if (releaseStore != null) {
