@@ -59,6 +59,7 @@ import app.bedtime.data.Quote
 import app.bedtime.data.Quotes
 import app.bedtime.data.Repository
 import app.bedtime.engine.Engine
+import app.bedtime.service.BlockingPause
 import app.bedtime.service.SystemApps
 import app.bedtime.ui.components.AppIcon
 import app.bedtime.ui.components.ProvideAppIcons
@@ -144,6 +145,7 @@ private fun MinimalHomeScreen(onFinish: () -> Unit, onLightBackground: (Boolean)
                 onCall = { SystemApps.dialerPackage(context)?.let { AppCatalog.launch(context, it) } },
                 alwaysAvailable = alwaysAvailableApps,
                 onOpenApp = { AppCatalog.launch(context, it) },
+                onPauseBlocking = { if (!BlockingPause.start(context)) context.startActivity(BlockingPause.settingsIntent()) },
             )
         }
         unlocking -> Surface(Modifier.fillMaxSize(), color = c.bgPrimary) {

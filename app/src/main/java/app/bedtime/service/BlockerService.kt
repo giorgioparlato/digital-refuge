@@ -96,14 +96,13 @@ class BlockerService : AccessibilityService() {
             }
             Engine.refresh()
             refreshSystemPackages()
-            // Catches up if notifications were allowed after the session started.
-            SessionNotifier.update(this@BlockerService, state)
             // Re-assert greyscale in case it was switched off from quick settings.
             scope.launch { applyGreyscale() }
         }
     }
 
     override fun onServiceConnected() {
+        BlockingPause.service = this
         refreshSystemPackages()
         val filter = IntentFilter().apply {
             addAction(Intent.ACTION_SCREEN_ON)
@@ -144,11 +143,14 @@ class BlockerService : AccessibilityService() {
                 state = next
                 applyGreyscale()
                 DndController.apply(this@BlockerService, next.dnd, next.hideNotifications)
-                SessionNotifier.update(this@BlockerService, next)
                 BlockWidget.updateAll(this@BlockerService)
+                // The guard keeps the notification and watches for blocking being switched off.
                 if (next.isActive) {
+                    SessionGuardService.start(this@BlockerService)
                     enforce(lastPackage)
                     repo.recordOccurrences(next.active)
+                } else {
+                    SessionGuardService.stop(this@BlockerService)
                 }
             }
         }
@@ -210,7 +212,7 @@ class BlockerService : AccessibilityService() {
     /** Switched off (e.g. through the emergency exit): give the phone its normal colours and sounds back. */
     override fun onUnbind(intent: Intent?): Boolean {
         val context = applicationContext
-        SessionNotifier.cancel(context)
+        BlockingPause.service = null
         releaseScope.launch {
             GreyscaleController.apply(context, wanted = false)
             DndController.apply(context, DndMode.OFF, hide = false)
@@ -219,6 +221,7 @@ class BlockerService : AccessibilityService() {
     }
 
     override fun onDestroy() {
+        BlockingPause.service = null
         if (receiverRegistered) unregisterReceiver(receiver)
         if (watchersRegistered) {
             unregisterReceiver(zenReceiver)

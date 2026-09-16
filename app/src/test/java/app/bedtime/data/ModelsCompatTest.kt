@@ -26,6 +26,16 @@ class ModelsCompatTest {
     }
 
     @Test
+    fun historyWithoutPausedAtStillLoads() {
+        val log = AppJson.decodeFromString(
+            ListSerializer(SessionLog.serializer()),
+            """[{"scheduleId":"x","name":"Bedtime","start":1,"end":2,"unlockTimes":[3],"endedEarlyAt":3}]""",
+        ).single()
+        assertTrue(log.pausedAt.isEmpty())
+        assertEquals(1, log.escapes)
+    }
+
+    @Test
     fun v1RuntimeStateLoads() {
         val runtime = AppJson.decodeFromString(
             RuntimeState.serializer(),

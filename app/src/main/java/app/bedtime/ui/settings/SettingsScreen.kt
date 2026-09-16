@@ -48,6 +48,7 @@ import app.bedtime.data.Repository
 import app.bedtime.data.Schedule
 import app.bedtime.service.DndController
 import app.bedtime.service.GreyscaleController
+import app.bedtime.service.BlockingPause
 import app.bedtime.service.SystemApps
 import app.bedtime.ui.components.BedtimeIcons
 import app.bedtime.ui.components.Chevron
@@ -154,6 +155,7 @@ fun SettingsScreen(
         version = version,
         canPinWidget = canPinWidget,
         onAddWidget = { block -> BlockWidget.requestPin(context, block) },
+        onPauseBlocking = { if (!BlockingPause.start(context)) context.startActivity(BlockingPause.settingsIntent()) },
         onExport = { exportFile.launch("digital-refuge-${LocalDate.now()}.json") },
         onImport = { pickFile.launch(arrayOf("application/json", "text/plain", "*/*")) },
     )
@@ -177,6 +179,7 @@ internal fun SettingsContent(
     onAddWidget: (Schedule) -> Unit = {},
     onExport: () -> Unit = {},
     onImport: () -> Unit = {},
+    onPauseBlocking: () -> Unit = {},
 ) {
     val c = Obsidian.colors
     Scaffold(containerColor = c.bgPrimary, topBar = { ObsidianTopBar("Settings", onBack = onBack) }) { padding ->
@@ -236,6 +239,18 @@ internal fun SettingsContent(
                         else -> "$alwaysAvailableCount apps, never blocked"
                     },
                     onClick = onAlwaysAvailable,
+                ) { Chevron() }
+            }
+
+            SectionCard(
+                title = "Banking and ID apps",
+                subtitle = "Some, like BankID, refuse to run while blocking is on. Pausing counts as an escape in your stats.",
+            ) {
+                OptionRow(
+                    Icons.Default.Warning,
+                    "Pause blocking for 1 minute",
+                    description = "Switches blocking off, then reminds you to switch it back on",
+                    onClick = onPauseBlocking,
                 ) { Chevron() }
             }
 

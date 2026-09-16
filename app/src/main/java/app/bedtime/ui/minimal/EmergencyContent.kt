@@ -39,6 +39,7 @@ internal fun EmergencyContent(
     onCall: () -> Unit,
     alwaysAvailable: List<AppEntry>,
     onOpenApp: (String) -> Unit,
+    onPauseBlocking: () -> Unit = {},
     preview: Boolean = false,
 ) {
     val c = Obsidian.colors
@@ -65,6 +66,16 @@ internal fun EmergencyContent(
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Body("the phone app always works here, including emergency calls.")
                 PlainButton("open phone", onClick = onCall, modifier = Modifier.fillMaxWidth())
+            }
+        }
+
+        SectionCard(title = "banking or id app", subtitle = "for apps that refuse to run while blocking is on") {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Body(
+                    "some banking and id apps (bankid, for one) won't start unless blocking is off. this switches it off for a " +
+                        "minute and reminds you to switch it back on. it counts as an escape in your stats.",
+                )
+                PlainButton("pause blocking for 1 minute", onClick = onPauseBlocking, modifier = Modifier.fillMaxWidth())
             }
         }
 

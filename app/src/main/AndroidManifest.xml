@@ -13,6 +13,10 @@
     <!-- The status-bar lotus while a session runs; asked for in Setup (Android 13+). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- Keeps watch during a session, so switching blocking off is noticed even then. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+
     <application
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -89,6 +93,15 @@
             <meta-data
                 android:name="android.accessibilityservice"
                 android:resource="@xml/accessibility_config" />
+        </service>
+
+        <service
+            android:name=".service.SessionGuardService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="watches whether blocking is still on during a session, and reminds the user if it was switched off" />
         </service>
 
         <service

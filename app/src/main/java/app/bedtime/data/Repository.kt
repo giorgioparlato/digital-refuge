@@ -76,6 +76,17 @@ class Repository private constructor(context: Context) {
             if (index >= 0) log.toMutableList().also { it[index] = entry } else (log + entry).takeLast(MAX_HISTORY)
         }
 
+    /** Notes that blocking was switched off during [occurrence], so the stats show it. */
+    suspend fun recordPause(occurrence: Occurrence, at: Long) =
+        update(HISTORY, historySerializer, emptyList()) { log ->
+            val index = log.indexOfFirst { it.scheduleId == occurrence.schedule.id && it.start == occurrence.start }
+            val base = if (index >= 0) log[index] else {
+                SessionLog(occurrence.schedule.id, occurrence.schedule.name, occurrence.start, occurrence.end)
+            }
+            val entry = base.copy(pausedAt = base.pausedAt + at)
+            if (index >= 0) log.toMutableList().also { it[index] = entry } else (log + entry).takeLast(MAX_HISTORY)
+        }
+
     /** Fills the always-available list once with suggested apps that are installed. */
     suspend fun seedAlwaysAvailable(suggested: Set<String>) = updateSettings {
         if (it.alwaysAvailableSeeded) it else it.copy(alwaysAvailable = it.alwaysAvailable + suggested, alwaysAvailableSeeded = true)

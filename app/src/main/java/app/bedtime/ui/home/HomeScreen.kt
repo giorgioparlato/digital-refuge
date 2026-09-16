@@ -394,7 +394,7 @@ private fun StatsCard(week: WeekStats, streak: Int) {
             // Whole hours once it's long, so the tile stays on one line.
             val protectedTime = if (week.protectedMinutes >= 600) "${week.protectedMinutes / 60} h" else formatMinutes(week.protectedMinutes)
             StatTile(protectedTime, "of refuge", Modifier.weight(1f))
-            StatTile("${week.earlyUnlocks}", if (week.earlyUnlocks == 1) "early unlock" else "early unlocks", Modifier.weight(1f))
+            StatTile("${week.escapes}", if (week.escapes == 1) "escape" else "escapes", Modifier.weight(1f))
         }
     }
 }

@@ -168,6 +168,11 @@ data class SessionLog(
     val end: Long,
     val unlockTimes: List<Long> = emptyList(),
     val endedEarlyAt: Long? = null,
+    /** Times blocking was switched off during this session (the banking pause, or Settings). */
+    val pausedAt: List<Long> = emptyList(),
 ) {
     val unlocks: Int get() = unlockTimes.size
+
+    /** Early unlocks and pauses together: every way out of a session. */
+    val escapes: Int get() = unlockTimes.size + pausedAt.size
 }
