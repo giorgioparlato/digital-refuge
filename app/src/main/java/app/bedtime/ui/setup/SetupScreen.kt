@@ -32,10 +32,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
@@ -49,7 +46,6 @@ import app.bedtime.service.GreyscaleController
 import app.bedtime.service.SystemApps
 import app.bedtime.ui.components.Callout
 import app.bedtime.ui.components.CalloutKind
-import app.bedtime.ui.components.CodeBlock
 import app.bedtime.ui.components.CtaButton
 import app.bedtime.ui.components.ObsidianTopBar
 import app.bedtime.ui.components.PlainButton
@@ -63,7 +59,6 @@ import kotlinx.coroutines.launch
 @Composable
 fun SetupScreen(onBack: () -> Unit, onAlwaysAvailable: () -> Unit) {
     val context = LocalContext.current
-    val clipboard = LocalClipboardManager.current
     val scope = rememberCoroutineScope()
     val state by Engine.state(context).collectAsStateWithLifecycle()
     val repo = remember { Repository.get(context) }
@@ -96,7 +91,6 @@ fun SetupScreen(onBack: () -> Unit, onAlwaysAvailable: () -> Unit) {
         onOpenAppInfo = {
             context.tryStart(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null)))
         },
-        onCopyCommand = { clipboard.setText(AnnotatedString(GreyscaleController.ADB_GRANT_COMMAND)) },
         onPreview = {
             previewing = true
             scope.launch {
@@ -134,7 +128,6 @@ internal fun SetupContent(
     onBack: () -> Unit,
     onOpenAccessibility: () -> Unit,
     onOpenAppInfo: () -> Unit,
-    onCopyCommand: () -> Unit,
     onPreview: () -> Unit,
     onOpenDnd: () -> Unit,
     onOpenBattery: () -> Unit,
@@ -175,13 +168,9 @@ internal fun SetupContent(
 
             StepCard(2, "Allow greyscale", done = greyscaleOk, badge = "Optional") {
                 if (greyscaleViaModes) {
-                    Body("On Android 15 and newer, greyscale works through Do Not Disturb access (step 3). No computer needed.")
+                    Body("Greyscale works through Do Not Disturb access (step 3): allow that, and sessions can fade apps to black and white.")
                 } else {
-                    Body("Android doesn't let apps switch on greyscale by themselves, so this needs a computer, just once:")
-                    NumberedLine(1, "On your phone, turn on Developer options → USB debugging.")
-                    NumberedLine(2, "Plug it into a computer that has Android Studio installed.")
-                    NumberedLine(3, "Run this command:")
-                    CodeBlock(GreyscaleController.ADB_GRANT_COMMAND, onCopy = onCopyCommand)
+                    Body("Greyscale needs Android 15 or newer, where it works through Do Not Disturb access. On older versions Android doesn't let apps switch it on.")
                 }
                 if (greyscaleOk) {
                     PlainButton(
@@ -249,15 +238,6 @@ private fun StepCard(number: Int, title: String, done: Boolean, badge: String, c
 @Composable
 private fun Body(text: String) {
     Text(text, style = MaterialTheme.typography.bodyMedium, color = Obsidian.colors.textMuted)
-}
-
-@Composable
-private fun NumberedLine(number: Int, text: String) {
-    val c = Obsidian.colors
-    Row {
-        Text("$number.", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = c.accentText, modifier = Modifier.width(22.dp))
-        Text(text, style = MaterialTheme.typography.bodyMedium, color = c.textNormal)
-    }
 }
 
 private fun Context.tryStart(intent: Intent) {

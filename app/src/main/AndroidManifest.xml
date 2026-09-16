@@ -7,11 +7,6 @@
         android:name="android.permission.QUERY_ALL_PACKAGES"
         tools:ignore="QueryAllPackagesPermission" />
 
-    <!-- Greyscale: granted once via `adb shell pm grant app.bedtime android.permission.WRITE_SECURE_SETTINGS`. -->
-    <uses-permission
-        android:name="android.permission.WRITE_SECURE_SETTINGS"
-        tools:ignore="ProtectedPermissions" />
-
     <!-- Do Not Disturb and hidden notifications; granted by the user in "Do Not Disturb access". -->
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
 

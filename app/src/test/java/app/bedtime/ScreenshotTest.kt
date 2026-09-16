@@ -218,7 +218,6 @@ class ScreenshotTest {
             onBack = {},
             onOpenAccessibility = {},
             onOpenAppInfo = {},
-            onCopyCommand = {},
             onPreview = {},
             onOpenDnd = {},
             onOpenBattery = {},

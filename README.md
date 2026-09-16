@@ -73,19 +73,9 @@ Open the app and follow **settings → permissions & setup**, which shows the st
 
 Sessions can also fade apps to black and white, while your minimal home screen stays in colour. Everything else works without it.
 
-**On Android 15 and newer, no computer is needed:** once Do Not Disturb access is allowed, greyscale runs through a "digital refuge greyscale" mode (Settings → Modes, the same system as Do Not Disturb and Bedtime).
+**It needs Android 15 or newer.** Allow Do Not Disturb access, and greyscale runs through a "digital refuge greyscale" mode (Settings → Modes, the same system as Do Not Disturb and Bedtime). No computer needed.
 
-On older versions, Android doesn't let apps switch greyscale on by themselves, so this one feature needs a permission granted once from a computer:
-
-1. On the phone, turn on USB debugging (Settings → About phone → tap *Build number* 7 times → Developer options → USB debugging).
-2. On the computer, get Google's small [platform-tools](https://developer.android.com/tools/releases/platform-tools) download, which contains `adb`.
-3. Plug in the phone and run:
-
-   ```sh
-   adb shell pm grant app.bedtime android.permission.WRITE_SECURE_SETTINGS
-   ```
-
-The permission survives reboots and updates. If you use colour correction yourself, your own setting comes back after each session.
+On older versions Android gives apps no way to switch greyscale on. digital refuge used to do it with a permission granted over `adb`, but that permission (`WRITE_SECURE_SETTINGS`) is no longer requested: banking and ID apps such as Sweden's BankID refuse to run beside an app that asks for it.
 
 ## Development
 

@@ -14,14 +14,14 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 /**
- * System-wide greyscale through the colour-correction ("daltonizer") filter in monochrome mode.
- * There is no public API for this; writing these secure settings needs WRITE_SECURE_SETTINGS,
- * which can only be granted over ADB. Without it, Android 15+ can do greyscale through an Android mode
- * instead ([ModeGreyscale]), which only needs Do Not Disturb access.
+ * System-wide greyscale. Android 15+ does it through an Android mode ([ModeGreyscale]), which only
+ * needs Do Not Disturb access; below that there is no way for an app to switch greyscale on.
+ *
+ * The colour-correction ("daltonizer") route below needs WRITE_SECURE_SETTINGS, which the app no
+ * longer declares: banking and ID apps such as BankID refuse to run beside an app that asks for it.
+ * The code stays because it works if that permission is ever declared and granted again.
  */
 object GreyscaleController {
-    const val ADB_GRANT_COMMAND = "adb shell pm grant app.bedtime android.permission.WRITE_SECURE_SETTINGS"
-
     private const val KEY_ENABLED = "accessibility_display_daltonizer_enabled"
     private const val KEY_MODE = "accessibility_display_daltonizer"
     private const val MODE_MONOCHROMACY = 0
@@ -36,7 +36,7 @@ object GreyscaleController {
         ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_SECURE_SETTINGS) ==
             PackageManager.PERMISSION_GRANTED
 
-    /** Greyscale can be switched on: through the ADB grant, or on Android 15+ through an Android mode. */
+    /** Whether greyscale can be switched on at all (Android 15+ with Do Not Disturb access). */
     fun isAvailable(context: Context): Boolean = hasPermission(context) || ModeGreyscale.isSupported(context)
 
     /**
