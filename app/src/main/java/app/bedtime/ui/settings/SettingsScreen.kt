@@ -1,5 +1,9 @@
 package app.bedtime.ui.settings
 
+import android.net.Uri
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -14,8 +18,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
@@ -25,6 +31,7 @@ import app.bedtime.ui.components.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -36,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.bedtime.data.AppSettings
+import app.bedtime.data.Backup
 import app.bedtime.data.Repository
 import app.bedtime.data.Schedule
 import app.bedtime.service.DndController
@@ -49,8 +57,11 @@ import app.bedtime.ui.components.OptionRow
 import app.bedtime.ui.components.SectionCard
 import app.bedtime.ui.formatMinutes
 import app.bedtime.ui.theme.Obsidian
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import app.bedtime.ui.widget.BlockWidget
 import kotlinx.coroutines.launch
+import java.time.LocalDate
 
 @Composable
 fun SettingsScreen(
@@ -68,6 +79,58 @@ fun SettingsScreen(
     var stepsLeft by remember { mutableIntStateOf(0) }
     val version = remember { runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull().orEmpty() }
     val canPinWidget = remember { BlockWidget.canPin(context) }
+    var pendingImport by remember { mutableStateOf<Uri?>(null) }
+
+    fun say(message: String) = Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+
+    val exportFile = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        if (uri != null) {
+            scope.launch {
+                val saved = withContext(Dispatchers.IO) {
+                    runCatching {
+                        val json = Backup.encode(repo.snapshot())
+                        checkNotNull(context.contentResolver.openOutputStream(uri)).use { it.write(json.toByteArray()) }
+                    }.isSuccess
+                }
+                say(if (saved) "settings saved to the file" else "couldn't write that file")
+            }
+        }
+    }
+    val pickFile = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        pendingImport = uri
+    }
+
+    pendingImport?.let { uri ->
+        val c = Obsidian.colors
+        AlertDialog(
+            onDismissRequest = { pendingImport = null },
+            title = { Text("Import settings?", color = c.textNormal) },
+            text = {
+                Text(
+                    "This replaces your schedules, blocks and settings with the ones in the file. Running sessions aren't affected.",
+                    color = c.textMuted,
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    pendingImport = null
+                    scope.launch {
+                        val backup = withContext(Dispatchers.IO) {
+                            runCatching {
+                                checkNotNull(context.contentResolver.openInputStream(uri)).use { Backup.decode(it.readBytes().decodeToString()) }
+                            }.getOrNull()
+                        }
+                        if (backup == null) say("that file isn't a digital refuge backup") else {
+                            repo.restore(backup)
+                            say("settings restored")
+                        }
+                    }
+                }) { Text("Replace", color = c.accentText, fontWeight = FontWeight.SemiBold) }
+            },
+            dismissButton = { TextButton(onClick = { pendingImport = null }) { Text("Cancel", color = c.textMuted) } },
+            containerColor = c.bgSecondary,
+        )
+    }
     LifecycleResumeEffect(Unit) {
         stepsLeft = listOf(
             SystemApps.isAccessibilityServiceEnabled(context),
@@ -91,6 +154,8 @@ fun SettingsScreen(
         version = version,
         canPinWidget = canPinWidget,
         onAddWidget = { block -> BlockWidget.requestPin(context, block) },
+        onExport = { exportFile.launch("digital-refuge-${LocalDate.now()}.json") },
+        onImport = { pickFile.launch(arrayOf("application/json", "text/plain", "*/*")) },
     )
 }
 
@@ -107,9 +172,11 @@ internal fun SettingsContent(
     onGroups: () -> Unit = {},
     alwaysAvailableCount: Int = 0,
     onAlwaysAvailable: () -> Unit = {},
-    version: String = "1.1",
+    version: String = "1.3",
     canPinWidget: Boolean = true,
     onAddWidget: (Schedule) -> Unit = {},
+    onExport: () -> Unit = {},
+    onImport: () -> Unit = {},
 ) {
     val c = Obsidian.colors
     Scaffold(containerColor = c.bgPrimary, topBar = { ObsidianTopBar("Settings", onBack = onBack) }) { padding ->
@@ -169,6 +236,24 @@ internal fun SettingsContent(
                         else -> "$alwaysAvailableCount apps, never blocked"
                     },
                     onClick = onAlwaysAvailable,
+                ) { Chevron() }
+            }
+
+            SectionCard(
+                title = "Backup",
+                subtitle = "Keep your schedules and settings in a file, to restore after reinstalling.",
+            ) {
+                OptionRow(
+                    Icons.Default.Share,
+                    "Export settings",
+                    description = "Save schedules, blocks, groups and stats to a file",
+                    onClick = onExport,
+                ) { Chevron() }
+                OptionRow(
+                    BedtimeIcons.Refuge,
+                    "Import settings",
+                    description = "Replace everything with a saved file",
+                    onClick = onImport,
                 ) { Chevron() }
             }
 

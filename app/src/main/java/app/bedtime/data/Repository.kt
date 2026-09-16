@@ -9,6 +9,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import app.bedtime.engine.Occurrence
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.ListSerializer
@@ -103,6 +104,23 @@ class Repository private constructor(context: Context) {
     }
 
     suspend fun deleteGroup(id: String) = updateSettings { it.copy(groups = it.groups.filterNot { group -> group.id == id }) }
+
+    /** Everything worth keeping across a reinstall. Running sessions are left out on purpose. */
+    suspend fun snapshot(): Backup = Backup(
+        exportedAt = System.currentTimeMillis(),
+        schedules = schedules.first(),
+        settings = settings.first(),
+        history = history.first(),
+    )
+
+    /** Replaces schedules, settings and history with [backup]. Runtime state is left alone. */
+    suspend fun restore(backup: Backup) {
+        store.edit { prefs ->
+            prefs[SCHEDULES] = AppJson.encodeToString(schedulesSerializer, backup.schedules)
+            prefs[SETTINGS] = AppJson.encodeToString(AppSettings.serializer(), backup.settings)
+            prefs[HISTORY] = AppJson.encodeToString(historySerializer, backup.history)
+        }
+    }
 
     private fun <T> observe(key: Preferences.Key<String>, serializer: KSerializer<T>, default: T): Flow<T> =
         store.data.map { decode(it[key], serializer, default) }.distinctUntilChanged()

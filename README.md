@@ -92,6 +92,7 @@ The permission survives reboots and updates. If you use colour correction yourse
 Build from source with [Android Studio](https://developer.android.com/studio), or any machine with the Android SDK and JDK 17:
 
 ```sh
+./gradlew assembleRelease        # the APK to install on a phone: app/build/outputs/apk/release/app-release.apk
 ./gradlew installDebug           # build and install on a connected phone
 ./gradlew assembleDebug          # just build the APK: app/build/outputs/apk/debug/app-debug.apk
 ./gradlew testDebugUnitTest      # logic tests: schedules, stats, challenges, DND policy…
@@ -99,6 +100,8 @@ Build from source with [Android Studio](https://developer.android.com/studio), o
 ./gradlew verifyPaparazziDebug   # fails if a screen changed unexpectedly
 ./gradlew lintDebug
 ```
+
+Release builds are signed with a key of your own, so banking and ID apps don't see a debug build. Put the details in `local.properties` (never committed): `RELEASE_STORE_FILE`, `RELEASE_STORE_PASSWORD`, `RELEASE_KEY_ALIAS` and `RELEASE_KEY_PASSWORD`. Without them, release builds fall back to the debug key. Keep the keystore safe: updates must use the same key, or the app has to be uninstalled and set up again (export your settings first, from settings → backup).
 
 The screens are checked with [Paparazzi](https://github.com/cashapp/paparazzi) screenshots rather than an emulator. Every screen has a stateless `…Content` composable, which is what the screenshot tests render.
 

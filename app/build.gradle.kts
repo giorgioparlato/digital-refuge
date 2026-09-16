@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -7,6 +9,13 @@ plugins {
     alias(libs.plugins.paparazzi)
 }
 
+/** Release signing details, kept out of git in local.properties. */
+val localProps = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+}
+val releaseStore: String? = localProps.getProperty("RELEASE_STORE_FILE")
+
 android {
     namespace = "app.bedtime"
     compileSdk = 35
@@ -15,15 +24,26 @@ android {
         applicationId = "app.bedtime"
         minSdk = 26
         targetSdk = 35
-        versionCode = 3
-        versionName = "1.2"
+        versionCode = 4
+        versionName = "1.3"
+    }
+
+    signingConfigs {
+        create("release") {
+            if (releaseStore != null) {
+                storeFile = file(releaseStore)
+                storePassword = localProps.getProperty("RELEASE_STORE_PASSWORD")
+                keyAlias = localProps.getProperty("RELEASE_KEY_ALIAS")
+                keyPassword = localProps.getProperty("RELEASE_KEY_PASSWORD")
+            }
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
-            // Sideloaded personal build: sign release with the debug key so `assembleRelease` just works.
-            signingConfig = signingConfigs.getByName("debug")
+            // The real key when local.properties has one; otherwise the debug key, so builds work anywhere.
+            signingConfig = signingConfigs.getByName(if (releaseStore != null) "release" else "debug")
         }
     }
 
