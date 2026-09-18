@@ -50,12 +50,10 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -83,7 +81,6 @@ import app.bedtime.ui.components.ObsidianTopBar
 import app.bedtime.ui.components.SectionCard
 import app.bedtime.ui.components.StatusDot
 import app.bedtime.ui.components.Tag
-import app.bedtime.ui.components.styledTime
 import app.bedtime.ui.create.TemplateGallery
 import app.bedtime.ui.formatDays
 import app.bedtime.ui.formatDuration
@@ -92,9 +89,7 @@ import app.bedtime.ui.formatMinutes
 import app.bedtime.ui.formatRelative
 import app.bedtime.ui.formatTime
 import app.bedtime.ui.pluralApps
-import app.bedtime.ui.scheduleMinutes
 import app.bedtime.ui.theme.Obsidian
-import app.bedtime.ui.unlockSummary
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.ZoneId
@@ -175,7 +170,10 @@ internal fun HomeContent(
     val c = Obsidian.colors
     var starting by remember { mutableStateOf<Schedule?>(null) }
     starting?.let { block ->
-        StartBlockDialog(block, onDismiss = { starting = null }, onStart = { minutes ->
+        StartBlockDialog(block, onDismiss = { starting = null }, onEdit = {
+            starting = null
+            onEdit(block.id)
+        }, onStart = { minutes ->
             onStartBlock(block, minutes)
             starting = null
         })
@@ -219,23 +217,24 @@ internal fun HomeContent(
             } else {
                 item(key = "status") { StatusHero(ui, onUnlock) }
                 if (ui.history.isNotEmpty()) {
-                    item(key = "stats") { StatsCard(Stats.week(ui.history, ui.now), Stats.streak(ui.history, ui.now)) }
+                    item(key = "stats") { StatsLine(Stats.week(ui.history, ui.now), Stats.streak(ui.history, ui.now)) }
                 }
                 if (blocks.isNotEmpty()) {
-                    item(key = "blocks-heading") { Heading("Focus blocks") }
-                    items(blocks, key = { it.id }) { block ->
-                        BlockCard(
-                            block = block,
-                            running = ui.active?.occurrenceOf(block.id),
-                            onClick = { onEdit(block.id) },
-                            onStart = { starting = block },
+                    item(key = "blocks-heading") { Heading("Start a block") }
+                    // Three tiles to a row; more blocks simply add rows.
+                    items(blocks.chunked(3), key = { row -> "blocks-" + row.first().id }) { row ->
+                        BlockRow(
+                            row = row,
+                            running = { ui.active?.occurrenceOf(it.id) },
+                            onStart = { starting = it },
+                            onEdit = onEdit,
                         )
                     }
                 }
                 if (recurring.isNotEmpty()) {
                     item(key = "schedules-heading") { Heading("Schedules") }
                     items(recurring, key = { it.id }) { schedule ->
-                        ScheduleCard(
+                        ScheduleRow(
                             schedule = schedule,
                             active = ui.active?.occurrenceOf(schedule.id) != null,
                             onClick = { onEdit(schedule.id) },
@@ -252,9 +251,9 @@ internal fun HomeContent(
 private fun Heading(text: String) {
     Text(
         text,
-        style = MaterialTheme.typography.titleMedium,
-        color = Obsidian.colors.textNormal,
-        modifier = Modifier.padding(top = 12.dp, start = 4.dp),
+        style = MaterialTheme.typography.labelLarge,
+        color = Obsidian.colors.textMuted,
+        modifier = Modifier.padding(top = 16.dp, start = 4.dp),
     )
 }
 
@@ -387,34 +386,6 @@ private fun StatusHero(ui: HomeUiState, onUnlock: (String) -> Unit) {
 }
 
 @Composable
-private fun StatsCard(week: WeekStats, streak: Int) {
-    SectionCard(title = "This week") {
-        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            StatTile("$streak", if (streak == 1) "session kept in a row" else "sessions kept in a row", Modifier.weight(1f))
-            // Whole hours once it's long, so the tile stays on one line.
-            val protectedTime = if (week.protectedMinutes >= 600) "${week.protectedMinutes / 60} h" else formatMinutes(week.protectedMinutes)
-            StatTile(protectedTime, "of refuge", Modifier.weight(1f))
-            StatTile("${week.escapes}", if (week.escapes == 1) "escape" else "escapes", Modifier.weight(1f))
-        }
-    }
-}
-
-@Composable
-private fun StatTile(value: String, label: String, modifier: Modifier) {
-    val c = Obsidian.colors
-    Column(
-        modifier
-            .fillMaxHeight()
-            .clip(RoundedCornerShape(12.dp))
-            .background(c.bgPrimaryAlt)
-            .padding(12.dp),
-    ) {
-        Text(value, style = MaterialTheme.typography.titleLarge, color = c.accentText)
-        Text(label, style = MaterialTheme.typography.labelMedium, color = c.textMuted)
-    }
-}
-
-@Composable
 private fun EmptyState(onCreate: () -> Unit, onTemplate: (String) -> Unit, isInstalled: (String) -> Boolean) {
     val c = Obsidian.colors
     Column(
@@ -453,112 +424,125 @@ private fun EmptyState(onCreate: () -> Unit, onTemplate: (String) -> Unit, isIns
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+/** Streak, time in refuge and escapes, in one quiet line instead of a card. */
 @Composable
-private fun RestrictionTags(schedule: Schedule) {
-    FlowRow(
-        Modifier.padding(top = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        if (schedule.blockedApps.isNotEmpty()) Tag("${pluralApps(schedule.blockedApps.size)} blocked")
-        if (schedule.greyscale) Tag("greyscale")
-        if (schedule.minimalMode) Tag("minimal mode")
-        when (schedule.dnd) {
-            DndMode.PRIORITY -> Tag("priority only")
-            DndMode.SILENCE -> Tag("silent")
-            DndMode.OFF -> Unit
-        }
-        if (schedule.hideNotifications) Tag("notifications held")
-        Tag(unlockSummary(schedule.unlock))
-    }
+private fun StatsLine(week: WeekStats, streak: Int) {
+    val protectedTime = if (week.protectedMinutes >= 600) "${week.protectedMinutes / 60} h" else formatMinutes(week.protectedMinutes)
+    val escapes = if (week.escapes == 1) "1 escape" else "${week.escapes} escapes"
+    Text(
+        "streak $streak · $protectedTime of refuge this week · $escapes",
+        style = MaterialTheme.typography.labelLarge,
+        color = Obsidian.colors.textMuted,
+        modifier = Modifier.padding(horizontal = 4.dp),
+    )
 }
 
+/** Up to three blocks side by side; a part-filled last row keeps the same tile width. */
 @Composable
-private fun BlockCard(block: Schedule, running: Occurrence?, onClick: () -> Unit, onStart: () -> Unit) {
-    val context = LocalContext.current
-    val c = Obsidian.colors
-    val shape = RoundedCornerShape(16.dp)
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clip(shape)
-            .background(c.bgSecondary)
-            .border(if (running != null) 1.5.dp else 1.dp, if (running != null) c.accent else c.border, shape)
-            .clickable(onClickLabel = "Edit ${block.name}", onClick = onClick)
-            .padding(18.dp),
-        verticalAlignment = Alignment.Top,
-    ) {
-        Column(Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(block.name, style = MaterialTheme.typography.titleMedium, color = c.textNormal)
-                if (running != null) {
-                    Spacer(Modifier.width(8.dp))
-                    Tag("on now")
-                }
-            }
-            Text(
-                if (running != null) "until ${formatTime(context, running.end)}" else formatMinutes(block.durationMinutes.toLong()),
-                fontSize = 26.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = c.textNormal,
-                modifier = Modifier.padding(top = 4.dp),
+private fun BlockRow(row: List<Schedule>, running: (Schedule) -> Occurrence?, onStart: (Schedule) -> Unit, onEdit: (String) -> Unit) {
+    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        row.forEach { block ->
+            BlockTile(
+                block = block,
+                running = running(block),
+                modifier = Modifier.weight(1f).fillMaxHeight(),
+                onStart = { onStart(block) },
+                onEdit = { onEdit(block.id) },
             )
-            RestrictionTags(block)
         }
-        if (running == null) CtaButton("Start", onClick = onStart, compact = true)
+        repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
     }
 }
 
+/** One tap starts the block (the dialog also leads to its settings); while it runs, a tap opens it. */
 @Composable
-private fun ScheduleCard(schedule: Schedule, active: Boolean, onClick: () -> Unit, onToggle: (Boolean) -> Unit) {
+private fun BlockTile(block: Schedule, running: Occurrence?, modifier: Modifier, onStart: () -> Unit, onEdit: () -> Unit) {
     val context = LocalContext.current
     val c = Obsidian.colors
-    val shape = RoundedCornerShape(16.dp)
+    val shape = RoundedCornerShape(14.dp)
+    Column(
+        modifier
+            .clip(shape)
+            .background(if (running != null) c.accent.copy(alpha = 0.10f) else c.bgSecondary)
+            .border(if (running != null) 1.5.dp else 1.dp, if (running != null) c.accent else c.border, shape)
+            .clickable(
+                onClickLabel = if (running != null) "Open ${block.name}" else "Start ${block.name}",
+                onClick = if (running != null) onEdit else onStart,
+            )
+            .padding(12.dp),
+    ) {
+        Icon(BedtimeIcons.Target, contentDescription = null, tint = c.accent, modifier = Modifier.size(22.dp))
+        Spacer(Modifier.height(10.dp))
+        Text(block.name, style = MaterialTheme.typography.titleSmall, color = c.textNormal, maxLines = 2)
+        Text(
+            if (running != null) "until ${formatTime(context, running.end)}" else formatMinutes(block.durationMinutes.toLong()),
+            style = MaterialTheme.typography.bodySmall,
+            color = if (running != null) c.accentText else c.textMuted,
+        )
+    }
+}
+
+/** A schedule as one slim row: name, when, its key restrictions, and the on/off switch. */
+@Composable
+private fun ScheduleRow(schedule: Schedule, active: Boolean, onClick: () -> Unit, onToggle: (Boolean) -> Unit) {
+    val context = LocalContext.current
+    val c = Obsidian.colors
+    val shape = RoundedCornerShape(14.dp)
     Row(
         Modifier
             .fillMaxWidth()
             .clip(shape)
-            .background(c.bgSecondary)
-            .border(if (active) 1.5.dp else 1.dp, if (active) c.accent else c.border, shape)
+            .then(if (active) Modifier.background(c.accent.copy(alpha = 0.08f)).border(1.dp, c.accent.copy(alpha = 0.5f), shape) else Modifier)
             .clickable(onClickLabel = "Edit ${schedule.name}", onClick = onClick)
-            .padding(18.dp),
-        verticalAlignment = Alignment.Top,
+            .padding(horizontal = 12.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(Modifier.weight(1f).alpha(if (schedule.enabled) 1f else 0.55f)) {
+        Column(Modifier.weight(1f).alpha(if (schedule.enabled) 1f else 0.5f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(schedule.name, style = MaterialTheme.typography.titleMedium, color = c.textNormal)
                 if (active) {
                     Spacer(Modifier.width(8.dp))
                     Tag("on now")
-                } else if (!schedule.enabled) {
-                    Spacer(Modifier.width(8.dp))
-                    Text("off", style = MaterialTheme.typography.labelMedium, color = c.textFaint)
                 }
             }
             Text(
-                styledTime(formatMinuteOfDay(context, schedule.startMinute), 16.sp) +
-                    AnnotatedString(" – ") +
-                    styledTime(formatMinuteOfDay(context, schedule.endMinute), 16.sp),
-                fontSize = 28.sp,
-                maxLines = 1,
-                fontWeight = FontWeight.SemiBold,
-                color = c.textNormal,
-                modifier = Modifier.padding(top = 4.dp),
-            )
-            Text(
-                "${formatDays(schedule.days)} · ${formatMinutes(scheduleMinutes(schedule).toLong())}",
+                "${formatMinuteOfDay(context, schedule.startMinute)} – ${formatMinuteOfDay(context, schedule.endMinute)} · ${formatDays(schedule.days)}",
                 style = MaterialTheme.typography.bodyMedium,
                 color = c.textMuted,
             )
-            RestrictionTags(schedule)
+            KeyTags(schedule)
         }
+        Spacer(Modifier.width(12.dp))
         ObsidianToggle(schedule.enabled, onToggle, enabled = !active)
     }
 }
 
+/** The restrictions that matter at a glance; everything else is one tap away in the editor. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun StartBlockDialog(block: Schedule, onDismiss: () -> Unit, onStart: (Int) -> Unit) {
+private fun KeyTags(schedule: Schedule) {
+    val tags = buildList {
+        if (schedule.minimalMode) add("minimal mode")
+        if (schedule.blockedApps.isNotEmpty()) add("${pluralApps(schedule.blockedApps.size)} blocked")
+        if (schedule.greyscale) add("greyscale")
+        when (schedule.dnd) {
+            DndMode.PRIORITY -> add("priority only")
+            DndMode.SILENCE -> add("silent")
+            DndMode.OFF -> Unit
+        }
+    }
+    if (tags.isEmpty()) return
+    FlowRow(
+        Modifier.padding(top = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        tags.forEach { Tag(it) }
+    }
+}
+
+@Composable
+private fun StartBlockDialog(block: Schedule, onDismiss: () -> Unit, onEdit: () -> Unit, onStart: (Int) -> Unit) {
     val context = LocalContext.current
     val c = Obsidian.colors
     var minutes by remember(block.id) { mutableIntStateOf(block.durationMinutes) }
@@ -582,7 +566,9 @@ private fun StartBlockDialog(block: Schedule, onDismiss: () -> Unit, onStart: (I
                     style = MaterialTheme.typography.bodyMedium,
                     color = c.textMuted,
                 )
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = onEdit) { Text("Edit", color = c.textMuted) }
+                    Spacer(Modifier.weight(1f))
                     TextButton(onClick = onDismiss) { Text("Not now", color = c.textMuted) }
                     Spacer(Modifier.width(8.dp))
                     CtaButton("Start", onClick = { onStart(minutes) }, compact = true)

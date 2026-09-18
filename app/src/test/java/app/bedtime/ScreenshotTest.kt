@@ -138,6 +138,9 @@ class ScreenshotTest {
     fun homeActive() = shot { Home(Samples.home(hour = 15, runningFocus = true)) }
 
     @Test
+    fun homeManyBlocks() = shot(tall = true) { Home(Samples.home(Samples.manyBlocks, hour = 15, runningFocus = true)) }
+
+    @Test
     fun create() = shot(tall = true) { CreateContent(onBack = {}, onPick = {}) }
 
     @Test
@@ -501,6 +504,14 @@ private object Samples {
     )
 
     private val all = listOf(focus, deepWork, bedtime, work)
+
+    private fun block(id: String, name: String, minutes: Int) =
+        Schedule(id = id, name = name, kind = ScheduleKind.BLOCK, durationMinutes = minutes, greyscale = false)
+
+    /** Five blocks, so the grid needs a second row. */
+    val manyBlocks: List<Schedule> get() = listOf(
+        focus, deepWork, block("pomodoro", "Pomodoro", 25), block("study", "Study", 45), block("read", "Reading", 30), bedtime, work,
+    )
 
     fun home(
         schedules: List<Schedule> = all,
