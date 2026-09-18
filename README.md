@@ -69,6 +69,8 @@ Open the app and follow **settings → permissions & setup**, which shows the st
 
 So digital refuge offers a way out instead of pretending: **emergency → banking or ID app → pause for 1 minute** switches blocking off, keeps a countdown in the notification, and reminds you until it's back on. Pauses are counted in your stats and break your streak, exactly like unlocking early, so this doesn't quietly become the easy way out. Switching blocking off from Settings, or from the link the banking app offers, is noticed and counted the same way.
 
+**Can I still switch blocking off mid-session?** Not in two taps. During a session, the Settings screens that switch blocking off, and the uninstall prompt, are covered by a screen offering the one-minute pause or the unlock steps (you can turn this off in settings → switching blocking off). The deliberate routes stay open: the pause, the unlock steps, or restarting the phone in safe mode. And if blocking does go off, Do Not Disturb, held notifications and greyscale keep going until the session ends, so it only unblocks apps.
+
 **Last resort,** if you're ever truly stuck: restart the phone in safe mode (power menu → press and hold *Power off*). Downloaded apps don't run there, so you can uninstall digital refuge like any other app.
 
 ## Extra: greyscale

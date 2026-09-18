@@ -54,6 +54,7 @@ import app.bedtime.ui.components.BedtimeIcons
 import app.bedtime.ui.components.Chevron
 import app.bedtime.ui.components.IconBadge
 import app.bedtime.ui.components.ObsidianTopBar
+import app.bedtime.ui.components.ObsidianToggle
 import app.bedtime.ui.components.OptionRow
 import app.bedtime.ui.components.SectionCard
 import app.bedtime.ui.formatMinutes
@@ -156,6 +157,8 @@ fun SettingsScreen(
         canPinWidget = canPinWidget,
         onAddWidget = { block -> BlockWidget.requestPin(context, block) },
         onPauseBlocking = { if (!BlockingPause.start(context)) context.startActivity(BlockingPause.settingsIntent()) },
+        lockSettings = settings.lockSettingsDuringSessions,
+        onLockSettings = { on -> scope.launch { repo.updateSettings { it.copy(lockSettingsDuringSessions = on) } } },
         onExport = { exportFile.launch("digital-refuge-${LocalDate.now()}.json") },
         onImport = { pickFile.launch(arrayOf("application/json", "text/plain", "*/*")) },
     )
@@ -174,12 +177,14 @@ internal fun SettingsContent(
     onGroups: () -> Unit = {},
     alwaysAvailableCount: Int = 0,
     onAlwaysAvailable: () -> Unit = {},
-    version: String = "1.3",
+    version: String = "1.5",
     canPinWidget: Boolean = true,
     onAddWidget: (Schedule) -> Unit = {},
     onExport: () -> Unit = {},
     onImport: () -> Unit = {},
     onPauseBlocking: () -> Unit = {},
+    lockSettings: Boolean = true,
+    onLockSettings: (Boolean) -> Unit = {},
 ) {
     val c = Obsidian.colors
     Scaffold(containerColor = c.bgPrimary, topBar = { ObsidianTopBar("Settings", onBack = onBack) }) { padding ->
@@ -243,9 +248,14 @@ internal fun SettingsContent(
             }
 
             SectionCard(
-                title = "Banking and ID apps",
-                subtitle = "Some, like BankID, refuse to run while blocking is on. Pausing counts as an escape in your stats.",
+                title = "Switching blocking off",
+                subtitle = "During a session it only happens on purpose. Some apps, like BankID, need it off for a moment.",
             ) {
+                OptionRow(
+                    BedtimeIcons.Refuge,
+                    "Lock blocking's settings during sessions",
+                    description = "Covers the screens that switch blocking off or uninstall the app, until the session ends",
+                ) { ObsidianToggle(lockSettings, onLockSettings) }
                 OptionRow(
                     Icons.Default.Warning,
                     "Pause blocking for 1 minute",

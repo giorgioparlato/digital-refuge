@@ -8,6 +8,7 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.provider.Settings
+import app.bedtime.data.DndMode
 import app.bedtime.data.Repository
 import app.bedtime.engine.ActiveState
 import app.bedtime.engine.Engine
@@ -29,6 +30,9 @@ import kotlinx.coroutines.launch
  */
 class SessionGuardService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
+    /** Not cancelled on destroy, so giving the phone its sound and colour back can finish. */
+    private val releaseScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var state: ActiveState? = null
     private var blockingOn = true
 
@@ -56,14 +60,25 @@ class SessionGuardService : Service() {
         scope.launch {
             Engine.state(this@SessionGuardService).filterNotNull().collect { next ->
                 state = next
-                if (!next.isActive) stopSelf() else refresh()
+                if (!next.isActive) {
+                    // Blocking was off, so nobody else will restore Do Not Disturb and colours.
+                    if (!blockingOn) release()
+                    stopSelf()
+                } else {
+                    refresh()
+                }
             }
         }
-        // While blocking is off the reminder is re-posted, so it stays in sight and the countdown moves.
+        // While blocking is off the reminder is re-posted, so it stays in sight and the countdown moves,
+        // and every 15 seconds Do Not Disturb and greyscale are re-asserted in case they were switched off.
         scope.launch {
+            var ticks = 0
             while (true) {
                 delay(1_000)
-                if (!blockingOn) post()
+                if (!blockingOn) {
+                    post()
+                    if (++ticks % 15 == 0) holdQuietAndGrey()
+                }
             }
         }
     }
@@ -97,7 +112,30 @@ class SessionGuardService : Service() {
                 Engine.refresh() // Pick the session back up straight away.
             }
         }
+        holdQuietAndGrey()
         post()
+    }
+
+    /**
+     * With the accessibility service off, keep the session's Do Not Disturb, held notifications and
+     * greyscale (Android 15+ modes) going from here, so switching blocking off only unblocks apps.
+     */
+    private fun holdQuietAndGrey() {
+        val current = state ?: return
+        if (blockingOn || !current.isActive) return
+        scope.launch {
+            DndController.apply(this@SessionGuardService, current.dnd, current.hideNotifications)
+            GreyscaleController.apply(this@SessionGuardService, wanted = current.greyscale)
+        }
+    }
+
+    /** The session ended while blocking was off: give the phone its normal sound and colours back. */
+    private fun release() {
+        val context = applicationContext
+        releaseScope.launch {
+            GreyscaleController.apply(context, wanted = false)
+            DndController.apply(context, DndMode.OFF, hide = false)
+        }
     }
 
     private fun post() {

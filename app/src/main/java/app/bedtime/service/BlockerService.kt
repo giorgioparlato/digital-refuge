@@ -13,6 +13,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.view.accessibility.AccessibilityEvent
 import androidx.core.content.ContextCompat
+import app.bedtime.R
 import app.bedtime.data.AppSettings
 import app.bedtime.data.DndMode
 import app.bedtime.data.Repository
@@ -44,6 +45,10 @@ class BlockerService : AccessibilityService() {
     private var overlays: Set<String> = emptySet()
     private var lastPackage: String? = null
     private var homeInFront = false
+
+    /** Settings and the package installer: where the screens that switch blocking off live. */
+    private var guardedPackages: Set<String> = emptySet()
+    private val guardNames by lazy { setOf(getString(R.string.accessibility_label), getString(R.string.app_name)) }
     private var receiverRegistered = false
     private var watchersRegistered = false
 
@@ -103,6 +108,8 @@ class BlockerService : AccessibilityService() {
 
     override fun onServiceConnected() {
         BlockingPause.service = this
+        // Just switched back on, probably from our own Settings page: let the user finish there.
+        SettingsGuard.graceUntil = System.currentTimeMillis() + SettingsGuard.GRACE_MS
         refreshSystemPackages()
         val filter = IntentFilter().apply {
             addAction(Intent.ACTION_SCREEN_ON)
@@ -169,7 +176,25 @@ class BlockerService : AccessibilityService() {
         lastPackage = pkg
         val boundary = state?.nextBoundary
         if (boundary != null && System.currentTimeMillis() >= boundary) Engine.refresh()
+        if (guardSettings(pkg, event)) return
         enforce(pkg)
+    }
+
+    /**
+     * During a session, covers the screens that would switch blocking off or uninstall the app. The
+     * deliberate ways out stay on the cover itself: the one-minute pause and the unlock steps.
+     */
+    private fun guardSettings(pkg: String, event: AccessibilityEvent): Boolean {
+        val current = state ?: return false
+        if (!current.isActive || !settings.lockSettingsDuringSessions) return false
+        if (System.currentTimeMillis() < SettingsGuard.graceUntil) return false
+        val texts = buildList {
+            addAll(event.text)
+            event.contentDescription?.let(::add)
+        }
+        if (!SettingsGuard.matches(pkg, texts, guardedPackages, guardNames)) return false
+        runCatching { startActivity(BlockedActivity.settingsIntent(this)) }
+        return true
     }
 
     private suspend fun applyGreyscale(): Boolean =
@@ -192,6 +217,7 @@ class BlockerService : AccessibilityService() {
     private fun refreshSystemPackages() {
         alwaysAllowed = SystemApps.alwaysAllowed(this)
         overlays = SystemApps.keyboards(this) + "com.android.systemui"
+        guardedPackages = setOfNotNull(SystemApps.settingsPackage(this), "com.android.settings") + SettingsGuard.INSTALLER_PACKAGES
     }
 
     private fun enforce(pkg: String?) {
@@ -209,13 +235,19 @@ class BlockerService : AccessibilityService() {
 
     override fun onInterrupt() = Unit
 
-    /** Switched off (e.g. through the emergency exit): give the phone its normal colours and sounds back. */
+    /**
+     * Switched off. Outside a session, give the phone its normal colours and sounds back. Mid-session,
+     * [SessionGuardService] keeps Do Not Disturb and greyscale going, so switching blocking off only
+     * unblocks apps.
+     */
     override fun onUnbind(intent: Intent?): Boolean {
         val context = applicationContext
         BlockingPause.service = null
-        releaseScope.launch {
-            GreyscaleController.apply(context, wanted = false)
-            DndController.apply(context, DndMode.OFF, hide = false)
+        if (state?.isActive != true) {
+            releaseScope.launch {
+                GreyscaleController.apply(context, wanted = false)
+                DndController.apply(context, DndMode.OFF, hide = false)
+            }
         }
         return super.onUnbind(intent)
     }

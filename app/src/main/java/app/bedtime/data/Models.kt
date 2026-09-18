@@ -149,6 +149,8 @@ data class AppSettings(
     val alwaysAvailableSeeded: Boolean = false,
     /** Which block each home-screen widget starts, by widget id; missing means the tile's block, then the first. */
     val widgetBlocks: Map<String, String> = emptyMap(),
+    /** During sessions, cover the Settings screens that switch blocking off (see SettingsGuard). */
+    val lockSettingsDuringSessions: Boolean = true,
 )
 
 /** A named set of apps for ticking many at once in the app picker. Copied into schedules, never linked. */

@@ -44,6 +44,12 @@ android {
             dimension = "trait"
             applicationIdSuffix = ".extras"
         }
+        // "display over other apps" alone, with no accessibility service: would a fallback blocker
+        // built on overlays upset BankID, Chase or Play Protect?
+        create("overlay") {
+            dimension = "trait"
+            applicationIdSuffix = ".overlay"
+        }
     }
 
     signingConfigs {

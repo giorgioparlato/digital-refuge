@@ -32,6 +32,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationManagerCompat
@@ -155,15 +156,22 @@ internal fun SetupContent(
             )
 
             StepCard(1, "Let digital refuge see which app is open", done = serviceOn, badge = "Required") {
-                Body("digital refuge uses Android's accessibility service to notice when a blocked app opens. It doesn't read what's on your screen or what you type.")
-                CtaButton("Open accessibility settings", onClick = onOpenAccessibility, modifier = Modifier.fillMaxWidth())
-                Callout(
-                    title = "Switch greyed out?",
-                    kind = CalloutKind.INFO,
-                    body = "Android 13 and newer are extra careful with apps installed outside the Play Store. Open App info, tap ⋮ in the top-right corner, choose “Allow restricted settings”, then try again.",
-                    actionLabel = "Open App info",
-                    onAction = onOpenAppInfo,
-                )
+                Body("This is what notices when a blocked app opens. It only sees which app is in front: it can't read what's on your screen or what you type.")
+                if (!serviceOn) {
+                    Body("Android hides this switch for apps installed outside the Play Store, so there are two parts. Do them in this order:")
+                    NumberedLine(1, "Tap “Allow restricted settings” below. In App info, tap ⋮ in the top-right corner, then “Allow restricted settings”. If that menu item isn't there, skip to step 2 — your phone doesn't need it.")
+                    NumberedLine(2, "Tap “Open accessibility settings” below, find digital refuge blocker (under “Downloaded apps” on most phones), open it and switch it on. Confirm the permission Android asks about.")
+                    PlainButton("1 · Allow restricted settings", onClick = onOpenAppInfo, modifier = Modifier.fillMaxWidth())
+                    CtaButton("2 · Open accessibility settings", onClick = onOpenAccessibility, modifier = Modifier.fillMaxWidth())
+                    Callout(
+                        title = "Switch still greyed out?",
+                        kind = CalloutKind.INFO,
+                        body = "Go back to step 1 and check the ⋮ menu again: the option only appears once, and it disappears after you've used it. " +
+                            "After a reinstall you have to do it again.",
+                    )
+                } else {
+                    CtaButton("Open accessibility settings", onClick = onOpenAccessibility, modifier = Modifier.fillMaxWidth())
+                }
             }
 
             StepCard(2, "Allow greyscale", done = greyscaleOk, badge = "Optional") {
@@ -232,6 +240,21 @@ private fun StepCard(number: Int, title: String, done: Boolean, badge: String, c
         }
         Spacer(Modifier.height(14.dp))
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) { content() }
+    }
+}
+
+@Composable
+private fun NumberedLine(number: Int, text: String) {
+    val c = Obsidian.colors
+    Row {
+        Text(
+            "$number.",
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = c.accentText,
+            modifier = Modifier.width(22.dp),
+        )
+        Text(text, style = MaterialTheme.typography.bodyMedium, color = c.textNormal)
     }
 }
 

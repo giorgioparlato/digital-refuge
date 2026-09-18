@@ -252,6 +252,9 @@ class ScreenshotTest {
     fun blocked() = shot { BlockedContent("Instagram", "Bedtime", "07:00", {}, {}) }
 
     @Test
+    fun settingsGuard() = shot { app.bedtime.ui.blocked.SettingsGuardContent("Bedtime", "07:00", {}, {}, {}) }
+
+    @Test
     fun minimalHome() = shot {
         MinimalHomeContent(
             now = Samples.lateEvening,
