@@ -60,8 +60,6 @@ import app.bedtime.engine.ActiveState
 import app.bedtime.engine.Engine
 import app.bedtime.engine.Occurrence
 import app.bedtime.engine.ScheduleEvaluator
-import app.bedtime.engine.Stats
-import app.bedtime.engine.WeekStats
 import app.bedtime.service.DndController
 import app.bedtime.service.GreyscaleController
 import app.bedtime.service.SystemApps
@@ -221,12 +219,6 @@ internal fun HomeContent(
             if (ui.quote != null) {
                 item(key = "quote") { QuoteFooter(ui.quote) }
             }
-            if (ui.history.isNotEmpty()) {
-                item(key = "stats") {
-                    Spacer(Modifier.height(28.dp))
-                    StatsCard(Stats.week(ui.history, ui.now), Stats.streak(ui.history, ui.now))
-                }
-            }
         }
     }
 }
@@ -304,34 +296,6 @@ private fun HomeHeader(ui: HomeUiState, onUnlock: (String) -> Unit) {
                 Text(body, style = MaterialTheme.typography.bodyLarge, color = c.textMuted)
             }
         }
-    }
-}
-
-/** The week in three figures, so the streak stays in sight without shouting. */
-@Composable
-private fun StatsCard(week: WeekStats, streak: Int) {
-    val c = Obsidian.colors
-    val hours = if (week.protectedMinutes >= 600) "${week.protectedMinutes / 60} h" else formatMinutes(week.protectedMinutes)
-    Row(
-        Modifier.padding(horizontal = 20.dp).fillMaxWidth().clip(RoundedCornerShape(18.dp))
-            .background(c.bgSecondary).padding(vertical = 16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Stat(streak.toString(), if (streak == 1) "day streak" else "day streak", Modifier.weight(1f))
-        Box(Modifier.width(1.dp).height(30.dp).background(c.border))
-        Stat(hours, "this week", Modifier.weight(1f))
-        Box(Modifier.width(1.dp).height(30.dp).background(c.border))
-        Stat(week.escapes.toString(), if (week.escapes == 1) "escape" else "escapes", Modifier.weight(1f))
-    }
-}
-
-@Composable
-private fun Stat(value: String, label: String, modifier: Modifier) {
-    val c = Obsidian.colors
-    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(value, fontSize = 21.sp, fontWeight = FontWeight.SemiBold, color = c.textNormal)
-        Spacer(Modifier.height(2.dp))
-        Text(label, style = MaterialTheme.typography.labelSmall, color = c.textFaint)
     }
 }
 

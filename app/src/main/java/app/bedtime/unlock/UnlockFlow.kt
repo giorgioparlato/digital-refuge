@@ -60,6 +60,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.bedtime.data.Repository
 import app.bedtime.data.Schedule
 import app.bedtime.data.SessionLog
+import app.bedtime.data.TextSource
 import app.bedtime.data.UnlockConfig
 import app.bedtime.data.UnlockMode
 import app.bedtime.engine.Occurrence
@@ -143,7 +144,7 @@ fun UnlockFlow(occurrence: Occurrence, onUnlocked: () -> Unit, onCancel: () -> U
             when (challenges.getOrNull(index)) {
                 null -> CtaButton("Unlock", onClick = ::passCurrent, modifier = Modifier.fillMaxWidth())
                 Challenge.WAIT -> WaitChallenge(occurrence, waitMs, onPassed = ::passCurrent)
-                Challenge.TEXT -> TextChallengeInput(textLength, onPassed = ::passCurrent)
+                Challenge.TEXT -> TextChallengeInput(textLength, config.textSource, onPassed = ::passCurrent)
                 Challenge.PASSWORD -> PasswordChallenge(config, onPassed = ::passCurrent)
             }
         }
@@ -272,9 +273,9 @@ internal fun WaitChallengeContent(remaining: Long?, total: Long, onContinue: () 
 }
 
 @Composable
-private fun TextChallengeInput(length: Int, onPassed: () -> Unit) {
+private fun TextChallengeInput(length: Int, source: TextSource, onPassed: () -> Unit) {
     val scope = rememberCoroutineScope()
-    val target = rememberSaveable { TextChallenge.generate(length) }
+    val target = rememberSaveable { TextChallenge.generate(length, source) }
     var typed by rememberSaveable { mutableStateOf("") }
     var rejected by rememberSaveable { mutableIntStateOf(0) }
     val shake = remember { Animatable(0f) }
@@ -310,19 +311,25 @@ internal fun TextChallengeContent(
     shakeOffset: () -> Float = { 0f },
 ) {
     val c = Obsidian.colors
+    // Words and passages read as themselves; random letters get grouped into fives.
+    val natural = remember(target) { target.any { it == ' ' } }
     val annotated = remember(target, typed.length, c) {
+        fun styleAt(index: Int) = when {
+            index < typed.length -> SpanStyle(color = c.textFaint)
+            index == typed.length -> SpanStyle(color = c.textNormal, background = c.accent.copy(alpha = 0.35f))
+            else -> SpanStyle(color = c.textNormal)
+        }
         buildAnnotatedString {
-            var i = 0
-            target.chunked(5).forEachIndexed { group, chunk ->
-                if (group > 0) append(' ')
-                for (char in chunk) {
-                    val style = when {
-                        i < typed.length -> SpanStyle(color = c.textFaint)
-                        i == typed.length -> SpanStyle(color = c.textNormal, background = c.accent.copy(alpha = 0.35f))
-                        else -> SpanStyle(color = c.textNormal)
+            if (natural) {
+                target.forEachIndexed { index, char -> withStyle(styleAt(index)) { append(char) } }
+            } else {
+                var i = 0
+                target.chunked(5).forEachIndexed { group, chunk ->
+                    if (group > 0) append(' ')
+                    for (char in chunk) {
+                        withStyle(styleAt(i)) { append(char) }
+                        i++
                     }
-                    withStyle(style) { append(char) }
-                    i++
                 }
             }
         }
@@ -330,15 +337,16 @@ internal fun TextChallengeContent(
 
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Text(
-            "Copy the text below, one character at a time. Spaces don't matter; pasting and typos are rejected.",
+            "Copy the text below, one character at a time. Spaces and punctuation fill themselves in; " +
+                "pasting and typos are rejected.",
             style = MaterialTheme.typography.bodyMedium,
             color = c.textMuted,
         )
         Text(
             annotated,
-            fontFamily = FontFamily.Monospace,
+            fontFamily = if (natural) FontFamily.Default else FontFamily.Monospace,
             fontSize = 17.sp,
-            lineHeight = 28.sp,
+            lineHeight = if (natural) 26.sp else 28.sp,
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(12.dp))

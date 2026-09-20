@@ -59,6 +59,8 @@ data class UnlockConfig(
     val waitSeconds: Int? = null,
     val textEnabled: Boolean = true,
     val textLength: Int = 200,
+    /** Random letters, plain words, or a passage worth reading while you copy it. */
+    val textSource: TextSource = TextSource.LETTERS,
     val passwordEnabled: Boolean = false,
     val passwordHash: String? = null,
     val passwordSalt: String? = null,
@@ -72,6 +74,10 @@ data class UnlockConfig(
     /** The wait timer's length in seconds, from the new field or the legacy minutes. */
     val waitDurationSeconds: Int get() = waitSeconds ?: (waitMinutes * 60)
 }
+
+/** What a typing challenge asks you to copy out. */
+@Serializable
+enum class TextSource { LETTERS, WORDS, PASSAGES }
 
 @Serializable
 enum class UnlockMode { END_SESSION, PAUSE }

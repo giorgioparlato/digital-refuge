@@ -365,8 +365,25 @@ class ScreenshotTest {
     }
 
     @Test
+    fun unlockPassage() = shot {
+        val target = TextChallenge.generate(220, app.bedtime.data.TextSource.PASSAGES, Random(4))
+        Screen {
+            UnlockLayout(
+                "Bedtime",
+                "This ends the current session.",
+                listOf("Wait", "Type"),
+                current = 1,
+                showCancel = true,
+                onCancel = {},
+            ) {
+                TextChallengeContent(target = target, typed = target.take(48), rejected = 0, onValueChange = {})
+            }
+        }
+    }
+
+    @Test
     fun unlockText() = shot {
-        val target = TextChallenge.generate(225, Random(7))
+        val target = TextChallenge.generate(225, random = Random(7))
         Screen {
             UnlockLayout(
                 "Bedtime",

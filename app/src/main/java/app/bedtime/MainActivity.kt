@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -255,7 +256,9 @@ private fun TabShell(tab: String, onTab: (String) -> Unit, content: @Composable 
             Column {
                 Box(Modifier.fillMaxWidth().height(1.dp).background(c.border))
                 Row(
-                    Modifier.fillMaxWidth().background(c.bgSecondary).padding(top = 10.dp, bottom = 12.dp),
+                    Modifier.fillMaxWidth().background(c.bgSecondary)
+                        .navigationBarsPadding()
+                        .padding(top = 10.dp, bottom = 10.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly,
                 ) {
                     TabItem(BedtimeIcons.Refuge, "home", tab == Routes.HOME) { onTab(Routes.HOME) }

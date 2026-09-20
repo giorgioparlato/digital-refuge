@@ -56,6 +56,7 @@ import app.bedtime.data.AppJson
 import app.bedtime.data.DndMode
 import app.bedtime.data.Repository
 import app.bedtime.data.Schedule
+import app.bedtime.data.TextSource
 import app.bedtime.data.Templates
 import app.bedtime.data.UnlockConfig
 import app.bedtime.data.UnlockMode
@@ -568,6 +569,28 @@ internal fun ScheduleEditContent(
                                 title = "characters",
                             )
                         }
+                        Text(
+                            "What to copy",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = c.textMuted,
+                            modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
+                        )
+                        SegmentedChoice(
+                            options = listOf("Letters", "Words", "Passages"),
+                            selected = unlock.textSource.ordinal,
+                            onSelect = { setUnlock { u -> u.copy(textSource = TextSource.entries[it]) } },
+                            enabled = editable,
+                        )
+                        Text(
+                            when (unlock.textSource) {
+                                TextSource.LETTERS -> "Random letters and digits. Nothing to read, only to copy."
+                                TextSource.WORDS -> "Plain words, easier on the eyes at midnight."
+                                TextSource.PASSAGES -> "Quotes and longer passages, worth reading while you type them."
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = c.textFaint,
+                            modifier = Modifier.padding(top = 8.dp),
+                        )
                     }
                 }
                 OptionRow(Icons.Default.Lock, "Password", description = "Tip: let someone else choose it", enabled = editable) {

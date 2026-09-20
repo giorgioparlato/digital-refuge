@@ -183,7 +183,7 @@ internal fun SettingsContent(
     onGroups: () -> Unit = {},
     alwaysAvailableCount: Int = 0,
     onAlwaysAvailable: () -> Unit = {},
-    version: String = "0.7.0",
+    version: String = "0.7.1",
     canPinWidget: Boolean = true,
     onAddWidget: (Schedule) -> Unit = {},
     onExport: () -> Unit = {},
@@ -211,6 +211,15 @@ internal fun SettingsContent(
                     Text("digital refuge", style = MaterialTheme.typography.titleLarge, color = c.textNormal)
                     Text("Version $version · everything stays on this phone", style = MaterialTheme.typography.bodySmall, color = c.textMuted)
                 }
+            }
+
+            SectionCard {
+                OptionRow(
+                    Icons.Default.Info,
+                    "How it works",
+                    description = "What a session locks, and your ways out",
+                    onClick = onHowItWorks,
+                ) { Chevron() }
             }
 
             SectionCard {
@@ -259,12 +268,6 @@ internal fun SettingsContent(
                 title = "Staying blocked",
                 subtitle = "How firmly a session holds. Tap \u201chow it works\u201d for the full picture.",
             ) {
-                OptionRow(
-                    Icons.Default.Info,
-                    "How it works",
-                    description = "What a session locks, and your ways out",
-                    onClick = onHowItWorks,
-                ) { Chevron() }
                 OptionRow(
                     BedtimeIcons.Refuge,
                     "Lock changes during sessions",
