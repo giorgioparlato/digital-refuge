@@ -13,6 +13,9 @@
     <!-- The status-bar lotus while a session runs; asked for in Setup (Android 13+). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- The full-screen takeover shown if blocking is switched off mid-session. -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
     <!-- Keeps watch during a session, so switching blocking off is noticed even then. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />

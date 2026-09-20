@@ -28,8 +28,8 @@ object SessionNotifier {
     private const val ID = 1
     private const val ACCENT = 0xFF2EA873.toInt()
 
-    /** Builds the notification: the lotus while blocking is on, a reminder to switch it back on while it isn't. */
-    fun build(context: Context, state: ActiveState?, blockingOn: Boolean): Notification {
+    /** Builds the notification for the phase: on, on a break, or off and asking to be switched back on. */
+    fun build(context: Context, state: ActiveState?, blockingOn: Boolean, breakMs: Long): Notification {
         ensureChannel(context)
         val main = state?.active?.maxByOrNull { it.end }
         val name = main?.schedule?.name?.lowercase()
@@ -37,14 +37,22 @@ object SessionNotifier {
         val title: String
         val text: String
         val intent: Intent
-        if (blockingOn) {
-            title = if (main == null) "refuge is on" else "$name · until ${formatTime(context, main.end)}".lowercase()
-            text = summary(state)
-            intent = MainActivity.intent(context, Routes.HOME)
-        } else {
-            title = "blocking is off"
-            text = if (name == null) "tap to switch it back on" else "$name is still running · tap to switch blocking back on"
-            intent = BlockingState.accessibilityIntent()
+        when {
+            blockingOn -> {
+                title = if (main == null) "refuge is on" else "$name · until ${formatTime(context, main.end)}".lowercase()
+                text = summary(state)
+                intent = MainActivity.intent(context, Routes.HOME)
+            }
+            breakMs > 0 -> {
+                title = "on a break · ${(breakMs / 1000).coerceAtLeast(1)}s left"
+                text = "switch blocking back on when you're done"
+                intent = BlockingState.accessibilityIntent()
+            }
+            else -> {
+                title = "blocking is off"
+                text = if (name == null) "tap to switch it back on" else "$name is still running · tap to switch blocking back on"
+                intent = BlockingState.accessibilityIntent()
+            }
         }
 
         val tap = PendingIntent.getActivity(
@@ -76,10 +84,10 @@ object SessionNotifier {
     }
 
     @SuppressLint("MissingPermission") // Checked through areNotificationsEnabled().
-    fun post(context: Context, id: Int, state: ActiveState?, blockingOn: Boolean) {
+    fun post(context: Context, id: Int, state: ActiveState?, blockingOn: Boolean, breakMs: Long) {
         val manager = NotificationManagerCompat.from(context)
         if (!manager.areNotificationsEnabled()) return
-        runCatching { manager.notify(id, build(context, state, blockingOn)) }
+        runCatching { manager.notify(id, build(context, state, blockingOn, breakMs)) }
     }
 
     fun cancel(context: Context) = NotificationManagerCompat.from(context).cancel(ID)

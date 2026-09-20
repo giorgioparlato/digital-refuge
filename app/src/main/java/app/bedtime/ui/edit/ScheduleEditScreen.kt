@@ -638,6 +638,24 @@ internal fun ScheduleEditContent(
                 }
             }
 
+            SectionCard(
+                title = "Banking or ID apps",
+                subtitle = "If one won't run while blocking is on, you can pause for a short break (turn the pause on in settings). Each break lasts:",
+            ) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text("Break length", style = MaterialTheme.typography.bodyMedium, color = c.textMuted, modifier = Modifier.weight(1f))
+                    NumberStepper(
+                        draft.breakMinutes,
+                        { v -> onDraftChange(draft.copy(breakMinutes = v)) },
+                        1..60,
+                        suffix = " min",
+                        enabled = editable,
+                        presets = listOf(1, 2, 3, 5, 10),
+                        title = "break length",
+                    )
+                }
+            }
+
             if (!isNew && editable) {
                 TextButton(onClick = onDelete, modifier = Modifier.align(Alignment.CenterHorizontally)) {
                     Text(if (isBlock) "Delete block" else "Delete schedule", color = c.red, fontWeight = FontWeight.Medium)

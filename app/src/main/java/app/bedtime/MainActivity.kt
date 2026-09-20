@@ -19,6 +19,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.snapshots.SnapshotStateList
@@ -35,12 +37,14 @@ import app.bedtime.service.SystemApps
 import app.bedtime.ui.groups.GroupsScreen
 import app.bedtime.ui.settings.AlwaysAvailableScreen
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import app.bedtime.ui.components.ObsidianTopBar
 import app.bedtime.ui.components.ProvideAppIcons
 import app.bedtime.ui.create.CreateScreen
 import app.bedtime.ui.edit.ScheduleEditScreen
 import app.bedtime.ui.home.HomeScreen
+import app.bedtime.ui.onboarding.OnboardingScreen
 import app.bedtime.ui.homestyle.HomeStyleScreen
 import app.bedtime.ui.settings.SettingsScreen
 import app.bedtime.ui.setup.SetupScreen
@@ -56,6 +60,7 @@ object Routes {
     const val HOME_STYLE = "homestyle"
     const val GROUPS = "groups"
     const val ALWAYS_AVAILABLE = "alwaysavailable"
+    const val ONBOARDING = "onboarding"
     const val CREATE = "create"
     const val EDIT = "edit/"
     const val TEMPLATE = "template/"
@@ -131,6 +136,15 @@ private fun BedtimeNavigation(pendingRoute: String?, onRouteConsumed: () -> Unit
         }
     }
 
+    val repo = remember { Repository.get(context) }
+    val settings by repo.settings.collectAsStateWithLifecycle(initialValue = null)
+    val scope = rememberCoroutineScope()
+    val loaded = settings
+    if (loaded != null && !loaded.onboarded) {
+        OnboardingScreen(onDone = { scope.launch { repo.updateSettings { it.copy(onboarded = true) } } })
+        return
+    }
+
     val top = stack.last()
     BackHandler(enabled = stack.size > 1) { pop(top) }
 
@@ -151,7 +165,9 @@ private fun BedtimeNavigation(pendingRoute: String?, onRouteConsumed: () -> Unit
                 onHomeStyle = { push(Routes.HOME_STYLE) },
                 onGroups = { push(Routes.GROUPS) },
                 onAlwaysAvailable = { push(Routes.ALWAYS_AVAILABLE) },
+                onHowItWorks = { push(Routes.ONBOARDING) },
             )
+            top == Routes.ONBOARDING -> OnboardingScreen(onDone = { pop(top) })
             top == Routes.SETUP -> SetupScreen(onBack = { pop(top) }, onAlwaysAvailable = { push(Routes.ALWAYS_AVAILABLE) })
             top == Routes.HOME_STYLE -> HomeStyleScreen(onBack = { pop(top) })
             top == Routes.GROUPS -> GroupsScreen(onBack = { pop(top) })

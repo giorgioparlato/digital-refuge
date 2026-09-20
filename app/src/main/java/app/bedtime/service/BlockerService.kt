@@ -109,6 +109,8 @@ class BlockerService : AccessibilityService() {
     }
 
     override fun onServiceConnected() {
+        BlockingState.service = this
+        BlockingState.clearBreak()
         // Just switched back on, probably from our own Settings page: let the user finish there.
         SettingsGuard.graceUntil = System.currentTimeMillis() + SettingsGuard.GRACE_MS
         refreshSystemPackages()
@@ -251,6 +253,7 @@ class BlockerService : AccessibilityService() {
      */
     override fun onUnbind(intent: Intent?): Boolean {
         val context = applicationContext
+        BlockingState.service = null
         if (state?.isActive != true) {
             releaseScope.launch {
                 GreyscaleController.apply(context, wanted = false)
@@ -261,6 +264,7 @@ class BlockerService : AccessibilityService() {
     }
 
     override fun onDestroy() {
+        BlockingState.service = null
         if (receiverRegistered) unregisterReceiver(receiver)
         if (watchersRegistered) {
             unregisterReceiver(zenReceiver)

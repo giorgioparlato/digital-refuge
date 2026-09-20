@@ -8,6 +8,7 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.provider.Settings
+import app.bedtime.data.AppSettings
 import app.bedtime.data.DndMode
 import app.bedtime.data.Repository
 import app.bedtime.engine.ActiveState
@@ -24,10 +25,9 @@ import kotlinx.coroutines.launch
  * Runs for as long as a session does, separately from [BlockerService], so that it survives the
  * accessibility service being switched off — which is exactly the moment it exists for.
  *
- * During a session, switching blocking off in Settings is covered by [BlockerService] and can only
- * be done deliberately (through the unlock steps, or safe mode). If it does go off, this service
- * notices in seconds, records it for the stats, keeps a reminder up until it's back, and keeps the
- * session's Do Not Disturb and greyscale going so that only apps are unblocked.
+ * If blocking is off mid-session (a banking pause, or safe mode) it records it, keeps Do Not Disturb
+ * and greyscale going so only apps are unblocked, and — once any granted break runs out — takes over
+ * the screen with [TakeoverOverlay] until blocking is switched back on.
  */
 class SessionGuardService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -36,6 +36,7 @@ class SessionGuardService : Service() {
     private val releaseScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     private var state: ActiveState? = null
+    private var settings = AppSettings()
     private var blockingOn = true
 
     /** So one switch-off is recorded once, not on every settings change. */
@@ -50,32 +51,32 @@ class SessionGuardService : Service() {
     override fun onCreate() {
         super.onCreate()
         blockingOn = BlockingState.isOn(this)
-        startForeground(NOTIFICATION_ID, SessionNotifier.build(this, null, blockingOn = blockingOn))
+        startForeground(NOTIFICATION_ID, SessionNotifier.build(this, null, blockingOn = blockingOn, breakMs = 0))
         contentResolver.registerContentObserver(
             Settings.Secure.getUriFor(Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES),
             false,
             accessibilityObserver,
         )
+        scope.launch { Repository.get(this@SessionGuardService).settings.collect { settings = it } }
         scope.launch {
             Engine.state(this@SessionGuardService).filterNotNull().collect { next ->
                 state = next
                 if (!next.isActive) {
-                    // Blocking was off, so nobody else will restore Do Not Disturb and colours.
                     if (!blockingOn) release()
+                    TakeoverOverlay.hide(this@SessionGuardService)
                     stopSelf()
                 } else {
                     refresh()
                 }
             }
         }
-        // While blocking is off the reminder is re-posted so it stays in sight, and every 15 seconds
-        // Do Not Disturb and greyscale are re-asserted in case they were switched off.
+        // Keep the reminder, break countdown and takeover current, and re-assert quiet/grey.
         scope.launch {
             var ticks = 0
             while (true) {
                 delay(1_000)
                 if (!blockingOn) {
-                    post()
+                    updateAlert()
                     if (++ticks % 15 == 0) holdQuietAndGrey()
                 }
             }
@@ -87,7 +88,7 @@ class SessionGuardService : Service() {
         return START_STICKY
     }
 
-    /** Re-reads whether blocking is on, records a switch-off once, and updates the notification. */
+    /** Re-reads whether blocking is on, records a switch-off once, and updates everything. */
     private fun refresh() {
         val nowOn = BlockingState.isOn(this)
         val wasOn = blockingOn
@@ -104,11 +105,30 @@ class SessionGuardService : Service() {
             }
             !wasOn && nowOn -> {
                 recorded = false
+                BlockingState.clearBreak()
                 Engine.refresh() // Pick the session back up straight away.
             }
         }
         holdQuietAndGrey()
-        post()
+        updateAlert()
+    }
+
+    /** Shows or hides the full-screen takeover and updates the ongoing notification for the phase. */
+    private fun updateAlert() {
+        val current = state
+        val takeover = !blockingOn &&
+            current?.isActive == true &&
+            settings.fullScreenAlert &&
+            !BlockingState.isOnBreak() &&
+            !BlockingState.isOverlaySuppressed()
+        if (takeover) {
+            val schedule = current.active.maxByOrNull { it.end }?.schedule
+            TakeoverOverlay.show(this, schedule?.name ?: "your session", schedule?.breakMinutes ?: 1, settings.pauseEnabled)
+        } else {
+            TakeoverOverlay.hide(this)
+        }
+        val breakMs = if (!blockingOn && BlockingState.isOnBreak()) BlockingState.breakRemainingMs() else 0L
+        SessionNotifier.post(this, NOTIFICATION_ID, state, blockingOn, breakMs)
     }
 
     /**
@@ -133,12 +153,9 @@ class SessionGuardService : Service() {
         }
     }
 
-    private fun post() {
-        SessionNotifier.post(this, NOTIFICATION_ID, state, blockingOn)
-    }
-
     override fun onDestroy() {
         contentResolver.unregisterContentObserver(accessibilityObserver)
+        TakeoverOverlay.hide(this)
         scope.cancel()
         SessionNotifier.cancel(this)
         super.onDestroy()

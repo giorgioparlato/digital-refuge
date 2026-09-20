@@ -42,6 +42,8 @@ data class Schedule(
     val hideNotifications: Boolean = false,
     val unlock: UnlockConfig = UnlockConfig(),
     val unlockAction: UnlockAction = UnlockAction(),
+    /** Break granted when blocking is paused for a banking/ID app, in minutes (at least 1). */
+    val breakMinutes: Int = 1,
 ) {
     val isBlock: Boolean get() = kind == ScheduleKind.BLOCK
 }
@@ -159,6 +161,12 @@ data class AppSettings(
     val widgetBlocks: Map<String, String> = emptyMap(),
     /** During sessions, cover the Settings screens that switch blocking off (see SettingsGuard). */
     val lockSettingsDuringSessions: Boolean = true,
+    /** If blocking is switched off mid-session, take over the screen until it's back on. */
+    val fullScreenAlert: Boolean = true,
+    /** Offer a "pause for a banking app" break. Off means total strictness: only the unlock steps. */
+    val pauseEnabled: Boolean = true,
+    /** True once the one-time explainer has been shown. */
+    val onboarded: Boolean = false,
 )
 
 /** A named set of apps for ticking many at once in the app picker. Copied into schedules, never linked. */

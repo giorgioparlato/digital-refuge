@@ -42,7 +42,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.bedtime.apps.AppCatalog
+import app.bedtime.data.AppSettings
+import app.bedtime.data.Repository
 import app.bedtime.engine.Engine
+import app.bedtime.service.BlockingState
 import app.bedtime.ui.components.BedtimeIcons
 import app.bedtime.ui.components.CtaButton
 import app.bedtime.ui.components.StatusPill
@@ -105,6 +108,7 @@ private fun BlockedScreen(pkg: String?, guardingSettings: Boolean, onHome: () ->
     val context = LocalContext.current
     val c = Obsidian.colors
     val state by Engine.state(context).collectAsStateWithLifecycle()
+    val settings by remember { Repository.get(context).settings }.collectAsStateWithLifecycle(initialValue = AppSettings())
     // Guarding Settings, the session to leave is the longest-running one; otherwise, whichever blocks this app.
     val blocker = if (guardingSettings) state?.active?.maxByOrNull { it.end } else pkg?.let { state?.blockerOf(it) }
     var unlocking by rememberSaveable { mutableStateOf(false) }
@@ -136,6 +140,12 @@ private fun BlockedScreen(pkg: String?, guardingSettings: Boolean, onHome: () ->
             SettingsGuardContent(
                 scheduleName = blocker.schedule.name,
                 until = formatTime(context, blocker.end),
+                breakMinutes = blocker.schedule.breakMinutes,
+                onPause = if (settings.pauseEnabled) {
+                    { if (BlockingState.pause(blocker.schedule.breakMinutes)) onFinish() }
+                } else {
+                    null
+                },
                 onUnlock = { unlocking = true },
                 onBack = onHome,
             )
@@ -200,8 +210,16 @@ internal fun BlockedContent(appLabel: String, scheduleName: String, until: Strin
 
 /** Shown over the Settings screens that would switch blocking off during a session. */
 @Composable
-internal fun SettingsGuardContent(scheduleName: String, until: String, onUnlock: () -> Unit, onBack: () -> Unit) {
+internal fun SettingsGuardContent(
+    scheduleName: String,
+    until: String,
+    breakMinutes: Int,
+    onPause: (() -> Unit)?,
+    onUnlock: () -> Unit,
+    onBack: () -> Unit,
+) {
     val c = Obsidian.colors
+    val minutes = "$breakMinutes ${if (breakMinutes == 1) "minute" else "minutes"}"
     Column(
         Modifier
             .fillMaxSize()
@@ -233,15 +251,27 @@ internal fun SettingsGuardContent(scheduleName: String, until: String, onUnlock:
         )
         Spacer(Modifier.height(12.dp))
         Text(
-            "Switching blocking off and uninstalling are locked while $scheduleName runs. If you really need to, end the " +
-                "session first — the unlock steps still work.",
+            if (onPause != null) {
+                "Switching blocking off and uninstalling are locked while $scheduleName runs. For a banking or ID app, take a " +
+                    "short break; otherwise end the session with the unlock steps."
+            } else {
+                "Switching blocking off and uninstalling are locked while $scheduleName runs. To do either, end the session " +
+                    "first — the unlock steps still work."
+            },
             style = MaterialTheme.typography.bodyLarge,
             color = c.textMuted,
             textAlign = TextAlign.Center,
         )
         Spacer(Modifier.weight(1.3f))
-        CtaButton("End $scheduleName early", onClick = onUnlock, modifier = Modifier.fillMaxWidth())
-        TextButton(onClick = onBack, modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) {
+        if (onPause != null) {
+            CtaButton("Pause blocking for $minutes", onClick = onPause, modifier = Modifier.fillMaxWidth())
+            TextButton(onClick = onUnlock, modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) {
+                Text("End $scheduleName early", color = c.textMuted)
+            }
+        } else {
+            CtaButton("End $scheduleName early", onClick = onUnlock, modifier = Modifier.fillMaxWidth())
+        }
+        TextButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) {
             Text("Go back", color = c.textMuted)
         }
     }
