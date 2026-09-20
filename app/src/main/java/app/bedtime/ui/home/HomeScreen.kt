@@ -23,12 +23,16 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Surface
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -44,6 +48,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -65,6 +70,7 @@ import app.bedtime.service.GreyscaleController
 import app.bedtime.service.SystemApps
 import app.bedtime.ui.components.BedtimeIcons
 import app.bedtime.ui.components.CtaButton
+import app.bedtime.ui.components.NumberStepper
 import app.bedtime.ui.components.SectionCard
 import app.bedtime.ui.components.StatusDot
 import app.bedtime.ui.components.Tag
@@ -142,6 +148,7 @@ fun HomeScreen(
         onCreate = onCreate,
         onTemplate = onTemplate,
         onStartBlock = { block, minutes -> scope.launch { repo.startBlock(block, minutes) } },
+        onDuration = { block, minutes -> scope.launch { repo.upsert(block.copy(durationMinutes = minutes)) } },
         onSetup = onSetup,
         onUnlock = onUnlock,
         isInstalled = { AppCatalog.isLaunchable(context, it) },
@@ -155,11 +162,23 @@ internal fun HomeContent(
     onCreate: () -> Unit,
     onTemplate: (String) -> Unit,
     onStartBlock: (Schedule, Int) -> Unit,
+    onDuration: (Schedule, Int) -> Unit = { _, _ -> },
     onSetup: () -> Unit,
     onUnlock: (String) -> Unit,
     isInstalled: (String) -> Boolean = { false },
 ) {
     val c = Obsidian.colors
+    var editingLength by remember { mutableStateOf<Schedule?>(null) }
+    editingLength?.let { block ->
+        BlockLengthDialog(
+            block = block,
+            onDismiss = { editingLength = null },
+            onDone = { minutes ->
+                onDuration(block, minutes)
+                editingLength = null
+            },
+        )
+    }
     val usesDnd = ui.schedules.any { it.dnd != DndMode.OFF || it.hideNotifications }
     // Greyscale is optional and needs a computer, so missing it alone doesn't warrant the card.
     val needsSetup = !ui.serviceOn || (usesDnd && !ui.dndOk)
@@ -209,6 +228,7 @@ internal fun HomeContent(
                                 running = ui.active?.occurrenceOf(block.id),
                                 onStart = { onStartBlock(block, block.durationMinutes) },
                                 onEdit = { onEdit(block.id) },
+                                onLength = { editingLength = block },
                                 modifier = Modifier.weight(1f).fillMaxHeight(),
                             )
                         }
@@ -301,7 +321,14 @@ private fun HomeHeader(ui: HomeUiState, onUnlock: (String) -> Unit) {
 
 /** A block: the tile opens it, the circle starts it. While it runs, it says so instead. */
 @Composable
-private fun BlockTile(block: Schedule, running: Occurrence?, onStart: () -> Unit, onEdit: () -> Unit, modifier: Modifier) {
+private fun BlockTile(
+    block: Schedule,
+    running: Occurrence?,
+    onStart: () -> Unit,
+    onEdit: () -> Unit,
+    onLength: () -> Unit,
+    modifier: Modifier,
+) {
     val context = LocalContext.current
     val c = Obsidian.colors
     val shape = RoundedCornerShape(18.dp)
@@ -315,13 +342,28 @@ private fun BlockTile(block: Schedule, running: Occurrence?, onStart: () -> Unit
     ) {
         Column(Modifier.weight(1f)) {
             Text(block.name, style = MaterialTheme.typography.titleSmall, color = c.textNormal, maxLines = 1)
-            Spacer(Modifier.height(2.dp))
-            Text(
-                if (running != null) "until ${formatTime(context, running.end)}" else formatMinutes(block.durationMinutes.toLong()),
-                style = MaterialTheme.typography.bodySmall,
-                color = if (running != null) c.accentText else c.textMuted,
-                maxLines = 1,
-            )
+            Spacer(Modifier.height(3.dp))
+            if (running != null) {
+                Text(
+                    "until ${formatTime(context, running.end)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = c.accentText,
+                    maxLines = 1,
+                )
+            } else {
+                // Framed like a field so it reads as something you can tap and change.
+                val chip = RoundedCornerShape(8.dp)
+                Row(
+                    Modifier.clip(chip).background(c.bgPrimaryAlt).border(1.dp, c.border, chip)
+                        .clickable(onClickLabel = "Change how long ${block.name} runs", onClick = onLength)
+                        .padding(horizontal = 8.dp, vertical = 3.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(formatMinutes(block.durationMinutes.toLong()), style = MaterialTheme.typography.bodySmall, color = c.textNormal, maxLines = 1)
+                    Spacer(Modifier.width(4.dp))
+                    Icon(Icons.Default.KeyboardArrowDown, contentDescription = null, tint = c.textFaint, modifier = Modifier.size(13.dp))
+                }
+            }
         }
         if (running == null) {
             Box(
@@ -331,6 +373,41 @@ private fun BlockTile(block: Schedule, running: Occurrence?, onStart: () -> Unit
             ) { Icon(Icons.Default.PlayArrow, contentDescription = null, tint = c.accent, modifier = Modifier.size(18.dp)) }
         } else {
             Tag("on now")
+        }
+    }
+}
+
+/** Set how long a block runs, straight from the home screen. */
+@Composable
+private fun BlockLengthDialog(block: Schedule, onDismiss: () -> Unit, onDone: (Int) -> Unit) {
+    val c = Obsidian.colors
+    var minutes by remember(block.id) { mutableIntStateOf(block.durationMinutes) }
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(shape = RoundedCornerShape(20.dp), color = c.bgSecondary) {
+            Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+                Text("How long is ${block.name}?", style = MaterialTheme.typography.titleLarge, color = c.textNormal)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                    NumberStepper(
+                        minutes,
+                        { minutes = it },
+                        5..480,
+                        step = 5,
+                        suffix = " min",
+                        presets = listOf(15, 25, 30, 45, 60, 90, 120, 180),
+                        title = "length",
+                    )
+                }
+                Text(
+                    "This is the length it starts with from now on. You can still change it in the block's settings.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = c.textMuted,
+                )
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = onDismiss) { Text("Cancel", color = c.textMuted) }
+                    Spacer(Modifier.width(8.dp))
+                    CtaButton("Save", onClick = { onDone(minutes) }, compact = true)
+                }
+            }
         }
     }
 }
