@@ -4,7 +4,7 @@ import app.bedtime.data.SessionLog
 import kotlin.math.pow
 import kotlin.math.roundToInt
 
-/** Escalating friction: every early unlock in a day makes the next text challenge longer. */
+/** Escalating friction: every early unlock in a day makes the next unlock's wait and text harder. */
 object Escalation {
     private const val DAY_MS = 24 * 60 * 60 * 1000L
 
@@ -12,7 +12,15 @@ object Escalation {
         history.filter { it.scheduleId == scheduleId }
             .sumOf { log -> log.unlockTimes.count { it > now - DAY_MS && it <= now } }
 
-    /** `base × 1.5ⁿ`, capped at three times the base length. */
-    fun textLength(base: Int, recentUnlocks: Int): Int =
-        (base * 1.5.pow(recentUnlocks)).coerceAtMost(base * 3.0).roundToInt()
+    /** `base × factorⁿ`, capped at [maxTimes] × the base. */
+    fun scale(base: Int, recentUnlocks: Int, factor: Float, maxTimes: Float): Int =
+        (base * factor.toDouble().pow(recentUnlocks)).coerceAtMost(base * maxTimes.toDouble()).roundToInt()
+
+    /** Text length grows by [factor] per unlock, capped at three times the base. */
+    fun textLength(base: Int, recentUnlocks: Int, factor: Float = 1.5f): Int =
+        scale(base, recentUnlocks, factor, 3f)
+
+    /** Wait length grows by [factor] per unlock, capped at eight times the base. */
+    fun waitSeconds(base: Int, recentUnlocks: Int, factor: Float): Int =
+        scale(base, recentUnlocks, factor, 8f)
 }

@@ -329,14 +329,14 @@ class ScreenshotTest {
             setPadding(48, 48, 48, 48)
         }
         listOf(
-            Triple("deep work", "1 h 30 min · tap to start", R.drawable.widget_background),
+            Triple("deep work", "1 h 30 min", R.drawable.widget_background),
             Triple("focus", "on · until 4:10 pm", R.drawable.widget_background_on),
         ).forEach { (title, subtitle, background) ->
             val widget = paparazzi.inflate<android.view.View>(R.layout.widget_block)
             widget.setBackgroundResource(background)
             widget.findViewById<android.widget.TextView>(R.id.widget_title).text = title
             widget.findViewById<android.widget.TextView>(R.id.widget_subtitle).text = subtitle
-            column.addView(widget, android.widget.LinearLayout.LayoutParams(420, 260).apply { bottomMargin = 40 })
+            column.addView(widget, android.widget.LinearLayout.LayoutParams(420, 150).apply { bottomMargin = 40 })
         }
         paparazzi.snapshot(column)
     }

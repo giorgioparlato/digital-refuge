@@ -133,7 +133,7 @@ class BlockWidget : AppWidgetProvider() {
                 }
                 else -> {
                     title = block.name
-                    subtitle = "${formatMinutes(block.durationMinutes.toLong())} · tap to start"
+                    subtitle = formatMinutes(block.durationMinutes.toLong())
                     click = start(context, widgetId, block.id)
                 }
             }

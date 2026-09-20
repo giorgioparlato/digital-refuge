@@ -118,10 +118,11 @@ fun UnlockFlow(occurrence: Occurrence, onUnlocked: () -> Unit, onCancel: () -> U
     }
 
     if (recentUnlocks == null) return
-    val textLength = if (config.escalate) Escalation.textLength(config.textLength, recentUnlocks) else config.textLength
-    val note = if (config.textEnabled && textLength > config.textLength) {
-        "This is early unlock #${recentUnlocks + 1} today, so the text is " +
-            "${(textLength * 100f / config.textLength - 100).roundToInt()}% longer."
+    val escalating = config.escalate && recentUnlocks > 0
+    val textLength = if (config.escalate) Escalation.textLength(config.textLength, recentUnlocks, config.escalateFactor) else config.textLength
+    val waitMs = (if (config.escalate) Escalation.waitSeconds(config.waitDurationSeconds, recentUnlocks, config.escalateFactor) else config.waitDurationSeconds) * 1000L
+    val note = if (escalating && (config.waitEnabled || config.textEnabled)) {
+        "This is early unlock #${recentUnlocks + 1} today, so the steps are longer."
     } else {
         null
     }
@@ -141,7 +142,7 @@ fun UnlockFlow(occurrence: Occurrence, onUnlocked: () -> Unit, onCancel: () -> U
         } else {
             when (challenges.getOrNull(index)) {
                 null -> CtaButton("Unlock", onClick = ::passCurrent, modifier = Modifier.fillMaxWidth())
-                Challenge.WAIT -> WaitChallenge(occurrence, onPassed = ::passCurrent)
+                Challenge.WAIT -> WaitChallenge(occurrence, waitMs, onPassed = ::passCurrent)
                 Challenge.TEXT -> TextChallengeInput(textLength, onPassed = ::passCurrent)
                 Challenge.PASSWORD -> PasswordChallenge(config, onPassed = ::passCurrent)
             }
@@ -215,8 +216,7 @@ internal fun UnlockSuccess(message: String) {
  * ("I'll stay focused") drops it, so the next attempt starts from scratch.
  */
 @Composable
-private fun WaitChallenge(occurrence: Occurrence, onPassed: () -> Unit) {
-    val total = occurrence.schedule.unlock.waitMinutes * 60_000L
+private fun WaitChallenge(occurrence: Occurrence, total: Long, onPassed: () -> Unit) {
     var elapsed by rememberSaveable(occurrence.start) { mutableLongStateOf(0L) }
     var inFront by remember { mutableStateOf(false) }
     LifecycleResumeEffect(Unit) {

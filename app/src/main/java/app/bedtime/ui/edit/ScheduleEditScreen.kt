@@ -83,6 +83,7 @@ import app.bedtime.ui.components.SubOptionRow
 import app.bedtime.ui.components.TimeTile
 import app.bedtime.ui.formatDays
 import app.bedtime.ui.formatMinuteOfDay
+import app.bedtime.ui.formatWaitSeconds
 import app.bedtime.ui.formatMinutes
 import app.bedtime.ui.is24Hour
 import app.bedtime.ui.pluralApps
@@ -93,6 +94,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.math.roundToInt
 
 private val ScheduleSaver = Saver<Schedule, String>(
     save = { AppJson.encodeToString(Schedule.serializer(), it) },
@@ -528,13 +530,14 @@ internal fun ScheduleEditContent(
                 AnimatedVisibility(unlock.waitEnabled) {
                     SubOptionRow("Timer") {
                         NumberStepper(
-                            unlock.waitMinutes,
-                            { v -> setUnlock { it.copy(waitMinutes = v) } },
-                            1..240,
-                            suffix = " min",
+                            unlock.waitDurationSeconds,
+                            { v -> setUnlock { it.copy(waitSeconds = v) } },
+                            5..3600,
+                            step = 5,
                             enabled = editable,
-                            presets = listOf(1, 2, 5, 10, 15, 20, 30, 45, 60),
+                            presets = listOf(10, 30, 60, 120, 300, 600),
                             title = "timer",
+                            format = { formatWaitSeconds(it) },
                         )
                     }
                 }
@@ -554,12 +557,6 @@ internal fun ScheduleEditContent(
                                 title = "characters",
                             )
                         }
-                        OptionRow(
-                            Icons.Default.Refresh,
-                            "Harder each time",
-                            description = "Each early unlock in a day makes the text 50% longer",
-                            enabled = editable,
-                        ) { ObsidianToggle(unlock.escalate, { on -> setUnlock { it.copy(escalate = on) } }, enabled = editable) }
                     }
                 }
                 OptionRow(Icons.Default.Lock, "Password", description = "Tip: let someone else choose it", enabled = editable) {
@@ -573,6 +570,29 @@ internal fun ScheduleEditContent(
                         password = true,
                         modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
                     )
+                }
+                AnimatedVisibility(unlock.waitEnabled || unlock.textEnabled) {
+                    Column {
+                        OptionRow(
+                            Icons.Default.Refresh,
+                            "Harder each time",
+                            description = "Each early unlock in a day makes the wait and text longer",
+                            enabled = editable,
+                        ) { ObsidianToggle(unlock.escalate, { on -> setUnlock { it.copy(escalate = on) } }, enabled = editable) }
+                        AnimatedVisibility(unlock.escalate) {
+                            SubOptionRow("How much") {
+                                NumberStepper(
+                                    (unlock.escalateFactor * 10).roundToInt(),
+                                    { v -> setUnlock { it.copy(escalateFactor = v / 10f) } },
+                                    11..40,
+                                    enabled = editable,
+                                    presets = listOf(15, 20, 25, 30, 40),
+                                    title = "each time",
+                                    format = { "%.1f×".format(it / 10f) },
+                                )
+                            }
+                        }
+                    }
                 }
                 val anyStep = unlock.waitEnabled || unlock.textEnabled ||
                     (unlock.passwordEnabled && (unlock.hasPassword || newPassword.isNotBlank()))

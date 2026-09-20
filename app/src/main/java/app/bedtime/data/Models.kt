@@ -49,16 +49,24 @@ data class Schedule(
 @Serializable
 data class UnlockConfig(
     val waitEnabled: Boolean = false,
+    /** Legacy wait length in whole minutes; kept so older saves still load. Use [waitDurationSeconds]. */
     val waitMinutes: Int = 10,
+    /** Wait length in seconds; null on old data, where [waitMinutes] is used instead. */
+    val waitSeconds: Int? = null,
     val textEnabled: Boolean = true,
     val textLength: Int = 200,
     val passwordEnabled: Boolean = false,
     val passwordHash: String? = null,
     val passwordSalt: String? = null,
-    /** Each early unlock of this schedule within a day makes the text challenge longer. */
+    /** Each early unlock of this schedule within a day makes the wait and text harder. */
     val escalate: Boolean = true,
+    /** How much harder per early unlock in a day, e.g. 1.5× or 2×. */
+    val escalateFactor: Float = 1.5f,
 ) {
     val hasPassword: Boolean get() = passwordHash != null && passwordSalt != null
+
+    /** The wait timer's length in seconds, from the new field or the legacy minutes. */
+    val waitDurationSeconds: Int get() = waitSeconds ?: (waitMinutes * 60)
 }
 
 @Serializable

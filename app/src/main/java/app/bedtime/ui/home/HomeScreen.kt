@@ -73,6 +73,7 @@ import app.bedtime.ui.components.IconBadge
 import app.bedtime.ui.components.ObsidianToggle
 import app.bedtime.ui.components.ObsidianTopBar
 import app.bedtime.ui.components.SectionCard
+import app.bedtime.ui.components.SwipeToDelete
 import app.bedtime.ui.components.StatusDot
 import app.bedtime.ui.components.Tag
 import app.bedtime.ui.create.TemplateGallery
@@ -140,6 +141,7 @@ fun HomeScreen(
         onCreate = onCreate,
         onTemplate = onTemplate,
         onToggle = { schedule, on -> scope.launch { repo.upsert(schedule.copy(enabled = on)) } },
+        onDelete = { schedule -> scope.launch { repo.delete(schedule.id) } },
         onStartBlock = { block, minutes -> scope.launch { repo.startBlock(block, minutes) } },
         onSettings = onSettings,
         onSetup = onSetup,
@@ -156,6 +158,7 @@ internal fun HomeContent(
     onTemplate: (String) -> Unit,
     onToggle: (Schedule, Boolean) -> Unit,
     onStartBlock: (Schedule, Int) -> Unit,
+    onDelete: (Schedule) -> Unit = {},
     onSettings: () -> Unit,
     onSetup: () -> Unit,
     onUnlock: (String) -> Unit,
@@ -206,23 +209,27 @@ internal fun HomeContent(
                 if (blocks.isNotEmpty()) {
                     item(key = "blocks-heading") { Heading("Focus blocks") }
                     items(blocks, key = { it.id }) { block ->
-                        BlockRow(
-                            block = block,
-                            running = ui.active?.occurrenceOf(block.id),
-                            onStart = { onStartBlock(block, block.durationMinutes) },
-                            onEdit = { onEdit(block.id) },
-                        )
+                        SwipeToDelete(onDelete = { onDelete(block) }) {
+                            BlockRow(
+                                block = block,
+                                running = ui.active?.occurrenceOf(block.id),
+                                onStart = { onStartBlock(block, block.durationMinutes) },
+                                onEdit = { onEdit(block.id) },
+                            )
+                        }
                     }
                 }
                 if (recurring.isNotEmpty()) {
                     item(key = "schedules-heading") { Heading("Schedules") }
                     items(recurring, key = { it.id }) { schedule ->
-                        ScheduleRow(
-                            schedule = schedule,
-                            active = ui.active?.occurrenceOf(schedule.id) != null,
-                            onClick = { onEdit(schedule.id) },
-                            onToggle = { onToggle(schedule, it) },
-                        )
+                        SwipeToDelete(onDelete = { onDelete(schedule) }) {
+                            ScheduleRow(
+                                schedule = schedule,
+                                active = ui.active?.occurrenceOf(schedule.id) != null,
+                                onClick = { onEdit(schedule.id) },
+                                onToggle = { onToggle(schedule, it) },
+                            )
+                        }
                     }
                 }
             }

@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.os.SystemClock
 import android.service.notification.Condition
 import android.service.notification.ZenDeviceEffects
 import androidx.annotation.RequiresApi
@@ -20,6 +21,13 @@ import app.bedtime.MainActivity
  */
 object ModeGreyscale {
     private val CONDITION: Uri = Uri.parse("condition://app.bedtime/greyscale")
+
+    /** Until when our own rule-state writes should be ignored, so re-asserting doesn't loop on itself. */
+    @Volatile
+    private var selfChangeUntil = 0L
+
+    /** True while a change we just made is still echoing back as a status broadcast. */
+    fun isSelfChange(): Boolean = SystemClock.elapsedRealtime() < selfChangeUntil
 
     fun isSupported(context: Context): Boolean =
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM &&
@@ -35,6 +43,9 @@ object ModeGreyscale {
         val manager = context.getSystemService(NotificationManager::class.java)
         runCatching {
             val id = ruleId(context, manager, create = on) ?: return
+            // Our own false→true toggle broadcasts a "deactivated" status; ignore it for a moment so
+            // it isn't mistaken for the user switching greyscale off, which would re-assert forever.
+            selfChangeUntil = SystemClock.elapsedRealtime() + 2_000
             if (on && reassert) manager.setAutomaticZenRuleState(id, condition(false))
             manager.setAutomaticZenRuleState(id, condition(on))
         }

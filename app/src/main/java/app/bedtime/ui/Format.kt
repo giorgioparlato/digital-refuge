@@ -81,8 +81,15 @@ fun greeting(hour: Int): String = when (hour) {
     else -> "Good night"
 }
 
+/** A wait length as "30 s", "5 min", or "1 min 30 s". */
+fun formatWaitSeconds(seconds: Int): String = when {
+    seconds < 60 -> "$seconds s"
+    seconds % 60 == 0 -> "${seconds / 60} min"
+    else -> "${seconds / 60} min ${seconds % 60} s"
+}
+
 fun unlockSummary(config: UnlockConfig): String = listOfNotNull(
-    if (config.waitEnabled) "wait ${config.waitMinutes} min" else null,
+    if (config.waitEnabled) "wait ${formatWaitSeconds(config.waitDurationSeconds)}" else null,
     if (config.textEnabled) "type ${config.textLength}" else null,
     if (config.passwordEnabled && config.hasPassword) "password" else null,
 ).joinToString(" + ").let { if (it.isEmpty()) "instant unlock" else "unlock: $it" }

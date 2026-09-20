@@ -23,6 +23,9 @@ class ModelsCompatTest {
         assertEquals(DndMode.OFF, schedule.dnd)
         assertEquals(false, schedule.hideNotifications)
         assertTrue(schedule.unlock.escalate)
+        // Old data had waitMinutes but no waitSeconds / escalateFactor.
+        assertEquals(600, schedule.unlock.waitDurationSeconds)
+        assertEquals(1.5f, schedule.unlock.escalateFactor)
     }
 
     @Test

@@ -5,5 +5,5 @@
     <string name="tile_label">refuge</string>
     <string name="widget_label">focus block</string>
     <string name="widget_description">start a focus block with one tap</string>
-    <string name="widget_hint">tap to start</string>
+    <string name="widget_hint">focus block</string>
 </resources>

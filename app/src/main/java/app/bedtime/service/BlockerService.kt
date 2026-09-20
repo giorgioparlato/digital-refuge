@@ -82,6 +82,7 @@ class BlockerService : AccessibilityService() {
     /** Our greyscale mode (Android 15+) switched off by hand mid-session: switch it straight back on. */
     private val modeReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
+            if (ModeGreyscale.isSelfChange()) return
             val owner = state?.active?.firstOrNull { it.schedule.greyscale } ?: return
             if (homeInFront && settings.homeStyle.keepInColour) return
             if (GreyscaleController.hasPermission(context) || !ModeGreyscale.isUserDeactivation(context, intent)) return
