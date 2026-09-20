@@ -11,6 +11,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.net.Uri
 import android.view.accessibility.AccessibilityEvent
 import androidx.core.content.ContextCompat
 import app.bedtime.R
@@ -107,7 +108,6 @@ class BlockerService : AccessibilityService() {
     }
 
     override fun onServiceConnected() {
-        BlockingPause.service = this
         // Just switched back on, probably from our own Settings page: let the user finish there.
         SettingsGuard.graceUntil = System.currentTimeMillis() + SettingsGuard.GRACE_MS
         refreshSystemPackages()
@@ -217,7 +217,15 @@ class BlockerService : AccessibilityService() {
     private fun refreshSystemPackages() {
         alwaysAllowed = SystemApps.alwaysAllowed(this)
         overlays = SystemApps.keyboards(this) + "com.android.systemui"
-        guardedPackages = setOfNotNull(SystemApps.settingsPackage(this), "com.android.settings") + SettingsGuard.INSTALLER_PACKAGES
+        // Settings (accessibility toggle, App info) plus whichever app handles uninstalling this one.
+        val uninstaller = runCatching {
+            packageManager.resolveActivity(
+                Intent(Intent.ACTION_DELETE, Uri.fromParts("package", packageName, null)),
+                0,
+            )?.activityInfo?.packageName
+        }.getOrNull()
+        guardedPackages = setOfNotNull(SystemApps.settingsPackage(this), "com.android.settings", uninstaller) +
+            SettingsGuard.INSTALLER_PACKAGES
     }
 
     private fun enforce(pkg: String?) {
@@ -242,7 +250,6 @@ class BlockerService : AccessibilityService() {
      */
     override fun onUnbind(intent: Intent?): Boolean {
         val context = applicationContext
-        BlockingPause.service = null
         if (state?.isActive != true) {
             releaseScope.launch {
                 GreyscaleController.apply(context, wanted = false)
@@ -253,7 +260,6 @@ class BlockerService : AccessibilityService() {
     }
 
     override fun onDestroy() {
-        BlockingPause.service = null
         if (receiverRegistered) unregisterReceiver(receiver)
         if (watchersRegistered) {
             unregisterReceiver(zenReceiver)

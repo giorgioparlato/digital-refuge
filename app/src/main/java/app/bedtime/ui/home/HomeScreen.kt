@@ -8,11 +8,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -32,13 +30,11 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import app.bedtime.ui.components.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -54,7 +50,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.bedtime.apps.AppCatalog
@@ -75,7 +70,6 @@ import app.bedtime.service.SystemApps
 import app.bedtime.ui.components.BedtimeIcons
 import app.bedtime.ui.components.CtaButton
 import app.bedtime.ui.components.IconBadge
-import app.bedtime.ui.components.NumberStepper
 import app.bedtime.ui.components.ObsidianToggle
 import app.bedtime.ui.components.ObsidianTopBar
 import app.bedtime.ui.components.SectionCard
@@ -168,16 +162,6 @@ internal fun HomeContent(
     isInstalled: (String) -> Boolean = { false },
 ) {
     val c = Obsidian.colors
-    var starting by remember { mutableStateOf<Schedule?>(null) }
-    starting?.let { block ->
-        StartBlockDialog(block, onDismiss = { starting = null }, onEdit = {
-            starting = null
-            onEdit(block.id)
-        }, onStart = { minutes ->
-            onStartBlock(block, minutes)
-            starting = null
-        })
-    }
     val usesDnd = ui.schedules.any { it.dnd != DndMode.OFF || it.hideNotifications }
     // Greyscale is optional and needs a computer, so missing it alone doesn't warrant the card.
     val needsSetup = !ui.serviceOn || (usesDnd && !ui.dndOk)
@@ -220,14 +204,13 @@ internal fun HomeContent(
                     item(key = "stats") { StatsLine(Stats.week(ui.history, ui.now), Stats.streak(ui.history, ui.now)) }
                 }
                 if (blocks.isNotEmpty()) {
-                    item(key = "blocks-heading") { Heading("Start a block") }
-                    // Three tiles to a row; more blocks simply add rows.
-                    items(blocks.chunked(3), key = { row -> "blocks-" + row.first().id }) { row ->
+                    item(key = "blocks-heading") { Heading("Focus blocks") }
+                    items(blocks, key = { it.id }) { block ->
                         BlockRow(
-                            row = row,
-                            running = { ui.active?.occurrenceOf(it.id) },
-                            onStart = { starting = it },
-                            onEdit = onEdit,
+                            block = block,
+                            running = ui.active?.occurrenceOf(block.id),
+                            onStart = { onStartBlock(block, block.durationMinutes) },
+                            onEdit = { onEdit(block.id) },
                         )
                     }
                 }
@@ -437,49 +420,56 @@ private fun StatsLine(week: WeekStats, streak: Int) {
     )
 }
 
-/** Up to three blocks side by side; a part-filled last row keeps the same tile width. */
+/** A block as one slim row: name, its length, and a start pill. One tap on the pill starts it. */
 @Composable
-private fun BlockRow(row: List<Schedule>, running: (Schedule) -> Occurrence?, onStart: (Schedule) -> Unit, onEdit: (String) -> Unit) {
-    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        row.forEach { block ->
-            BlockTile(
-                block = block,
-                running = running(block),
-                modifier = Modifier.weight(1f).fillMaxHeight(),
-                onStart = { onStart(block) },
-                onEdit = { onEdit(block.id) },
-            )
-        }
-        repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
-    }
-}
-
-/** One tap starts the block (the dialog also leads to its settings); while it runs, a tap opens it. */
-@Composable
-private fun BlockTile(block: Schedule, running: Occurrence?, modifier: Modifier, onStart: () -> Unit, onEdit: () -> Unit) {
+private fun BlockRow(block: Schedule, running: Occurrence?, onStart: () -> Unit, onEdit: () -> Unit) {
     val context = LocalContext.current
     val c = Obsidian.colors
     val shape = RoundedCornerShape(14.dp)
-    Column(
-        modifier
+    Row(
+        Modifier
+            .fillMaxWidth()
             .clip(shape)
-            .background(if (running != null) c.accent.copy(alpha = 0.10f) else c.bgSecondary)
-            .border(if (running != null) 1.5.dp else 1.dp, if (running != null) c.accent else c.border, shape)
-            .clickable(
-                onClickLabel = if (running != null) "Open ${block.name}" else "Start ${block.name}",
-                onClick = if (running != null) onEdit else onStart,
-            )
-            .padding(12.dp),
+            .then(if (running != null) Modifier.background(c.accent.copy(alpha = 0.08f)).border(1.dp, c.accent.copy(alpha = 0.5f), shape) else Modifier)
+            .clickable(onClickLabel = "Edit ${block.name}", onClick = onEdit)
+            .padding(horizontal = 12.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(BedtimeIcons.Target, contentDescription = null, tint = c.accent, modifier = Modifier.size(22.dp))
-        Spacer(Modifier.height(10.dp))
-        Text(block.name, style = MaterialTheme.typography.titleSmall, color = c.textNormal, maxLines = 2)
-        Text(
-            if (running != null) "until ${formatTime(context, running.end)}" else formatMinutes(block.durationMinutes.toLong()),
-            style = MaterialTheme.typography.bodySmall,
-            color = if (running != null) c.accentText else c.textMuted,
-        )
+        Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(block.name, style = MaterialTheme.typography.titleMedium, color = c.textNormal)
+                if (running != null) {
+                    Spacer(Modifier.width(8.dp))
+                    Tag("on now")
+                }
+            }
+            Text(
+                if (running != null) "until ${formatTime(context, running.end)}" else formatMinutes(block.durationMinutes.toLong()),
+                style = MaterialTheme.typography.bodyMedium,
+                color = c.textMuted,
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        if (running == null) StartPill(onStart)
     }
+}
+
+/** A one-tap "start" affordance on a block row. */
+@Composable
+private fun StartPill(onStart: () -> Unit) {
+    val c = Obsidian.colors
+    val shape = RoundedCornerShape(50)
+    Text(
+        "start",
+        style = MaterialTheme.typography.labelLarge,
+        fontWeight = FontWeight.SemiBold,
+        color = c.accentText,
+        modifier = Modifier
+            .clip(shape)
+            .border(1.dp, c.accent.copy(alpha = 0.5f), shape)
+            .clickable(onClickLabel = "Start now", onClick = onStart)
+            .padding(horizontal = 18.dp, vertical = 8.dp),
+    )
 }
 
 /** A schedule as one slim row: name, when, its key restrictions, and the on/off switch. */
@@ -538,42 +528,5 @@ private fun KeyTags(schedule: Schedule) {
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         tags.forEach { Tag(it) }
-    }
-}
-
-@Composable
-private fun StartBlockDialog(block: Schedule, onDismiss: () -> Unit, onEdit: () -> Unit, onStart: (Int) -> Unit) {
-    val context = LocalContext.current
-    val c = Obsidian.colors
-    var minutes by remember(block.id) { mutableIntStateOf(block.durationMinutes) }
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(shape = RoundedCornerShape(20.dp), color = c.bgSecondary) {
-            Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
-                Text("Start ${block.name}?", style = MaterialTheme.typography.titleLarge, color = c.textNormal)
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                    NumberStepper(
-                        minutes,
-                        { minutes = it },
-                        5..480,
-                        step = 5,
-                        suffix = " min",
-                        presets = listOf(15, 25, 30, 45, 60, 90, 120, 180),
-                        title = "length",
-                    )
-                }
-                Text(
-                    "Runs until ${formatTime(context, System.currentTimeMillis() + minutes * 60_000L)}. Stopping early takes the unlock steps.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = c.textMuted,
-                )
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    TextButton(onClick = onEdit) { Text("Edit", color = c.textMuted) }
-                    Spacer(Modifier.weight(1f))
-                    TextButton(onClick = onDismiss) { Text("Not now", color = c.textMuted) }
-                    Spacer(Modifier.width(8.dp))
-                    CtaButton("Start", onClick = { onStart(minutes) }, compact = true)
-                }
-            }
-        }
     }
 }

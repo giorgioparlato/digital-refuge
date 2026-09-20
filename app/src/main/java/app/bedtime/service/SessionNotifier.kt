@@ -28,32 +28,23 @@ object SessionNotifier {
     private const val ID = 1
     private const val ACCENT = 0xFF2EA873.toInt()
 
-    /** Builds the notification for the current state; [pausedUntil] is set during a deliberate pause. */
-    fun build(context: Context, state: ActiveState?, blockingOn: Boolean, pausedUntil: Long): Notification {
+    /** Builds the notification: the lotus while blocking is on, a reminder to switch it back on while it isn't. */
+    fun build(context: Context, state: ActiveState?, blockingOn: Boolean): Notification {
         ensureChannel(context)
         val main = state?.active?.maxByOrNull { it.end }
         val name = main?.schedule?.name?.lowercase()
-        val remaining = pausedUntil - System.currentTimeMillis()
 
         val title: String
         val text: String
         val intent: Intent
-        when {
-            blockingOn -> {
-                title = if (main == null) "refuge is on" else "$name · until ${formatTime(context, main.end)}".lowercase()
-                text = summary(state)
-                intent = MainActivity.intent(context, Routes.HOME)
-            }
-            remaining > 0 -> {
-                title = "blocking is off for ${(remaining / 1000).coerceAtLeast(1)}s"
-                text = "switch it back on when your banking app is done"
-                intent = BlockingPause.settingsIntent()
-            }
-            else -> {
-                title = "blocking is off"
-                text = if (name == null) "tap to switch it back on" else "$name is still running · tap to switch blocking back on"
-                intent = BlockingPause.settingsIntent()
-            }
+        if (blockingOn) {
+            title = if (main == null) "refuge is on" else "$name · until ${formatTime(context, main.end)}".lowercase()
+            text = summary(state)
+            intent = MainActivity.intent(context, Routes.HOME)
+        } else {
+            title = "blocking is off"
+            text = if (name == null) "tap to switch it back on" else "$name is still running · tap to switch blocking back on"
+            intent = BlockingState.accessibilityIntent()
         }
 
         val tap = PendingIntent.getActivity(
@@ -85,10 +76,10 @@ object SessionNotifier {
     }
 
     @SuppressLint("MissingPermission") // Checked through areNotificationsEnabled().
-    fun post(context: Context, id: Int, state: ActiveState?, blockingOn: Boolean, pausedUntil: Long) {
+    fun post(context: Context, id: Int, state: ActiveState?, blockingOn: Boolean) {
         val manager = NotificationManagerCompat.from(context)
         if (!manager.areNotificationsEnabled()) return
-        runCatching { manager.notify(id, build(context, state, blockingOn, pausedUntil)) }
+        runCatching { manager.notify(id, build(context, state, blockingOn)) }
     }
 
     fun cancel(context: Context) = NotificationManagerCompat.from(context).cancel(ID)

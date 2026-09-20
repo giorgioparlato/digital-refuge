@@ -43,7 +43,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.bedtime.apps.AppCatalog
 import app.bedtime.engine.Engine
-import app.bedtime.service.BlockingPause
 import app.bedtime.ui.components.BedtimeIcons
 import app.bedtime.ui.components.CtaButton
 import app.bedtime.ui.components.StatusPill
@@ -137,7 +136,6 @@ private fun BlockedScreen(pkg: String?, guardingSettings: Boolean, onHome: () ->
             SettingsGuardContent(
                 scheduleName = blocker.schedule.name,
                 until = formatTime(context, blocker.end),
-                onPause = { if (BlockingPause.start(context)) onFinish() },
                 onUnlock = { unlocking = true },
                 onBack = onHome,
             )
@@ -202,7 +200,7 @@ internal fun BlockedContent(appLabel: String, scheduleName: String, until: Strin
 
 /** Shown over the Settings screens that would switch blocking off during a session. */
 @Composable
-internal fun SettingsGuardContent(scheduleName: String, until: String, onPause: () -> Unit, onUnlock: () -> Unit, onBack: () -> Unit) {
+internal fun SettingsGuardContent(scheduleName: String, until: String, onUnlock: () -> Unit, onBack: () -> Unit) {
     val c = Obsidian.colors
     Column(
         Modifier
@@ -228,25 +226,22 @@ internal fun SettingsGuardContent(scheduleName: String, until: String, onPause: 
         StatusPill("$scheduleName is on", c.accentText)
         Spacer(Modifier.height(16.dp))
         Text(
-            "Blocking stays on until $until",
+            "This stays locked until $until",
             style = MaterialTheme.typography.headlineMedium,
             color = c.textNormal,
             textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(12.dp))
         Text(
-            "Switching it off is locked while $scheduleName runs. If a banking or ID app needs it off, pause for a minute: " +
-                "it counts as an escape in your stats.",
+            "Switching blocking off and uninstalling are locked while $scheduleName runs. If you really need to, end the " +
+                "session first — the unlock steps still work.",
             style = MaterialTheme.typography.bodyLarge,
             color = c.textMuted,
             textAlign = TextAlign.Center,
         )
         Spacer(Modifier.weight(1.3f))
-        CtaButton("Pause blocking for 1 minute", onClick = onPause, modifier = Modifier.fillMaxWidth())
-        TextButton(onClick = onUnlock, modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) {
-            Text("End $scheduleName early", color = c.textMuted)
-        }
-        TextButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) {
+        CtaButton("End $scheduleName early", onClick = onUnlock, modifier = Modifier.fillMaxWidth())
+        TextButton(onClick = onBack, modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) {
             Text("Go back", color = c.textMuted)
         }
     }

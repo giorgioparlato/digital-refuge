@@ -24,20 +24,19 @@ import kotlinx.coroutines.launch
  * Runs for as long as a session does, separately from [BlockerService], so that it survives the
  * accessibility service being switched off — which is exactly the moment it exists for.
  *
- * It notices blocking going off mid-session (from the app's own pause, from Settings, or from the
- * link a banking app offers), records it so the stats show it, and keeps a reminder up until
- * blocking is back on.
+ * During a session, switching blocking off in Settings is covered by [BlockerService] and can only
+ * be done deliberately (through the unlock steps, or safe mode). If it does go off, this service
+ * notices in seconds, records it for the stats, keeps a reminder up until it's back, and keeps the
+ * session's Do Not Disturb and greyscale going so that only apps are unblocked.
  */
 class SessionGuardService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     /** Not cancelled on destroy, so giving the phone its sound and colour back can finish. */
     private val releaseScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
     private var state: ActiveState? = null
     private var blockingOn = true
-
-    /** Set when the user asked for a pause, so the first minute is a countdown and not a telling-off. */
-    private var pausedUntil = 0L
 
     /** So one switch-off is recorded once, not on every settings change. */
     private var recorded = false
@@ -50,8 +49,8 @@ class SessionGuardService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        blockingOn = BlockingPause.isBlockingOn(this)
-        startForeground(NOTIFICATION_ID, SessionNotifier.build(this, null, blockingOn = blockingOn, pausedUntil = 0L))
+        blockingOn = BlockingState.isOn(this)
+        startForeground(NOTIFICATION_ID, SessionNotifier.build(this, null, blockingOn = blockingOn))
         contentResolver.registerContentObserver(
             Settings.Secure.getUriFor(Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES),
             false,
@@ -69,8 +68,8 @@ class SessionGuardService : Service() {
                 }
             }
         }
-        // While blocking is off the reminder is re-posted, so it stays in sight and the countdown moves,
-        // and every 15 seconds Do Not Disturb and greyscale are re-asserted in case they were switched off.
+        // While blocking is off the reminder is re-posted so it stays in sight, and every 15 seconds
+        // Do Not Disturb and greyscale are re-asserted in case they were switched off.
         scope.launch {
             var ticks = 0
             while (true) {
@@ -84,16 +83,13 @@ class SessionGuardService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == ACTION_PAUSE_STARTING) {
-            pausedUntil = System.currentTimeMillis() + BlockingPause.LENGTH_MS
-        }
         refresh()
         return START_STICKY
     }
 
     /** Re-reads whether blocking is on, records a switch-off once, and updates the notification. */
     private fun refresh() {
-        val nowOn = BlockingPause.isBlockingOn(this)
+        val nowOn = BlockingState.isOn(this)
         val wasOn = blockingOn
         blockingOn = nowOn
         when {
@@ -108,7 +104,6 @@ class SessionGuardService : Service() {
             }
             !wasOn && nowOn -> {
                 recorded = false
-                pausedUntil = 0L
                 Engine.refresh() // Pick the session back up straight away.
             }
         }
@@ -139,7 +134,7 @@ class SessionGuardService : Service() {
     }
 
     private fun post() {
-        SessionNotifier.post(this, NOTIFICATION_ID, state, blockingOn, pausedUntil)
+        SessionNotifier.post(this, NOTIFICATION_ID, state, blockingOn)
     }
 
     override fun onDestroy() {
@@ -153,19 +148,14 @@ class SessionGuardService : Service() {
 
     companion object {
         private const val NOTIFICATION_ID = 1
-        private const val ACTION_PAUSE_STARTING = "app.bedtime.guard.PAUSE_STARTING"
 
         /** Starts the guard, or wakes it, whenever a session is running. */
-        fun start(context: Context, action: String? = null) {
-            val intent = Intent(context, SessionGuardService::class.java).setAction(action)
-            runCatching { context.startForegroundService(intent) }
+        fun start(context: Context) {
+            runCatching { context.startForegroundService(Intent(context, SessionGuardService::class.java)) }
         }
 
         fun stop(context: Context) {
             runCatching { context.stopService(Intent(context, SessionGuardService::class.java)) }
         }
-
-        /** Called just before blocking is switched off on purpose, so the first minute is a countdown. */
-        fun pauseStarting(context: Context) = start(context, ACTION_PAUSE_STARTING)
     }
 }

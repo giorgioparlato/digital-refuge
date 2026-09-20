@@ -48,7 +48,6 @@ import app.bedtime.data.Repository
 import app.bedtime.data.Schedule
 import app.bedtime.service.DndController
 import app.bedtime.service.GreyscaleController
-import app.bedtime.service.BlockingPause
 import app.bedtime.service.SystemApps
 import app.bedtime.ui.components.BedtimeIcons
 import app.bedtime.ui.components.Chevron
@@ -156,7 +155,6 @@ fun SettingsScreen(
         version = version,
         canPinWidget = canPinWidget,
         onAddWidget = { block -> BlockWidget.requestPin(context, block) },
-        onPauseBlocking = { if (!BlockingPause.start(context)) context.startActivity(BlockingPause.settingsIntent()) },
         lockSettings = settings.lockSettingsDuringSessions,
         onLockSettings = { on -> scope.launch { repo.updateSettings { it.copy(lockSettingsDuringSessions = on) } } },
         onExport = { exportFile.launch("digital-refuge-${LocalDate.now()}.json") },
@@ -177,12 +175,11 @@ internal fun SettingsContent(
     onGroups: () -> Unit = {},
     alwaysAvailableCount: Int = 0,
     onAlwaysAvailable: () -> Unit = {},
-    version: String = "1.5",
+    version: String = "0.6",
     canPinWidget: Boolean = true,
     onAddWidget: (Schedule) -> Unit = {},
     onExport: () -> Unit = {},
     onImport: () -> Unit = {},
-    onPauseBlocking: () -> Unit = {},
     lockSettings: Boolean = true,
     onLockSettings: (Boolean) -> Unit = {},
 ) {
@@ -248,20 +245,14 @@ internal fun SettingsContent(
             }
 
             SectionCard(
-                title = "Switching blocking off",
-                subtitle = "During a session it only happens on purpose. Some apps, like BankID, need it off for a moment.",
+                title = "Locking blocking down",
+                subtitle = "During a session, switching blocking off or uninstalling can only be done through the unlock steps.",
             ) {
                 OptionRow(
                     BedtimeIcons.Refuge,
-                    "Lock blocking's settings during sessions",
-                    description = "Covers the screens that switch blocking off or uninstall the app, until the session ends",
+                    "Lock changes during sessions",
+                    description = "Covers the Settings screens that switch blocking off or uninstall the app, until the session ends",
                 ) { ObsidianToggle(lockSettings, onLockSettings) }
-                OptionRow(
-                    Icons.Default.Warning,
-                    "Pause blocking for 1 minute",
-                    description = "Switches blocking off, then reminds you to switch it back on",
-                    onClick = onPauseBlocking,
-                ) { Chevron() }
             }
 
             SectionCard(
