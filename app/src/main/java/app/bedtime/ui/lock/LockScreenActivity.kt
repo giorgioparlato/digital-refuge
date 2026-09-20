@@ -172,7 +172,7 @@ private fun LockScreen(onOpen: () -> Unit, onFinish: () -> Unit, onLightBackgrou
         until = formatTime(context, occurrence.end),
         style = style,
         onOpen = onOpen,
-        quote = Quotes.forDay(now.toLocalDate()),
+        quote = Quotes.forPeriod(now, style.quoteRefresh),
     )
 }
 

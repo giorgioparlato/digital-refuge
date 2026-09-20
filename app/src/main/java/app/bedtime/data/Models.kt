@@ -42,7 +42,9 @@ data class Schedule(
     val hideNotifications: Boolean = false,
     val unlock: UnlockConfig = UnlockConfig(),
     val unlockAction: UnlockAction = UnlockAction(),
-    /** Break granted when blocking is paused for a banking/ID app, in minutes (at least 1). */
+    /** Offer a short break for apps that won't run while blocking is on. Off means no way out but unlocking. */
+    val pauseEnabled: Boolean = true,
+    /** How long each of those breaks lasts, in minutes (at least 1). */
     val breakMinutes: Int = 1,
 ) {
     val isBlock: Boolean get() = kind == ScheduleKind.BLOCK
@@ -128,6 +130,10 @@ enum class AppNameSize(val scale: Float) { VERY_SMALL(0.55f), SMALL(0.75f), MEDI
 @Serializable
 enum class TextSize(val scale: Float) { SMALL(0.85f), MEDIUM(1f), LARGE(1.2f) }
 
+/** How long a quote stays before the next one comes round. */
+@Serializable
+enum class QuoteRefresh(val hours: Int) { HOURLY(1), SIX_HOURS(6), DAILY(24), WEEKLY(168) }
+
 /** Look of the minimal home screen. Colours are ARGB. */
 @Serializable
 data class HomeStyle(
@@ -138,8 +144,10 @@ data class HomeStyle(
     val showGreeting: Boolean = true,
     val showDate: Boolean = true,
     val showIcons: Boolean = false,
-    /** A quote of the day under the session, on the minimal home and the lock screen. */
+    /** A quote under the session, on the minimal home and the lock screen. */
     val showQuote: Boolean = true,
+    /** How often that quote changes. */
+    val quoteRefresh: QuoteRefresh = QuoteRefresh.DAILY,
     /** When greyscale is on, keep the home screen itself in colour. */
     val keepInColour: Boolean = true,
     /** During sessions, show the clock and session over the lock screen. */
@@ -163,8 +171,6 @@ data class AppSettings(
     val lockSettingsDuringSessions: Boolean = true,
     /** If blocking is switched off mid-session, take over the screen until it's back on. */
     val fullScreenAlert: Boolean = true,
-    /** Offer a "pause for a banking app" break. Off means total strictness: only the unlock steps. */
-    val pauseEnabled: Boolean = true,
     /** True once the one-time explainer has been shown. */
     val onboarded: Boolean = false,
 )

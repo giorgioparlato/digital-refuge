@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Home
@@ -21,6 +22,8 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -118,6 +121,7 @@ fun ScheduleEditScreen(
     onSaved: () -> Unit,
     onUnlock: (String) -> Unit,
     onSetup: () -> Unit,
+    onHowItWorks: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val c = Obsidian.colors
@@ -279,6 +283,7 @@ fun ScheduleEditScreen(
         onEditStart = { editingTime = TIME_START },
         onEditEnd = { editingTime = TIME_END },
         onOpenSetup = onSetup,
+        onHowItWorks = onHowItWorks,
         appLabel = { AppCatalog.label(context, it) },
         essentials = essentials,
     )
@@ -305,6 +310,7 @@ internal fun ScheduleEditContent(
     onEditStart: () -> Unit,
     onEditEnd: () -> Unit,
     onOpenSetup: () -> Unit,
+    onHowItWorks: () -> Unit = {},
     appLabel: (String) -> String = { it },
     /** Pre-filled as allowed apps when minimal mode is switched on with none chosen yet. */
     essentials: Set<String> = emptySet(),
@@ -328,6 +334,11 @@ internal fun ScheduleEditContent(
                     else -> "Edit schedule"
                 },
                 onBack = onBack,
+                actions = {
+                    IconButton(onClick = onHowItWorks) {
+                        Icon(Icons.Default.Info, contentDescription = "How it works", tint = c.textMuted)
+                    }
+                },
             )
         },
         bottomBar = {
@@ -639,20 +650,28 @@ internal fun ScheduleEditContent(
             }
 
             SectionCard(
-                title = "Banking or ID apps",
-                subtitle = "If one won't run while blocking is on, you can pause for a short break (turn the pause on in settings). Each break lasts:",
+                title = "Apps that need blocking off",
+                subtitle = "A few apps won't run while blocking is on. This one can offer them a short break.",
             ) {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text("Break length", style = MaterialTheme.typography.bodyMedium, color = c.textMuted, modifier = Modifier.weight(1f))
-                    NumberStepper(
-                        draft.breakMinutes,
-                        { v -> onDraftChange(draft.copy(breakMinutes = v)) },
-                        1..60,
-                        suffix = " min",
-                        enabled = editable,
-                        presets = listOf(1, 2, 3, 5, 10),
-                        title = "break length",
-                    )
+                OptionRow(
+                    BedtimeIcons.Hourglass,
+                    "Allow a pause",
+                    description = "Switches blocking off briefly, then a full screen brings you back. It counts as an escape.",
+                    enabled = editable,
+                ) { ObsidianToggle(draft.pauseEnabled, { on -> onDraftChange(draft.copy(pauseEnabled = on)) }, enabled = editable) }
+                AnimatedVisibility(draft.pauseEnabled) {
+                    Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("Break length", style = MaterialTheme.typography.bodyMedium, color = c.textMuted, modifier = Modifier.weight(1f))
+                        NumberStepper(
+                            draft.breakMinutes,
+                            { v -> onDraftChange(draft.copy(breakMinutes = v)) },
+                            1..60,
+                            suffix = " min",
+                            enabled = editable,
+                            presets = listOf(1, 2, 3, 5, 10),
+                            title = "break length",
+                        )
+                    }
                 }
             }
 

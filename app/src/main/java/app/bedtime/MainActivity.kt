@@ -179,6 +179,7 @@ private fun BedtimeNavigation(pendingRoute: String?, onRouteConsumed: () -> Unit
                 onSaved = ::popToHome,
                 onUnlock = { id -> push(Routes.unlock(id)) },
                 onSetup = { push(Routes.SETUP) },
+                onHowItWorks = { push(Routes.ONBOARDING) },
             )
             top.startsWith(Routes.TEMPLATE) -> ScheduleEditScreen(
                 scheduleId = null,
@@ -187,6 +188,7 @@ private fun BedtimeNavigation(pendingRoute: String?, onRouteConsumed: () -> Unit
                 onSaved = ::popToHome,
                 onUnlock = { id -> push(Routes.unlock(id)) },
                 onSetup = { push(Routes.SETUP) },
+                onHowItWorks = { push(Routes.ONBOARDING) },
             )
             top.startsWith(Routes.UNLOCK) -> UnlockScreen(top.removePrefix(Routes.UNLOCK), onBack = { pop(top) })
         }

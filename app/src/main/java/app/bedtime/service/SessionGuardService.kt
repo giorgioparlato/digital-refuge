@@ -123,7 +123,7 @@ class SessionGuardService : Service() {
             !BlockingState.isOverlaySuppressed()
         if (takeover) {
             val schedule = current.active.maxByOrNull { it.end }?.schedule
-            TakeoverOverlay.show(this, schedule?.name ?: "your session", schedule?.breakMinutes ?: 1, settings.pauseEnabled)
+            TakeoverOverlay.show(this, schedule?.name ?: "your session", schedule?.breakMinutes ?: 1, schedule?.pauseEnabled == true)
         } else {
             TakeoverOverlay.hide(this)
         }

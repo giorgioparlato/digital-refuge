@@ -255,6 +255,9 @@ class ScreenshotTest {
     fun blocked() = shot { BlockedContent("Instagram", "Bedtime", "07:00", {}, {}) }
 
     @Test
+    fun onboarding() = shot(tall = true) { app.bedtime.ui.onboarding.OnboardingScreen(onDone = {}) }
+
+    @Test
     fun settingsGuard() = shot { app.bedtime.ui.blocked.SettingsGuardContent("Bedtime", "07:00", 1, {}, {}, {}) }
 
     @Test

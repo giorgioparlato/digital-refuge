@@ -222,10 +222,17 @@ private fun AlwaysInfo(apps: List<AppEntry>, selected: Set<String>, riskyPackage
     val risky = (riskyPackages intersect selected).map { pkg -> apps.firstOrNull { it.packageName == pkg }?.label ?: pkg }
     Column(Modifier.padding(horizontal = 16.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Callout(
-            title = "Always available",
+            title = "What belongs here",
             kind = CalloutKind.INFO,
-            body = "These apps are never blocked, and you can open them from the Emergency button during any session. " +
-                "Keep the list short: think maps, rides, your authenticator or bank.",
+            body = "Apps you could need in the middle of anything: maps and public transport, taxis, your bank or payment app, " +
+                "an authenticator, tickets and boarding passes, a health or care app. These are never blocked, and the " +
+                "Emergency button reaches them during any session.",
+        )
+        Callout(
+            title = "Keep the list short",
+            kind = CalloutKind.INFO,
+            body = "Everything here is a way around every session, so add what you would genuinely need in a hurry \u2014 " +
+                "not what you would like to have.",
         )
         if (risky.isNotEmpty()) {
             Callout(

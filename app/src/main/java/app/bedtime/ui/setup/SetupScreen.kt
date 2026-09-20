@@ -67,6 +67,7 @@ fun SetupScreen(onBack: () -> Unit, onAlwaysAvailable: () -> Unit) {
     var serviceOn by remember { mutableStateOf(false) }
     var greyscaleOk by remember { mutableStateOf(false) }
     var dndOk by remember { mutableStateOf(false) }
+    var overlayOk by remember { mutableStateOf(false) }
     var notificationsOk by remember { mutableStateOf(true) }
     var askedNotifications by rememberSaveable { mutableStateOf(false) }
     var previewing by remember { mutableStateOf(false) }
@@ -77,6 +78,7 @@ fun SetupScreen(onBack: () -> Unit, onAlwaysAvailable: () -> Unit) {
         serviceOn = SystemApps.isAccessibilityServiceEnabled(context)
         greyscaleOk = GreyscaleController.isAvailable(context)
         dndOk = DndController.hasAccess(context)
+        overlayOk = Settings.canDrawOverlays(context)
         notificationsOk = NotificationManagerCompat.from(context).areNotificationsEnabled()
         onPauseOrDispose { }
     }
@@ -103,6 +105,10 @@ fun SetupScreen(onBack: () -> Unit, onAlwaysAvailable: () -> Unit) {
         },
         onOpenDnd = { context.tryStart(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)) },
         onOpenBattery = { context.tryStart(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) },
+        overlayOk = overlayOk,
+        onOpenOverlay = {
+            context.tryStart(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.fromParts("package", context.packageName, null)))
+        },
         alwaysAvailableCount = settings.alwaysAvailable.size,
         onAlwaysAvailable = onAlwaysAvailable,
         notificationsOk = notificationsOk,
@@ -132,6 +138,8 @@ internal fun SetupContent(
     onPreview: () -> Unit,
     onOpenDnd: () -> Unit,
     onOpenBattery: () -> Unit,
+    overlayOk: Boolean = true,
+    onOpenOverlay: () -> Unit = {},
     alwaysAvailableCount: Int = 0,
     onAlwaysAvailable: () -> Unit = {},
     notificationsOk: Boolean = true,
@@ -202,7 +210,17 @@ internal fun SetupContent(
                 }
             }
 
-            StepCard(5, "Choose always-available apps", done = alwaysAvailableCount > 0, badge = "Recommended") {
+            StepCard(5, "Allow the full-screen reminder", done = overlayOk, badge = "Optional") {
+                Body(
+                    "If blocking is ever switched off while a session is running, digital refuge fills the screen until you " +
+                        "switch it back on. That needs permission to display over other apps.",
+                )
+                if (!overlayOk) {
+                    PlainButton("Allow display over other apps", onClick = onOpenOverlay, modifier = Modifier.fillMaxWidth())
+                }
+            }
+
+            StepCard(6, "Choose always-available apps", done = alwaysAvailableCount > 0, badge = "Recommended") {
                 Body(
                     "Apps that stay usable during every session, reached from the emergency button: maps, rides, your authenticator. " +
                         "Keep the list short. You can change it later in settings → emergency.",
@@ -214,7 +232,7 @@ internal fun SetupContent(
                 )
             }
 
-            StepCard(6, "Keep digital refuge running", done = false, badge = "Recommended") {
+            StepCard(7, "Keep digital refuge running", done = false, badge = "Recommended") {
                 Body("Some phones (Samsung, Xiaomi, OnePlus…) put background apps to sleep. If blocking ever stops working, set digital refuge's battery usage to Unrestricted.")
                 PlainButton("Open battery settings", onClick = onOpenBattery, modifier = Modifier.fillMaxWidth())
             }

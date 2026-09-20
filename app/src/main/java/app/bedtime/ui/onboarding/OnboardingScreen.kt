@@ -44,20 +44,46 @@ fun OnboardingScreen(onDone: () -> Unit) {
             Spacer(Modifier.height(12.dp))
             Icon(BedtimeIcons.Refuge, contentDescription = null, tint = c.accent, modifier = Modifier.size(48.dp))
             Spacer(Modifier.height(16.dp))
-            Text("how a session holds", style = MaterialTheme.typography.headlineMedium, color = c.textNormal)
+            Text("welcome to your refuge", style = MaterialTheme.typography.headlineMedium, color = c.textNormal)
             Spacer(Modifier.height(8.dp))
             Text(
-                "digital refuge adds friction to impulses, not a prison. here's what a running schedule or block does, and how you leave.",
+                "digital refuge sets aside hours when your phone asks less of you. here is what happens inside one of those hours, " +
+                    "and how to step out if you truly need to.",
                 style = MaterialTheme.typography.bodyLarge,
                 color = c.textMuted,
             )
             Spacer(Modifier.height(28.dp))
 
-            Point(BedtimeIcons.Moon, "it blocks and quiets", "distracting apps step aside, the screen can fade to grey, and notifications wait until the session ends.")
-            Point(BedtimeIcons.Hourglass, "leaving early takes effort", "the unlock steps you choose — wait, type, password — run in order. you can make each early unlock harder than the last.")
-            Point(BedtimeIcons.Refuge, "it stays put", "during a session, the settings screens that switch blocking off, and the uninstall prompt, are covered. no two-tap escape. (you can turn this off.)")
-            Point(BedtimeIcons.Target, "if blocking still goes off", "should it be switched off anyway, a full-screen reminder brings you back until you switch it on again. do not disturb and greyscale stay on meanwhile.")
-            Point(BedtimeIcons.Contrast, "banking and id apps", "some (like bankid) refuse to run while blocking is on. if you allow it, you can pause for a short break, set per block. it counts as an escape. for total strictness, leave the pause off.")
+            Point(
+                BedtimeIcons.Moon,
+                "a session begins",
+                "at the times you choose, or whenever you start a block, the apps you have named step aside. the screen can " +
+                    "fade to grey, and notifications wait quietly until the session ends.",
+            )
+            Point(
+                BedtimeIcons.Hourglass,
+                "leaving early asks something of you",
+                "if you want out before the end, the steps you picked stand in the way: a wait, a passage to type, a password. " +
+                    "just enough of a pause for the urge to pass. each unlock can be set to ask a little more than the last.",
+            )
+            Point(
+                BedtimeIcons.Refuge,
+                "it holds firm",
+                "during a session, the screens that would switch blocking off, or remove the app, are gently covered. not to " +
+                    "trap you — only so that leaving is a decision rather than a reflex.",
+            )
+            Point(
+                BedtimeIcons.Target,
+                "if blocking stops anyway",
+                "should it be switched off regardless, a full screen waits with you until you turn it back on. the quiet and " +
+                    "the grey stay in place meanwhile, so only your apps return.",
+            )
+            Point(
+                BedtimeIcons.Contrast,
+                "when an app needs the door open",
+                "a few apps will not run while blocking is on. if you allow it, a block can offer a short break for exactly " +
+                    "that, then gather itself back together. leave it off if you would rather have no door at all.",
+            )
 
             Spacer(Modifier.height(20.dp))
             CtaButton("got it", onClick = onDone, modifier = Modifier.fillMaxWidth())

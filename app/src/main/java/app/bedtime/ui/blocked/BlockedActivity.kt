@@ -42,8 +42,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.bedtime.apps.AppCatalog
-import app.bedtime.data.AppSettings
-import app.bedtime.data.Repository
 import app.bedtime.engine.Engine
 import app.bedtime.service.BlockingState
 import app.bedtime.ui.components.BedtimeIcons
@@ -108,7 +106,6 @@ private fun BlockedScreen(pkg: String?, guardingSettings: Boolean, onHome: () ->
     val context = LocalContext.current
     val c = Obsidian.colors
     val state by Engine.state(context).collectAsStateWithLifecycle()
-    val settings by remember { Repository.get(context).settings }.collectAsStateWithLifecycle(initialValue = AppSettings())
     // Guarding Settings, the session to leave is the longest-running one; otherwise, whichever blocks this app.
     val blocker = if (guardingSettings) state?.active?.maxByOrNull { it.end } else pkg?.let { state?.blockerOf(it) }
     var unlocking by rememberSaveable { mutableStateOf(false) }
@@ -141,7 +138,7 @@ private fun BlockedScreen(pkg: String?, guardingSettings: Boolean, onHome: () ->
                 scheduleName = blocker.schedule.name,
                 until = formatTime(context, blocker.end),
                 breakMinutes = blocker.schedule.breakMinutes,
-                onPause = if (settings.pauseEnabled) {
+                onPause = if (blocker.schedule.pauseEnabled) {
                     { if (BlockingState.pause(blocker.schedule.breakMinutes)) onFinish() }
                 } else {
                     null

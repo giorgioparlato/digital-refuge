@@ -83,7 +83,6 @@ fun SettingsScreen(
     val schedules by repo.schedules.collectAsStateWithLifecycle(initialValue = emptyList())
     val settings by repo.settings.collectAsStateWithLifecycle(initialValue = AppSettings())
     var stepsLeft by remember { mutableIntStateOf(0) }
-    var canOverlay by remember { mutableStateOf(Settings.canDrawOverlays(context)) }
     val version = remember { runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull().orEmpty() }
     val canPinWidget = remember { BlockWidget.canPin(context) }
     var pendingImport by remember { mutableStateOf<Uri?>(null) }
@@ -144,7 +143,6 @@ fun SettingsScreen(
             GreyscaleController.isAvailable(context),
             DndController.hasAccess(context),
         ).count { !it }
-        canOverlay = Settings.canDrawOverlays(context)
         onPauseOrDispose { }
     }
     SettingsContent(
@@ -166,10 +164,6 @@ fun SettingsScreen(
         onLockSettings = { on -> scope.launch { repo.updateSettings { it.copy(lockSettingsDuringSessions = on) } } },
         fullScreenAlert = settings.fullScreenAlert,
         onFullScreenAlert = { on -> scope.launch { repo.updateSettings { it.copy(fullScreenAlert = on) } } },
-        pauseEnabled = settings.pauseEnabled,
-        onPauseEnabled = { on -> scope.launch { repo.updateSettings { it.copy(pauseEnabled = on) } } },
-        overlayGranted = canOverlay,
-        onGrantOverlay = { runCatching { context.startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, "package:${context.packageName}".toUri())) } },
         onHowItWorks = onHowItWorks,
         onExport = { exportFile.launch("digital-refuge-${LocalDate.now()}.json") },
         onImport = { pickFile.launch(arrayOf("application/json", "text/plain", "*/*")) },
@@ -189,7 +183,7 @@ internal fun SettingsContent(
     onGroups: () -> Unit = {},
     alwaysAvailableCount: Int = 0,
     onAlwaysAvailable: () -> Unit = {},
-    version: String = "0.6.2",
+    version: String = "0.6.3",
     canPinWidget: Boolean = true,
     onAddWidget: (Schedule) -> Unit = {},
     onExport: () -> Unit = {},
@@ -198,10 +192,6 @@ internal fun SettingsContent(
     onLockSettings: (Boolean) -> Unit = {},
     fullScreenAlert: Boolean = true,
     onFullScreenAlert: (Boolean) -> Unit = {},
-    pauseEnabled: Boolean = true,
-    onPauseEnabled: (Boolean) -> Unit = {},
-    overlayGranted: Boolean = true,
-    onGrantOverlay: () -> Unit = {},
     onHowItWorks: () -> Unit = {},
 ) {
     val c = Obsidian.colors
@@ -283,21 +273,8 @@ internal fun SettingsContent(
                 OptionRow(
                     Icons.Default.Warning,
                     "Full-screen reminder if blocking goes off",
-                    description = "If blocking is switched off mid-session, take over the screen until it's back on",
+                    description = "If blocking is switched off mid-session, take over the screen until it's back on. Allow it in setup.",
                 ) { ObsidianToggle(fullScreenAlert, onFullScreenAlert) }
-                if (fullScreenAlert && !overlayGranted) {
-                    OptionRow(
-                        Icons.Default.Warning,
-                        "Allow display over other apps",
-                        description = "Needed for the full-screen reminder",
-                        onClick = onGrantOverlay,
-                    ) { Chevron() }
-                }
-                OptionRow(
-                    BedtimeIcons.Hourglass,
-                    "Allow a banking pause",
-                    description = "A short break for apps like BankID. Off = total strictness (only the unlock steps)",
-                ) { ObsidianToggle(pauseEnabled, onPauseEnabled) }
             }
 
             SectionCard(

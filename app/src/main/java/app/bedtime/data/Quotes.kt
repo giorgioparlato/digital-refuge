@@ -1,6 +1,7 @@
 package app.bedtime.data
 
 import java.time.LocalDate
+import java.time.LocalDateTime
 
 /** A short line for the minimal home and the lock screen. [work] is null when no book could be confirmed. */
 data class Quote(val text: String, val author: String, val work: String? = null)
@@ -156,9 +157,23 @@ object Quotes {
             "In some Native languages the term for plants translates to 'those who take care of us.'",
             "Robin Wall Kimmerer", "Braiding Sweetgrass",
         ),
+        Quote(
+            "All that you touch you change. All that you change changes you.",
+            "Octavia E. Butler", "Parable of the Sower",
+        ),
     )
 
     /** Today's quote; [offset] steps to the following ones ("tap for another"). */
     fun forDay(date: LocalDate, offset: Int = 0): Quote =
         all[Math.floorMod(date.toEpochDay() + offset, all.size.toLong()).toInt()]
+
+    /**
+     * The quote for the stretch of time [now] falls in, so it changes as often as [refresh] says.
+     * At [QuoteRefresh.DAILY] this matches [forDay]: a new one at local midnight.
+     */
+    fun forPeriod(now: LocalDateTime, refresh: QuoteRefresh, offset: Int = 0): Quote {
+        val hours = now.toLocalDate().toEpochDay() * 24 + now.hour
+        val period = Math.floorDiv(hours, refresh.hours.toLong())
+        return all[Math.floorMod(period + offset, all.size.toLong()).toInt()]
+    }
 }

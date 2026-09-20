@@ -49,6 +49,7 @@ import app.bedtime.data.HomeStyle
 import app.bedtime.data.Quote
 import app.bedtime.data.Quotes
 import app.bedtime.data.Repository
+import app.bedtime.data.QuoteRefresh
 import app.bedtime.data.TextSize
 import app.bedtime.ui.components.BedtimeIcons
 import app.bedtime.ui.components.ObsidianTextField
@@ -83,7 +84,7 @@ fun HomeStyleScreen(onBack: () -> Unit) {
         previewApps = apps,
         now = LocalDateTime.now(),
         onBack = onBack,
-        quote = Quotes.forDay(LocalDate.now()),
+        quote = Quotes.forPeriod(LocalDateTime.now(), current.homeStyle.quoteRefresh),
     )
 }
 
@@ -165,8 +166,16 @@ internal fun HomeStyleContent(
                 OptionRow(BedtimeIcons.Grid, "App icons", description = "Small icons next to app names") {
                     ObsidianToggle(style.showIcons, { onChange(style.copy(showIcons = it)) })
                 }
-                OptionRow(BedtimeIcons.Leaf, "Quote of the day", description = "Here and on the lock screen, a new one each day. Tap it on the home screen for another") {
+                OptionRow(BedtimeIcons.Leaf, "Quote", description = "Here and on the lock screen. Tap it on the home screen for another") {
                     ObsidianToggle(style.showQuote, { onChange(style.copy(showQuote = it)) })
+                }
+                if (style.showQuote) {
+                    SizeLabel("A new one every", Modifier.padding(top = 12.dp, bottom = 8.dp))
+                    SegmentedChoice(
+                        options = listOf("Hour", "6 hours", "Day", "Week"),
+                        selected = style.quoteRefresh.ordinal,
+                        onSelect = { onChange(style.copy(quoteRefresh = QuoteRefresh.entries[it])) },
+                    )
                 }
             }
             SectionCard {

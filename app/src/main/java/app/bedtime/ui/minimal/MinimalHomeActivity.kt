@@ -150,7 +150,7 @@ private fun MinimalHomeScreen(onFinish: () -> Unit, onLightBackground: (Boolean)
                     emergency = false
                 },
                 breakMinutes = occurrence.schedule.breakMinutes,
-                pauseEnabled = settings.pauseEnabled,
+                pauseEnabled = occurrence.schedule.pauseEnabled,
             )
         }
         unlocking -> Surface(Modifier.fillMaxSize(), color = c.bgPrimary) {
@@ -177,7 +177,7 @@ private fun MinimalHomeScreen(onFinish: () -> Unit, onLightBackground: (Boolean)
             onLaunch = { AppCatalog.launch(context, it) },
             onUnlock = { unlocking = true },
             onEmergency = { emergency = true },
-            quote = Quotes.forDay(now.toLocalDate(), quoteOffset),
+            quote = Quotes.forPeriod(now, style.quoteRefresh, quoteOffset),
             onNextQuote = { quoteOffset++ },
         )
     }

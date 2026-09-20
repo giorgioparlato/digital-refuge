@@ -7,6 +7,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.os.Bundle
 import android.widget.RemoteViews
 import app.bedtime.MainActivity
 import app.bedtime.R
@@ -31,6 +32,17 @@ import java.time.ZoneId
  */
 class BlockWidget : AppWidgetProvider() {
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
+        async { updateAll(context) }
+    }
+
+    /** Resized by the user: redraw, so the layout can grow or shrink to fit. */
+    override fun onAppWidgetOptionsChanged(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        appWidgetId: Int,
+        newOptions: Bundle?,
+    ) {
+        super.onAppWidgetOptionsChanged(context, appWidgetManager, appWidgetId, newOptions)
         async { updateAll(context) }
     }
 
@@ -104,7 +116,9 @@ class BlockWidget : AppWidgetProvider() {
             val schedules = repo.schedules.first()
             val settings = repo.settings.first()
             val state = ScheduleEvaluator.evaluate(System.currentTimeMillis(), ZoneId.systemDefault(), schedules, repo.runtime.first())
-            ids.forEach { id -> manager.updateAppWidget(id, views(context, id, schedules, settings, state)) }
+            ids.forEach { id ->
+                manager.updateAppWidget(id, views(context, id, schedules, settings, state, manager.getAppWidgetOptions(id)))
+            }
         }
 
         private fun blockFor(widgetId: Int, schedules: List<Schedule>, settings: AppSettings): Schedule? {
@@ -114,7 +128,28 @@ class BlockWidget : AppWidgetProvider() {
                 ?: blocks.firstOrNull()
         }
 
-        private fun views(context: Context, widgetId: Int, schedules: List<Schedule>, settings: AppSettings, state: ActiveState): RemoteViews {
+        /**
+         * The layout that fits the size the user dragged the widget to: a single row when it's short,
+         * stacked and roomier as it grows.
+         */
+        private fun layoutFor(options: Bundle?): Int {
+            val height = options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0) ?: 0
+            val width = options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0) ?: 0
+            return when {
+                height >= 200 && width >= 130 -> R.layout.widget_block_large
+                height >= 110 -> R.layout.widget_block_medium
+                else -> R.layout.widget_block
+            }
+        }
+
+        private fun views(
+            context: Context,
+            widgetId: Int,
+            schedules: List<Schedule>,
+            settings: AppSettings,
+            state: ActiveState,
+            options: Bundle? = null,
+        ): RemoteViews {
             val block = blockFor(widgetId, schedules, settings)
             val running = block?.let { b -> state.active.firstOrNull { it.schedule.id == b.id } }
             val title: String
@@ -137,7 +172,7 @@ class BlockWidget : AppWidgetProvider() {
                     click = start(context, widgetId, block.id)
                 }
             }
-            return RemoteViews(context.packageName, R.layout.widget_block).apply {
+            return RemoteViews(context.packageName, layoutFor(options)).apply {
                 setTextViewText(R.id.widget_title, title.lowercase())
                 setTextViewText(R.id.widget_subtitle, subtitle.lowercase())
                 setInt(
