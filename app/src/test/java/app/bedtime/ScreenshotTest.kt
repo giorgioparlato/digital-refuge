@@ -94,9 +94,7 @@ class ScreenshotTest {
             onEdit = {},
             onCreate = {},
             onTemplate = {},
-            onToggle = { _, _ -> },
             onStartBlock = { _, _ -> },
-            onSettings = {},
             onSetup = {},
             onUnlock = {},
         )
@@ -136,6 +134,19 @@ class ScreenshotTest {
 
     @Test
     fun homeActive() = shot { Home(Samples.home(hour = 15, runningFocus = true)) }
+
+    @Test
+    fun schedules() = shot(tall = true) {
+        val ui = Samples.home()
+        app.bedtime.ui.schedules.SchedulesContent(
+            schedules = ui.schedules.filterNot { it.isBlock },
+            active = ui.active,
+            now = ui.now,
+            onEdit = {},
+            onCreate = {},
+            onToggle = { _, _ -> },
+        )
+    }
 
     @Test
     fun homeManyBlocks() = shot(tall = true) { Home(Samples.home(Samples.manyBlocks, hour = 15, runningFocus = true)) }
@@ -529,6 +540,7 @@ private object Samples {
         val now = LocalDate.now().atTime(hour, minute).atZone(zone).toInstant().toEpochMilli()
         val runtime = if (runningFocus) RuntimeState(activeRuns = mapOf("focus" to Run(now - 20 * MIN, now + 40 * MIN))) else RuntimeState()
         return HomeUiState(
+            quote = app.bedtime.data.Quotes.all.first(),
             schedules = schedules,
             active = ScheduleEvaluator.evaluate(now, zone, schedules, runtime),
             runtime = runtime,

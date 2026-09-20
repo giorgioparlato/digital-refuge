@@ -70,7 +70,7 @@ import java.time.LocalDate
 
 @Composable
 fun SettingsScreen(
-    onBack: () -> Unit,
+    onBack: (() -> Unit)? = null,
     onSetup: () -> Unit,
     onHomeStyle: () -> Unit,
     onGroups: () -> Unit,
@@ -175,7 +175,7 @@ internal fun SettingsContent(
     blocks: List<Schedule>,
     tileBlockId: String?,
     setupStepsLeft: Int,
-    onBack: () -> Unit,
+    onBack: (() -> Unit)? = null,
     onSetup: () -> Unit,
     onHomeStyle: () -> Unit,
     onTileBlock: (String) -> Unit,
@@ -183,7 +183,7 @@ internal fun SettingsContent(
     onGroups: () -> Unit = {},
     alwaysAvailableCount: Int = 0,
     onAlwaysAvailable: () -> Unit = {},
-    version: String = "0.6.3",
+    version: String = "0.7.0",
     canPinWidget: Boolean = true,
     onAddWidget: (Schedule) -> Unit = {},
     onExport: () -> Unit = {},
