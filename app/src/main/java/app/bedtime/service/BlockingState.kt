@@ -3,6 +3,7 @@ package app.bedtime.service
 import android.content.Context
 import android.content.Intent
 import android.os.SystemClock
+import android.net.Uri
 import android.provider.Settings
 
 /**
@@ -32,6 +33,9 @@ object BlockingState {
     /**
      * Starts a break of [minutes] and switches blocking off. Returns false if the service wasn't
      * running, in which case there's nothing to pause.
+     *
+     * A paused session can't be made tamper-proof: once blocking is off, any permission this app
+     * holds can be withdrawn. A block that shouldn't have that door sets `pauseEnabled = false`.
      */
     fun pause(minutes: Int): Boolean {
         val running = service ?: return false
@@ -60,4 +64,9 @@ object BlockingState {
     /** Settings → Accessibility, where blocking is switched back on. */
     fun accessibilityIntent(): Intent =
         Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+    /** Settings → Display over other apps, for putting the takeover back. */
+    fun overlayIntent(context: Context): Intent =
+        Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.fromParts("package", context.packageName, null))
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 }

@@ -53,15 +53,19 @@
             android:excludeFromRecents="true"
             android:exported="false"
             android:launchMode="singleTask"
+            android:screenOrientation="portrait"
             android:taskAffinity="app.bedtime.minimal"
-            android:windowSoftInputMode="adjustResize" />
+            android:windowSoftInputMode="adjustResize"
+            tools:ignore="DiscouragedApi,LockedOrientationActivity" />
 
         <activity
             android:name=".ui.lock.LockScreenActivity"
             android:excludeFromRecents="true"
             android:exported="false"
             android:launchMode="singleTask"
-            android:taskAffinity="app.bedtime.lock" />
+            android:screenOrientation="portrait"
+            android:taskAffinity="app.bedtime.lock"
+            tools:ignore="DiscouragedApi,LockedOrientationActivity" />
 
         <activity
             android:name=".ui.widget.BlockWidgetConfigActivity"

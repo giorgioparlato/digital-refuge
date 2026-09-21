@@ -29,7 +29,7 @@ object SessionNotifier {
     private const val ACCENT = 0xFF2EA873.toInt()
 
     /** Builds the notification for the phase: on, on a break, or off and asking to be switched back on. */
-    fun build(context: Context, state: ActiveState?, blockingOn: Boolean, breakMs: Long): Notification {
+    fun build(context: Context, state: ActiveState?, blockingOn: Boolean, breakMs: Long, overlayMissing: Boolean = false): Notification {
         ensureChannel(context)
         val main = state?.active?.maxByOrNull { it.end }
         val name = main?.schedule?.name?.lowercase()
@@ -38,6 +38,11 @@ object SessionNotifier {
         val text: String
         val intent: Intent
         when {
+            overlayMissing && blockingOn -> {
+                title = "the full-screen reminder is off"
+                text = "tap to allow display over other apps again"
+                intent = BlockingState.overlayIntent(context)
+            }
             blockingOn -> {
                 title = if (main == null) "refuge is on" else "$name · until ${formatTime(context, main.end)}".lowercase()
                 text = summary(state)
@@ -84,10 +89,10 @@ object SessionNotifier {
     }
 
     @SuppressLint("MissingPermission") // Checked through areNotificationsEnabled().
-    fun post(context: Context, id: Int, state: ActiveState?, blockingOn: Boolean, breakMs: Long) {
+    fun post(context: Context, id: Int, state: ActiveState?, blockingOn: Boolean, breakMs: Long, overlayMissing: Boolean = false) {
         val manager = NotificationManagerCompat.from(context)
         if (!manager.areNotificationsEnabled()) return
-        runCatching { manager.notify(id, build(context, state, blockingOn, breakMs)) }
+        runCatching { manager.notify(id, build(context, state, blockingOn, breakMs, overlayMissing)) }
     }
 
     fun cancel(context: Context) = NotificationManagerCompat.from(context).cancel(ID)

@@ -42,6 +42,10 @@ class SessionGuardService : Service() {
     /** So one switch-off is recorded once, not on every settings change. */
     private var recorded = false
 
+    /** Whether the takeover could be drawn last time we looked, and whether losing it was counted. */
+    private var overlayOk = true
+    private var overlayRecorded = false
+
     private val accessibilityObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
         override fun onChange(selfChange: Boolean) {
             refresh()
@@ -75,10 +79,9 @@ class SessionGuardService : Service() {
             var ticks = 0
             while (true) {
                 delay(1_000)
-                if (!blockingOn) {
-                    updateAlert()
-                    if (++ticks % 15 == 0) holdQuietAndGrey()
-                }
+                // Checked even while blocking is on, so losing the wall is caught before it matters.
+                updateAlert()
+                if (!blockingOn && ++ticks % 15 == 0) holdQuietAndGrey()
             }
         }
     }
@@ -113,8 +116,34 @@ class SessionGuardService : Service() {
         updateAlert()
     }
 
+    /**
+     * Notices "display over other apps" being taken away while a session runs. It can't be stopped —
+     * no app can hold its own permissions down — but the grace ends at once, it's counted like any
+     * other escape, and the notification keeps asking for it back.
+     */
+    private fun checkOverlay() {
+        val current = state ?: return
+        if (!current.isActive || !settings.fullScreenAlert) return
+        val now = TakeoverOverlay.canShow(this)
+        val was = overlayOk
+        overlayOk = now
+        if (was && !now) {
+            BlockingState.clearBreak() // No wall to come back to, so the break stops being a favour.
+            if (!overlayRecorded) {
+                overlayRecorded = true
+                val occurrence = current.active.firstOrNull()
+                if (occurrence != null) {
+                    scope.launch { Repository.get(this@SessionGuardService).recordPause(occurrence, System.currentTimeMillis()) }
+                }
+            }
+        } else if (!was && now) {
+            overlayRecorded = false
+        }
+    }
+
     /** Shows or hides the full-screen takeover and updates the ongoing notification for the phase. */
     private fun updateAlert() {
+        checkOverlay()
         val current = state
         val takeover = !blockingOn &&
             current?.isActive == true &&
@@ -128,7 +157,8 @@ class SessionGuardService : Service() {
             TakeoverOverlay.hide(this)
         }
         val breakMs = if (!blockingOn && BlockingState.isOnBreak()) BlockingState.breakRemainingMs() else 0L
-        SessionNotifier.post(this, NOTIFICATION_ID, state, blockingOn, breakMs)
+        val overlayMissing = settings.fullScreenAlert && current?.isActive == true && !overlayOk
+        SessionNotifier.post(this, NOTIFICATION_ID, state, blockingOn, breakMs, overlayMissing)
     }
 
     /**
