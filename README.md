@@ -3,11 +3,29 @@ Contributions from the open-source community of developers are extremely welcome
 
 # digital refuge
 
-A calm, [primary](https://primary-theme.github.io/start-here/)-styled Android app that gives you a refuge from your phone. On a schedule, or for an on-demand focus block, it can:
+**digital refuge sets aside hours when your phone asks less of you.** Choose quiet hours that repeat — a bedtime, a working morning — or start a focus block whenever you need one. While a session runs, the apps you've named step aside, your screen can fade to grey, and notifications wait until it ends.
 
-- **block distracting apps**: a gentle full-screen cover appears over them;
-- **swap your home screen for a minimal launcher** where only the apps you choose can be opened. Its colours, text size (app names down to very small, so many apps fit) and what it shows are yours to customize;
-- **quiet the phone** with Do Not Disturb ("Priority only" or "Silence") and **hold notifications back** until the session ends. Media and alarms are never muted, so music, videos and alarms keep playing.
+### Nothing you do here leaves your phone
+
+The app **has no internet permission at all.** You can check that yourself: [the manifest](app/src/main/AndroidManifest.xml) lists every permission it asks for, and there is no `INTERNET` line. Without it Android will not let the app open a connection, whatever its code says.
+
+So there is no account to make, nothing to sign into, no sync, no analytics, no ads, and no way for your schedules, the apps you choose, or your history to reach anyone. It all lives in the app's own storage on the device, and it's gone when you uninstall it. The one thing that ever goes anywhere is a backup file, and only if you ask for one and choose where to put it.
+
+### You decide how firmly it holds
+
+Every schedule and block carries its own settings, so a forgiving morning routine and an uncompromising bedtime can sit side by side. Roughly, three levels:
+
+- **Gentle** — a short wait to leave early, and the banking pause left on. Enough friction to interrupt a reflex, easy to step out of when you mean it.
+- **Firm** *(a good default)* — a wait plus a passage to type, set to get harder with each unlock the same day. Settings stay locked while a session runs, and stay locked afterwards if you leave early, so unlocking can't be used to soften it.
+- **Uncompromising** — add a password someone else chose, switch the banking pause off, and let the full-screen reminder bring you back if blocking is ever switched off.
+
+Nothing here can be made impossible, and the app doesn't pretend otherwise — Android always lets you withdraw an app's permissions, and safe mode always works. What it can do is make leaving a decision rather than a reflex, and count it when you do. Each block's ⓘ button opens the same explanation inside the app.
+
+### What a session can do
+
+- **Block distracting apps**: a gentle full-screen cover appears over them.
+- **Swap your home screen for a minimal launcher** where only the apps you choose can be opened. Its colours, text size (app names down to very small, so many apps fit) and what it shows are yours to customize.
+- **Quiet the phone** with Do Not Disturb ("Priority only" or "Silence") and **hold notifications back** until the session ends. Media and alarms are never muted, so music, videos and alarms keep playing.
 
 <p>
   <img src="app/src/test/snapshots/images/app.bedtime_ScreenshotTest_homeActive_dark.png" width="190" alt="Home screen with a focus block running">
@@ -28,10 +46,10 @@ A calm, [primary](https://primary-theme.github.io/start-here/)-styled Android ap
   2. type random text (no pasting, no typos);
   3. enter a password.
 
-  Each schedule decides whether unlocking **ends the session** or **pauses it for N minutes**. Optionally, the text gets 50% longer with each early unlock in a day.
+  Each schedule decides whether unlocking **ends the session** or **pauses it for N minutes**. Optionally, both the wait and the text grow with every early unlock the same day, by a multiplier you set (1.5×, 2×…). That count resets at midnight.
 - **No quick escapes mid-session.** While a session is running, you can't edit or delete its schedule. If Do Not Disturb is switched off from quick settings, the app switches it straight back on and tells you why.
 - **A calm lock screen.** During a session, the lock screen shows your home style's clock, date and session, without the apps. Tap it to unlock as usual (PIN, fingerprint…). You can switch it off in the minimal home screen settings.
-- **A quote of the day** on the minimal home and lock screen: 34 lines on attention, nature and the sacred, from Thoreau, Emerson, the Buddha, Kimmerer, Weil, Dillard and others, each checked against its source ([docs/quotes-review.md](docs/quotes-review.md)). A new one each day; tap it on the home screen for another. Switch it off in the minimal home screen settings.
+- **A quote** on the minimal home and lock screen — 72 lines on attention, nature and the sacred, from Thoreau, Emerson, the Buddha, Kimmerer, Weil, Dillard, Murakami, Bohm, Thich Nhat Hanh, Hafiz and others, each checked against its source. They rotate in a scrambled but complete cycle, so every one comes round before any repeats; choose whether that's hourly, every six hours, daily or weekly. Tap it on the home screen for another, or switch it off in the minimal home screen settings.
 - **A lotus in the status bar** while a session runs, with a countdown in the notification. It's silent and stays visible even when notifications are hidden.
 - **Emergency button** on the minimal home screen, which keeps the session in place. It offers calling someone, and your **always-available apps** (maps, rides, authenticators…), which no session ever blocks.
 - **Easy number picking:** tap − or + for one step, hold to keep going faster, or tap the number to type a value or pick a preset.

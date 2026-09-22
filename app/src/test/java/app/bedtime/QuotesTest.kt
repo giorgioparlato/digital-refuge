@@ -33,6 +33,20 @@ class QuotesTest {
     }
 
     @Test
+    fun everyQuoteComesRoundBeforeAnyRepeats() {
+        val day = LocalDate.of(2026, 9, 22)
+        val cycle = (0 until Quotes.all.size).map { Quotes.forDay(day, offset = it) }
+        // A full cycle is every quote exactly once...
+        assertEquals(Quotes.all.size, cycle.toSet().size)
+        assertEquals(Quotes.all.toSet(), cycle.toSet())
+        // ...and only then does it start again.
+        assertEquals(cycle.first(), Quotes.forDay(day, offset = Quotes.all.size))
+        // Consecutive days shouldn't be list-neighbours, or a day's quotes all come from one corner.
+        val steps = (0 until 20).map { Quotes.all.indexOf(Quotes.forDay(day, offset = it)) }
+        assertTrue("rotation is still sequential: $steps", steps.zipWithNext().count { (a, b) -> b == a + 1 } < 5)
+    }
+
+    @Test
     fun quoteFollowsTheChosenRhythm() {
         // Anchored to the epoch so every period boundary is exact, whatever today happens to be.
         val epoch = LocalDate.ofEpochDay(0).atStartOfDay()

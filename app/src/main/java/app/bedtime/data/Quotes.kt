@@ -2,6 +2,7 @@ package app.bedtime.data
 
 import java.time.LocalDate
 import java.time.LocalDateTime
+import kotlin.random.Random
 
 /** A short line for the minimal home and the lock screen. [work] is null when no book could be confirmed. */
 data class Quote(val text: String, val author: String, val work: String? = null)
@@ -260,9 +261,21 @@ object Quotes {
         Quote("What we plant in the soil of contemplation we shall reap in the harvest of action.", "Meister Eckhart"),
     )
 
+    /**
+     * A fixed scramble of the list. Stepping through it one period at a time gives a full cycle —
+     * every quote appears once before any comes round again — while neighbouring periods land far
+     * apart in the list, so the handful you see in a day aren't all from the same corner of it.
+     *
+     * Walking [all] in order would also be a full cycle, but a clumpy one: on the six-hourly setting
+     * that's four list-neighbours a day. The seed is fixed, so every screen agrees on today's quote
+     * and it survives restarts.
+     */
+    private val rotation: List<Int> = all.indices.shuffled(Random(20260922))
+
+    private fun at(step: Long): Quote = all[rotation[Math.floorMod(step, all.size.toLong()).toInt()]]
+
     /** Today's quote; [offset] steps to the following ones ("tap for another"). */
-    fun forDay(date: LocalDate, offset: Int = 0): Quote =
-        all[Math.floorMod(date.toEpochDay() + offset, all.size.toLong()).toInt()]
+    fun forDay(date: LocalDate, offset: Int = 0): Quote = at(date.toEpochDay() + offset)
 
     /**
      * The quote for the stretch of time [now] falls in, so it changes as often as [refresh] says.
@@ -270,7 +283,6 @@ object Quotes {
      */
     fun forPeriod(now: LocalDateTime, refresh: QuoteRefresh, offset: Int = 0): Quote {
         val hours = now.toLocalDate().toEpochDay() * 24 + now.hour
-        val period = Math.floorDiv(hours, refresh.hours.toLong())
-        return all[Math.floorMod(period + offset, all.size.toLong()).toInt()]
+        return at(Math.floorDiv(hours, refresh.hours.toLong()) + offset)
     }
 }
