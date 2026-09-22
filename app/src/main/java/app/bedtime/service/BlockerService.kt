@@ -178,7 +178,12 @@ class BlockerService : AccessibilityService() {
         }
         lastPackage = pkg
         val boundary = state?.nextBoundary
-        if (boundary != null && System.currentTimeMillis() >= boundary) Engine.refresh()
+        if (boundary != null && System.currentTimeMillis() >= boundary) {
+            // A session has just started or ended, so what we hold is stale: an app the new state
+            // allows could be bounced by the old one. The refresh re-runs enforce(lastPackage) itself.
+            Engine.refresh()
+            return
+        }
         if (guardSettings(pkg, event)) return
         enforce(pkg)
     }

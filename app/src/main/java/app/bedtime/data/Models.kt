@@ -44,6 +44,8 @@ data class Schedule(
     val unlockAction: UnlockAction = UnlockAction(),
     /** Offer a short break for apps that won't run while blocking is on. Off means no way out but unlocking. */
     val pauseEnabled: Boolean = true,
+    /** Allow editing right after an early unlock. Off keeps settings shut until the session would have ended. */
+    val editAfterUnlock: Boolean = false,
     /** How long each of those breaks lasts, in minutes (at least 1). */
     val breakMinutes: Int = 1,
 ) {

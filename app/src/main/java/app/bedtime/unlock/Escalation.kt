@@ -1,16 +1,27 @@
 package app.bedtime.unlock
 
 import app.bedtime.data.SessionLog
+import java.time.Instant
+import java.time.ZoneId
 import kotlin.math.pow
 import kotlin.math.roundToInt
 
-/** Escalating friction: every early unlock in a day makes the next unlock's wait and text harder. */
+/** Escalating friction: every early unlock today makes the next unlock's wait and text harder. */
 object Escalation {
-    private const val DAY_MS = 24 * 60 * 60 * 1000L
-
-    fun recentUnlocks(history: List<SessionLog>, scheduleId: String, now: Long): Int =
-        history.filter { it.scheduleId == scheduleId }
-            .sumOf { log -> log.unlockTimes.count { it > now - DAY_MS && it <= now } }
+    /**
+     * Early unlocks of this schedule **since local midnight**. Counting a rolling 24 hours instead
+     * would let last night's unlocks keep tonight's challenge long, and the day would never start clean.
+     */
+    fun recentUnlocks(
+        history: List<SessionLog>,
+        scheduleId: String,
+        now: Long,
+        zone: ZoneId = ZoneId.systemDefault(),
+    ): Int {
+        val midnight = Instant.ofEpochMilli(now).atZone(zone).toLocalDate().atStartOfDay(zone).toInstant().toEpochMilli()
+        return history.filter { it.scheduleId == scheduleId }
+            .sumOf { log -> log.unlockTimes.count { it in midnight..now } }
+    }
 
     /** `base × factorⁿ`, capped at [maxTimes] × the base. */
     fun scale(base: Int, recentUnlocks: Int, factor: Float, maxTimes: Float): Int =

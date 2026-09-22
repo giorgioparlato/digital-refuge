@@ -6,6 +6,14 @@ data class WeekStats(val protectedMinutes: Long, val kept: Int, val escapes: Int
 
 /** Pure summaries of the session history for the home screen. */
 object Stats {
+    /**
+     * When a session you left early would have ended, if that moment is still ahead. Its settings stay
+     * shut until then, so an unlock can't be used as a way in to soften the next one.
+     */
+    fun lockedUntil(history: List<SessionLog>, scheduleId: String, now: Long): Long? =
+        history.filter { it.scheduleId == scheduleId && it.endedEarlyAt != null && it.end > now }
+            .maxOfOrNull { it.end }
+
     private const val WEEK_MS = 7 * 24 * 60 * 60 * 1000L
 
     /** Sessions that started in the last 7 days. */

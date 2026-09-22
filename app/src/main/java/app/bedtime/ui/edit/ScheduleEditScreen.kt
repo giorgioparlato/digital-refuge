@@ -67,6 +67,7 @@ import app.bedtime.service.SystemApps
 import app.bedtime.ui.apps.AppPickerScreen
 import app.bedtime.ui.apps.PickerMode
 import app.bedtime.ui.components.AppIconStack
+import app.bedtime.engine.Stats
 import app.bedtime.ui.components.BedtimeIcons
 import app.bedtime.ui.components.BottomActionBar
 import app.bedtime.ui.components.Callout
@@ -86,6 +87,7 @@ import app.bedtime.ui.components.SegmentedChoice
 import app.bedtime.ui.components.SubOptionRow
 import app.bedtime.ui.components.TimeTile
 import app.bedtime.ui.formatDays
+import app.bedtime.ui.formatTime
 import app.bedtime.ui.formatMinuteOfDay
 import app.bedtime.ui.formatWaitSeconds
 import app.bedtime.ui.formatMinutes
@@ -129,6 +131,7 @@ fun ScheduleEditScreen(
     val repo = remember { Repository.get(context) }
     val scope = rememberCoroutineScope()
     val state by Engine.state(context).collectAsStateWithLifecycle()
+    val history by repo.history.collectAsStateWithLifecycle(initialValue = emptyList())
     val essentials = remember { SystemApps.essentials(context) }
 
     var original by rememberSaveable(stateSaver = ScheduleSaver) {
@@ -166,7 +169,14 @@ fun ScheduleEditScreen(
     if (!loaded) return
 
     // While a schedule is enforcing, editing it would be an escape hatch around the unlock challenge.
-    val readOnly = scheduleId != null && state?.occurrenceOf(scheduleId) != null
+    val running = scheduleId != null && state?.occurrenceOf(scheduleId) != null
+    // And unlocking early mustn't hand over the settings either, or the challenge buys a free rewrite.
+    val lockedUntil = if (scheduleId != null && !draft.editAfterUnlock) {
+        Stats.lockedUntil(history, scheduleId, System.currentTimeMillis())
+    } else {
+        null
+    }
+    val readOnly = running || lockedUntil != null
     val dirty = !readOnly && (draft != original || newPassword.isNotEmpty())
 
     when (picking) {
@@ -269,6 +279,7 @@ fun ScheduleEditScreen(
         },
         isNew = scheduleId == null,
         readOnly = readOnly,
+        lockedUntil = lockedUntil,
         newPassword = newPassword,
         onNewPasswordChange = { newPassword = it },
         greyscaleAvailable = greyscaleAvailable,
@@ -296,6 +307,7 @@ internal fun ScheduleEditContent(
     onDraftChange: (Schedule) -> Unit,
     isNew: Boolean,
     readOnly: Boolean,
+    lockedUntil: Long? = null,
     newPassword: String,
     onNewPasswordChange: (String) -> Unit,
     greyscaleAvailable: Boolean,
@@ -344,7 +356,14 @@ internal fun ScheduleEditContent(
         },
         bottomBar = {
             BottomActionBar {
-                if (readOnly) {
+                if (lockedUntil != null) {
+                    CtaButton(
+                        "Locked until ${formatTime(context, lockedUntil)}",
+                        onClick = {},
+                        enabled = false,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                } else if (readOnly) {
                     CtaButton("Unlock to make changes", onClick = onUnlock, modifier = Modifier.fillMaxWidth())
                 } else {
                     CtaButton(
@@ -372,8 +391,18 @@ internal fun ScheduleEditContent(
         ) {
             if (readOnly) {
                 Callout(
-                    title = if (isBlock) "This block is running" else "This schedule is on right now",
-                    body = "To keep you honest, it can't be changed or deleted until you unlock it or it ends.",
+                    title = when {
+                        lockedUntil != null -> "You left this one early"
+                        isBlock -> "This block is running"
+                        else -> "This schedule is on right now"
+                    },
+                    body = if (lockedUntil != null) {
+                        "Its settings stay shut until ${formatTime(context, lockedUntil)}, when it would have ended — " +
+                            "otherwise unlocking would be a way to soften it and start again. You can change that under " +
+                            "\"When you unlock\"."
+                    } else {
+                        "To keep you honest, it can't be changed or deleted until you unlock it or it ends."
+                    },
                 )
             }
             if (error != null) Callout(title = "Almost there", kind = CalloutKind.WARNING, body = error)
@@ -669,6 +698,18 @@ internal fun ScheduleEditContent(
                             title = "break length",
                         )
                     }
+                }
+                OptionRow(
+                    Icons.Default.Lock,
+                    "Lock settings afterwards",
+                    description = "Keeps this shut until the session would have ended, so unlocking can't soften it",
+                    enabled = editable,
+                ) {
+                    ObsidianToggle(
+                        !draft.editAfterUnlock,
+                        { on -> onDraftChange(draft.copy(editAfterUnlock = !on)) },
+                        enabled = editable,
+                    )
                 }
             }
 
