@@ -92,8 +92,36 @@ object Passages {
             "difficult while it is still easy; accomplish the great task by a series of small acts.",
     )
 
+    /**
+     * The longer selections from docs/quotes-review-3.md: too long to sit on the home screen as
+     * quotes, but worth reading while you copy one out. Each is a short attributed excerpt.
+     */
+    val OTHERS: List<String> = listOf(
+        // Haruki Murakami, Kafka on the Shore
+        "And once the storm is over, you won't remember how you made it through, how you managed to survive. " +
+            "You won't even be sure, whether the storm is really over. But one thing is certain. When you come out " +
+            "of the storm, you won't be the same person who walked in.",
+        // Thich Nhat Hanh, Peace Is Every Step
+        "Every morning, when we wake up, we have twenty-four brand-new hours to live. What a precious gift! " +
+            "We have the capacity to live in a way that these twenty-four hours will bring peace, joy, and happiness " +
+            "to ourselves and others.",
+        // Thich Nhat Hanh, The Miracle of Mindfulness
+        "People usually consider walking on water or in thin air a miracle. But I think the real miracle is not to " +
+            "walk either on water or in thin air, but to walk on earth. Every day we are engaged in a miracle which " +
+            "we don't even recognize: a blue sky, white clouds, green leaves, the black, curious eyes of a child — " +
+            "our own two eyes. All is a miracle.",
+        // Ikky\u016b S\u014djun, version by John Stevens
+        "Every day priests minutely examine the Dharma and endlessly chant complicated sutras. Before doing that, " +
+            "though, they should learn how to read the love letters sent by the wind and rain, the snow and moon.",
+        // Robin Wall Kimmerer, Braiding Sweetgrass
+        "The Honorable Harvest asks us to give back, in reciprocity for what we have been given. One of our " +
+            "responsibilities as human people is to find ways to enter into reciprocity with the more-than-human " +
+            "world. We can do it through gratitude, through ceremony, through land stewardship, science, art, and " +
+            "in everyday acts of practical reverence.",
+    )
+
     /** Everything a "passage" challenge can draw from: the app's quotes, plus the longer passages. */
-    val ALL: List<String> get() = Quotes.all.map { it.text } + TAO
+    val ALL: List<String> get() = Quotes.all.map { it.text } + TAO + OTHERS
 
     /** Plain, unhurried words; nothing you'd need to squint at on a keyboard at midnight. */
     val WORDS: List<String> = (
