@@ -1,5 +1,7 @@
 package app.bedtime.ui.onboarding
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,6 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -22,7 +25,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.foundation.background
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.bedtime.ui.components.BedtimeIcons
@@ -30,7 +32,7 @@ import app.bedtime.ui.components.CtaButton
 import app.bedtime.ui.components.Text
 import app.bedtime.ui.theme.Obsidian
 
-/** A one-time explainer of how a session holds, and the ways out. Also reachable from settings. */
+/** What a session does and how to leave it. Shown once, and reachable from settings and any block. */
 @Composable
 fun OnboardingScreen(onDone: () -> Unit) {
     val c = Obsidian.colors
@@ -43,101 +45,131 @@ fun OnboardingScreen(onDone: () -> Unit) {
                 .padding(horizontal = 24.dp, vertical = 20.dp),
         ) {
             Spacer(Modifier.height(12.dp))
-            Icon(BedtimeIcons.Refuge, contentDescription = null, tint = c.accent, modifier = Modifier.size(48.dp))
-            Spacer(Modifier.height(16.dp))
-            Text("welcome to your refuge", style = MaterialTheme.typography.headlineMedium, color = c.textNormal)
-            Spacer(Modifier.height(8.dp))
+            Icon(BedtimeIcons.Refuge, contentDescription = null, tint = c.accent, modifier = Modifier.size(44.dp))
+            Spacer(Modifier.height(18.dp))
+            Text("how it works", style = MaterialTheme.typography.headlineMedium, color = c.textNormal)
+            Spacer(Modifier.height(10.dp))
             Text(
-                "digital refuge sets aside hours when your phone asks less of you. here is what happens inside one of those hours, " +
-                    "and how to step out if you truly need to.",
+                "digital refuge sets aside hours when your phone asks less of you. here is what happens in one of " +
+                    "them, and how to leave if you need to.",
                 style = MaterialTheme.typography.bodyLarge,
                 color = c.textMuted,
             )
-            Spacer(Modifier.height(28.dp))
+            Spacer(Modifier.height(30.dp))
 
             Point(
                 BedtimeIcons.Moon,
                 "a session begins",
-                "at the times you choose, or whenever you start a block, the apps you have named step aside. the screen can " +
-                    "fade to grey, and notifications wait quietly until the session ends.",
+                "at the times you set, or whenever you start a block. the apps you named stop opening. your home " +
+                    "screen can become a short list of what you chose, the screen can fade to grey, and notifications " +
+                    "wait. music and alarms are never silenced.",
             )
             Point(
                 BedtimeIcons.Hourglass,
-                "leaving early asks something of you",
-                "if you want out before the end, the steps you picked stand in the way: a wait, a passage to type, a password. " +
-                    "just enough of a pause for the urge to pass. each unlock can be set to ask a little more than the last.",
+                "leaving early takes the steps you chose",
+                "a wait, a passage to type, a password — as many as you want, in that order. enough of a pause for an " +
+                    "urge to pass. they can grow with each unlock on the same day, and start fresh each morning.",
             )
             Point(
                 BedtimeIcons.Refuge,
-                "it holds firm",
-                "during a session, the screens that would switch blocking off, or remove the app, are gently covered. not to " +
-                    "trap you — only so that leaving is a decision rather than a reflex.",
-            )
-            Point(
-                BedtimeIcons.Target,
-                "if blocking stops anyway",
-                "should it be switched off regardless, a full screen waits with you until you turn it back on. the quiet and " +
-                    "the grey stay in place meanwhile, so only your apps return.",
+                "it stays put while it runs",
+                "a session's own settings can't be changed while it is running. that one isn't a choice: without it, " +
+                    "the easiest way out would simply be to edit the block.",
             )
             Point(
                 BedtimeIcons.Contrast,
-                "when an app needs the door open",
-                "a few apps will not run while blocking is on. if you allow it, a block can offer a short break for exactly " +
-                    "that, then gather itself back together. leave it off if you would rather have no door at all.",
+                "an emergency break",
+                "if a block allows one, you can step out for a few minutes without ending the session — for whatever " +
+                    "genuinely can't wait. it counts as an escape, and a full screen brings you back when it is over.",
             )
 
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(6.dp))
             Box(Modifier.fillMaxWidth().height(1.dp).background(c.border))
             Spacer(Modifier.height(28.dp))
 
             Text("how firm to make it", style = MaterialTheme.typography.headlineSmall, color = c.textNormal)
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(10.dp))
             Text(
-                "each block and schedule keeps its own settings, so a gentle morning and an unbending bedtime can sit " +
-                    "side by side. three rough levels, all set inside the block itself:",
+                "two things are always true: while a session runs its settings can't be changed, and leaving early " +
+                    "takes the steps you chose. everything below is one switch on top of that. turn them all on for " +
+                    "the firmest it gets, or pick only the ones you want.",
                 style = MaterialTheme.typography.bodyLarge,
                 color = c.textMuted,
             )
-            Spacer(Modifier.height(22.dp))
-            Level(
-                "gentle",
-                "a short wait to leave early, and the pause for banking apps left on. enough friction to interrupt a " +
-                    "reflex, easy to step out of when you truly mean to.",
+            Spacer(Modifier.height(24.dp))
+
+            Switch(
+                "1",
+                "harder each time",
+                "each unlock on the same day makes the wait and the typing longer, by a multiplier you set. it starts " +
+                    "fresh each morning.",
+                "in the block",
             )
-            Level(
-                "firm",
-                "a wait and a passage to type, set to grow with each unlock the same day. settings stay shut while it " +
-                    "runs — and stay shut afterwards if you left early, so unlocking can't be used to soften it.",
+            Switch(
+                "2",
+                "lock settings afterwards",
+                "leave a session early and that block stays shut for what would have been the rest of it, so unlocking " +
+                    "can't be used to soften it.",
+                "in the block",
             )
-            Level(
-                "uncompromising",
-                "add a password someone else chose, switch the pause off so there is no short way out, and let the full " +
-                    "screen wait with you if blocking is ever switched off.",
+            Switch(
+                "3",
+                "no emergency break",
+                "with the break switched off there is no short way out, and the unlock steps are the only way through.",
+                "in the block",
             )
+            Switch(
+                "4",
+                "lock changes during sessions",
+                "covers the settings screens that would switch blocking off, and the prompt to uninstall the app.",
+                "settings → staying blocked",
+            )
+            Switch(
+                "5",
+                "full-screen reminder",
+                "if blocking is switched off at all, a full screen stays with you until you switch it back on.",
+                "settings → staying blocked",
+            )
+
             Text(
-                "to set any of this, open a block or schedule. the ⓘ button at the top of it brings you back here.",
+                "open a block or schedule to set the first three; the ⓘ at the top of it brings you back here.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = c.textFaint,
             )
 
-            Spacer(Modifier.height(26.dp))
+            Spacer(Modifier.height(28.dp))
             CtaButton("got it", onClick = onDone, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(12.dp))
         }
     }
 }
 
-/** One of the three strictness levels, named and spelled out. */
+/** One switch: what it closes off, and where to find it. */
 @Composable
-private fun Level(name: String, body: String) {
+private fun Switch(step: String, name: String, body: String, where: String) {
     val c = Obsidian.colors
-    Row(Modifier.fillMaxWidth().padding(bottom = 20.dp)) {
-        Box(Modifier.width(3.dp).height(38.dp).clip(CircleShape).background(c.accent.copy(alpha = 0.55f)))
+    Row(Modifier.fillMaxWidth().padding(bottom = 22.dp), verticalAlignment = Alignment.Top) {
+        Box(
+            Modifier.size(26.dp).clip(CircleShape).background(c.accent.copy(alpha = 0.16f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(step, style = MaterialTheme.typography.labelMedium, color = c.accentText, fontWeight = FontWeight.SemiBold)
+        }
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
-            Text(name, style = MaterialTheme.typography.titleMedium, color = c.accentText, fontWeight = FontWeight.SemiBold)
+            Text(name, style = MaterialTheme.typography.titleMedium, color = c.textNormal, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(3.dp))
             Text(body, style = MaterialTheme.typography.bodyMedium, color = c.textMuted)
+            Spacer(Modifier.height(8.dp))
+            Text(
+                where,
+                style = MaterialTheme.typography.labelSmall,
+                color = c.textFaint,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50))
+                    .border(1.dp, c.border, RoundedCornerShape(50))
+                    .padding(horizontal = 10.dp, vertical = 4.dp),
+            )
         }
     }
 }

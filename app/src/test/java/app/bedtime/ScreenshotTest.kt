@@ -269,6 +269,9 @@ class ScreenshotTest {
     fun onboarding() = shot(tall = true) { app.bedtime.ui.onboarding.OnboardingScreen(onDone = {}) }
 
     @Test
+    fun walkthrough() = shot { app.bedtime.ui.onboarding.WalkthroughScreen(onDone = {}) }
+
+    @Test
     fun settingsGuard() = shot { app.bedtime.ui.blocked.SettingsGuardContent("Bedtime", "07:00", 1, {}, {}, {}) }
 
     @Test

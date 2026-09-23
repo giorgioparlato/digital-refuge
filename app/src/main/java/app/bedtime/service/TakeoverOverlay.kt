@@ -13,7 +13,7 @@ import app.bedtime.R
 /**
  * A full-screen wall shown by [SessionGuardService] while blocking is switched off during a session,
  * so it can't quietly stay off. Drawn with "display over other apps" so it covers whatever's in front,
- * even a banking app. Two ways out: switch blocking back on, or take another break.
+ * even whatever is in front. Two ways out: switch blocking back on, or take another break.
  */
 @SuppressLint("StaticFieldLeak", "InflateParams", "SetTextI18n")
 object TakeoverOverlay {

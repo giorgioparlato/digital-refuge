@@ -25,7 +25,7 @@ import kotlinx.coroutines.launch
  * Runs for as long as a session does, separately from [BlockerService], so that it survives the
  * accessibility service being switched off — which is exactly the moment it exists for.
  *
- * If blocking is off mid-session (a banking pause, or safe mode) it records it, keeps Do Not Disturb
+ * If blocking is off mid-session (an emergency break, or safe mode) it records it, keeps Do Not Disturb
  * and greyscale going so only apps are unblocked, and — once any granted break runs out — takes over
  * the screen with [TakeoverOverlay] until blocking is switched back on.
  */
@@ -68,6 +68,7 @@ class SessionGuardService : Service() {
                 if (!next.isActive) {
                     if (!blockingOn) release()
                     TakeoverOverlay.hide(this@SessionGuardService)
+                    releaseScope.launch { SessionAlarms.schedule(applicationContext) }
                     stopSelf()
                 } else {
                     refresh()

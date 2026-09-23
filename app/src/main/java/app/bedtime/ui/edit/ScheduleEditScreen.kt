@@ -494,6 +494,20 @@ internal fun ScheduleEditContent(
                     description = if (greyscaleAvailable) "Fade apps to black and white" else "Needs a one-time step (see Setup)",
                     enabled = editable,
                 ) { ObsidianToggle(draft.greyscale, { onDraftChange(draft.copy(greyscale = it)) }, enabled = editable) }
+                AnimatedVisibility(draft.greyscale) {
+                    OptionRow(
+                        BedtimeIcons.Contrast,
+                        "Keep home screen in colour",
+                        description = "Only apps turn grey; digital refuge's own home screen keeps its colours",
+                        enabled = editable,
+                    ) {
+                        ObsidianToggle(
+                            draft.keepHomeInColour,
+                            { on -> onDraftChange(draft.copy(keepHomeInColour = on)) },
+                            enabled = editable,
+                        )
+                    }
+                }
                 OptionRow(
                     Icons.Default.Home,
                     "Minimal mode",
@@ -714,13 +728,13 @@ internal fun ScheduleEditContent(
             }
 
             SectionCard(
-                title = "Apps that need blocking off",
-                subtitle = "A few apps won't run while blocking is on. This one can offer them a short break.",
+                title = "Emergency break",
+                subtitle = "A short step out for whatever genuinely can't wait, without ending the session.",
             ) {
                 OptionRow(
                     BedtimeIcons.Hourglass,
-                    "Allow a pause",
-                    description = "Switches blocking off briefly, then a full screen brings you back. It counts as an escape.",
+                    "Allow an emergency break",
+                    description = "Steps out briefly, then a full screen brings you back. It counts as an escape.",
                     enabled = editable,
                 ) { ObsidianToggle(draft.pauseEnabled, { on -> onDraftChange(draft.copy(pauseEnabled = on)) }, enabled = editable) }
                 AnimatedVisibility(draft.pauseEnabled) {

@@ -16,6 +16,13 @@
     <!-- The full-screen takeover shown if blocking is switched off mid-session. -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
+    <!-- Wakes the app when a schedule begins, even if blocking was switched off beforehand. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission
+        android:name="android.permission.SCHEDULE_EXACT_ALARM"
+        android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+
     <!-- Keeps watch during a session, so switching blocking off is noticed even then. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
@@ -87,6 +94,19 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/block_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".service.SessionAlarmReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".service.BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
         </receiver>
 
         <service

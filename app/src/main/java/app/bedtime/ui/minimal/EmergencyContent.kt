@@ -72,11 +72,11 @@ internal fun EmergencyContent(
             }
         }
 
-        if (pauseEnabled) SectionCard(title = "banking or id app", subtitle = "for apps that won't run while blocking is on") {
+        if (pauseEnabled) SectionCard(title = "emergency break", subtitle = "step out for a moment without ending the session") {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Body(
-                    "some banking and id apps (bankid, for one) won't start unless blocking is off. this pauses it for " +
-                        "$minutes; when the break ends, a full-screen reminder brings you back. it counts as an escape.",
+                    "for whatever genuinely can't wait. this steps out for $minutes; when the break ends, a full screen " +
+                        "brings you back. it counts as an escape in your stats.",
                 )
                 PlainButton("pause blocking for $minutes", onClick = onPauseBlocking, modifier = Modifier.fillMaxWidth())
             }

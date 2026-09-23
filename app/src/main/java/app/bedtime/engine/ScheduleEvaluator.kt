@@ -29,6 +29,9 @@ data class ActiveState(
 
     val hideNotifications: Boolean = active.any { it.schedule.hideNotifications }
 
+    /** Our own home screen stays in colour only if every session greying the screen allows it. */
+    val keepHomeInColour: Boolean = active.filter { it.schedule.greyscale }.all { it.schedule.keepHomeInColour }
+
     /** Null when no active schedule uses minimal mode; otherwise only apps allowed by *every* such schedule. */
     val minimalAllowlist: Set<String>? = active
         .filter { it.schedule.minimalMode }

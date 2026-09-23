@@ -84,7 +84,7 @@ class BlockerService : AccessibilityService() {
         override fun onReceive(context: Context, intent: Intent) {
             if (ModeGreyscale.isSelfChange()) return
             val owner = state?.active?.firstOrNull { it.schedule.greyscale } ?: return
-            if (homeInFront && settings.homeStyle.keepInColour) return
+            if (homeInFront && state?.keepHomeInColour == true) return
             if (GreyscaleController.hasPermission(context) || !ModeGreyscale.isUserDeactivation(context, intent)) return
             ModeGreyscale.apply(context, on = true, reassert = true)
             notice("Greyscale stays on during ${owner.schedule.name}.")
@@ -162,6 +162,7 @@ class BlockerService : AccessibilityService() {
                 } else {
                     SessionGuardService.stop(this@BlockerService)
                 }
+                SessionAlarms.schedule(this@BlockerService)
             }
         }
     }
@@ -209,7 +210,7 @@ class BlockerService : AccessibilityService() {
         GreyscaleController.apply(
             this,
             wanted = state?.greyscale == true,
-            pausedForHome = homeInFront && settings.homeStyle.keepInColour,
+            pausedForHome = homeInFront && state?.keepHomeInColour == true,
         )
 
     /** Screen just went off mid-session: put the session's clock over the lock screen for next time. */
@@ -259,6 +260,9 @@ class BlockerService : AccessibilityService() {
     override fun onUnbind(intent: Intent?): Boolean {
         val context = applicationContext
         BlockingState.service = null
+        // Being switched off is exactly when the alarm matters: nothing else will be left running
+        // to notice the next session starting.
+        releaseScope.launch { SessionAlarms.schedule(context) }
         if (state?.isActive != true) {
             releaseScope.launch {
                 GreyscaleController.apply(context, wanted = false)

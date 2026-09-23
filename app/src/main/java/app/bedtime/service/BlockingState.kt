@@ -7,8 +7,8 @@ import android.net.Uri
 import android.provider.Settings
 
 /**
- * Whether blocking (the accessibility service) is on, and the deliberate "pause for a banking or ID
- * app" that switches it off for a set break. There's no way to switch it back on ourselves, so once
+ * Whether blocking (the accessibility service) is on, and the deliberate "emergency break" that
+ * switches it off for a set time. There's no way to switch it back on ourselves, so once
  * the break runs out [SessionGuardService] takes over the screen until the user re-enables it.
  */
 object BlockingState {

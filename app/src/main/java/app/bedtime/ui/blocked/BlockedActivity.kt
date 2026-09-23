@@ -249,8 +249,8 @@ internal fun SettingsGuardContent(
         Spacer(Modifier.height(12.dp))
         Text(
             if (onPause != null) {
-                "Switching blocking off and uninstalling are locked while $scheduleName runs. For a banking or ID app, take a " +
-                    "short break; otherwise end the session with the unlock steps."
+                "Switching blocking off and uninstalling are locked while $scheduleName runs. If something truly can't " +
+                    "wait, take an emergency break; otherwise end the session with the unlock steps."
             } else {
                 "Switching blocking off and uninstalling are locked while $scheduleName runs. To do either, end the session " +
                     "first — the unlock steps still work."

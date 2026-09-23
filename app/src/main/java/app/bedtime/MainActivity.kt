@@ -56,6 +56,7 @@ import app.bedtime.apps.AppCatalog
 import app.bedtime.data.Repository
 import app.bedtime.data.Templates
 import app.bedtime.engine.Engine
+import app.bedtime.service.SessionAlarms
 import app.bedtime.service.SystemApps
 import app.bedtime.ui.groups.GroupsScreen
 import app.bedtime.ui.settings.AlwaysAvailableScreen
@@ -70,6 +71,7 @@ import app.bedtime.ui.create.CreateScreen
 import app.bedtime.ui.edit.ScheduleEditScreen
 import app.bedtime.ui.home.HomeScreen
 import app.bedtime.ui.onboarding.OnboardingScreen
+import app.bedtime.ui.onboarding.WalkthroughScreen
 import app.bedtime.ui.homestyle.HomeStyleScreen
 import app.bedtime.ui.schedules.SchedulesScreen
 import app.bedtime.ui.settings.SettingsScreen
@@ -159,6 +161,7 @@ private fun BedtimeNavigation(pendingRoute: String?, onRouteConsumed: () -> Unit
             SystemApps.ALWAYS_AVAILABLE_SUGGESTIONS.filter { AppCatalog.isLaunchable(context, it) }.toSet()
         }
         Repository.get(context).seedAlwaysAvailable(suggested)
+        SessionAlarms.schedule(context)
     }
 
     LaunchedEffect(pendingRoute) {
@@ -178,7 +181,7 @@ private fun BedtimeNavigation(pendingRoute: String?, onRouteConsumed: () -> Unit
     val scope = rememberCoroutineScope()
     val loaded = settings
     if (loaded != null && !loaded.onboarded) {
-        OnboardingScreen(onDone = { scope.launch { repo.updateSettings { it.copy(onboarded = true) } } })
+        WalkthroughScreen(onDone = { scope.launch { repo.updateSettings { it.copy(onboarded = true) } } })
         return
     }
 

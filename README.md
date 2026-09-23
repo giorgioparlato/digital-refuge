@@ -15,9 +15,17 @@ So there is no account to make, nothing to sign into, no sync, no analytics, no 
 
 Every schedule and block carries its own settings, so a forgiving morning routine and an uncompromising bedtime can sit side by side. Roughly, three levels:
 
-- **Gentle** — a short wait to leave early, and the banking pause left on. Enough friction to interrupt a reflex, easy to step out of when you mean it.
-- **Firm** *(a good default)* — a wait plus a passage to type, set to get harder with each unlock the same day. Settings stay locked while a session runs, and stay locked afterwards if you leave early, so unlocking can't be used to soften it.
-- **Uncompromising** — add a password someone else chose, switch the banking pause off, and let the full-screen reminder bring you back if blocking is ever switched off.
+Two things are always true: while a session runs its settings can't be changed, and leaving early takes the steps you chose (a wait, a passage to type, a password — as many as you want). On top of that sit five switches, each closing one way around. Turn them all on for the firmest it gets, or pick only the ones you want:
+
+| Switch | What it closes off | Where |
+|---|---|---|
+| **Harder each time** | Each unlock on the same day makes the wait and the typing longer, by a multiplier you set. Starts fresh each morning. | In the block |
+| **Lock settings afterwards** | Leave a session early and that block stays shut for what would have been the rest of it. | In the block |
+| **No emergency break** | With the break off, the unlock steps are the only way through. | In the block |
+| **Lock changes during sessions** | Covers the Settings screens that switch blocking off, and the prompt to uninstall. | Settings → staying blocked |
+| **Full-screen reminder** | If blocking is switched off at all, a full screen stays until you switch it back on. | Settings → staying blocked |
+
+An **emergency break** steps out for a few minutes without ending the session, for whatever genuinely can't wait. It counts as an escape, and the full screen brings you back when it's over.
 
 Nothing here can be made impossible, and the app doesn't pretend otherwise — Android always lets you withdraw an app's permissions, and safe mode always works. What it can do is make leaving a decision rather than a reflex, and count it when you do. Each block's ⓘ button opens the same explanation inside the app.
 
@@ -87,7 +95,7 @@ Open the app and follow **settings → permissions & setup**, which shows the st
 
 So the app doesn't pretend it can. To use such an app, end the session first through the usual unlock steps (wait, type, password), then switch *digital refuge blocker* off in Settings → Accessibility; switch it back on afterwards.
 
-**Can I still switch blocking off, or uninstall, mid-session?** Not in two taps. During a session, the Settings screens that switch blocking off, and the uninstall prompt, are covered by a screen that points you back to the unlock steps. If blocking is switched off anyway, a **full-screen takeover** brings you back until you switch it on again — and Do Not Disturb, held notifications and greyscale keep going meanwhile, so only apps are unblocked. For apps that refuse to run while blocking is on, each block can offer a short **pause**: a break of a length you set, after which the full-screen reminder brings you back. Leave the pause off for total strictness. All of this is explained in the app's intro, reachable any time from settings → staying blocked, or the ⓘ button in any block's settings.
+**Can I still switch blocking off, or uninstall, mid-session?** Not in two taps. During a session, the Settings screens that switch blocking off, and the uninstall prompt, are covered by a screen that points you back to the unlock steps. If blocking is switched off anyway, a **full-screen takeover** brings you back until you switch it on again — and Do Not Disturb, held notifications and greyscale keep going meanwhile, so only apps are unblocked. Each block can offer an **emergency break**: a step out of a length you set, after which the full-screen reminder brings you back. Leave it off and the unlock steps are the only way through. All of this is explained in the app's intro, reachable any time from settings → staying blocked, or the ⓘ button in any block's settings.
 
 **Last resort,** if you're ever truly stuck: restart the phone in safe mode (power menu → press and hold *Power off*). Downloaded apps don't run there, so you can uninstall digital refuge like any other app.
 

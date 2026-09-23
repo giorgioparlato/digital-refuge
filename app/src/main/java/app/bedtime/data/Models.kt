@@ -35,6 +35,8 @@ data class Schedule(
     val durationMinutes: Int = 60,
     val blockedApps: Set<String> = emptySet(),
     val greyscale: Boolean = true,
+    /** While this session greys the screen, leave our own minimal home in colour. */
+    val keepHomeInColour: Boolean = true,
     val minimalMode: Boolean = false,
     val allowedApps: Set<String> = emptySet(),
     val dnd: DndMode = DndMode.OFF,
@@ -156,8 +158,6 @@ data class HomeStyle(
     val showQuote: Boolean = true,
     /** How often that quote changes. */
     val quoteRefresh: QuoteRefresh = QuoteRefresh.DAILY,
-    /** When greyscale is on, keep the home screen itself in colour. */
-    val keepInColour: Boolean = true,
     /** During sessions, show the clock and session over the lock screen. */
     val lockScreen: Boolean = true,
 )
@@ -200,7 +200,7 @@ data class SessionLog(
     val end: Long,
     val unlockTimes: List<Long> = emptyList(),
     val endedEarlyAt: Long? = null,
-    /** Times blocking was switched off during this session (the banking pause, or Settings). */
+    /** Times blocking was switched off during this session (an emergency break, or Settings). */
     val pausedAt: List<Long> = emptyList(),
 ) {
     val unlocks: Int get() = unlockTimes.size
