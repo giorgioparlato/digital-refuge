@@ -185,7 +185,7 @@ internal fun SettingsContent(
     onGroups: () -> Unit = {},
     alwaysAvailableCount: Int = 0,
     onAlwaysAvailable: () -> Unit = {},
-    version: String = "0.7.7.2",
+    version: String = "0.7.7.3",
     canPinWidget: Boolean = true,
     onAddWidget: (Schedule) -> Unit = {},
     onExport: () -> Unit = {},

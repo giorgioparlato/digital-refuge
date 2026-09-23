@@ -15,6 +15,7 @@ import android.net.Uri
 import android.view.accessibility.AccessibilityEvent
 import androidx.core.content.ContextCompat
 import app.bedtime.R
+import app.bedtime.apps.AppCatalog
 import app.bedtime.data.AppSettings
 import app.bedtime.data.DndMode
 import app.bedtime.data.Repository
@@ -49,6 +50,12 @@ class BlockerService : AccessibilityService() {
 
     /** Settings and the package installer: where the screens that switch blocking off live. */
     private var guardedPackages: Set<String> = emptySet()
+
+    /** Every app that can act as a home screen, so pressing Home still lands on the minimal one. */
+    private var homePackages: Set<String> = emptySet()
+
+    /** Whether a package can be opened from the launcher. Asked once per package, not per window. */
+    private val launchable = mutableMapOf<String, Boolean>()
     private val guardNames by lazy { setOf(getString(R.string.accessibility_label), getString(R.string.app_name)) }
     private var receiverRegistered = false
     private var watchersRegistered = false
@@ -226,6 +233,13 @@ class BlockerService : AccessibilityService() {
     private fun refreshSystemPackages() {
         alwaysAllowed = SystemApps.alwaysAllowed(this)
         overlays = SystemApps.keyboards(this) + "com.android.systemui"
+        homePackages = runCatching {
+            packageManager
+                .queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), 0)
+                .map { it.activityInfo.packageName }
+                .toSet()
+        }.getOrDefault(emptySet())
+        launchable.clear()
         // Settings (accessibility toggle, App info) plus whichever app handles uninstalling this one.
         val uninstaller = runCatching {
             packageManager.resolveActivity(
@@ -246,9 +260,20 @@ class BlockerService : AccessibilityService() {
         when {
             pkg in current.blocked -> startActivity(BlockedActivity.intent(this, pkg))
             // In minimal mode the stock launcher and recents are "not allowed" too, so Home lands here.
-            minimal != null && pkg !in minimal -> startActivity(MinimalHomeActivity.intent(this))
+            minimal != null && pkg !in minimal && opensAsApp(pkg) -> startActivity(MinimalHomeActivity.intent(this))
         }
     }
+
+    /**
+     * Whether a window belongs to something the user could have opened themselves.
+     *
+     * Plenty of windows are not apps: the keyboard, an autofill or suggestion popup, a play-services
+     * prompt, a system service. Those appear *over* the app you are already in — most often the moment
+     * a text field takes focus — and treating one as "you have gone somewhere else" would throw you out
+     * of an app the session allows. Home screens count, so pressing Home still lands on the minimal one.
+     */
+    private fun opensAsApp(pkg: String): Boolean =
+        pkg in homePackages || launchable.getOrPut(pkg) { AppCatalog.isLaunchable(this, pkg) }
 
     override fun onInterrupt() = Unit
 
