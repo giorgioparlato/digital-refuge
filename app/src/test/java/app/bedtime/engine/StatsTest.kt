@@ -2,9 +2,31 @@ package app.bedtime.engine
 
 import app.bedtime.data.SessionLog
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class StatsTest {
+    @Test
+    fun anyUnlockKeepsTheBlockShutForWhatWasLeftOfIt() {
+        val now = 10_000_000L
+        val hour = 3_600_000L
+        // Unlocked in a way that ended the session.
+        val ended = SessionLog("a", "A", now - hour, now + hour, unlockTimes = listOf(now), endedEarlyAt = now)
+        assertEquals(now + hour, Stats.lockedUntil(listOf(ended), "a", now))
+
+        // Unlocked on a block set to "take a break": merely paused, so endedEarlyAt stays null.
+        val paused = SessionLog("b", "B", now - hour, now + hour, unlockTimes = listOf(now))
+        assertEquals(now + hour, Stats.lockedUntil(listOf(paused), "b", now))
+
+        // Once the occurrence is past, it unlocks again.
+        val over = SessionLog("c", "C", now - 2 * hour, now - hour, unlockTimes = listOf(now - 2 * hour))
+        assertNull(Stats.lockedUntil(listOf(over), "c", now))
+
+        // Never unlocked, never locked.
+        val clean = SessionLog("d", "D", now - hour, now + hour)
+        assertNull(Stats.lockedUntil(listOf(clean), "d", now))
+    }
+
     private val hour = 3_600_000L
     private val day = 24 * hour
     private val now = 100 * day
