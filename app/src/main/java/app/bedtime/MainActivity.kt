@@ -93,6 +93,7 @@ object Routes {
     const val GROUPS = "groups"
     const val ALWAYS_AVAILABLE = "alwaysavailable"
     const val ONBOARDING = "onboarding"
+    const val WALKTHROUGH = "walkthrough"
     const val CREATE = "create"
     const val EDIT = "edit/"
     const val TEMPLATE = "template/"
@@ -204,6 +205,7 @@ private fun BedtimeNavigation(pendingRoute: String?, onRouteConsumed: () -> Unit
                         onGroups = { push(Routes.GROUPS) },
                         onAlwaysAvailable = { push(Routes.ALWAYS_AVAILABLE) },
                         onHowItWorks = { push(Routes.ONBOARDING) },
+                        onWalkthrough = { push(Routes.WALKTHROUGH) },
                     )
                     else -> HomeScreen(
                         onEdit = { id -> push(Routes.EDIT + id) },
@@ -226,6 +228,7 @@ private fun BedtimeNavigation(pendingRoute: String?, onRouteConsumed: () -> Unit
             top == Routes.GROUPS -> GroupsScreen(onBack = ::pop)
             top == Routes.ALWAYS_AVAILABLE -> AlwaysAvailableScreen(onBack = ::pop)
             top == Routes.ONBOARDING -> OnboardingScreen(onDone = ::pop)
+            top == Routes.WALKTHROUGH -> WalkthroughScreen(onDone = ::pop)
             top.startsWith(Routes.EDIT) -> ScheduleEditScreen(
                 scheduleId = top.removePrefix(Routes.EDIT).ifEmpty { null },
                 template = null,

@@ -76,6 +76,7 @@ fun SettingsScreen(
     onGroups: () -> Unit,
     onAlwaysAvailable: () -> Unit,
     onHowItWorks: () -> Unit,
+    onWalkthrough: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val repo = remember { Repository.get(context) }
@@ -165,6 +166,7 @@ fun SettingsScreen(
         fullScreenAlert = settings.fullScreenAlert,
         onFullScreenAlert = { on -> scope.launch { repo.updateSettings { it.copy(fullScreenAlert = on) } } },
         onHowItWorks = onHowItWorks,
+        onWalkthrough = onWalkthrough,
         onExport = { exportFile.launch("digital-refuge-${LocalDate.now()}.json") },
         onImport = { pickFile.launch(arrayOf("application/json", "text/plain", "*/*")) },
     )
@@ -183,7 +185,7 @@ internal fun SettingsContent(
     onGroups: () -> Unit = {},
     alwaysAvailableCount: Int = 0,
     onAlwaysAvailable: () -> Unit = {},
-    version: String = "0.7.7",
+    version: String = "0.7.7.1",
     canPinWidget: Boolean = true,
     onAddWidget: (Schedule) -> Unit = {},
     onExport: () -> Unit = {},
@@ -193,6 +195,7 @@ internal fun SettingsContent(
     fullScreenAlert: Boolean = true,
     onFullScreenAlert: (Boolean) -> Unit = {},
     onHowItWorks: () -> Unit = {},
+    onWalkthrough: () -> Unit = {},
 ) {
     val c = Obsidian.colors
     Scaffold(containerColor = c.bgPrimary, topBar = { ObsidianTopBar("Settings", onBack = onBack) }) { padding ->
@@ -219,6 +222,12 @@ internal fun SettingsContent(
                     "How it works",
                     description = "What a session locks, and your ways out",
                     onClick = onHowItWorks,
+                ) { Chevron() }
+                OptionRow(
+                    BedtimeIcons.Leaf,
+                    "The intro again",
+                    description = "The short walk-through from the first launch",
+                    onClick = onWalkthrough,
                 ) { Chevron() }
             }
 
