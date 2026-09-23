@@ -37,9 +37,15 @@ import kotlin.math.roundToInt
 fun SwipeToDelete(
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
     panel: Color = Obsidian.colors.bgPrimary,
     content: @Composable () -> Unit,
 ) {
+    if (!enabled) {
+        // Locked: no reveal, so deleting can't be a way around a session.
+        Box(modifier.fillMaxWidth().background(panel)) { content() }
+        return
+    }
     val c = Obsidian.colors
     val scope = rememberCoroutineScope()
     val revealPx = with(LocalDensity.current) { 96.dp.toPx() }

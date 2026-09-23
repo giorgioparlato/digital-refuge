@@ -43,9 +43,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.bedtime.data.DndMode
 import app.bedtime.data.Repository
 import app.bedtime.data.Schedule
+import app.bedtime.data.SessionLog
 import app.bedtime.engine.ActiveState
 import app.bedtime.engine.Engine
 import app.bedtime.engine.ScheduleEvaluator
+import app.bedtime.engine.Stats
 import app.bedtime.ui.components.CtaButton
 import app.bedtime.ui.components.ObsidianToggle
 import app.bedtime.ui.components.SwipeToDelete
@@ -54,6 +56,7 @@ import app.bedtime.ui.components.Text
 import app.bedtime.ui.formatDays
 import app.bedtime.ui.formatMinuteOfDay
 import app.bedtime.ui.formatRelative
+import app.bedtime.ui.formatTime
 import app.bedtime.ui.pluralApps
 import app.bedtime.ui.theme.Obsidian
 import kotlinx.coroutines.delay
@@ -68,6 +71,7 @@ fun SchedulesScreen(onEdit: (String) -> Unit, onCreate: () -> Unit) {
     val scope = rememberCoroutineScope()
     val schedules: List<Schedule>? by repo.schedules.collectAsStateWithLifecycle(initialValue = null)
     val active by Engine.state(context).collectAsStateWithLifecycle()
+    val history by repo.history.collectAsStateWithLifecycle(initialValue = emptyList())
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) {
         while (true) {
@@ -79,6 +83,7 @@ fun SchedulesScreen(onEdit: (String) -> Unit, onCreate: () -> Unit) {
     SchedulesContent(
         schedules = loaded.filterNot { it.isBlock },
         active = active,
+        history = history,
         now = now,
         onEdit = onEdit,
         onCreate = onCreate,
@@ -91,6 +96,7 @@ fun SchedulesScreen(onEdit: (String) -> Unit, onCreate: () -> Unit) {
 internal fun SchedulesContent(
     schedules: List<Schedule>,
     active: ActiveState?,
+    history: List<SessionLog> = emptyList(),
     now: Long,
     onEdit: (String) -> Unit,
     onCreate: () -> Unit,
@@ -140,10 +146,15 @@ internal fun SchedulesContent(
             }
             items(schedules.size, key = { schedules[it].id }) { index ->
                 val schedule = schedules[index]
-                SwipeToDelete(onDelete = { onDelete(schedule) }) {
+                val running = active?.occurrenceOf(schedule.id) != null
+                // The same lock the editor honours: switching a schedule off, or deleting it, would
+                // otherwise walk straight around the unlock steps.
+                val lockedUntil = if (schedule.editAfterUnlock) null else Stats.lockedUntil(history, schedule.id, now)
+                SwipeToDelete(onDelete = { onDelete(schedule) }, enabled = !running && lockedUntil == null) {
                     ScheduleCard(
                         schedule = schedule,
-                        running = active?.occurrenceOf(schedule.id) != null,
+                        running = running,
+                        lockedUntil = lockedUntil,
                         now = now,
                         onClick = { onEdit(schedule.id) },
                         onToggle = { onToggle(schedule, it) },
@@ -156,7 +167,14 @@ internal fun SchedulesContent(
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun ScheduleCard(schedule: Schedule, running: Boolean, now: Long, onClick: () -> Unit, onToggle: (Boolean) -> Unit) {
+private fun ScheduleCard(
+    schedule: Schedule,
+    running: Boolean,
+    lockedUntil: Long?,
+    now: Long,
+    onClick: () -> Unit,
+    onToggle: (Boolean) -> Unit,
+) {
     val context = LocalContext.current
     val c = Obsidian.colors
     val shape = RoundedCornerShape(18.dp)
@@ -186,7 +204,7 @@ private fun ScheduleCard(schedule: Schedule, running: Boolean, now: Long, onClic
                 )
             }
             Spacer(Modifier.width(12.dp))
-            ObsidianToggle(schedule.enabled, onToggle, enabled = !running)
+            ObsidianToggle(schedule.enabled, onToggle, enabled = !running && lockedUntil == null)
         }
         val tags = buildList {
             if (schedule.minimalMode) add("minimal mode")
@@ -204,7 +222,14 @@ private fun ScheduleCard(schedule: Schedule, running: Boolean, now: Long, onClic
                 tags.forEach { Tag(it) }
             }
         }
-        if (!running && schedule.enabled && next != null) {
+        if (lockedUntil != null) {
+            Spacer(Modifier.height(10.dp))
+            Text(
+                "locked until ${formatTime(context, lockedUntil)}",
+                style = MaterialTheme.typography.labelMedium,
+                color = c.textFaint,
+            )
+        } else if (!running && schedule.enabled && next != null) {
             Spacer(Modifier.height(10.dp))
             Text(
                 "starts ${formatRelative(context, next)}",
