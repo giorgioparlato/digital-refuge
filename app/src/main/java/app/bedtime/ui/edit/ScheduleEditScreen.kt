@@ -109,6 +109,27 @@ private val ScheduleSaver = Saver<Schedule, String>(
 
 private const val PICK_BLOCKED = "blocked"
 private const val PICK_ALLOWED = "allowed"
+/**
+ * The smallest gap a seven-day schedule must leave. Without one the occurrences tile the week end
+ * to end: the session is always running, so the schedule can never be edited, switched off or
+ * deleted — not even in the moment after an unlock, because the next occurrence starts right then.
+ */
+private const val MIN_DAILY_GAP_MINUTES = 5
+
+/**
+ * Why [draft] can't be saved yet, or null if it can. [newPassword] is what has been typed into the
+ * password field, which stands in for a password the schedule doesn't have stored yet.
+ */
+internal fun scheduleProblem(draft: Schedule, newPassword: String): String? = when {
+    !draft.isBlock && draft.days.isEmpty() -> "Pick at least one day for this schedule."
+    !draft.isBlock && draft.days.size == 7 && 24 * 60 - scheduleMinutes(draft) < MIN_DAILY_GAP_MINUTES ->
+        "A schedule on every day of the week has to leave a gap of at least $MIN_DAILY_GAP_MINUTES minutes, " +
+            "so there is always a moment when you can change it. Set the end time a few minutes before the start."
+    draft.unlock.passwordEnabled && !draft.unlock.hasPassword && newPassword.isBlank() ->
+        "Choose a password, or switch off the password step."
+    else -> null
+}
+
 private const val TIME_START = "start"
 private const val TIME_END = "end"
 
@@ -214,12 +235,7 @@ fun ScheduleEditScreen(
     }
 
     fun save() {
-        val problem = when {
-            !draft.isBlock && draft.days.isEmpty() -> "Pick at least one day for this schedule."
-            draft.unlock.passwordEnabled && !draft.unlock.hasPassword && newPassword.isBlank() ->
-                "Choose a password, or switch off the password step."
-            else -> null
-        }
+        val problem = scheduleProblem(draft, newPassword)
         if (problem != null) {
             error = problem
             return

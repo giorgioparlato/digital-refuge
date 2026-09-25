@@ -51,7 +51,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -287,11 +286,10 @@ private fun TextChallengeInput(length: Int, source: TextSource, onPassed: () -> 
         shakeOffset = { shake.value },
         onValueChange = { value ->
             val step = TextChallenge.advance(target, typed, value)
+            // Always take the progress back: a burst that ends in a typo still got the earlier letters right.
+            typed = step.typed
             when (step.outcome) {
-                TextChallenge.Outcome.ACCEPTED -> {
-                    typed = step.typed
-                    if (typed.length == target.length) onPassed()
-                }
+                TextChallenge.Outcome.ACCEPTED -> if (typed.length == target.length) onPassed()
                 TextChallenge.Outcome.REJECTED -> {
                     rejected++
                     scope.launch { for (x in listOf(-12f, 12f, -8f, 8f, 0f)) shake.animateTo(x, tween(40)) }
@@ -313,24 +311,18 @@ internal fun TextChallengeContent(
     val c = Obsidian.colors
     // Words and passages read as themselves; random letters get grouped into fives.
     val natural = remember(target) { target.any { it == ' ' } }
-    val annotated = remember(target, typed.length, c) {
-        fun styleAt(index: Int) = when {
-            index < typed.length -> SpanStyle(color = c.textFaint)
-            index == typed.length -> SpanStyle(color = c.textNormal, background = c.accent.copy(alpha = 0.35f))
-            else -> SpanStyle(color = c.textNormal)
-        }
+    val display = remember(target, natural) { DisplayText.of(target, natural) }
+    // Only three stretches ever differ: what's done, the character to type next, and the rest. Styling
+    // each character separately meant rebuilding hundreds of spans per keystroke, which typing felt.
+    val annotated = remember(display, typed.length, c) {
+        val cursor = display.offsetOf(typed.length)
+        val end = display.text.length
         buildAnnotatedString {
-            if (natural) {
-                target.forEachIndexed { index, char -> withStyle(styleAt(index)) { append(char) } }
-            } else {
-                var i = 0
-                target.chunked(5).forEachIndexed { group, chunk ->
-                    if (group > 0) append(' ')
-                    for (char in chunk) {
-                        withStyle(styleAt(i)) { append(char) }
-                        i++
-                    }
-                }
+            append(display.text)
+            if (cursor > 0) addStyle(SpanStyle(color = c.textFaint), 0, cursor)
+            if (cursor < end) {
+                addStyle(SpanStyle(color = c.textNormal, background = c.accent.copy(alpha = 0.35f)), cursor, cursor + 1)
+                if (cursor + 1 < end) addStyle(SpanStyle(color = c.textNormal), cursor + 1, end)
             }
         }
     }
@@ -383,6 +375,34 @@ internal fun TextChallengeContent(
             keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, keyboardType = KeyboardType.Password),
             textStyle = TextStyle(fontFamily = FontFamily.Monospace, fontSize = 16.sp),
         )
+    }
+}
+
+/**
+ * The challenge text as it is shown, and where each character of the target sits in it. Random letters
+ * are grouped into fives for legibility, which shifts every index along; words and passages read as
+ * themselves. Worked out once per challenge so that moving the cursor on costs nothing.
+ */
+private class DisplayText(val text: String, private val offsets: IntArray?) {
+    /** Where the target's [index]th character sits in [text] — the end, once past the last one. */
+    fun offsetOf(index: Int): Int = when {
+        offsets == null -> index.coerceIn(0, text.length)
+        index < offsets.size -> offsets[index]
+        else -> text.length
+    }
+
+    companion object {
+        fun of(target: String, natural: Boolean): DisplayText {
+            if (natural) return DisplayText(target, null)
+            val text = StringBuilder(target.length + target.length / 5)
+            val offsets = IntArray(target.length)
+            target.forEachIndexed { index, char ->
+                if (index > 0 && index % 5 == 0) text.append(' ')
+                offsets[index] = text.length
+                text.append(char)
+            }
+            return DisplayText(text.toString(), offsets)
+        }
     }
 }
 

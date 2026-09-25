@@ -63,7 +63,37 @@ class TextChallengeTest {
 
     @Test
     fun rejectsPasteEvenWhenCorrect() {
-        assertEquals(TextChallenge.Step("", Outcome.REJECTED), TextChallenge.advance(target, "", "ab3"))
+        val long = "ab3de" + "fghjk" + "mnpqr"
+        assertEquals(TextChallenge.Step("", Outcome.REJECTED), TextChallenge.advance(long, "", long))
+    }
+
+    @Test
+    fun acceptsABurstOfCorrectCharacters() {
+        // A keyboard hands over two or three at once when typing quickly; that isn't a paste.
+        assertEquals(TextChallenge.Step("ab3", Outcome.ACCEPTED), TextChallenge.advance(target, "", "ab3"))
+        assertEquals(TextChallenge.Step("ab3de", Outcome.ACCEPTED), TextChallenge.advance(target, "ab", "ab3de"))
+    }
+
+    @Test
+    fun aBurstThatGoesWrongKeepsWhatWasRight() {
+        assertEquals(TextChallenge.Step("ab", Outcome.REJECTED), TextChallenge.advance(target, "", "abx"))
+    }
+
+    @Test
+    fun aBurstFillsPunctuationInAsItGoes() {
+        assertEquals(
+            TextChallenge.Step("Be still, n", Outcome.ACCEPTED),
+            TextChallenge.advance("Be still, now.", "Be", "Be" + "stilln"),
+        )
+    }
+
+    @Test
+    fun rejectsAnythingLongerThanABurst() {
+        val long = TextChallenge.generate(60, random = Random(7))
+        assertEquals(
+            TextChallenge.Step("", Outcome.REJECTED),
+            TextChallenge.advance(long, "", long.take(TextChallenge.MAX_BURST + 1)),
+        )
     }
 
     @Test

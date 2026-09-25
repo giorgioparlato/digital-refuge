@@ -38,22 +38,39 @@ object TextChallenge {
     }
 
     /**
-     * Applies a text-field change. Progress only moves forward, one correct character at a time:
-     * multi-character insertions (paste, autocomplete) and wrong characters are rejected;
-     * deletions and whitespace are ignored. Spaces and punctuation in the target fill themselves in,
-     * so a passage is typed letter by letter without hunting for the comma key.
+     * The most characters one field change may add. A keyboard sometimes delivers two or three at
+     * once when typing quickly, and rejecting those looked like the app dropping letters. Anything
+     * longer than a burst is a paste.
+     */
+    const val MAX_BURST = 8
+
+    /**
+     * Applies a text-field change. Progress only moves forward, and only over correct characters:
+     * insertions longer than [MAX_BURST] (paste) and wrong characters are rejected; deletions and
+     * whitespace are ignored. Spaces and punctuation in the target fill themselves in, so a passage
+     * is typed letter by letter without hunting for the comma key.
+     *
+     * A burst that starts correctly and then goes wrong keeps the letters that were right, so a
+     * typo at speed costs no more than a typo typed slowly.
      */
     fun advance(target: String, typed: String, newValue: String): Step {
         if (newValue.length <= typed.length) return Step(typed, Outcome.IGNORED)
-        if (newValue.length > typed.length + 1 || !newValue.startsWith(typed)) return Step(typed, Outcome.REJECTED)
-        val char = newValue.last().lowercaseChar()
-        if (char.isWhitespace()) return Step(typed, Outcome.IGNORED)
-        var next = typed.length
-        while (next < target.length && !target[next].isLetterOrDigit()) next++
-        return if (next < target.length && char == target[next].lowercaseChar()) {
-            Step(target.substring(0, next + 1), Outcome.ACCEPTED)
-        } else {
-            Step(typed, Outcome.REJECTED)
+        if (!newValue.startsWith(typed)) return Step(typed, Outcome.REJECTED)
+        val added = newValue.substring(typed.length)
+        if (added.length > MAX_BURST) return Step(typed, Outcome.REJECTED)
+        var progress = typed
+        var moved = false
+        for (typedChar in added) {
+            val char = typedChar.lowercaseChar()
+            if (char.isWhitespace()) continue
+            var next = progress.length
+            while (next < target.length && !target[next].isLetterOrDigit()) next++
+            if (next >= target.length || char != target[next].lowercaseChar()) {
+                return Step(progress, Outcome.REJECTED)
+            }
+            progress = target.substring(0, next + 1)
+            moved = true
         }
+        return Step(progress, if (moved) Outcome.ACCEPTED else Outcome.IGNORED)
     }
 }
