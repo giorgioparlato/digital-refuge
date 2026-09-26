@@ -37,6 +37,7 @@ import app.bedtime.data.UnlockConfig
 import app.bedtime.data.UnlockMode
 import app.bedtime.engine.ScheduleEvaluator
 import app.bedtime.ui.apps.AppPickerContent
+import app.bedtime.ui.apps.PickerLock
 import app.bedtime.ui.blocked.BlockedContent
 import app.bedtime.ui.components.BedtimeIcons
 import app.bedtime.ui.create.CreateContent
@@ -195,6 +196,22 @@ class ScreenshotTest {
             mode = PickerMode.ALLOW,
             essentials = setOf(Samples.SETTINGS, Samples.PHONE, Samples.MESSAGES),
             alwaysAllowed = setOf(Samples.PHONE),
+            groups = Samples.groups,
+            onSaveGroup = {},
+        )
+    }
+
+    @Test
+    fun appPickerLocked() = shot {
+        AppPickerContent(
+            "Always available", Samples.apps, setOf(Samples.MAPS, Samples.SPOTIFY), "", {}, {}, {}, {},
+            mode = PickerMode.ALWAYS,
+            lock = PickerLock(
+                title = "A session is running",
+                body = "Apps here are never blocked, so adding one now would be a way out of the session you are in " +
+                    "\u2014 and of every session after it. The list opens again at 07:00.",
+                button = "Locked until 07:00",
+            ),
             groups = Samples.groups,
             onSaveGroup = {},
         )

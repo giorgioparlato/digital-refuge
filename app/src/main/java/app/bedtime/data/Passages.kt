@@ -113,6 +113,24 @@ object Passages {
         // Ikky\u016b S\u014djun, version by John Stevens
         "Every day priests minutely examine the Dharma and endlessly chant complicated sutras. Before doing that, " +
             "though, they should learn how to read the love letters sent by the wind and rain, the snow and moon.",
+        // Haruki Murakami, Norwegian Wood
+        "Naoko started walking the minute we hit the street, and I hurried after her, keeping a few paces behind. " +
+            "I could have closed the distance between us, but something held me back. I walked with my eyes on her " +
+            "shoulders and her straight black hair. She wore a big, brown hairslide, and when she turned her head " +
+            "I caught a glimpse of a small, white ear.",
+        // Haruki Murakami, Norwegian Wood
+        "As the three of us sat facing the candle amid these hushed surroundings, it began to seem as if we were " +
+            "the only ones left on some far edge of the world. The still shadows of the moonlight and the swaying " +
+            "shadows of the candlelight met and melded on the white walls of the flat. Naoko and I sat next to each " +
+            "other on the sofa, and Reiko settled into the rocking chair facing us.",
+        // Haruki Murakami, Norwegian Wood
+        "Colours shone with an exceptional clarity in the rain: the ground was a deep black, the pine branches a " +
+            "brilliant green, and the people wrapped in yellow looking like otherworldly spirits that were only " +
+            "allowed to wander the earth on rainy mornings.",
+        // Haruki Murakami, Norwegian Wood
+        "I sipped my coffee and watched the scene passing by the shop window. It was a typical university " +
+            "springtime scene as the new year was getting underway: a haze hanging in the sky, the cherry trees " +
+            "blooming, the new students (you could tell at a glance) carrying armloads of new books.",
         // Robin Wall Kimmerer, Braiding Sweetgrass
         "The Honorable Harvest asks us to give back, in reciprocity for what we have been given. One of our " +
             "responsibilities as human people is to find ways to enter into reciprocity with the more-than-human " +

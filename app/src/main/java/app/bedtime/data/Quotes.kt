@@ -233,7 +233,6 @@ object Quotes {
             "All that you touch you change. All that you change changes you.",
             "Octavia E. Butler", "Parable of the Sower",
         ),
-        Quote("Where there is love there are no demands, no expectations, no dependency.", "Anthony de Mello", "Awareness"),
         Quote(
             "If he thinks of the totality as constituted of independent fragments, then that is how his mind will tend to " +
             "operate.",
@@ -243,10 +242,6 @@ object Quotes {
             "To be a participant in a complex system is to desire to be both lost and found in the interrelationships " +
             "between people, nature and ideas.",
             "Nora Bateson", "Small Arcs of Larger Circles",
-        ),
-        Quote(
-            "Spend your money on the things money can buy. Spend your time on the things money can't buy.",
-            "Haruki Murakami", "The Wind-Up Bird Chronicle",
         ),
         Quote(
             "Gratitude is not a passive response to something we have been given; gratitude arises from paying attention.",

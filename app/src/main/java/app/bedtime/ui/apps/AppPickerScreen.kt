@@ -63,8 +63,21 @@ import kotlinx.coroutines.withContext
 /** What the picked apps are for; changes the guidance and whether groups are offered. */
 enum class PickerMode { BLOCK, ALLOW, ALWAYS, GROUP }
 
+/**
+ * Why a picker can be read but not changed: shown as a notice above the list, and on the button in
+ * place of "Done". The apps stay visible, so you can still see what the list holds.
+ */
+data class PickerLock(val title: String, val body: String, val button: String)
+
 @Composable
-fun AppPickerScreen(title: String, initial: Set<String>, mode: PickerMode, onDone: (Set<String>) -> Unit, onBack: () -> Unit) {
+fun AppPickerScreen(
+    title: String,
+    initial: Set<String>,
+    mode: PickerMode,
+    onDone: (Set<String>) -> Unit,
+    onBack: () -> Unit,
+    lock: PickerLock? = null,
+) {
     val context = LocalContext.current
     val repo = remember { Repository.get(context) }
     val scope = rememberCoroutineScope()
@@ -94,6 +107,7 @@ fun AppPickerScreen(title: String, initial: Set<String>, mode: PickerMode, onDon
         onDone = { onDone(selected) },
         onBack = onBack,
         mode = mode,
+        lock = lock,
         essentials = essentials,
         alwaysAllowed = alwaysAllowed,
         riskyPackages = risky,
@@ -118,6 +132,7 @@ internal fun AppPickerContent(
     onDone: () -> Unit,
     onBack: () -> Unit,
     mode: PickerMode = PickerMode.BLOCK,
+    lock: PickerLock? = null,
     essentials: Set<String> = emptySet(),
     alwaysAllowed: Set<String> = emptySet(),
     /** Apps that would make an escape trivial if always available (Settings). */
@@ -140,11 +155,15 @@ internal fun AppPickerContent(
         topBar = { ObsidianTopBar(title, onBack = onBack) },
         bottomBar = {
             BottomActionBar {
-                CtaButton(
-                    if (selected.isEmpty()) "Done" else "Done · ${pluralApps(selected.size)}",
-                    onClick = onDone,
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                if (lock != null) {
+                    CtaButton(lock.button, onClick = {}, enabled = false, modifier = Modifier.fillMaxWidth())
+                } else {
+                    CtaButton(
+                        if (selected.isEmpty()) "Done" else "Done · ${pluralApps(selected.size)}",
+                        onClick = onDone,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
             }
         },
     ) { padding ->
@@ -168,13 +187,23 @@ internal fun AppPickerContent(
             val filtered = if (query.isBlank()) apps else apps.filter { it.label.contains(query.trim(), ignoreCase = true) }
 
             LazyColumn(Modifier.fillMaxSize()) {
-                if (mode == PickerMode.ALLOW && query.isBlank()) {
+                if (lock != null) {
+                    item(key = "lock") {
+                        Callout(
+                            title = lock.title,
+                            kind = CalloutKind.WARNING,
+                            body = lock.body,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        )
+                    }
+                }
+                if (lock == null && mode == PickerMode.ALLOW && query.isBlank()) {
                     item(key = "info") { AllowInfo(apps, selected, essentials, alwaysAllowed) }
                 }
-                if (mode == PickerMode.ALWAYS && query.isBlank()) {
+                if (lock == null && mode == PickerMode.ALWAYS && query.isBlank()) {
                     item(key = "info") { AlwaysInfo(apps, selected, riskyPackages) }
                 }
-                if (query.isBlank() && (usableGroups.isNotEmpty() || canSaveGroup)) {
+                if (lock == null && query.isBlank() && (usableGroups.isNotEmpty() || canSaveGroup)) {
                     item(key = "groups") { GroupChips(usableGroups, selected, onToggleGroup, canSaveGroup, onSave = { naming = true }) }
                 }
                 if (filtered.isEmpty()) {
@@ -188,7 +217,12 @@ internal fun AppPickerContent(
                     }
                 }
                 items(filtered, key = { it.packageName }) { app ->
-                    AppRow(app, checked = app.packageName in selected, onToggle = { onToggle(app.packageName) })
+                    AppRow(
+                        app,
+                        checked = app.packageName in selected,
+                        onToggle = { onToggle(app.packageName) },
+                        enabled = lock == null,
+                    )
                 }
             }
         }
@@ -289,12 +323,12 @@ private fun SaveGroupDialog(onDismiss: () -> Unit, onSave: (String) -> Unit) {
 }
 
 @Composable
-private fun AppRow(app: AppEntry, checked: Boolean, onToggle: () -> Unit) {
+private fun AppRow(app: AppEntry, checked: Boolean, onToggle: () -> Unit, enabled: Boolean = true) {
     val c = Obsidian.colors
     Row(
         Modifier
             .fillMaxWidth()
-            .clickable(onClick = onToggle)
+            .then(if (enabled) Modifier.clickable(onClick = onToggle) else Modifier)
             .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -303,7 +337,8 @@ private fun AppRow(app: AppEntry, checked: Boolean, onToggle: () -> Unit) {
         Text(app.label, style = MaterialTheme.typography.bodyLarge, color = c.textNormal, modifier = Modifier.weight(1f))
         Checkbox(
             checked = checked,
-            onCheckedChange = { onToggle() },
+            onCheckedChange = if (enabled) ({ onToggle() }) else null,
+            enabled = enabled,
             colors = CheckboxDefaults.colors(checkedColor = c.accentFill, uncheckedColor = c.textFaint, checkmarkColor = c.textOnAccent),
         )
     }
