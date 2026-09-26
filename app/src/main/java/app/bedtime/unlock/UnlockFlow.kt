@@ -259,7 +259,7 @@ internal fun UnlockLayout(
         if (showCancel) {
             Spacer(Modifier.height(12.dp))
             Text(
-                "Never mind, let's keep the quiet",
+                "Never mind, let's keep still",
                 style = MaterialTheme.typography.bodyLarge,
                 color = c.textMuted,
                 modifier = Modifier.clickable(onClick = onCancel).padding(8.dp),
