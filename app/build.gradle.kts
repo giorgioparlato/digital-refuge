@@ -42,8 +42,11 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
-            // The real key when local.properties has one; otherwise the debug key, so builds work anywhere.
-            signingConfig = signingConfigs.getByName(if (releaseStore != null) "release" else "debug")
+            // Signed with the real key when local.properties has one. Without it the build still runs,
+            // but comes out unsigned rather than stamped with the debug key: a debug-signed release
+            // installs as a different developer and can't upgrade a real one, and the only sign of it
+            // would be the warning Play shows the person who tried.
+            signingConfig = if (releaseStore != null) signingConfigs.getByName("release") else null
         }
     }
 
