@@ -2,10 +2,32 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- List installed apps for the blocked / allowed pickers. Fine for a sideloaded app. -->
-    <uses-permission
-        android:name="android.permission.QUERY_ALL_PACKAGES"
-        tools:ignore="QueryAllPackagesPermission" />
+    <!--
+      Which other apps this one can see. Naming the four lookups it actually makes is enough, so it
+      does not ask for QUERY_ALL_PACKAGES — a permission that, next to an accessibility service and
+      an overlay, makes a blocker look like the malware it is shaped like.
+    -->
+    <queries>
+        <!-- Every app with a launcher icon: the blocked / allowed pickers, and launching from them. -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+        <!-- Which packages are home screens, so pressing Home reaches the minimal one. -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.HOME" />
+        </intent>
+        <!-- Settings, guarded during a session so blocking can't quietly be switched off. -->
+        <intent>
+            <action android:name="android.settings.SETTINGS" />
+        </intent>
+        <!-- Whichever app handles uninstalling this one, guarded for the same reason. -->
+        <intent>
+            <action android:name="android.intent.action.DELETE" />
+            <data android:scheme="package" />
+        </intent>
+    </queries>
 
     <!-- Do Not Disturb and hidden notifications; granted by the user in "Do Not Disturb access". -->
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
