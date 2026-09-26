@@ -128,9 +128,7 @@ private fun BlockedScreen(pkg: String?, guardingSettings: Boolean, onHome: () ->
                     modifier = Modifier
                         .fillMaxSize()
                         .safeDrawingPadding()
-                        .imePadding()
-                        .verticalScroll(rememberScrollState())
-                        .padding(24.dp),
+                        .imePadding(),
                 )
             }
         } else if (guardingSettings) {

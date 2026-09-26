@@ -41,37 +41,28 @@ private data class Page(val icon: ImageVector, val title: String, val body: Stri
 private val pages = listOf(
     Page(
         BedtimeIcons.Refuge,
-        "hours that ask less of you",
-        "digital refuge sets aside times when your phone gets quieter: a bedtime that repeats, or a block you start " +
-            "when you need one.",
-        "nothing you do here leaves your phone. no account, no sync — the app has no internet permission at all.",
+        "hours that ask less",
+        "some hours are better spent not reaching for anything. you choose which ones, and the phone keeps to them.",
+        "none of this leaves your phone. no account, no sync \u2014 the app has no internet permission at all.",
     ),
     Page(
         BedtimeIcons.Moon,
-        "a session begins",
-        "the apps you named stop opening. your home screen can become a short list of what you chose, and the screen " +
-            "can fade to grey.",
-        "notifications wait until it ends. music and alarms are never silenced.",
+        "what a session is like",
+        "the apps you named stay shut. the home screen thins out to what you chose. the colour can drain away.",
+        "notifications wait. music and alarms are never silenced.",
     ),
     Page(
         BedtimeIcons.Hourglass,
-        "leaving early takes a moment",
-        "a wait, a passage to type, a password — as many as you want, in that order.",
-        "enough of a pause for an urge to pass. they can grow with each unlock on the same day, and start fresh each morning.",
+        "the way out is slow on purpose",
+        "a wait, a passage to copy, a password. long enough for the reaching to pass.",
+        "each unlock in a day can make the next one longer. the count starts again each morning.",
     ),
     Page(
         BedtimeIcons.Target,
-        "it stays put",
-        "while a session runs, its own settings can't be changed. the screens that would switch blocking off can be " +
-            "covered too.",
-        "and if blocking goes off anyway, a full screen stays with you until you switch it back on.",
-    ),
-    Page(
-        BedtimeIcons.Contrast,
-        "as firm as you want it",
-        "strictness is a handful of switches, each closing one way around. turn them all on for the firmest, or pick " +
-            "only the ones you want.",
-        "they sit in each block, and in settings → staying blocked, where this explanation lives too.",
+        "as firm as you want",
+        "every way around a session has a switch of its own. turn them all on and there is no way out but the " +
+            "steps you set yourself.",
+        "the switches sit in each block, and in settings \u2192 staying blocked.",
     ),
 )
 

@@ -162,9 +162,7 @@ private fun MinimalHomeScreen(onFinish: () -> Unit, onLightBackground: (Boolean)
                     modifier = Modifier
                         .fillMaxSize()
                         .safeDrawingPadding()
-                        .imePadding()
-                        .verticalScroll(rememberScrollState())
-                        .padding(24.dp),
+                        .imePadding(),
                 )
             }
         }

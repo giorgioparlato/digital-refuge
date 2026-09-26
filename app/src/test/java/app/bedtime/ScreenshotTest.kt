@@ -36,10 +36,12 @@ import app.bedtime.data.UnlockAction
 import app.bedtime.data.UnlockConfig
 import app.bedtime.data.UnlockMode
 import app.bedtime.engine.ScheduleEvaluator
+import androidx.compose.foundation.layout.fillMaxWidth
 import app.bedtime.ui.apps.AppPickerContent
 import app.bedtime.ui.apps.PickerLock
 import app.bedtime.ui.blocked.BlockedContent
 import app.bedtime.ui.components.BedtimeIcons
+import app.bedtime.ui.components.CtaButton
 import app.bedtime.ui.create.CreateContent
 import app.bedtime.ui.edit.ScheduleEditContent
 import app.bedtime.ui.home.HomeContent
@@ -86,6 +88,12 @@ class ScreenshotTest {
     @Composable
     private fun Screen(content: @Composable () -> Unit) {
         Box(Modifier.fillMaxSize().background(Obsidian.colors.bgPrimary).padding(20.dp)) { content() }
+    }
+
+    /** For pages that reach the screen edges themselves, like the unlock flow's fade. */
+    @Composable
+    private fun FullScreen(content: @Composable () -> Unit) {
+        Box(Modifier.fillMaxSize().background(Obsidian.colors.bgPrimary)) { content() }
     }
 
     @Composable
@@ -377,9 +385,19 @@ class ScreenshotTest {
 
     @Test
     fun unlockWait() = shot {
-        Screen {
-            UnlockLayout("Bedtime", "This ends the current session.", listOf("Wait", "Type"), current = 0, showCancel = true, onCancel = {}) {
-                WaitChallengeContent(remaining = 372_000, total = 600_000, onContinue = {})
+        FullScreen {
+            UnlockLayout(
+                "Bedtime",
+                listOf("Wait", "Type"),
+                current = 0,
+                showCancel = true,
+                onCancel = {},
+                footnote = "This ends the current session. The timer only runs while this screen is open, " +
+                    "and starts over if you back out.",
+                note = "2nd unlock today \u00b7 the steps are longer",
+                action = { CtaButton("Waiting\u2026", onClick = {}, enabled = false, modifier = Modifier.fillMaxWidth()) },
+            ) {
+                WaitChallengeContent(remaining = 372_000, total = 600_000)
             }
         }
     }
@@ -387,14 +405,15 @@ class ScreenshotTest {
     @Test
     fun unlockPassage() = shot {
         val target = TextChallenge.generate(220, app.bedtime.data.TextSource.PASSAGES, Random(4))
-        Screen {
+        FullScreen {
             UnlockLayout(
                 "Bedtime",
-                "This ends the current session.",
                 listOf("Wait", "Type"),
                 current = 1,
                 showCancel = true,
                 onCancel = {},
+                footnote = "This ends the current session. Spaces and punctuation fill themselves in; " +
+                    "pasting and typos are rejected.",
             ) {
                 TextChallengeContent(target = target, typed = target.take(48), rejected = 0, onValueChange = {})
             }
@@ -404,15 +423,16 @@ class ScreenshotTest {
     @Test
     fun unlockText() = shot {
         val target = TextChallenge.generate(225, random = Random(7))
-        Screen {
+        FullScreen {
             UnlockLayout(
                 "Bedtime",
-                "This ends the current session.",
                 listOf("Wait", "Type"),
                 current = 1,
                 showCancel = true,
                 onCancel = {},
-                note = "This is early unlock #2 today, so the text is 50% longer.",
+                footnote = "This ends the current session. Spaces and punctuation fill themselves in; " +
+                    "pasting and typos are rejected.",
+                note = "2nd unlock today \u00b7 the steps are longer",
             ) {
                 TextChallengeContent(target = target, typed = target.take(37), rejected = 2, onValueChange = {})
             }
@@ -421,8 +441,8 @@ class ScreenshotTest {
 
     @Test
     fun unlockSuccess() = shot {
-        Screen {
-            UnlockLayout("Bedtime", "This ends the current session.", listOf("Wait", "Type"), current = 2, showCancel = false, onCancel = {}) {
+        FullScreen {
+            UnlockLayout("Bedtime", listOf("Wait", "Type"), current = 2, showCancel = false, onCancel = {}) {
                 UnlockSuccess("Bedtime is off until its next scheduled start.")
             }
         }

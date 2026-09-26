@@ -314,9 +314,7 @@ private fun UnlockScreen(scheduleId: String, onBack: () -> Unit) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .imePadding()
-                .verticalScroll(rememberScrollState())
-                .padding(20.dp),
+                .imePadding(),
         )
     }
 }

@@ -22,6 +22,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
@@ -58,6 +60,126 @@ class QuietDesignsTest {
                     Box(Modifier.fillMaxSize().padding(padding).padding(20.dp)) { content() }
                 }
             }
+        }
+    }
+
+    /** Same page, on the home screen's fade. */
+    private fun shotOnGradient(content: @Composable () -> Unit) {
+        paparazzi.snapshot("dark") {
+            BedtimeTheme(darkTheme = true) {
+                val c = Obsidian.colors
+                Scaffold(containerColor = c.bgPrimary) { padding ->
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .background(Brush.verticalGradient(listOf(Color(0xFF1F2C25), c.bgPrimary)))
+                            .padding(padding)
+                            .padding(20.dp),
+                    ) { content() }
+                }
+            }
+        }
+    }
+
+    /** "this is your nth time today" — kept, but quiet and amber rather than a full warning card. */
+    @Composable
+    private fun EscalationPill(text: String, modifier: Modifier = Modifier) {
+        val c = Obsidian.colors
+        Row(
+            modifier
+                .clip(RoundedCornerShape(50))
+                .background(c.orange.copy(alpha = 0.14f))
+                .padding(horizontal = 14.dp, vertical = 7.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(Modifier.size(6.dp).clip(CircleShape).background(c.orange))
+            Spacer(Modifier.width(9.dp))
+            Text(text, style = MaterialTheme.typography.labelMedium, color = c.orange)
+        }
+    }
+
+    private val escalation = "2nd unlock today \u00b7 the steps are longer"
+
+    // ---------------------------------------------------------------- C1
+
+    /** C, on the fade: the count sits just above the button, the way back just below it. */
+    @Test
+    fun waitC1() = shotOnGradient {
+        val c = Obsidian.colors
+        Column(
+            Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Spacer(Modifier.weight(1f))
+            Text("Take a breath.", style = MaterialTheme.typography.titleLarge, color = c.textMuted)
+            Spacer(Modifier.height(34.dp))
+            Ring(248)
+            Spacer(Modifier.height(30.dp))
+            StepDots(current = 0)
+            Spacer(Modifier.weight(1f))
+            EscalationPill(escalation)
+            Spacer(Modifier.height(16.dp))
+            CtaButton("Waiting\u2026", onClick = {}, enabled = false, modifier = Modifier.fillMaxWidth())
+            Spacer(Modifier.height(12.dp))
+            Text("Never mind", style = MaterialTheme.typography.bodyLarge, color = c.textMuted)
+            Spacer(Modifier.height(18.dp))
+            Footnote("unlocking bedtime ends the current session. $smallPrint")
+        }
+    }
+
+    // ---------------------------------------------------------------- C2
+
+    /** C, on the fade: the way back under the button, the count at the very foot. */
+    @Test
+    fun waitC2() = shotOnGradient {
+        val c = Obsidian.colors
+        Column(
+            Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Spacer(Modifier.weight(1f))
+            Text("Take a breath.", style = MaterialTheme.typography.titleLarge, color = c.textMuted)
+            Spacer(Modifier.height(34.dp))
+            Ring(248)
+            Spacer(Modifier.height(30.dp))
+            StepDots(current = 0)
+            Spacer(Modifier.weight(1f))
+            CtaButton("Waiting\u2026", onClick = {}, enabled = false, modifier = Modifier.fillMaxWidth())
+            Spacer(Modifier.height(12.dp))
+            Text("Keep it running", style = MaterialTheme.typography.bodyLarge, color = c.textMuted)
+            Spacer(Modifier.height(18.dp))
+            Footnote("unlocking bedtime ends the current session. $smallPrint")
+            Spacer(Modifier.height(14.dp))
+            EscalationPill(escalation)
+        }
+    }
+
+    // ---------------------------------------------------------------- C3
+
+    /** C, on the fade: the count rides with the step dots, so the foot stays plain. */
+    @Test
+    fun waitC3() = shotOnGradient {
+        val c = Obsidian.colors
+        Column(
+            Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Spacer(Modifier.weight(1f))
+            Text("Take a breath.", style = MaterialTheme.typography.titleLarge, color = c.textMuted)
+            Spacer(Modifier.height(34.dp))
+            Ring(248)
+            Spacer(Modifier.height(26.dp))
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                StepDots(current = 0)
+            }
+            Spacer(Modifier.height(14.dp))
+            EscalationPill(escalation)
+            Spacer(Modifier.weight(1f))
+            CtaButton("Waiting\u2026", onClick = {}, enabled = false, modifier = Modifier.fillMaxWidth())
+            Spacer(Modifier.height(12.dp))
+            Text("Stay in the session", style = MaterialTheme.typography.bodyLarge, color = c.textMuted)
+            Spacer(Modifier.height(18.dp))
+            Footnote("unlocking bedtime ends the current session. $smallPrint")
         }
     }
 

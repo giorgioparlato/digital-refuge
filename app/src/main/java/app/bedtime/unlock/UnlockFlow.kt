@@ -4,6 +4,9 @@ import android.os.SystemClock
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -41,6 +44,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.SpanStyle
@@ -122,32 +127,74 @@ fun UnlockFlow(occurrence: Occurrence, onUnlocked: () -> Unit, onCancel: () -> U
     val textLength = if (config.escalate) Escalation.textLength(config.textLength, recentUnlocks, config.escalateFactor) else config.textLength
     val waitMs = (if (config.escalate) Escalation.waitSeconds(config.waitDurationSeconds, recentUnlocks, config.escalateFactor) else config.waitDurationSeconds) * 1000L
     val note = if (escalating && (config.waitEnabled || config.textEnabled)) {
-        "This is early unlock #${recentUnlocks + 1} today, so the steps are longer."
+        "${ordinal(recentUnlocks + 1)} unlock today \u00b7 the steps are longer"
     } else {
         null
     }
 
+    val step = if (succeeded) null else challenges.getOrNull(index)
+    // The timer is hoisted out of the page so the ring and the button, which sit at opposite ends of
+    // it, can both read the same countdown.
+    val remaining = if (step == Challenge.WAIT) waitCountdown(occurrence, waitMs) else null
+
     UnlockLayout(
         scheduleName = schedule.name,
-        outcome = outcomeText(schedule),
+        footnote = if (succeeded) null else footnoteFor(step, outcomeText(schedule)),
         stepLabels = challenges.map { it.label },
         current = if (succeeded) challenges.size else index,
         showCancel = !succeeded,
         onCancel = onCancel,
-        note = note,
+        note = if (succeeded) null else note,
         modifier = modifier,
+        action = when {
+            succeeded -> null
+            challenges.isEmpty() -> {
+                { CtaButton("Unlock", onClick = ::passCurrent, modifier = Modifier.fillMaxWidth()) }
+            }
+            step == Challenge.WAIT -> {
+                {
+                    val done = remaining == 0L
+                    CtaButton(
+                        if (done) "Continue" else "Waiting\u2026",
+                        onClick = ::passCurrent,
+                        enabled = done,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
+            else -> null
+        },
     ) {
         if (succeeded) {
             UnlockSuccess(successText(schedule))
         } else {
-            when (challenges.getOrNull(index)) {
-                null -> CtaButton("Unlock", onClick = ::passCurrent, modifier = Modifier.fillMaxWidth())
-                Challenge.WAIT -> WaitChallenge(occurrence, waitMs, onPassed = ::passCurrent)
+            when (step) {
+                null -> Unit
+                Challenge.WAIT -> WaitChallengeContent(remaining = remaining, total = waitMs)
                 Challenge.TEXT -> TextChallengeInput(textLength, config.textSource, onPassed = ::passCurrent)
                 Challenge.PASSWORD -> PasswordChallenge(config, onPassed = ::passCurrent)
             }
         }
     }
+}
+
+/** "1st", "2nd", "3rd", "4th" \u2014 enough for a day's worth of unlocks. */
+private fun ordinal(n: Int): String {
+    val suffix = when {
+        n % 100 in 11..13 -> "th"
+        n % 10 == 1 -> "st"
+        n % 10 == 2 -> "nd"
+        n % 10 == 3 -> "rd"
+        else -> "th"
+    }
+    return "$n$suffix"
+}
+
+/** The small print at the foot: what unlocking does, plus whatever this step needs you to know. */
+private fun footnoteFor(step: Challenge?, outcome: String): String = when (step) {
+    Challenge.WAIT -> "$outcome The timer only runs while this screen is open, and starts over if you back out."
+    Challenge.TEXT -> "$outcome Spaces and punctuation fill themselves in; pasting and typos are rejected."
+    else -> outcome
 }
 
 internal fun outcomeText(schedule: Schedule): String = when (schedule.unlockAction.mode) {
@@ -164,34 +211,110 @@ internal fun successText(schedule: Schedule): String = when (schedule.unlockActi
 @Composable
 internal fun UnlockLayout(
     scheduleName: String,
-    outcome: String,
     stepLabels: List<String>,
     current: Int,
     showCancel: Boolean,
     onCancel: () -> Unit,
     modifier: Modifier = Modifier,
+    footnote: String? = null,
     note: String? = null,
+    action: (@Composable () -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
     val c = Obsidian.colors
-    val intro = when (stepLabels.size) {
-        0 -> "Unlock $scheduleName?"
-        1 -> "Finish this step to unlock $scheduleName."
-        else -> "Finish these steps to unlock $scheduleName."
-    }
-    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("Leaving early?", style = MaterialTheme.typography.headlineSmall, color = c.textNormal)
-            Text("$intro $outcome", style = MaterialTheme.typography.bodyMedium, color = c.textMuted)
-        }
-        if (note != null) Callout(title = "A little harder this time", kind = CalloutKind.WARNING, body = note)
-        if (stepLabels.size > 1) StepChips(stepLabels, current)
-        content()
-        if (showCancel) {
-            TextButton(onClick = onCancel, modifier = Modifier.fillMaxWidth()) {
-                Text("Never mind, I'll stay focused", color = c.textMuted)
+    Column(
+        modifier
+            .fillMaxSize()
+            .background(Brush.verticalGradient(listOf(Color(0xFF1F2C25), c.bgPrimary)))
+            .padding(horizontal = 20.dp, vertical = 18.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            "Unlocking $scheduleName",
+            style = MaterialTheme.typography.bodyMedium,
+            color = c.textFaint,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        // The middle scrolls on its own, so the button and the small print stay at the foot of the
+        // page instead of being pushed off it by a long passage or the keyboard.
+        Column(
+            Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            content()
+            if (stepLabels.size > 1) {
+                Spacer(Modifier.height(26.dp))
+                StepDots(stepLabels, current)
+            }
+            if (note != null) {
+                Spacer(Modifier.height(14.dp))
+                EscalationPill(note)
             }
         }
+        if (action != null) {
+            Spacer(Modifier.height(16.dp))
+            action()
+        }
+        if (showCancel) {
+            Spacer(Modifier.height(12.dp))
+            Text(
+                "Never mind, let's keep the quiet",
+                style = MaterialTheme.typography.bodyLarge,
+                color = c.textMuted,
+                modifier = Modifier.clickable(onClick = onCancel).padding(8.dp),
+            )
+        }
+        if (footnote != null) {
+            Spacer(Modifier.height(14.dp))
+            Text(
+                footnote,
+                style = MaterialTheme.typography.labelSmall,
+                color = c.textFaint,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+}
+
+/** Which step you are on, without spelling the steps out: a stretched dot for here, small ones after. */
+@Composable
+private fun StepDots(labels: List<String>, current: Int) {
+    val c = Obsidian.colors
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+        labels.indices.forEach { index ->
+            Box(
+                Modifier
+                    .height(5.dp)
+                    .width(if (index == current) 18.dp else 5.dp)
+                    .clip(CircleShape)
+                    .background(if (index == current) c.accent else c.textFaint.copy(alpha = 0.35f)),
+            )
+        }
+        Spacer(Modifier.width(8.dp))
+        Text(
+            "step ${(current + 1).coerceAtMost(labels.size)} of ${labels.size}",
+            style = MaterialTheme.typography.labelSmall,
+            color = c.textFaint,
+        )
+    }
+}
+
+/** How many times you have been here today. Warm enough to notice, quiet enough not to scold. */
+@Composable
+private fun EscalationPill(text: String) {
+    val c = Obsidian.colors
+    Row(
+        Modifier
+            .clip(RoundedCornerShape(50))
+            .background(c.orange.copy(alpha = 0.14f))
+            .padding(horizontal = 14.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(6.dp).clip(CircleShape).background(c.orange))
+        Spacer(Modifier.width(9.dp))
+        Text(text, style = MaterialTheme.typography.labelMedium, color = c.orange)
     }
 }
 
@@ -212,11 +335,11 @@ internal fun UnlockSuccess(message: String) {
 }
 
 /**
- * Counts only while this screen is open and in front: leaving the app pauses it, and backing out
- * ("I'll stay focused") drops it, so the next attempt starts from scratch.
+ * The countdown, in milliseconds left. Counts only while this screen is open and in front: leaving
+ * the app pauses it, and backing out drops it, so the next attempt starts from scratch.
  */
 @Composable
-private fun WaitChallenge(occurrence: Occurrence, total: Long, onPassed: () -> Unit) {
+private fun waitCountdown(occurrence: Occurrence, total: Long): Long {
     var elapsed by rememberSaveable(occurrence.start) { mutableLongStateOf(0L) }
     var inFront by remember { mutableStateOf(false) }
     LifecycleResumeEffect(Unit) {
@@ -233,41 +356,37 @@ private fun WaitChallenge(occurrence: Occurrence, total: Long, onPassed: () -> U
             last = tick
         }
     }
-    WaitChallengeContent(remaining = total - elapsed, total = total, onContinue = onPassed)
+    return total - elapsed
 }
 
+/** Three words and a ring. Everything else about waiting lives in the small print at the foot. */
 @Composable
-internal fun WaitChallengeContent(remaining: Long?, total: Long, onContinue: () -> Unit) {
+internal fun WaitChallengeContent(remaining: Long?, total: Long) {
     val c = Obsidian.colors
     val done = remaining == 0L
-    Column(
-        Modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(20.dp),
-    ) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
-            if (done) "Time's up. Still want to unlock?" else "Take a breath. The timer only runs while this screen is open, and starts over if you back out.",
-            style = MaterialTheme.typography.bodyLarge,
+            if (done) "Time's up." else "Take a breath.",
+            style = MaterialTheme.typography.titleLarge,
             color = c.textMuted,
-            textAlign = TextAlign.Center,
         )
-        Box(Modifier.size(208.dp), contentAlignment = Alignment.Center) {
+        Spacer(Modifier.height(34.dp))
+        Box(Modifier.size(248.dp), contentAlignment = Alignment.Center) {
             CircularProgressIndicator(
                 progress = { if (remaining == null || total <= 0) 0f else 1f - remaining.toFloat() / total },
                 modifier = Modifier.fillMaxSize(),
                 color = if (done) c.green else c.accent,
-                strokeWidth = 8.dp,
+                strokeWidth = 9.dp,
                 trackColor = c.interactive,
                 strokeCap = StrokeCap.Round,
             )
             Text(
-                remaining?.let(::formatCountdown) ?: "…",
+                remaining?.let(::formatCountdown) ?: "\u2026",
                 style = MaterialTheme.typography.displaySmall.copy(fontFeatureSettings = "tnum"),
                 fontWeight = FontWeight.Medium,
                 color = if (done) c.green else c.textNormal,
             )
         }
-        CtaButton(if (done) "Continue" else "Waiting…", onClick = onContinue, enabled = done, modifier = Modifier.fillMaxWidth())
     }
 }
 
@@ -328,12 +447,6 @@ internal fun TextChallengeContent(
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Text(
-            "Copy the text below, one character at a time. Spaces and punctuation fill themselves in; " +
-                "pasting and typos are rejected.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = c.textMuted,
-        )
         Text(
             annotated,
             fontFamily = if (natural) FontFamily.Default else FontFamily.Monospace,
