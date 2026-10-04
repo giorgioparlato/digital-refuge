@@ -145,6 +145,7 @@ private fun MinimalHomeScreen(onFinish: () -> Unit, onLightBackground: (Boolean)
                 onCall = { SystemApps.dialerPackage(context)?.let { AppCatalog.launch(context, it) } },
                 alwaysAvailable = alwaysAvailableApps,
                 onOpenApp = { AppCatalog.launch(context, it) },
+                onOpenRefuge = { AppCatalog.launch(context, context.packageName) },
                 onPauseBlocking = {
                     if (!BlockingState.pause(occurrence.schedule.breakMinutes)) context.startActivity(BlockingState.accessibilityIntent())
                     emergency = false

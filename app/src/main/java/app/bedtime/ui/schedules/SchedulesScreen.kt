@@ -41,10 +41,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.bedtime.data.DndMode
+import app.bedtime.data.EditWindow
 import app.bedtime.data.Repository
 import app.bedtime.data.Schedule
 import app.bedtime.data.SessionLog
 import app.bedtime.engine.ActiveState
+import app.bedtime.engine.EditWindows
 import app.bedtime.engine.Engine
 import app.bedtime.engine.ScheduleEvaluator
 import app.bedtime.engine.Stats
@@ -61,6 +63,7 @@ import app.bedtime.ui.pluralApps
 import app.bedtime.ui.theme.Obsidian
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.time.Instant
 import java.time.ZoneId
 
 /** The schedules tab: the hours that look after themselves. */
@@ -104,6 +107,9 @@ internal fun SchedulesContent(
     onDelete: (Schedule) -> Unit = {},
 ) {
     val c = Obsidian.colors
+    val minuteOfDay = remember(now) {
+        Instant.ofEpochMilli(now).atZone(ZoneId.systemDefault()).toLocalTime().let { it.hour * 60 + it.minute }
+    }
     Scaffold(
         containerColor = c.bgPrimary,
         floatingActionButton = {
@@ -150,11 +156,14 @@ internal fun SchedulesContent(
                 // The same lock the editor honours: switching a schedule off, or deleting it, would
                 // otherwise walk straight around the unlock steps.
                 val lockedUntil = if (schedule.editAfterUnlock) null else Stats.lockedUntil(history, schedule.id, now)
-                SwipeToDelete(onDelete = { onDelete(schedule) }, enabled = !running && lockedUntil == null) {
+                // And the hours it may be changed in, if it names any.
+                val shut = schedule.editWindow?.takeIf { !EditWindows.isOpen(it, minuteOfDay) }
+                SwipeToDelete(onDelete = { onDelete(schedule) }, enabled = !running && lockedUntil == null && shut == null) {
                     ScheduleCard(
                         schedule = schedule,
                         running = running,
                         lockedUntil = lockedUntil,
+                        shutWindow = shut,
                         now = now,
                         onClick = { onEdit(schedule.id) },
                         onToggle = { onToggle(schedule, it) },
@@ -171,6 +180,7 @@ private fun ScheduleCard(
     schedule: Schedule,
     running: Boolean,
     lockedUntil: Long?,
+    shutWindow: EditWindow?,
     now: Long,
     onClick: () -> Unit,
     onToggle: (Boolean) -> Unit,
@@ -204,7 +214,7 @@ private fun ScheduleCard(
                 )
             }
             Spacer(Modifier.width(12.dp))
-            ObsidianToggle(schedule.enabled, onToggle, enabled = !running && lockedUntil == null)
+            ObsidianToggle(schedule.enabled, onToggle, enabled = !running && lockedUntil == null && shutWindow == null)
         }
         val tags = buildList {
             if (schedule.minimalMode) add("minimal mode")
@@ -222,7 +232,14 @@ private fun ScheduleCard(
                 tags.forEach { Tag(it) }
             }
         }
-        if (lockedUntil != null) {
+        if (shutWindow != null) {
+            Spacer(Modifier.height(10.dp))
+            Text(
+                "can be changed from ${formatMinuteOfDay(context, shutWindow.startMinute)}",
+                style = MaterialTheme.typography.labelMedium,
+                color = c.textFaint,
+            )
+        } else if (lockedUntil != null) {
             Spacer(Modifier.height(10.dp))
             Text(
                 "locked until ${formatTime(context, lockedUntil)}",

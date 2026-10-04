@@ -1,6 +1,11 @@
 package app.bedtime.ui.minimal
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.filled.Call
+import app.bedtime.ui.components.BedtimeIcons
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -39,6 +44,7 @@ internal fun EmergencyContent(
     onCall: () -> Unit,
     alwaysAvailable: List<AppEntry>,
     onOpenApp: (String) -> Unit,
+    onOpenRefuge: () -> Unit = {},
     onPauseBlocking: () -> Unit = {},
     breakMinutes: Int = 1,
     pauseEnabled: Boolean = true,
@@ -65,44 +71,60 @@ internal fun EmergencyContent(
             color = c.textMuted,
         )
 
-        SectionCard(title = "call someone") {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Body("the phone app always works here, including emergency calls.")
-                PlainButton("open phone", onClick = onCall, modifier = Modifier.fillMaxWidth())
+        // Two that work no matter how the session is set up, so there is always something here.
+        SectionCard(title = "always works") {
+            ActionRow(onClick = onOpenRefuge, label = "digital refuge") {
+                Box(
+                    Modifier.size(36.dp).clip(CircleShape).background(c.accent.copy(alpha = 0.16f)),
+                    contentAlignment = Alignment.Center,
+                ) { Icon(BedtimeIcons.Refuge, contentDescription = null, tint = c.accent, modifier = Modifier.size(20.dp)) }
             }
-        }
-
-        if (pauseEnabled) SectionCard(title = "emergency break", subtitle = "step out for a moment without ending the session") {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Body(
-                    "for whatever genuinely can't wait. this steps out for $minutes; when the break ends, a full screen " +
-                        "brings you back. it counts as an escape in your stats.",
-                )
-                PlainButton("pause blocking for $minutes", onClick = onPauseBlocking, modifier = Modifier.fillMaxWidth())
+            ActionRow(onClick = onCall, label = "phone") {
+                Box(
+                    Modifier.size(36.dp).clip(CircleShape).background(c.accent.copy(alpha = 0.16f)),
+                    contentAlignment = Alignment.Center,
+                ) { Icon(Icons.Default.Call, contentDescription = null, tint = c.accent, modifier = Modifier.size(20.dp)) }
             }
         }
 
         SectionCard(title = "always available", subtitle = "never blocked, whatever the session") {
             if (alwaysAvailable.isEmpty()) {
-                Body("no apps here yet. after this session, add a few (maps, rides, your authenticator) in settings → emergency.")
+                Body("none yet. add a few — maps, rides, your authenticator — in settings \u2192 emergency.")
             } else {
                 alwaysAvailable.forEach { app ->
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(10.dp))
-                            .clickable(onClickLabel = "open ${app.label}") { onOpenApp(app.packageName) }
-                            .padding(vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
+                    ActionRow(onClick = { onOpenApp(app.packageName) }, label = app.label) {
                         AppIcon(app.packageName, app.label, 36.dp)
-                        Spacer(Modifier.width(14.dp))
-                        Text(app.label, style = MaterialTheme.typography.bodyLarge, color = c.textNormal, modifier = Modifier.weight(1f))
-                        Chevron()
                     }
                 }
             }
         }
+
+        if (pauseEnabled) {
+            SectionCard(title = "emergency break") {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Body("steps out for $minutes. a full screen brings you back when it ends.")
+                    PlainButton("pause blocking for $minutes", onClick = onPauseBlocking, modifier = Modifier.fillMaxWidth())
+                }
+            }
+        }
+    }
+}
+
+/** One tappable line: icon, name, chevron. Everything on this screen opens something. */
+@Composable
+private fun ActionRow(onClick: () -> Unit, label: String, icon: @Composable () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .clickable(onClickLabel = "open $label", onClick = onClick)
+            .padding(vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        icon()
+        Spacer(Modifier.width(14.dp))
+        Text(label, style = MaterialTheme.typography.bodyLarge, color = Obsidian.colors.textNormal, modifier = Modifier.weight(1f))
+        Chevron()
     }
 }
 

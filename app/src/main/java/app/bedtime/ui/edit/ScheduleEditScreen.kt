@@ -36,6 +36,7 @@ import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -54,6 +55,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.bedtime.apps.AppCatalog
 import app.bedtime.data.AppJson
 import app.bedtime.data.DndMode
+import app.bedtime.data.EditWindow
+import app.bedtime.engine.EditWindows
 import app.bedtime.data.Repository
 import app.bedtime.data.Schedule
 import app.bedtime.data.TextSource
@@ -98,9 +101,11 @@ import app.bedtime.ui.theme.Obsidian
 import app.bedtime.unlock.PasswordHasher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
+import java.time.LocalTime
 
 private val ScheduleSaver = Saver<Schedule, String>(
     save = { AppJson.encodeToString(Schedule.serializer(), it) },
@@ -110,21 +115,19 @@ private val ScheduleSaver = Saver<Schedule, String>(
 private const val PICK_BLOCKED = "blocked"
 private const val PICK_ALLOWED = "allowed"
 /**
- * The smallest gap a seven-day schedule must leave. Without one the occurrences tile the week end
- * to end: the session is always running, so the schedule can never be edited, switched off or
- * deleted — not even in the moment after an unlock, because the next occurrence starts right then.
- */
-private const val MIN_DAILY_GAP_MINUTES = 5
-
-/**
  * Why [draft] can't be saved yet, or null if it can. [newPassword] is what has been typed into the
  * password field, which stands in for a password the schedule doesn't have stored yet.
  */
 internal fun scheduleProblem(draft: Schedule, newPassword: String): String? = when {
     !draft.isBlock && draft.days.isEmpty() -> "Pick at least one day for this schedule."
-    !draft.isBlock && draft.days.size == 7 && 24 * 60 - scheduleMinutes(draft) < MIN_DAILY_GAP_MINUTES ->
-        "A schedule on every day of the week has to leave a gap of at least $MIN_DAILY_GAP_MINUTES minutes, " +
-            "so there is always a moment when you can change it. Set the end time a few minutes before the start."
+    !draft.isBlock && !EditWindows.leavesAWayIn(draft) ->
+        "Every day needs at least ${EditWindows.MIN_DAILY_EDITABLE_MINUTES} minutes in a row when this can be " +
+            "changed, so you can never be shut out of it. " +
+            if (draft.editWindow != null) {
+                "Widen the hours it can be changed, or move them clear of the hours it runs."
+            } else {
+                "Leave a longer gap between when it ends and when it starts again."
+            }
     draft.unlock.passwordEnabled && !draft.unlock.hasPassword && newPassword.isBlank() ->
         "Choose a password, or switch off the password step."
     else -> null
@@ -132,6 +135,8 @@ internal fun scheduleProblem(draft: Schedule, newPassword: String): String? = wh
 
 private const val TIME_START = "start"
 private const val TIME_END = "end"
+private const val TIME_WINDOW_START = "windowstart"
+private const val TIME_WINDOW_END = "windowend"
 
 /**
  * Edits an existing schedule or block ([scheduleId]), or creates a new one from a [Templates] key
@@ -172,6 +177,14 @@ fun ScheduleEditScreen(
     var saving by remember { mutableStateOf(false) }
     var greyscaleAvailable by remember { mutableStateOf(GreyscaleController.isAvailable(context)) }
     var dndAvailable by remember { mutableStateOf(DndController.hasAccess(context)) }
+    // Ticks so an editing window that closes (or opens) while the screen is open is noticed.
+    var nowMinuteOfDay by remember { mutableIntStateOf(LocalTime.now().let { it.hour * 60 + it.minute }) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(20_000)
+            nowMinuteOfDay = LocalTime.now().let { it.hour * 60 + it.minute }
+        }
+    }
     LifecycleResumeEffect(Unit) {
         greyscaleAvailable = GreyscaleController.isAvailable(context)
         dndAvailable = DndController.hasAccess(context)
@@ -197,7 +210,10 @@ fun ScheduleEditScreen(
     } else {
         null
     }
-    val readOnly = running || lockedUntil != null
+    // An existing schedule can also name the only hours it may be touched in. A new one can't yet:
+    // the window is being chosen right now, so it would shut the door on the way in.
+    val shutWindow = original.editWindow?.takeIf { !EditWindows.isOpen(it, nowMinuteOfDay) }
+    val readOnly = running || lockedUntil != null || shutWindow != null
     val dirty = !readOnly && (draft != original || newPassword.isNotEmpty())
 
     when (picking) {
@@ -223,12 +239,28 @@ fun ScheduleEditScreen(
     BackHandler { requestBack() }
 
     editingTime?.let { which ->
+        val window = draft.editWindow ?: EditWindow()
         TimePickerDialog(
-            title = if (which == TIME_START) "Starts at" else "Ends at",
-            initialMinute = if (which == TIME_START) draft.startMinute else draft.endMinute,
+            title = when (which) {
+                TIME_START -> "Starts at"
+                TIME_END -> "Ends at"
+                TIME_WINDOW_START -> "Can be changed from"
+                else -> "Can be changed until"
+            },
+            initialMinute = when (which) {
+                TIME_START -> draft.startMinute
+                TIME_END -> draft.endMinute
+                TIME_WINDOW_START -> window.startMinute
+                else -> window.endMinute
+            },
             onDismiss = { editingTime = null },
             onConfirm = { minute ->
-                draft = if (which == TIME_START) draft.copy(startMinute = minute) else draft.copy(endMinute = minute)
+                draft = when (which) {
+                    TIME_START -> draft.copy(startMinute = minute)
+                    TIME_END -> draft.copy(endMinute = minute)
+                    TIME_WINDOW_START -> draft.copy(editWindow = window.copy(startMinute = minute))
+                    else -> draft.copy(editWindow = window.copy(endMinute = minute))
+                }
                 editingTime = null
             },
         )
@@ -296,6 +328,7 @@ fun ScheduleEditScreen(
         isNew = scheduleId == null,
         readOnly = readOnly,
         lockedUntil = lockedUntil,
+        shutWindow = shutWindow,
         newPassword = newPassword,
         onNewPasswordChange = { newPassword = it },
         greyscaleAvailable = greyscaleAvailable,
@@ -310,6 +343,8 @@ fun ScheduleEditScreen(
         onPickAllowed = { picking = PICK_ALLOWED },
         onEditStart = { editingTime = TIME_START },
         onEditEnd = { editingTime = TIME_END },
+        onEditWindowStart = { editingTime = TIME_WINDOW_START },
+        onEditWindowEnd = { editingTime = TIME_WINDOW_END },
         onOpenSetup = onSetup,
         onHowItWorks = onHowItWorks,
         appLabel = { AppCatalog.label(context, it) },
@@ -324,6 +359,7 @@ internal fun ScheduleEditContent(
     isNew: Boolean,
     readOnly: Boolean,
     lockedUntil: Long? = null,
+    shutWindow: EditWindow? = null,
     newPassword: String,
     onNewPasswordChange: (String) -> Unit,
     greyscaleAvailable: Boolean,
@@ -338,6 +374,8 @@ internal fun ScheduleEditContent(
     onPickAllowed: () -> Unit,
     onEditStart: () -> Unit,
     onEditEnd: () -> Unit,
+    onEditWindowStart: () -> Unit = {},
+    onEditWindowEnd: () -> Unit = {},
     onOpenSetup: () -> Unit,
     onHowItWorks: () -> Unit = {},
     appLabel: (String) -> String = { it },
@@ -372,7 +410,14 @@ internal fun ScheduleEditContent(
         },
         bottomBar = {
             BottomActionBar {
-                if (lockedUntil != null) {
+                if (shutWindow != null) {
+                    CtaButton(
+                        "Can be changed from ${formatMinuteOfDay(context, shutWindow.startMinute)}",
+                        onClick = {},
+                        enabled = false,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                } else if (lockedUntil != null) {
                     CtaButton(
                         "Locked until ${formatTime(context, lockedUntil)}",
                         onClick = {},
@@ -408,11 +453,17 @@ internal fun ScheduleEditContent(
             if (readOnly) {
                 Callout(
                     title = when {
+                        shutWindow != null -> "Outside the hours you set"
                         lockedUntil != null -> "You left this one early"
                         isBlock -> "This block is running"
                         else -> "This schedule is on right now"
                     },
-                    body = if (lockedUntil != null) {
+                    body = if (shutWindow != null) {
+                        "You chose to let this one be changed only between " +
+                            "${formatMinuteOfDay(context, shutWindow.startMinute)} and " +
+                            "${formatMinuteOfDay(context, shutWindow.endMinute)}. Until then it can't be edited, " +
+                            "switched off or deleted."
+                    } else if (lockedUntil != null) {
                         "Its settings stay shut until ${formatTime(context, lockedUntil)}, when it would have ended — " +
                             "otherwise unlocking would be a way to soften it and start again. You can change that under " +
                             "\"When you unlock\"."
@@ -740,6 +791,55 @@ internal fun ScheduleEditContent(
                         { on -> onDraftChange(draft.copy(editAfterUnlock = !on)) },
                         enabled = editable,
                     )
+                }
+            }
+
+            if (!isBlock) {
+                SectionCard(
+                    title = "When it can be changed",
+                    subtitle = "Put this schedule out of reach of the hours that would talk you out of it.",
+                ) {
+                    OptionRow(
+                        Icons.Default.Lock,
+                        "Only at certain hours",
+                        description = "Outside them it can't be edited, switched off or deleted.",
+                        enabled = editable,
+                    ) {
+                        ObsidianToggle(
+                            draft.editWindow != null,
+                            { on -> onDraftChange(draft.copy(editWindow = if (on) EditWindow() else null)) },
+                            enabled = editable,
+                        )
+                    }
+                    AnimatedVisibility(draft.editWindow != null) {
+                        val window = draft.editWindow ?: EditWindow()
+                        Column(Modifier.padding(top = 8.dp)) {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                TimeTile(
+                                    "From",
+                                    formatMinuteOfDay(context, window.startMinute),
+                                    Modifier.weight(1f),
+                                    enabled = editable,
+                                    onClick = onEditWindowStart,
+                                )
+                                TimeTile(
+                                    "Until",
+                                    formatMinuteOfDay(context, window.endMinute),
+                                    Modifier.weight(1f),
+                                    caption = if (window.endMinute <= window.startMinute) "next day" else null,
+                                    enabled = editable,
+                                    onClick = onEditWindowEnd,
+                                )
+                            }
+                            Text(
+                                "Outside these hours this page is read-only, and the schedule can't be switched " +
+                                    "off or deleted from the list either.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = c.textMuted,
+                                modifier = Modifier.padding(top = 10.dp),
+                            )
+                        }
+                    }
                 }
             }
 

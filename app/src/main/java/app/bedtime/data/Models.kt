@@ -50,9 +50,19 @@ data class Schedule(
     val editAfterUnlock: Boolean = false,
     /** How long each of those breaks lasts, in minutes (at least 1). */
     val breakMinutes: Int = 1,
+    /** Hours outside which this can't be changed at all; null means it can be changed any time. */
+    val editWindow: EditWindow? = null,
 ) {
     val isBlock: Boolean get() = kind == ScheduleKind.BLOCK
 }
+
+/**
+ * The only hours of the day in which a schedule can be edited, switched off or deleted — so a
+ * bedtime can be put beyond reach of the evening that would talk you out of it. Equal times mean
+ * the whole day, as they do for a session.
+ */
+@Serializable
+data class EditWindow(val startMinute: Int = 9 * 60, val endMinute: Int = 17 * 60)
 
 @Serializable
 data class UnlockConfig(
