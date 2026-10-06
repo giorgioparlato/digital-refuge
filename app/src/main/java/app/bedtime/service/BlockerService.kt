@@ -45,8 +45,14 @@ class BlockerService : AccessibilityService() {
 
     /** Windows that float over the current app (shade, keyboards) and don't change what's "in front". */
     private var overlays: Set<String> = emptySet()
+
+    /** The app we believe is in front: the last window that was a move to somewhere else, not a float. */
     private var lastPackage: String? = null
     private var homeInFront = false
+
+    /** The settle timer for the window change we have not acted on yet. */
+    private val handler = Handler(Looper.getMainLooper())
+    private var pendingSettle: Runnable? = null
 
     /** Settings and the package installer: where the screens that switch blocking off live. */
     private var guardedPackages: Set<String> = emptySet()
@@ -177,12 +183,14 @@ class BlockerService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
         if (event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
         val pkg = event.packageName?.toString() ?: return
-        if (pkg !in overlays) {
-            val home = pkg == packageName && event.className?.toString() in colourScreens
-            if (home != homeInFront) {
-                homeInFront = home
-                scope.launch { applyGreyscale() }
-            }
+        // A keyboard or the notification shade appearing is not a move to another app, so it must not
+        // become what we think is in front: that both bounced people out of apps a session allows and
+        // left the app actually in front unexamined when the session came back.
+        if (pkg in overlays) return
+        val home = pkg == packageName && event.className?.toString() in colourScreens
+        if (home != homeInFront) {
+            homeInFront = home
+            scope.launch { applyGreyscale() }
         }
         lastPackage = pkg
         val boundary = state?.nextBoundary
@@ -192,8 +200,30 @@ class BlockerService : AccessibilityService() {
             Engine.refresh()
             return
         }
+        // Read while the event is still alive; the cover over Settings can't wait for the settle.
         if (guardSettings(pkg, event)) return
-        enforce(pkg)
+        settle(pkg)
+    }
+
+    /**
+     * Acts on a window change only once it has held for a moment.
+     *
+     * One window event is not proof that you went somewhere else. Apps open full-screen windows
+     * belonging to other packages — an in-app browser tab, a system picker, the launcher's own
+     * overview during an edge swipe — and each of those used to count as leaving, which is how you
+     * could be thrown back to the minimal home while never leaving the app you were allowed to use.
+     * A window that really is the foreground app is still there a moment later; a flash is not,
+     * because the app underneath comes back and takes this timer with it.
+     */
+    private fun settle(pkg: String) {
+        pendingSettle?.let(handler::removeCallbacks)
+        // enforce() re-reads the state, so a session ending before this runs leaves it with nothing to do.
+        val task = Runnable {
+            pendingSettle = null
+            enforce(pkg)
+        }
+        pendingSettle = task
+        handler.postDelayed(task, SETTLE_MS)
     }
 
     /**
@@ -252,6 +282,9 @@ class BlockerService : AccessibilityService() {
     }
 
     private fun enforce(pkg: String?) {
+        // Whatever window we were waiting on is no longer the question; this is.
+        pendingSettle?.let(handler::removeCallbacks)
+        pendingSettle = null
         val current = state ?: return
         if (pkg == null || !current.isActive || pkg == packageName || pkg in alwaysAllowed) return
         // Always-available apps (maps, rides, authenticators…) are never blocked by any session.
@@ -299,6 +332,7 @@ class BlockerService : AccessibilityService() {
 
     override fun onDestroy() {
         BlockingState.service = null
+        pendingSettle?.let(handler::removeCallbacks)
         if (receiverRegistered) unregisterReceiver(receiver)
         if (watchersRegistered) {
             unregisterReceiver(zenReceiver)
@@ -307,5 +341,10 @@ class BlockerService : AccessibilityService() {
         if (modeReceiverRegistered) unregisterReceiver(modeReceiver)
         scope.cancel()
         super.onDestroy()
+    }
+
+    private companion object {
+        /** Long enough to let a flashed window be replaced by the app underneath, short enough not to be seen. */
+        const val SETTLE_MS = 250L
     }
 }
