@@ -41,6 +41,7 @@ import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.TextFieldColors
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import app.bedtime.ui.components.Text
@@ -69,6 +70,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
@@ -540,21 +542,64 @@ fun ObsidianTextField(
         singleLine = singleLine,
         maxLines = maxLines,
         shape = RoundedCornerShape(10.dp),
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = c.accent,
-            unfocusedBorderColor = c.border,
-            disabledBorderColor = c.border,
-            focusedContainerColor = c.bgPrimaryAlt,
-            unfocusedContainerColor = c.bgPrimaryAlt,
-            disabledContainerColor = c.bgPrimaryAlt,
-            cursorColor = c.accent,
-            focusedLabelColor = c.accentText,
-            unfocusedLabelColor = c.textMuted,
-            focusedTextColor = c.textNormal,
-            unfocusedTextColor = c.textNormal,
-            disabledTextColor = c.textMuted,
-            disabledLabelColor = c.textFaint,
-        ),
+        colors = obsidianFieldColors(),
+    )
+}
+
+/**
+ * The same field, but holding the cursor as well as the text.
+ *
+ * A [String]-valued field keeps its own idea of where the cursor is, and leaves it at the same
+ * offset when the app rewrites the text underneath it. The typing challenge fills in spaces and
+ * punctuation for you, so a single keystroke can add two characters — and the cursor would be left
+ * behind them, dropping the next letter into the middle of the word.
+ */
+@Composable
+fun ObsidianTextField(
+    value: TextFieldValue,
+    onValueChange: (TextFieldValue) -> Unit,
+    modifier: Modifier = Modifier,
+    placeholder: String? = null,
+    enabled: Boolean = true,
+    singleLine: Boolean = true,
+    maxLines: Int = if (singleLine) 1 else Int.MAX_VALUE,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    textStyle: TextStyle = LocalTextStyle.current,
+) {
+    val c = Obsidian.colors
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        modifier = modifier.fillMaxWidth(),
+        enabled = enabled,
+        textStyle = textStyle,
+        placeholder = placeholder?.let { { Text(it, color = c.textFaint) } },
+        visualTransformation = LowercaseTransformation,
+        keyboardOptions = keyboardOptions,
+        singleLine = singleLine,
+        maxLines = maxLines,
+        shape = RoundedCornerShape(10.dp),
+        colors = obsidianFieldColors(),
+    )
+}
+
+@Composable
+private fun obsidianFieldColors(): TextFieldColors {
+    val c = Obsidian.colors
+    return OutlinedTextFieldDefaults.colors(
+        focusedBorderColor = c.accent,
+        unfocusedBorderColor = c.border,
+        disabledBorderColor = c.border,
+        focusedContainerColor = c.bgPrimaryAlt,
+        unfocusedContainerColor = c.bgPrimaryAlt,
+        disabledContainerColor = c.bgPrimaryAlt,
+        cursorColor = c.accent,
+        focusedLabelColor = c.accentText,
+        unfocusedLabelColor = c.textMuted,
+        focusedTextColor = c.textNormal,
+        unfocusedTextColor = c.textNormal,
+        disabledTextColor = c.textMuted,
+        disabledLabelColor = c.textFaint,
     )
 }
 

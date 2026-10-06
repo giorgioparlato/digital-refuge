@@ -49,12 +49,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -477,9 +479,17 @@ internal fun TextChallengeContent(
                 color = c.textFaint,
             )
         }
+        // The field holds the cursor as well as the text, and the cursor is always put back at the end:
+        // accepting a letter can fill a space in with it, and a cursor left in front of that space
+        // would drop the next letter into the middle of the word.
+        var field by remember { mutableStateOf(TextFieldValue(typed, TextRange(typed.length))) }
+        if (field.text != typed) field = TextFieldValue(typed, TextRange(typed.length))
         ObsidianTextField(
-            value = typed,
-            onValueChange = onValueChange,
+            value = field,
+            onValueChange = { value ->
+                field = value.copy(selection = TextRange(value.text.length))
+                onValueChange(value.text)
+            },
             modifier = Modifier.offset { IntOffset(shakeOffset().roundToInt(), 0) },
             placeholder = "Start typing here…",
             singleLine = false,
