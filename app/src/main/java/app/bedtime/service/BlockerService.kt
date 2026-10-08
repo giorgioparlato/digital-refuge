@@ -8,6 +8,7 @@ import android.os.Handler
 import android.os.Looper
 import android.widget.Toast
 import android.content.BroadcastReceiver
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -62,6 +63,9 @@ class BlockerService : AccessibilityService() {
 
     /** Whether a package can be opened from the launcher. Asked once per package, not per window. */
     private val launchable = mutableMapOf<String, Boolean>()
+
+    /** Whether a window's class is one of its app's activities, by "package/class". Asked once each. */
+    private val activityClasses = mutableMapOf<String, Boolean>()
     private val guardNames by lazy { setOf(getString(R.string.accessibility_label), getString(R.string.app_name)) }
     private var receiverRegistered = false
     private var watchersRegistered = false
@@ -187,11 +191,20 @@ class BlockerService : AccessibilityService() {
         // become what we think is in front: that both bounced people out of apps a session allows and
         // left the app actually in front unexamined when the session came back.
         if (pkg in overlays) return
-        val home = pkg == packageName && event.className?.toString() in colourScreens
+        val className: String? = event.className?.toString()
+        val home = pkg == packageName && className != null && className in colourScreens
         if (home != homeInFront) {
             homeInFront = home
             scope.launch { applyGreyscale() }
         }
+        // First, and on every window of Settings: its fragments and dialogs are not activities of their
+        // own, and the cover over them can't wait for the settle either — the event's text dies with it.
+        if (guardSettings(pkg, event)) return
+        // A window whose class is not an activity of its own app was drawn over whatever you are using
+        // rather than opened by you. The launcher's rotation hint is one of those, which is why turning
+        // the phone sideways threw you out of an app the session allowed. Without a class name we can't
+        // tell, so it counts as an app, as it always did.
+        if (className != null && !isActivity(pkg, className)) return
         lastPackage = pkg
         val boundary = state?.nextBoundary
         if (boundary != null && System.currentTimeMillis() >= boundary) {
@@ -200,8 +213,6 @@ class BlockerService : AccessibilityService() {
             Engine.refresh()
             return
         }
-        // Read while the event is still alive; the cover over Settings can't wait for the settle.
-        if (guardSettings(pkg, event)) return
         settle(pkg)
     }
 
@@ -270,6 +281,7 @@ class BlockerService : AccessibilityService() {
                 .toSet()
         }.getOrDefault(emptySet())
         launchable.clear()
+        activityClasses.clear()
         // Settings (accessibility toggle, App info) plus whichever app handles uninstalling this one.
         val uninstaller = runCatching {
             packageManager.resolveActivity(
@@ -307,6 +319,16 @@ class BlockerService : AccessibilityService() {
      */
     private fun opensAsApp(pkg: String): Boolean =
         pkg in homePackages || launchable.getOrPut(pkg) { AppCatalog.isLaunchable(this, pkg) }
+
+    /**
+     * Whether [className] is an activity of [pkg], rather than a view in a window the app has put up
+     * over something else. Asking the package manager settles it without guessing at class names,
+     * which differ by launcher and by manufacturer.
+     */
+    private fun isActivity(pkg: String, className: String): Boolean =
+        activityClasses.getOrPut("$pkg/$className") {
+            runCatching { packageManager.getActivityInfo(ComponentName(pkg, className), 0) }.isSuccess
+        }
 
     override fun onInterrupt() = Unit
 
