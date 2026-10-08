@@ -8,7 +8,6 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.provider.Settings
-import app.bedtime.data.AppSettings
 import app.bedtime.data.DndMode
 import app.bedtime.data.Repository
 import app.bedtime.engine.ActiveState
@@ -36,7 +35,6 @@ class SessionGuardService : Service() {
     private val releaseScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     private var state: ActiveState? = null
-    private var settings = AppSettings()
     private var blockingOn = true
 
     /** So one switch-off is recorded once, not on every settings change. */
@@ -61,7 +59,6 @@ class SessionGuardService : Service() {
             false,
             accessibilityObserver,
         )
-        scope.launch { Repository.get(this@SessionGuardService).settings.collect { settings = it } }
         scope.launch {
             Engine.state(this@SessionGuardService).filterNotNull().collect { next ->
                 state = next
@@ -124,7 +121,7 @@ class SessionGuardService : Service() {
      */
     private fun checkOverlay() {
         val current = state ?: return
-        if (!current.isActive || !settings.fullScreenAlert) return
+        if (!current.isActive || !current.fullScreenAlert) return
         val now = TakeoverOverlay.canShow(this)
         val was = overlayOk
         overlayOk = now
@@ -148,7 +145,7 @@ class SessionGuardService : Service() {
         val current = state
         val takeover = !blockingOn &&
             current?.isActive == true &&
-            settings.fullScreenAlert &&
+            current.fullScreenAlert &&
             !BlockingState.isOnBreak() &&
             !BlockingState.isOverlaySuppressed()
         if (takeover) {
@@ -158,7 +155,7 @@ class SessionGuardService : Service() {
             TakeoverOverlay.hide(this)
         }
         val breakMs = if (!blockingOn && BlockingState.isOnBreak()) BlockingState.breakRemainingMs() else 0L
-        val overlayMissing = settings.fullScreenAlert && current?.isActive == true && !overlayOk
+        val overlayMissing = current?.isActive == true && current.fullScreenAlert && !overlayOk
         SessionNotifier.post(this, NOTIFICATION_ID, state, blockingOn, breakMs, overlayMissing)
     }
 

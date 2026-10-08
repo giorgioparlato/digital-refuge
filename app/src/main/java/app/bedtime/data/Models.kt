@@ -52,6 +52,10 @@ data class Schedule(
     val breakMinutes: Int = 1,
     /** Hours outside which this can't be changed at all; null means it can be changed any time. */
     val editWindow: EditWindow? = null,
+    /** Cover the Settings screens that switch blocking off or uninstall the app, while this runs. */
+    val lockSettings: Boolean = true,
+    /** Take over the screen if blocking is switched off while this runs, until it's back on. */
+    val fullScreenAlert: Boolean = true,
 ) {
     val isBlock: Boolean get() = kind == ScheduleKind.BLOCK
 }
@@ -185,10 +189,9 @@ data class AppSettings(
     val alwaysAvailableSeeded: Boolean = false,
     /** Which block each home-screen widget starts, by widget id; missing means the tile's block, then the first. */
     val widgetBlocks: Map<String, String> = emptyMap(),
-    /** During sessions, cover the Settings screens that switch blocking off (see SettingsGuard). */
-    val lockSettingsDuringSessions: Boolean = true,
-    /** If blocking is switched off mid-session, take over the screen until it's back on. */
-    val fullScreenAlert: Boolean = true,
+    // Both of these used to live here and now belong to each schedule, since how firmly a session
+    // holds is a property of that session and not of the phone. Old saves still carry them; the
+    // decoder ignores unknown keys, so they are simply dropped.
     /** True once the one-time explainer has been shown. */
     val onboarded: Boolean = false,
 )

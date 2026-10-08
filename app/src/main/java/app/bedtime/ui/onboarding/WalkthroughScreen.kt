@@ -42,19 +42,19 @@ private val pages = listOf(
     Page(
         BedtimeIcons.Refuge,
         "hours that ask less",
-        "some hours are better spent not reaching for anything. you choose which ones, and the phone keeps to them.",
-        "none of this leaves your phone. no account, no sync \u2014 the app has no internet permission at all.",
+        "some hours are better spent not reaching for your phone. you choose which ones.",
+        "no data leaves your phone. no account, no sync \u2014 the app has no internet permission at all.",
     ),
     Page(
         BedtimeIcons.Moon,
         "what a session is like",
-        "the apps you named stay shut. the home screen thins out to what you chose. the colour can drain away.",
+        "the apps you named stay shut. the home screen thins out to what you chose. the color can drain away.",
         "notifications wait. music and alarms are never silenced.",
     ),
     Page(
         BedtimeIcons.Hourglass,
         "the way out is slow on purpose",
-        "a wait, a passage to copy, a password. long enough for the reaching to pass.",
+        "a wait, a passage to copy, a password. long enough for the instinct to pass.",
         "each unlock in a day can make the next one longer. the count starts again each morning.",
     ),
     Page(
@@ -62,7 +62,7 @@ private val pages = listOf(
         "as firm as you want",
         "every way around a session has a switch of its own. turn them all on and there is no way out but the " +
             "steps you set yourself.",
-        "the switches sit in each block, and in settings \u2192 staying blocked.",
+        "the switches sit in each schedule and block, under \u201cthe ways around it\u201d.",
     ),
 )
 

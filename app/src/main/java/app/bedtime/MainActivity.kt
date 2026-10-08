@@ -153,6 +153,12 @@ private fun BedtimeNavigation(pendingRoute: String?, onRouteConsumed: () -> Unit
         stack.clear()
     }
 
+    /** Swaps the screen you are on for another, so Back doesn't return to the one it replaced. */
+    fun replace(route: String) {
+        pop()
+        push(route)
+    }
+
     // One-time starter groups: "Social & feeds" (installed ones) and "Essentials".
     val context = LocalContext.current
     LaunchedEffect(Unit) {
@@ -237,6 +243,9 @@ private fun BedtimeNavigation(pendingRoute: String?, onRouteConsumed: () -> Unit
                 onUnlock = { id -> push(Routes.unlock(id)) },
                 onSetup = { push(Routes.SETUP) },
                 onHowItWorks = { push(Routes.ONBOARDING) },
+                // The copy opens in place of the original, so Back goes to the list, not to a page
+                // you have just finished with.
+                onDuplicated = { id -> replace(Routes.EDIT + id) },
             )
             top.startsWith(Routes.TEMPLATE) -> ScheduleEditScreen(
                 scheduleId = null,

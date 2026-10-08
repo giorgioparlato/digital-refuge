@@ -29,6 +29,11 @@ data class ActiveState(
 
     val hideNotifications: Boolean = active.any { it.schedule.hideNotifications }
 
+    /** Strictest wins: one lax block running alongside a firm schedule can't loosen the firm one. */
+    val lockSettings: Boolean = active.any { it.schedule.lockSettings }
+
+    val fullScreenAlert: Boolean = active.any { it.schedule.fullScreenAlert }
+
     /** Our own home screen stays in colour only if every session greying the screen allows it. */
     val keepHomeInColour: Boolean = active.filter { it.schedule.greyscale }.all { it.schedule.keepHomeInColour }
 

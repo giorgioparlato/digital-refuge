@@ -147,6 +147,7 @@ fun UnlockFlow(occurrence: Occurrence, onUnlocked: () -> Unit, onCancel: () -> U
         showCancel = !succeeded,
         onCancel = onCancel,
         note = if (succeeded) null else note,
+        bloom = step == Challenge.WAIT,
         modifier = modifier,
         action = when {
             succeeded -> null
@@ -220,14 +221,23 @@ internal fun UnlockLayout(
     modifier: Modifier = Modifier,
     footnote: String? = null,
     note: String? = null,
+    /** The waiting page's light comes from behind its ring rather than from the top of the screen. */
+    bloom: Boolean = false,
     action: (@Composable () -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
     val c = Obsidian.colors
+    val deep = Color(0xFF1F2C25)
     Column(
         modifier
             .fillMaxSize()
-            .background(Brush.verticalGradient(listOf(Color(0xFF1F2C25), c.bgPrimary)))
+            .background(
+                if (bloom) {
+                    Brush.radialGradient(listOf(deep, c.bgPrimary))
+                } else {
+                    Brush.verticalGradient(listOf(deep, c.bgPrimary))
+                },
+            )
             .padding(horizontal = 20.dp, vertical = 18.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -361,11 +371,17 @@ private fun waitCountdown(occurrence: Occurrence, total: Long): Long {
     return total - elapsed
 }
 
-/** Three words and a ring. Everything else about waiting lives in the small print at the foot. */
+/**
+ * Three words and a ring. Everything else about waiting lives in the small print at the foot.
+ *
+ * The ring sits inside a hairline it can fill, and the page's light blooms from behind it rather
+ * than falling from the top of the screen, so what you are waiting on is also what you are looking at.
+ */
 @Composable
 internal fun WaitChallengeContent(remaining: Long?, total: Long) {
     val c = Obsidian.colors
     val done = remaining == 0L
+    val ring = if (done) c.green else c.accent
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
             if (done) "Time's up." else "Take a breath.",
@@ -373,19 +389,21 @@ internal fun WaitChallengeContent(remaining: Long?, total: Long) {
             color = c.textMuted,
         )
         Spacer(Modifier.height(34.dp))
-        Box(Modifier.size(248.dp), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(264.dp), contentAlignment = Alignment.Center) {
+            Box(Modifier.fillMaxSize().border(1.dp, ring.copy(alpha = 0.12f), CircleShape))
             CircularProgressIndicator(
                 progress = { if (remaining == null || total <= 0) 0f else 1f - remaining.toFloat() / total },
-                modifier = Modifier.fillMaxSize(),
-                color = if (done) c.green else c.accent,
-                strokeWidth = 9.dp,
-                trackColor = c.interactive,
+                modifier = Modifier.size(228.dp),
+                color = ring,
+                strokeWidth = 7.dp,
+                trackColor = ring.copy(alpha = 0.10f),
                 strokeCap = StrokeCap.Round,
             )
             Text(
                 remaining?.let(::formatCountdown) ?: "\u2026",
+                fontSize = 54.sp,
+                fontWeight = FontWeight.Light,
                 style = MaterialTheme.typography.displaySmall.copy(fontFeatureSettings = "tnum"),
-                fontWeight = FontWeight.Medium,
                 color = if (done) c.green else c.textNormal,
             )
         }

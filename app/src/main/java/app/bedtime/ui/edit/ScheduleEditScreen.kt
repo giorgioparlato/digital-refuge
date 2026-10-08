@@ -88,6 +88,7 @@ import app.bedtime.ui.components.QuickChip
 import app.bedtime.ui.components.SectionCard
 import app.bedtime.ui.components.SegmentedChoice
 import app.bedtime.ui.components.SubOptionRow
+import app.bedtime.ui.components.styledTime
 import app.bedtime.ui.components.TimeTile
 import app.bedtime.ui.formatDays
 import app.bedtime.ui.formatTime
@@ -106,6 +107,22 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 import java.time.LocalTime
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Create
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.size
 
 private val ScheduleSaver = Saver<Schedule, String>(
     save = { AppJson.encodeToString(Schedule.serializer(), it) },
@@ -151,6 +168,7 @@ fun ScheduleEditScreen(
     onUnlock: (String) -> Unit,
     onSetup: () -> Unit,
     onHowItWorks: () -> Unit = {},
+    onDuplicated: (String) -> Unit = {},
 ) {
     val context = LocalContext.current
     val c = Obsidian.colors
@@ -338,6 +356,9 @@ fun ScheduleEditScreen(
         onBack = ::requestBack,
         onSave = ::save,
         onDelete = { confirmDelete = true },
+        // Copies what is saved, not what is on screen, so it is offered only once there is nothing unsaved.
+        onDuplicate = { scheduleId?.let { id -> scope.launch { repo.duplicate(id)?.let(onDuplicated) } } },
+        canDuplicate = scheduleId != null && !dirty,
         onUnlock = { scheduleId?.let(onUnlock) },
         onPickBlocked = { picking = PICK_BLOCKED },
         onPickAllowed = { picking = PICK_ALLOWED },
@@ -351,6 +372,56 @@ fun ScheduleEditScreen(
         essentials = essentials,
     )
 }
+
+/** Which fold is open. Only one at a time, so the page never grows past a screenful of scrolling. */
+private const val SECTION_DOES = "does"
+private const val SECTION_LEAVING = "leaving"
+private const val SECTION_AROUND = "around"
+
+/** The line "what it does" shows while it is shut. */
+internal fun whatItDoesSummary(draft: Schedule): String = buildList {
+    add(if (draft.blockedApps.isEmpty()) "nothing blocked yet" else "${pluralApps(draft.blockedApps.size)} blocked")
+    if (draft.minimalMode) add("minimal home")
+    if (draft.greyscale) add("greyscale")
+    when (draft.dnd) {
+        DndMode.PRIORITY -> add("priority calls only")
+        DndMode.SILENCE -> add("silenced")
+        DndMode.OFF -> Unit
+    }
+    if (draft.hideNotifications) add("notifications held")
+}.joinToString(" · ")
+
+/** The line "how hard to leave" shows while it is shut: the steps in order, then what they buy. */
+internal fun leavingSummary(draft: Schedule, hasNewPassword: Boolean): String {
+    val unlock = draft.unlock
+    val steps = buildList {
+        if (unlock.waitEnabled) add("wait ${formatWaitSeconds(unlock.waitDurationSeconds)}")
+        if (unlock.textEnabled) {
+            add(
+                when (unlock.textSource) {
+                    TextSource.PASSAGES -> "copy out a passage"
+                    TextSource.WORDS -> "type ${unlock.textLength} characters"
+                    TextSource.LETTERS -> "type ${unlock.textLength} characters"
+                },
+            )
+        }
+        if (unlock.passwordEnabled && (unlock.hasPassword || hasNewPassword)) add("a password")
+    }
+    if (steps.isEmpty()) return "a single tap — no steps picked"
+    val then = when (draft.unlockAction.mode) {
+        UnlockMode.END_SESSION -> if (draft.isBlock) "ends the block" else "off until its next start"
+        UnlockMode.PAUSE -> "a ${draft.unlockAction.pauseMinutes}-minute break"
+    }
+    return "${steps.joinToString(", then ")} · $then"
+}
+
+/** The line "the ways around it" shows while it is shut. [changeable] is null when there are no hours set. */
+internal fun waysAroundSummary(draft: Schedule, changeable: String?): String = buildList {
+    add(if (draft.pauseEnabled) "emergency break ${draft.breakMinutes} min" else "no emergency break")
+    if (draft.lockSettings) add("settings locked")
+    if (draft.fullScreenAlert) add("reminder on")
+    if (changeable != null) add("changeable $changeable")
+}.joinToString(" · ")
 
 @Composable
 internal fun ScheduleEditContent(
@@ -369,6 +440,8 @@ internal fun ScheduleEditContent(
     onBack: () -> Unit,
     onSave: () -> Unit,
     onDelete: () -> Unit,
+    onDuplicate: () -> Unit = {},
+    canDuplicate: Boolean = false,
     onUnlock: () -> Unit,
     onPickBlocked: () -> Unit,
     onPickAllowed: () -> Unit,
@@ -387,27 +460,26 @@ internal fun ScheduleEditContent(
     val editable = !readOnly
     val unlock = draft.unlock
     val isBlock = draft.isBlock
+    // A new schedule opens on its first question answered — what it does — rather than on three shut doors.
+    var open by rememberSaveable { mutableStateOf<String?>(if (isNew) SECTION_DOES else null) }
+    var renaming by rememberSaveable { mutableStateOf(false) }
 
     fun setUnlock(transform: (UnlockConfig) -> UnlockConfig) = onDraftChange(draft.copy(unlock = transform(unlock)))
+    fun toggle(section: String) {
+        open = if (open == section) null else section
+    }
+
+    if (renaming) {
+        RenameDialog(
+            name = draft.name,
+            isBlock = isBlock,
+            onDismiss = { renaming = false },
+            onDone = { onDraftChange(draft.copy(name = it)); renaming = false },
+        )
+    }
 
     Scaffold(
         containerColor = c.bgPrimary,
-        topBar = {
-            ObsidianTopBar(
-                when {
-                    isNew && isBlock -> "New block"
-                    isNew -> "New schedule"
-                    isBlock -> "Edit block"
-                    else -> "Edit schedule"
-                },
-                onBack = onBack,
-                actions = {
-                    IconButton(onClick = onHowItWorks) {
-                        Icon(Icons.Default.Info, contentDescription = "How it works", tint = c.textMuted)
-                    }
-                },
-            )
-        },
         bottomBar = {
             BottomActionBar {
                 if (shutWindow != null) {
@@ -445,438 +517,641 @@ internal fun ScheduleEditContent(
         Column(
             Modifier
                 .fillMaxSize()
-                .padding(padding)
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+                .padding(bottom = padding.calculateBottomPadding())
+                .verticalScroll(rememberScrollState()),
         ) {
-            if (readOnly) {
-                Callout(
-                    title = when {
-                        shutWindow != null -> "Outside the hours you set"
-                        lockedUntil != null -> "You left this one early"
-                        isBlock -> "This block is running"
-                        else -> "This schedule is on right now"
-                    },
-                    body = if (shutWindow != null) {
-                        "You chose to let this one be changed only between " +
-                            "${formatMinuteOfDay(context, shutWindow.startMinute)} and " +
-                            "${formatMinuteOfDay(context, shutWindow.endMinute)}. Until then it can't be edited, " +
-                            "switched off or deleted."
-                    } else if (lockedUntil != null) {
-                        "Its settings stay shut until ${formatTime(context, lockedUntil)}, when it would have ended — " +
-                            "otherwise unlocking would be a way to soften it and start again. You can change that under " +
-                            "\"When you unlock\"."
-                    } else {
-                        "To keep you honest, it can't be changed or deleted until you unlock it or it ends."
-                    },
-                )
-            }
-            if (error != null) Callout(title = "Almost there", kind = CalloutKind.WARNING, body = error)
-
-            SectionCard {
-                ObsidianTextField(
-                    value = draft.name,
-                    onValueChange = { onDraftChange(draft.copy(name = it)) },
-                    label = "Name",
-                    placeholder = if (isBlock) "e.g. Deep work" else "e.g. Bedtime",
-                    enabled = editable,
-                )
-                if (!isBlock) {
-                    Spacer(Modifier.height(18.dp))
-                    Text("Repeats on", style = MaterialTheme.typography.labelLarge, color = c.textMuted)
-                    DaySelector(draft.days, onChange = { onDraftChange(draft.copy(days = it)) }, enabled = editable)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        QuickChip("Every day", draft.days.size == 7, editable) { onDraftChange(draft.copy(days = (1..7).toSet())) }
-                        QuickChip("Weekdays", draft.days == (1..5).toSet(), editable) { onDraftChange(draft.copy(days = (1..5).toSet())) }
-                        QuickChip("Weekends", draft.days == setOf(6, 7), editable) { onDraftChange(draft.copy(days = setOf(6, 7))) }
-                    }
-                }
-            }
-
-            if (isBlock) {
-                SectionCard(title = "Length") {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text("Default length", style = MaterialTheme.typography.bodyMedium, color = c.textMuted, modifier = Modifier.weight(1f))
-                        NumberStepper(
-                            draft.durationMinutes,
-                            { onDraftChange(draft.copy(durationMinutes = it)) },
-                            5..480,
-                            step = 5,
-                            suffix = " min",
-                            enabled = editable,
-                            presets = listOf(15, 25, 30, 45, 60, 90, 120, 180),
-                            title = "default length",
-                        )
-                    }
-                    Text(
-                        "You can adjust it each time you start the block.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = c.textMuted,
-                        modifier = Modifier.padding(top = 8.dp),
+            ScheduleHeader(
+                draft = draft,
+                editable = editable,
+                onBack = onBack,
+                onHowItWorks = onHowItWorks,
+                onRename = { renaming = true },
+                onDraftChange = onDraftChange,
+                onEditStart = onEditStart,
+                onEditEnd = onEditEnd,
+            )
+            Column(Modifier.padding(horizontal = 20.dp)) {
+                if (readOnly) {
+                    Callout(
+                        title = when {
+                            shutWindow != null -> "Outside the hours you set"
+                            lockedUntil != null -> "You left this one early"
+                            isBlock -> "This block is running"
+                            else -> "This schedule is on right now"
+                        },
+                        body = if (shutWindow != null) {
+                            "You chose to let this one be changed only between " +
+                                "${formatMinuteOfDay(context, shutWindow.startMinute)} and " +
+                                "${formatMinuteOfDay(context, shutWindow.endMinute)}. Until then it can't be edited, " +
+                                "switched off or deleted."
+                        } else if (lockedUntil != null) {
+                            "Its settings stay shut until ${formatTime(context, lockedUntil)}, when it would have ended — " +
+                                "otherwise unlocking would be a way to soften it and start again. You can change that under " +
+                                "\"the ways around it\"."
+                        } else {
+                            "To keep you honest, it can't be changed or deleted until you unlock it or it ends."
+                        },
+                        modifier = Modifier.padding(top = 14.dp),
                     )
                 }
-            } else {
-                SectionCard(title = "Time") {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        TimeTile(
-                            "Starts",
-                            formatMinuteOfDay(context, draft.startMinute),
-                            Modifier.weight(1f),
-                            enabled = editable,
-                            onClick = onEditStart,
-                        )
-                        TimeTile(
-                            "Ends",
-                            formatMinuteOfDay(context, draft.endMinute),
-                            Modifier.weight(1f),
-                            caption = if (draft.endMinute <= draft.startMinute) "next day" else null,
-                            enabled = editable,
-                            onClick = onEditEnd,
-                        )
-                    }
-                    Text(
-                        "${formatDays(draft.days)} · ${formatMinutes(scheduleMinutes(draft).toLong())} each time",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = c.textMuted,
-                        modifier = Modifier.padding(top = 10.dp),
+                if (error != null) {
+                    Callout(
+                        title = "Almost there",
+                        kind = CalloutKind.WARNING,
+                        body = error,
+                        modifier = Modifier.padding(top = 14.dp),
                     )
                 }
-            }
+                Spacer(Modifier.height(10.dp))
 
-            SectionCard(title = "While it's on") {
-                OptionRow(
-                    BedtimeIcons.Block,
-                    "Block apps",
-                    description = if (draft.blockedApps.isEmpty()) "None yet · tap to choose" else pluralApps(draft.blockedApps.size),
-                    enabled = editable,
-                    onClick = onPickBlocked,
+                // ---------------------------------------------------------------- what it does
+                FoldSection(
+                    title = "What it does",
+                    summary = whatItDoesSummary(draft),
+                    open = open == SECTION_DOES,
+                    onToggle = { toggle(SECTION_DOES) },
                 ) {
-                    AppIconStack(draft.blockedApps.sorted(), appLabel)
-                    Chevron()
-                }
-                OptionRow(
-                    BedtimeIcons.Contrast,
-                    "Greyscale",
-                    description = if (greyscaleAvailable) "Fade apps to black and white" else "Needs a one-time step (see Setup)",
-                    enabled = editable,
-                ) { ObsidianToggle(draft.greyscale, { onDraftChange(draft.copy(greyscale = it)) }, enabled = editable) }
-                AnimatedVisibility(draft.greyscale) {
+                    OptionRow(
+                        BedtimeIcons.Block,
+                        "Block apps",
+                        description = if (draft.blockedApps.isEmpty()) "None yet · tap to choose" else pluralApps(draft.blockedApps.size),
+                        enabled = editable,
+                        onClick = onPickBlocked,
+                    ) {
+                        AppIconStack(draft.blockedApps.sorted(), appLabel)
+                        Chevron()
+                    }
                     OptionRow(
                         BedtimeIcons.Contrast,
-                        "Keep home screen in colour",
-                        description = "Only apps turn grey; digital refuge's own home screen keeps its colours",
+                        "Greyscale",
+                        description = if (greyscaleAvailable) "Fade apps to black and white" else "Needs a one-time step (see Setup)",
+                        enabled = editable,
+                    ) { ObsidianToggle(draft.greyscale, { onDraftChange(draft.copy(greyscale = it)) }, enabled = editable) }
+                    AnimatedVisibility(draft.greyscale) {
+                        OptionRow(
+                            BedtimeIcons.Contrast,
+                            "Keep home screen in colour",
+                            description = "Only apps turn grey; digital refuge's own home screen keeps its colours",
+                            enabled = editable,
+                        ) {
+                            ObsidianToggle(
+                                draft.keepHomeInColour,
+                                { on -> onDraftChange(draft.copy(keepHomeInColour = on)) },
+                                enabled = editable,
+                            )
+                        }
+                    }
+                    OptionRow(
+                        Icons.Default.Home,
+                        "Minimal mode",
+                        description = "Swap your home screen for a calm list of essential apps",
                         enabled = editable,
                     ) {
                         ObsidianToggle(
-                            draft.keepHomeInColour,
-                            { on -> onDraftChange(draft.copy(keepHomeInColour = on)) },
-                            enabled = editable,
-                        )
-                    }
-                }
-                OptionRow(
-                    Icons.Default.Home,
-                    "Minimal mode",
-                    description = "Swap your home screen for a calm list of essential apps",
-                    enabled = editable,
-                ) {
-                    ObsidianToggle(
-                        draft.minimalMode,
-                        { on ->
-                            val allowed = if (on && draft.allowedApps.isEmpty()) essentials else draft.allowedApps
-                            onDraftChange(draft.copy(minimalMode = on, allowedApps = allowed))
-                        },
-                        enabled = editable,
-                    )
-                }
-                AnimatedVisibility(draft.minimalMode) {
-                    OptionRow(
-                        BedtimeIcons.Grid,
-                        "Allowed apps",
-                        description = if (draft.allowedApps.isEmpty()) {
-                            "Just the phone app for now · tap to add"
-                        } else {
-                            "${pluralApps(draft.allowedApps.size)}, plus the phone app"
-                        },
-                        enabled = editable,
-                        onClick = onPickAllowed,
-                    ) {
-                        AppIconStack(draft.allowedApps.sorted(), appLabel)
-                        Chevron()
-                    }
-                }
-            }
-
-            SectionCard(title = "Notifications") {
-                Text("Do Not Disturb", style = MaterialTheme.typography.labelLarge, color = c.textMuted)
-                Spacer(Modifier.height(8.dp))
-                SegmentedChoice(
-                    options = listOf("Off", "Priority", "Silence"),
-                    selected = draft.dnd.ordinal,
-                    onSelect = { onDraftChange(draft.copy(dnd = DndMode.entries[it])) },
-                    enabled = editable,
-                )
-                Text(
-                    when (draft.dnd) {
-                        DndMode.OFF -> "Calls and notifications work as usual."
-                        DndMode.PRIORITY -> "Only your priority contacts can ring. Music, videos and alarms still play."
-                        DndMode.SILENCE -> "No calls or notification sounds. Music, videos and alarms still play."
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = c.textMuted,
-                    modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
-                )
-                OptionRow(
-                    Icons.Default.Notifications,
-                    "Hide notifications",
-                    description = "Held back while it's on, then they all come back",
-                    enabled = editable,
-                ) { ObsidianToggle(draft.hideNotifications, { onDraftChange(draft.copy(hideNotifications = it)) }, enabled = editable) }
-                AnimatedVisibility((draft.dnd != DndMode.OFF || draft.hideNotifications) && !dndAvailable) {
-                    Callout(
-                        title = "Needs Do Not Disturb access",
-                        kind = CalloutKind.INFO,
-                        body = "Grant it once in Setup so digital refuge can quiet your phone.",
-                        actionLabel = "Open setup",
-                        onAction = onOpenSetup,
-                        modifier = Modifier.padding(top = 8.dp),
-                    )
-                }
-            }
-
-            SectionCard(title = "Leaving early", subtitle = "Make unlocking take a little effort. The steps you pick run in this order.") {
-                OptionRow(BedtimeIcons.Hourglass, "Wait it out", description = "Start a timer, come back when it's done", enabled = editable) {
-                    ObsidianToggle(unlock.waitEnabled, { on -> setUnlock { it.copy(waitEnabled = on) } }, enabled = editable)
-                }
-                AnimatedVisibility(unlock.waitEnabled) {
-                    SubOptionRow("Timer") {
-                        NumberStepper(
-                            unlock.waitDurationSeconds,
-                            { v -> setUnlock { it.copy(waitSeconds = v) } },
-                            5..3600,
-                            step = 5,
-                            enabled = editable,
-                            presets = listOf(10, 30, 60, 120, 300, 600),
-                            title = "timer",
-                            format = { formatWaitSeconds(it) },
-                        )
-                    }
-                }
-                OptionRow(Icons.Default.Edit, "Type random text", description = "No pasting, typos don't count", enabled = editable) {
-                    ObsidianToggle(unlock.textEnabled, { on -> setUnlock { it.copy(textEnabled = on) } }, enabled = editable)
-                }
-                AnimatedVisibility(unlock.textEnabled) {
-                    Column {
-                        SubOptionRow("Characters") {
-                            NumberStepper(
-                                unlock.textLength,
-                                { v -> setUnlock { it.copy(textLength = v) } },
-                                25..2000,
-                                step = 25,
-                                enabled = editable,
-                                presets = listOf(50, 100, 150, 200, 300, 500, 1000),
-                                title = "characters",
-                            )
-                        }
-                        Text(
-                            "What to copy",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = c.textMuted,
-                            modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
-                        )
-                        SegmentedChoice(
-                            options = listOf("Letters", "Words", "Passages"),
-                            selected = unlock.textSource.ordinal,
-                            onSelect = { setUnlock { u -> u.copy(textSource = TextSource.entries[it]) } },
-                            enabled = editable,
-                        )
-                        Text(
-                            when (unlock.textSource) {
-                                TextSource.LETTERS -> "Random letters and digits. Nothing to read, only to copy."
-                                TextSource.WORDS -> "Plain words, easier on the eyes at midnight."
-                                TextSource.PASSAGES -> "Quotes and longer passages, worth reading while you type them."
+                            draft.minimalMode,
+                            { on ->
+                                val allowed = if (on && draft.allowedApps.isEmpty()) essentials else draft.allowedApps
+                                onDraftChange(draft.copy(minimalMode = on, allowedApps = allowed))
                             },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = c.textFaint,
+                            enabled = editable,
+                        )
+                    }
+                    AnimatedVisibility(draft.minimalMode) {
+                        OptionRow(
+                            BedtimeIcons.Grid,
+                            "Allowed apps",
+                            description = if (draft.allowedApps.isEmpty()) {
+                                "Just the phone app for now · tap to add"
+                            } else {
+                                "${pluralApps(draft.allowedApps.size)}, plus the phone app"
+                            },
+                            enabled = editable,
+                            onClick = onPickAllowed,
+                        ) {
+                            AppIconStack(draft.allowedApps.sorted(), appLabel)
+                            Chevron()
+                        }
+                    }
+                    FoldLabel("Notifications")
+                    SegmentedChoice(
+                        options = listOf("Off", "Priority", "Silence"),
+                        selected = draft.dnd.ordinal,
+                        onSelect = { onDraftChange(draft.copy(dnd = DndMode.entries[it])) },
+                        enabled = editable,
+                    )
+                    Text(
+                        when (draft.dnd) {
+                            DndMode.OFF -> "Calls and notifications work as usual."
+                            DndMode.PRIORITY -> "Only your priority contacts can ring. Music, videos and alarms still play."
+                            DndMode.SILENCE -> "No calls or notification sounds. Music, videos and alarms still play."
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = c.textMuted,
+                        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
+                    )
+                    OptionRow(
+                        Icons.Default.Notifications,
+                        "Hide notifications",
+                        description = "Held back while it's on, then they all come back",
+                        enabled = editable,
+                    ) { ObsidianToggle(draft.hideNotifications, { onDraftChange(draft.copy(hideNotifications = it)) }, enabled = editable) }
+                    AnimatedVisibility((draft.dnd != DndMode.OFF || draft.hideNotifications) && !dndAvailable) {
+                        Callout(
+                            title = "Needs Do Not Disturb access",
+                            kind = CalloutKind.INFO,
+                            body = "Grant it once in Setup so digital refuge can quiet your phone.",
+                            actionLabel = "Open setup",
+                            onAction = onOpenSetup,
                             modifier = Modifier.padding(top = 8.dp),
                         )
                     }
                 }
-                OptionRow(Icons.Default.Lock, "Password", description = "Tip: let someone else choose it", enabled = editable) {
-                    ObsidianToggle(unlock.passwordEnabled, { on -> setUnlock { it.copy(passwordEnabled = on) } }, enabled = editable)
-                }
-                AnimatedVisibility(unlock.passwordEnabled && editable) {
-                    ObsidianTextField(
-                        value = newPassword,
-                        onValueChange = onNewPasswordChange,
-                        label = if (unlock.hasPassword) "New password (leave empty to keep)" else "Choose a password",
-                        password = true,
-                        modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
-                    )
-                }
-                AnimatedVisibility(unlock.waitEnabled || unlock.textEnabled) {
-                    Column {
-                        OptionRow(
-                            Icons.Default.Refresh,
-                            "Harder each time",
-                            description = "Each early unlock in a day makes the wait and text longer",
-                            enabled = editable,
-                        ) { ObsidianToggle(unlock.escalate, { on -> setUnlock { it.copy(escalate = on) } }, enabled = editable) }
-                        AnimatedVisibility(unlock.escalate) {
-                            SubOptionRow("How much") {
-                                NumberStepper(
-                                    (unlock.escalateFactor * 10).roundToInt(),
-                                    { v -> setUnlock { it.copy(escalateFactor = v / 10f) } },
-                                    11..40,
-                                    enabled = editable,
-                                    presets = listOf(15, 20, 25, 30, 40),
-                                    title = "each time",
-                                    format = { "%.1f×".format(it / 10f) },
-                                )
-                            }
-                        }
-                    }
-                }
-                val anyStep = unlock.waitEnabled || unlock.textEnabled ||
-                    (unlock.passwordEnabled && (unlock.hasPassword || newPassword.isNotBlank()))
-                AnimatedVisibility(!anyStep) {
-                    Callout(
-                        title = "No steps picked",
-                        kind = CalloutKind.WARNING,
-                        body = "Unlocking will take a single tap.",
-                        modifier = Modifier.padding(top = 8.dp),
-                    )
-                }
-            }
 
-            SectionCard(title = "When you unlock") {
-                SegmentedChoice(
-                    options = listOf(if (isBlock) "End the block" else "End for today", "Take a break"),
-                    selected = draft.unlockAction.mode.ordinal,
-                    onSelect = { onDraftChange(draft.copy(unlockAction = draft.unlockAction.copy(mode = UnlockMode.entries[it]))) },
-                    enabled = editable,
-                )
-                Text(
-                    when (draft.unlockAction.mode) {
-                        UnlockMode.END_SESSION -> if (isBlock) "The block stops there." else "The schedule stays off until its next start."
-                        UnlockMode.PAUSE -> "It switches itself back on after your break."
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = c.textMuted,
-                    modifier = Modifier.padding(top = 10.dp, bottom = 4.dp),
-                )
-                AnimatedVisibility(draft.unlockAction.mode == UnlockMode.PAUSE) {
-                    Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text("Break length", style = MaterialTheme.typography.bodyMedium, color = c.textMuted, modifier = Modifier.weight(1f))
-                        NumberStepper(
-                            draft.unlockAction.pauseMinutes,
-                            { v -> onDraftChange(draft.copy(unlockAction = draft.unlockAction.copy(pauseMinutes = v))) },
-                            1..240,
-                            suffix = " min",
-                            enabled = editable,
-                            presets = listOf(5, 10, 15, 20, 30, 45, 60),
-                            title = "break length",
-                        )
-                    }
-                }
-                OptionRow(
-                    Icons.Default.Lock,
-                    "Lock settings afterwards",
-                    description = "Keeps this shut until the session would have ended, so unlocking can't soften it",
-                    enabled = editable,
+                // ---------------------------------------------------------------- how hard to leave
+                FoldSection(
+                    title = "How hard to leave",
+                    summary = leavingSummary(draft, newPassword.isNotBlank()),
+                    open = open == SECTION_LEAVING,
+                    onToggle = { toggle(SECTION_LEAVING) },
                 ) {
-                    ObsidianToggle(
-                        !draft.editAfterUnlock,
-                        { on -> onDraftChange(draft.copy(editAfterUnlock = !on)) },
-                        enabled = editable,
-                    )
-                }
-            }
-
-            if (!isBlock) {
-                SectionCard(
-                    title = "When it can be changed",
-                    subtitle = "Put this schedule out of reach of the hours that would talk you out of it.",
-                ) {
-                    OptionRow(
-                        Icons.Default.Lock,
-                        "Only at certain hours",
-                        description = "Outside them it can't be edited, switched off or deleted.",
-                        enabled = editable,
-                    ) {
-                        ObsidianToggle(
-                            draft.editWindow != null,
-                            { on -> onDraftChange(draft.copy(editWindow = if (on) EditWindow() else null)) },
-                            enabled = editable,
-                        )
+                    FoldLabel("The steps, in this order")
+                    OptionRow(BedtimeIcons.Hourglass, "Wait it out", description = "Start a timer, come back when it's done", enabled = editable) {
+                        ObsidianToggle(unlock.waitEnabled, { on -> setUnlock { it.copy(waitEnabled = on) } }, enabled = editable)
                     }
-                    AnimatedVisibility(draft.editWindow != null) {
-                        val window = draft.editWindow ?: EditWindow()
-                        Column(Modifier.padding(top = 8.dp)) {
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                TimeTile(
-                                    "From",
-                                    formatMinuteOfDay(context, window.startMinute),
-                                    Modifier.weight(1f),
-                                    enabled = editable,
-                                    onClick = onEditWindowStart,
-                                )
-                                TimeTile(
-                                    "Until",
-                                    formatMinuteOfDay(context, window.endMinute),
-                                    Modifier.weight(1f),
-                                    caption = if (window.endMinute <= window.startMinute) "next day" else null,
-                                    enabled = editable,
-                                    onClick = onEditWindowEnd,
-                                )
-                            }
-                            Text(
-                                "Outside these hours this page is read-only, and the schedule can't be switched " +
-                                    "off or deleted from the list either.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = c.textMuted,
-                                modifier = Modifier.padding(top = 10.dp),
+                    AnimatedVisibility(unlock.waitEnabled) {
+                        SubOptionRow("Timer") {
+                            NumberStepper(
+                                unlock.waitDurationSeconds,
+                                { v -> setUnlock { it.copy(waitSeconds = v) } },
+                                5..3600,
+                                step = 5,
+                                enabled = editable,
+                                presets = listOf(10, 30, 60, 120, 300, 600),
+                                title = "timer",
+                                format = { formatWaitSeconds(it) },
                             )
                         }
                     }
-                }
-            }
-
-            SectionCard(
-                title = "Emergency break",
-                subtitle = "A short step out for whatever genuinely can't wait, without ending the session.",
-            ) {
-                OptionRow(
-                    BedtimeIcons.Hourglass,
-                    "Allow an emergency break",
-                    description = "Steps out briefly, then a full screen brings you back. It counts as an escape.",
-                    enabled = editable,
-                ) { ObsidianToggle(draft.pauseEnabled, { on -> onDraftChange(draft.copy(pauseEnabled = on)) }, enabled = editable) }
-                AnimatedVisibility(draft.pauseEnabled) {
-                    Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text("Break length", style = MaterialTheme.typography.bodyMedium, color = c.textMuted, modifier = Modifier.weight(1f))
-                        NumberStepper(
-                            draft.breakMinutes,
-                            { v -> onDraftChange(draft.copy(breakMinutes = v)) },
-                            1..60,
-                            suffix = " min",
+                    OptionRow(Icons.Default.Edit, "Type random text", description = "No pasting, typos don't count", enabled = editable) {
+                        ObsidianToggle(unlock.textEnabled, { on -> setUnlock { it.copy(textEnabled = on) } }, enabled = editable)
+                    }
+                    AnimatedVisibility(unlock.textEnabled) {
+                        Column {
+                            SubOptionRow("Characters") {
+                                NumberStepper(
+                                    unlock.textLength,
+                                    { v -> setUnlock { it.copy(textLength = v) } },
+                                    25..2000,
+                                    step = 25,
+                                    enabled = editable,
+                                    presets = listOf(50, 100, 150, 200, 300, 500, 1000),
+                                    title = "characters",
+                                )
+                            }
+                            Text(
+                                "What to copy",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = c.textMuted,
+                                modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
+                            )
+                            SegmentedChoice(
+                                options = listOf("Letters", "Words", "Passages"),
+                                selected = unlock.textSource.ordinal,
+                                onSelect = { setUnlock { u -> u.copy(textSource = TextSource.entries[it]) } },
+                                enabled = editable,
+                            )
+                            Text(
+                                when (unlock.textSource) {
+                                    TextSource.LETTERS -> "Random letters and digits. Nothing to read, only to copy."
+                                    TextSource.WORDS -> "Plain words, easier on the eyes at midnight."
+                                    TextSource.PASSAGES -> "Quotes and longer passages, worth reading while you type them."
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = c.textFaint,
+                                modifier = Modifier.padding(top = 8.dp),
+                            )
+                        }
+                    }
+                    OptionRow(Icons.Default.Lock, "Password", description = "Tip: let someone else choose it", enabled = editable) {
+                        ObsidianToggle(unlock.passwordEnabled, { on -> setUnlock { it.copy(passwordEnabled = on) } }, enabled = editable)
+                    }
+                    AnimatedVisibility(unlock.passwordEnabled && editable) {
+                        ObsidianTextField(
+                            value = newPassword,
+                            onValueChange = onNewPasswordChange,
+                            label = if (unlock.hasPassword) "New password (leave empty to keep)" else "Choose a password",
+                            password = true,
+                            modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
+                        )
+                    }
+                    AnimatedVisibility(unlock.waitEnabled || unlock.textEnabled) {
+                        Column {
+                            OptionRow(
+                                Icons.Default.Refresh,
+                                "Harder each time",
+                                description = "Each early unlock in a day makes the wait and text longer",
+                                enabled = editable,
+                            ) { ObsidianToggle(unlock.escalate, { on -> setUnlock { it.copy(escalate = on) } }, enabled = editable) }
+                            AnimatedVisibility(unlock.escalate) {
+                                SubOptionRow("How much") {
+                                    NumberStepper(
+                                        (unlock.escalateFactor * 10).roundToInt(),
+                                        { v -> setUnlock { it.copy(escalateFactor = v / 10f) } },
+                                        11..40,
+                                        enabled = editable,
+                                        presets = listOf(15, 20, 25, 30, 40),
+                                        title = "each time",
+                                        format = { "%.1f×".format(it / 10f) },
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    val anyStep = unlock.waitEnabled || unlock.textEnabled ||
+                        (unlock.passwordEnabled && (unlock.hasPassword || newPassword.isNotBlank()))
+                    AnimatedVisibility(!anyStep) {
+                        Callout(
+                            title = "No steps picked",
+                            kind = CalloutKind.WARNING,
+                            body = "Unlocking will take a single tap.",
+                            modifier = Modifier.padding(top = 8.dp),
+                        )
+                    }
+                    FoldLabel("What unlocking gets you")
+                    SegmentedChoice(
+                        options = listOf(if (isBlock) "End the block" else "End for today", "Take a break"),
+                        selected = draft.unlockAction.mode.ordinal,
+                        onSelect = { onDraftChange(draft.copy(unlockAction = draft.unlockAction.copy(mode = UnlockMode.entries[it]))) },
+                        enabled = editable,
+                    )
+                    Text(
+                        when (draft.unlockAction.mode) {
+                            UnlockMode.END_SESSION -> if (isBlock) "The block stops there." else "The schedule stays off until its next start."
+                            UnlockMode.PAUSE -> "It switches itself back on after your break."
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = c.textMuted,
+                        modifier = Modifier.padding(top = 10.dp, bottom = 4.dp),
+                    )
+                    AnimatedVisibility(draft.unlockAction.mode == UnlockMode.PAUSE) {
+                        Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text("How long the break lasts", style = MaterialTheme.typography.bodyMedium, color = c.textMuted, modifier = Modifier.weight(1f))
+                            NumberStepper(
+                                draft.unlockAction.pauseMinutes,
+                                { v -> onDraftChange(draft.copy(unlockAction = draft.unlockAction.copy(pauseMinutes = v))) },
+                                1..240,
+                                suffix = " min",
+                                enabled = editable,
+                                presets = listOf(5, 10, 15, 20, 30, 45, 60),
+                                title = "break length",
+                            )
+                        }
+                    }
+                    OptionRow(
+                        Icons.Default.Lock,
+                        "Lock settings afterwards",
+                        description = "Keeps this shut until the session would have ended, so unlocking can't soften it",
+                        enabled = editable,
+                    ) {
+                        ObsidianToggle(
+                            !draft.editAfterUnlock,
+                            { on -> onDraftChange(draft.copy(editAfterUnlock = !on)) },
                             enabled = editable,
-                            presets = listOf(1, 2, 3, 5, 10),
-                            title = "break length",
                         )
                     }
                 }
-            }
 
-            if (!isNew && editable) {
-                TextButton(onClick = onDelete, modifier = Modifier.align(Alignment.CenterHorizontally)) {
-                    Text(if (isBlock) "Delete block" else "Delete schedule", color = c.red, fontWeight = FontWeight.Medium)
+                // ---------------------------------------------------------------- the ways around it
+                FoldSection(
+                    title = "The ways around it",
+                    summary = waysAroundSummary(
+                        draft,
+                        draft.editWindow?.let {
+                            "${formatMinuteOfDay(context, it.startMinute)}–${formatMinuteOfDay(context, it.endMinute)}"
+                        },
+                    ),
+                    open = open == SECTION_AROUND,
+                    onToggle = { toggle(SECTION_AROUND) },
+                    note = "Every way around a session has a switch of its own.",
+                ) {
+                    OptionRow(
+                        BedtimeIcons.Hourglass,
+                        "Emergency break",
+                        description = "A short step out for whatever genuinely can't wait. It counts as an escape.",
+                        enabled = editable,
+                    ) { ObsidianToggle(draft.pauseEnabled, { on -> onDraftChange(draft.copy(pauseEnabled = on)) }, enabled = editable) }
+                    AnimatedVisibility(draft.pauseEnabled) {
+                        SubOptionRow("How long you can step out") {
+                            NumberStepper(
+                                draft.breakMinutes,
+                                { v -> onDraftChange(draft.copy(breakMinutes = v)) },
+                                1..60,
+                                suffix = " min",
+                                enabled = editable,
+                                presets = listOf(1, 2, 3, 5, 10),
+                                title = "step out",
+                            )
+                        }
+                    }
+                    OptionRow(
+                        Icons.Default.Lock,
+                        "Lock changes during sessions",
+                        description = "Covers the Settings screens that switch blocking off or uninstall the app",
+                        enabled = editable,
+                    ) { ObsidianToggle(draft.lockSettings, { on -> onDraftChange(draft.copy(lockSettings = on)) }, enabled = editable) }
+                    OptionRow(
+                        BedtimeIcons.Contrast,
+                        "Full-screen reminder",
+                        description = "If blocking is switched off while this runs, take over the screen until it's back on",
+                        enabled = editable,
+                    ) { ObsidianToggle(draft.fullScreenAlert, { on -> onDraftChange(draft.copy(fullScreenAlert = on)) }, enabled = editable) }
+                    if (!isBlock) {
+                        OptionRow(
+                            Icons.Default.Lock,
+                            "Changeable only at certain hours",
+                            description = "Outside them it can't be edited, switched off or deleted.",
+                            enabled = editable,
+                        ) {
+                            ObsidianToggle(
+                                draft.editWindow != null,
+                                { on -> onDraftChange(draft.copy(editWindow = if (on) EditWindow() else null)) },
+                                enabled = editable,
+                            )
+                        }
+                        AnimatedVisibility(draft.editWindow != null) {
+                            val window = draft.editWindow ?: EditWindow()
+                            Column(Modifier.padding(top = 8.dp)) {
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    TimeTile(
+                                        "From",
+                                        formatMinuteOfDay(context, window.startMinute),
+                                        Modifier.weight(1f),
+                                        enabled = editable,
+                                        onClick = onEditWindowStart,
+                                    )
+                                    TimeTile(
+                                        "Until",
+                                        formatMinuteOfDay(context, window.endMinute),
+                                        Modifier.weight(1f),
+                                        caption = if (window.endMinute <= window.startMinute) "next day" else null,
+                                        enabled = editable,
+                                        onClick = onEditWindowEnd,
+                                    )
+                                }
+                                Text(
+                                    "Outside these hours this page is read-only, and the schedule can't be switched " +
+                                        "off or deleted from the list either.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = c.textMuted,
+                                    modifier = Modifier.padding(top = 10.dp),
+                                )
+                            }
+                        }
+                    }
                 }
+
+                if (!isNew) {
+                    Spacer(Modifier.height(18.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                        TextButton(onClick = onDuplicate, enabled = canDuplicate) {
+                            Text(
+                                if (isBlock) "Duplicate block" else "Duplicate schedule",
+                                color = if (canDuplicate) c.accentText else c.textFaint,
+                                fontWeight = FontWeight.Medium,
+                            )
+                        }
+                        if (editable) {
+                            TextButton(onClick = onDelete) {
+                                Text(if (isBlock) "Delete block" else "Delete schedule", color = c.red, fontWeight = FontWeight.Medium)
+                            }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(16.dp))
             }
-            Spacer(Modifier.height(8.dp))
         }
     }
+}
+
+/**
+ * The top of the page: the back arrow, the name, and then the thing you came to change — the hours
+ * for a schedule, the length for a block — on the home screen's fade.
+ */
+@Composable
+private fun ScheduleHeader(
+    draft: Schedule,
+    editable: Boolean,
+    onBack: () -> Unit,
+    onHowItWorks: () -> Unit,
+    onRename: () -> Unit,
+    onDraftChange: (Schedule) -> Unit,
+    onEditStart: () -> Unit,
+    onEditEnd: () -> Unit,
+) {
+    val context = LocalContext.current
+    val c = Obsidian.colors
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .background(Brush.verticalGradient(listOf(Color(0xFF1F2C25), c.bgPrimary)))
+            .padding(horizontal = 24.dp)
+            .padding(top = 30.dp, bottom = 18.dp),
+    ) {
+        Column {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Back",
+                    tint = c.textMuted,
+                    modifier = Modifier.clip(CircleShape).clickable(onClick = onBack).padding(4.dp).size(22.dp),
+                )
+                Spacer(Modifier.width(10.dp))
+                Row(
+                    Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable(enabled = editable, onClickLabel = "rename", onClick = onRename)
+                        .padding(vertical = 4.dp, horizontal = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        draft.name.ifBlank { if (draft.isBlock) "name this block" else "name this schedule" },
+                        style = MaterialTheme.typography.labelLarge,
+                        color = c.textFaint,
+                    )
+                    if (editable) {
+                        Spacer(Modifier.width(7.dp))
+                        Icon(Icons.Default.Create, contentDescription = null, tint = c.textFaint, modifier = Modifier.size(13.dp))
+                    }
+                }
+                Icon(
+                    Icons.Default.Info,
+                    contentDescription = "How it works",
+                    tint = c.textFaint,
+                    modifier = Modifier.clip(CircleShape).clickable(onClick = onHowItWorks).padding(4.dp).size(20.dp),
+                )
+            }
+            Spacer(Modifier.height(22.dp))
+            if (draft.isBlock) {
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text(
+                        formatMinutes(draft.durationMinutes.toLong()),
+                        fontSize = 40.sp,
+                        fontWeight = FontWeight.Light,
+                        color = c.textNormal,
+                    )
+                }
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    "you can change it each time you start the block",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = c.textMuted,
+                )
+                Spacer(Modifier.height(16.dp))
+                NumberStepper(
+                    draft.durationMinutes,
+                    { onDraftChange(draft.copy(durationMinutes = it)) },
+                    5..480,
+                    step = 5,
+                    suffix = " min",
+                    enabled = editable,
+                    presets = listOf(15, 25, 30, 45, 60, 90, 120, 180),
+                    title = "default length",
+                )
+            } else {
+                // A 12-hour clock adds " pm" to both ends, so the am/pm shrinks and nothing wraps.
+                val big = if (is24Hour(context)) 40.sp else 34.sp
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text(
+                        styledTime(formatMinuteOfDay(context, draft.startMinute), suffixSize = big * 0.5f),
+                        fontSize = big,
+                        fontWeight = FontWeight.Light,
+                        color = c.textNormal,
+                        maxLines = 1,
+                        softWrap = false,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable(enabled = editable, onClickLabel = "change the start", onClick = onEditStart)
+                            .padding(horizontal = 4.dp),
+                    )
+                    Text(" \u2192 ", fontSize = 24.sp, color = c.textFaint, modifier = Modifier.padding(bottom = 5.dp))
+                    Text(
+                        styledTime(formatMinuteOfDay(context, draft.endMinute), suffixSize = big * 0.5f),
+                        fontSize = big,
+                        fontWeight = FontWeight.Light,
+                        color = c.textNormal,
+                        maxLines = 1,
+                        softWrap = false,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable(enabled = editable, onClickLabel = "change the end", onClick = onEditEnd)
+                            .padding(horizontal = 4.dp),
+                    )
+                }
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    "${formatDays(draft.days)} · ${formatMinutes(scheduleMinutes(draft).toLong())} each time" +
+                        if (draft.endMinute <= draft.startMinute) " · ends next day" else "",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = c.textMuted,
+                )
+                Spacer(Modifier.height(16.dp))
+                DaySelector(draft.days, onChange = { onDraftChange(draft.copy(days = it)) }, enabled = editable)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    QuickChip("Every day", draft.days.size == 7, editable) { onDraftChange(draft.copy(days = (1..7).toSet())) }
+                    QuickChip("Weekdays", draft.days == (1..5).toSet(), editable) { onDraftChange(draft.copy(days = (1..5).toSet())) }
+                    QuickChip("Weekends", draft.days == setOf(6, 7), editable) { onDraftChange(draft.copy(days = setOf(6, 7))) }
+                }
+            }
+        }
+    }
+}
+
+/** A heading that opens where it stands, carrying its section's whole answer while shut. */
+@Composable
+private fun FoldSection(
+    title: String,
+    summary: String,
+    open: Boolean,
+    onToggle: () -> Unit,
+    note: String? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val c = Obsidian.colors
+    Column(Modifier.fillMaxWidth()) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .clickable(onClick = onToggle)
+                .heightIn(min = 58.dp)
+                .padding(vertical = 8.dp, horizontal = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f).padding(end = 10.dp)) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
+                    color = if (open) c.accentText else c.textNormal,
+                )
+                Text(summary, style = MaterialTheme.typography.bodySmall, color = c.textFaint)
+            }
+            Icon(
+                if (open) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                contentDescription = null,
+                tint = c.textFaint,
+            )
+        }
+        AnimatedVisibility(open) {
+            Column(Modifier.padding(start = 2.dp, bottom = 10.dp)) {
+                if (note != null) {
+                    Text(
+                        note,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = c.textFaint,
+                        modifier = Modifier.padding(bottom = 4.dp),
+                    )
+                }
+                content()
+            }
+        }
+        HorizontalDivider(color = c.border.copy(alpha = if (open) 0f else 0.5f))
+    }
+}
+
+/** A small heading inside an open fold, where one section holds two questions. */
+@Composable
+private fun FoldLabel(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelLarge,
+        color = Obsidian.colors.accentText,
+        modifier = Modifier.padding(top = 18.dp, bottom = 8.dp),
+    )
+}
+
+/** Renaming, kept off the page itself: it is read far more often than it is changed. */
+@Composable
+private fun RenameDialog(name: String, isBlock: Boolean, onDismiss: () -> Unit, onDone: (String) -> Unit) {
+    val c = Obsidian.colors
+    var text by remember { mutableStateOf(name) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = c.bgSecondary,
+        title = { Text(if (isBlock) "Name this block" else "Name this schedule") },
+        text = {
+            ObsidianTextField(
+                value = text,
+                onValueChange = { text = it },
+                placeholder = if (isBlock) "e.g. Deep work" else "e.g. Bedtime",
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { onDone(text) }) { Text("Done", color = c.accentText, fontWeight = FontWeight.SemiBold) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = c.textMuted) } },
+    )
 }
 
 /** Start/end time: Android's clock dial (hour first, then minutes), following the phone's 12/24-hour setting. */

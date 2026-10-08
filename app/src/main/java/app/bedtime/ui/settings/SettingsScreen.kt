@@ -67,6 +67,25 @@ import kotlinx.coroutines.withContext
 import app.bedtime.ui.widget.BlockWidget
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.sp
 
 @Composable
 fun SettingsScreen(
@@ -161,10 +180,6 @@ fun SettingsScreen(
         version = version,
         canPinWidget = canPinWidget,
         onAddWidget = { block -> BlockWidget.requestPin(context, block) },
-        lockSettings = settings.lockSettingsDuringSessions,
-        onLockSettings = { on -> scope.launch { repo.updateSettings { it.copy(lockSettingsDuringSessions = on) } } },
-        fullScreenAlert = settings.fullScreenAlert,
-        onFullScreenAlert = { on -> scope.launch { repo.updateSettings { it.copy(fullScreenAlert = on) } } },
         onHowItWorks = onHowItWorks,
         onWalkthrough = onWalkthrough,
         onExport = { exportFile.launch("digital-refuge-${LocalDate.now()}.json") },
@@ -185,185 +200,247 @@ internal fun SettingsContent(
     onGroups: () -> Unit = {},
     alwaysAvailableCount: Int = 0,
     onAlwaysAvailable: () -> Unit = {},
-    version: String = "0.7.7.10",
+    version: String = "0.7.8",
     canPinWidget: Boolean = true,
     onAddWidget: (Schedule) -> Unit = {},
     onExport: () -> Unit = {},
     onImport: () -> Unit = {},
-    lockSettings: Boolean = true,
-    onLockSettings: (Boolean) -> Unit = {},
-    fullScreenAlert: Boolean = true,
-    onFullScreenAlert: (Boolean) -> Unit = {},
     onHowItWorks: () -> Unit = {},
     onWalkthrough: () -> Unit = {},
 ) {
     val c = Obsidian.colors
-    Scaffold(containerColor = c.bgPrimary, topBar = { ObsidianTopBar("Settings", onBack = onBack) }) { padding ->
-        Column(
+    var otherOpen by rememberSaveable { mutableStateOf(false) }
+    Box(Modifier.fillMaxSize().background(c.bgPrimary)) {
+        // The home screen's fade, kept short so it dies out under the title instead of tinting the page.
+        Box(
             Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                IconBadge(BedtimeIcons.Refuge, size = 56.dp)
-                Spacer(Modifier.width(16.dp))
+                .fillMaxWidth()
+                .height(240.dp)
+                .background(Brush.verticalGradient(listOf(Color(0xFF1F2C25), c.bgPrimary))),
+        )
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+            Row(
+                Modifier.padding(horizontal = 22.dp).padding(top = 30.dp, bottom = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (onBack != null) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back",
+                        tint = c.textMuted,
+                        modifier = Modifier.clip(CircleShape).clickable(onClick = onBack).padding(4.dp).size(22.dp),
+                    )
+                    Spacer(Modifier.width(12.dp))
+                } else {
+                    IconBadge(BedtimeIcons.Refuge, size = 46.dp)
+                    Spacer(Modifier.width(14.dp))
+                }
                 Column {
-                    Text("digital refuge", style = MaterialTheme.typography.titleLarge, color = c.textNormal)
-                    Text("Version $version · everything stays on this phone", style = MaterialTheme.typography.bodySmall, color = c.textMuted)
+                    Text("settings", fontSize = 26.sp, fontWeight = FontWeight.Light, color = c.textNormal)
+                    Text("version $version · all on this phone", style = MaterialTheme.typography.bodySmall, color = c.textMuted)
                 }
             }
-
-            SectionCard {
-                OptionRow(
-                    Icons.Default.Info,
-                    "How it works",
-                    description = "What a session locks, and your ways out",
-                    onClick = onHowItWorks,
-                ) { Chevron() }
-                OptionRow(
-                    BedtimeIcons.Leaf,
-                    "The intro again",
-                    description = "The short walk-through from the first launch",
-                    onClick = onWalkthrough,
-                ) { Chevron() }
-            }
-
-            SectionCard {
-                OptionRow(
+            Column(Modifier.padding(horizontal = 22.dp)) {
+                Spacer(Modifier.height(14.dp))
+                // Not a preference but a health check: the one row that can be wrong, so it sits alone.
+                SettingsRow(
                     Icons.Default.Build,
                     "Permissions & setup",
-                    description = when (setupStepsLeft) {
+                    when (setupStepsLeft) {
                         0 -> "All set"
                         1 -> "1 step left"
                         else -> "$setupStepsLeft steps left"
                     },
                     onClick = onSetup,
-                ) { Chevron() }
-                OptionRow(
-                    Icons.Default.Home,
-                    "Minimal home screen",
-                    description = "Colours, text size and what's shown",
-                    onClick = onHomeStyle,
-                ) { Chevron() }
-                OptionRow(
+                )
+                SettingsRow(
                     BedtimeIcons.Grid,
                     "App groups",
-                    description = when (groupCount) {
+                    when (groupCount) {
                         0 -> "Tick many apps at once when choosing"
                         1 -> "1 group"
                         else -> "$groupCount groups"
                     },
                     onClick = onGroups,
-                ) { Chevron() }
-            }
+                    last = true,
+                )
 
-            SectionCard(title = "Emergency", subtitle = "What the Emergency button on the minimal home screen offers, besides calling.") {
-                OptionRow(
+                SettingsLabel("what a session is like")
+                SettingsRow(
+                    Icons.Default.Home,
+                    "Minimal home screen",
+                    "Colours, text size and what's shown",
+                    onClick = onHomeStyle,
+                )
+                SettingsRow(
                     Icons.Default.Warning,
                     "Always-available apps",
-                    description = when (alwaysAvailableCount) {
+                    when (alwaysAvailableCount) {
                         0 -> "None yet · maps, rides, authenticators…"
-                        1 -> "1 app, never blocked"
-                        else -> "$alwaysAvailableCount apps, never blocked"
+                        1 -> "1 app, never blocked, whichever session is on"
+                        else -> "$alwaysAvailableCount apps, never blocked, whichever session is on"
                     },
                     onClick = onAlwaysAvailable,
-                ) { Chevron() }
-            }
+                    last = true,
+                )
 
-            SectionCard(
-                title = "Staying blocked",
-                subtitle = "How firmly a session holds. Tap \u201chow it works\u201d for the full picture.",
-            ) {
-                OptionRow(
-                    BedtimeIcons.Refuge,
-                    "Lock changes during sessions",
-                    description = "Covers the Settings screens that switch blocking off or uninstall the app",
-                ) { ObsidianToggle(lockSettings, onLockSettings) }
-                OptionRow(
-                    Icons.Default.Warning,
-                    "Full-screen reminder if blocking goes off",
-                    description = "If blocking is switched off mid-session, take over the screen until it's back on. Allow it in setup.",
-                ) { ObsidianToggle(fullScreenAlert, onFullScreenAlert) }
-            }
+                // How firmly a session holds now belongs to each schedule, under "the ways around it".
+                Spacer(Modifier.height(26.dp))
+                SettingsFold(
+                    title = "Other",
+                    summary = "How it works · the intro · shortcuts · backup",
+                    open = otherOpen,
+                    onToggle = { otherOpen = !otherOpen },
+                ) {
+                    SettingsRow(Icons.Default.Info, "How it works", "What a session locks, and your ways out", onClick = onHowItWorks)
+                    SettingsRow(BedtimeIcons.Leaf, "The intro again", "The walk-through from the first launch", onClick = onWalkthrough)
+                    SettingsRow(Icons.Default.Share, "Export settings", "Save schedules, blocks, groups and stats to a file", onClick = onExport)
+                    SettingsRow(BedtimeIcons.Refuge, "Import settings", "Replace everything with a saved file", onClick = onImport, last = true)
 
-            SectionCard(
-                title = "Backup",
-                subtitle = "Keep your schedules and settings in a file, to restore after reinstalling.",
-            ) {
-                OptionRow(
-                    Icons.Default.Share,
-                    "Export settings",
-                    description = "Save schedules, blocks, groups and stats to a file",
-                    onClick = onExport,
-                ) { Chevron() }
-                OptionRow(
-                    BedtimeIcons.Refuge,
-                    "Import settings",
-                    description = "Replace everything with a saved file",
-                    onClick = onImport,
-                ) { Chevron() }
-            }
+                    SettingsLabel("home-screen widget")
+                    Text(
+                        if (canPinWidget) {
+                            "A one-tap button on your home screen that starts a block. Add one for:"
+                        } else {
+                            "Long-press your home screen → widgets → digital refuge, then pick a block."
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = c.textFaint,
+                        modifier = Modifier.padding(start = 2.dp, bottom = 6.dp),
+                    )
+                    if (blocks.isEmpty()) {
+                        Text("Create a focus block first.", style = MaterialTheme.typography.bodyMedium, color = c.textMuted)
+                    } else if (canPinWidget) {
+                        blocks.forEachIndexed { index, block ->
+                            Column {
+                                Row(Modifier.fillMaxWidth().heightIn(min = 52.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        "${block.name} · ${formatMinutes(block.durationMinutes.toLong())}",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = c.textNormal,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    TextButton(onClick = { onAddWidget(block) }) {
+                                        Text("Add", color = c.accentText, fontWeight = FontWeight.SemiBold)
+                                    }
+                                }
+                                if (index < blocks.lastIndex) HorizontalDivider(color = c.border.copy(alpha = 0.5f))
+                            }
+                        }
+                    }
 
-            SectionCard(
-                title = "Home-screen widget",
-                subtitle = if (canPinWidget) {
-                    "A one-tap button on your home screen that starts a block. Add one for:"
-                } else {
-                    "Long-press your home screen → widgets → digital refuge, then pick a block."
-                },
-            ) {
-                if (blocks.isEmpty()) {
-                    Text("Create a focus block first.", style = MaterialTheme.typography.bodyMedium, color = c.textMuted)
-                } else if (canPinWidget) {
-                    blocks.forEach { block ->
-                        Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                "${block.name} · ${formatMinutes(block.durationMinutes.toLong())}",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = c.textNormal,
-                                modifier = Modifier.weight(1f),
-                            )
-                            TextButton(onClick = { onAddWidget(block) }) {
-                                Text("Add", color = c.accentText, fontWeight = FontWeight.SemiBold)
+                    SettingsLabel("quick settings tile")
+                    Text(
+                        "Edit your quick settings and add the “refuge” tile. Tapping it starts:",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = c.textFaint,
+                        modifier = Modifier.padding(start = 2.dp, bottom = 6.dp),
+                    )
+                    if (blocks.isEmpty()) {
+                        Text("Create a focus block first.", style = MaterialTheme.typography.bodyMedium, color = c.textMuted)
+                    } else {
+                        val selected = blocks.firstOrNull { it.id == tileBlockId }?.id ?: blocks.first().id
+                        blocks.forEachIndexed { index, block ->
+                            Column {
+                                Row(
+                                    Modifier.fillMaxWidth().heightIn(min = 52.dp).clickable { onTileBlock(block.id) },
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    RadioButton(
+                                        selected = block.id == selected,
+                                        onClick = { onTileBlock(block.id) },
+                                        colors = RadioButtonDefaults.colors(selectedColor = c.accent, unselectedColor = c.textFaint),
+                                    )
+                                    Text(
+                                        "${block.name} · ${formatMinutes(block.durationMinutes.toLong())}",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = c.textNormal,
+                                    )
+                                }
+                                if (index < blocks.lastIndex) {
+                                    HorizontalDivider(Modifier.padding(start = 52.dp), color = c.border.copy(alpha = 0.5f))
+                                }
                             }
                         }
                     }
                 }
-            }
-
-            SectionCard(
-                title = "Quick Settings tile",
-                subtitle = "Edit your quick settings and add the “refuge” tile. Tapping it starts:",
-            ) {
-                if (blocks.isEmpty()) {
-                    Text("Create a focus block first.", style = MaterialTheme.typography.bodyMedium, color = c.textMuted)
-                } else {
-                    val selected = blocks.firstOrNull { it.id == tileBlockId }?.id ?: blocks.first().id
-                    blocks.forEach { block ->
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = 48.dp)
-                                .clickable { onTileBlock(block.id) },
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            RadioButton(
-                                selected = block.id == selected,
-                                onClick = { onTileBlock(block.id) },
-                                colors = RadioButtonDefaults.colors(selectedColor = c.accent, unselectedColor = c.textFaint),
-                            )
-                            Text(
-                                "${block.name} · ${formatMinutes(block.durationMinutes.toLong())}",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = c.textNormal,
-                            )
-                        }
-                    }
-                }
+                Spacer(Modifier.height(18.dp))
+                Text(
+                    "digital refuge $version · everything stays on this phone",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = c.textFaint,
+                    modifier = Modifier.fillMaxWidth().padding(start = 2.dp),
+                )
+                Spacer(Modifier.height(28.dp))
             }
         }
+    }
+}
+
+/** A group's name, in the accent, above the rows it covers. */
+@Composable
+private fun SettingsLabel(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelLarge,
+        color = Obsidian.colors.accentText,
+        modifier = Modifier.padding(start = 2.dp, top = 22.dp, bottom = 2.dp),
+    )
+}
+
+/** A row on the bare background, with a hairline under it unless it closes its group. */
+@Composable
+private fun SettingsRow(
+    icon: ImageVector,
+    title: String,
+    description: String,
+    onClick: (() -> Unit)? = null,
+    last: Boolean = false,
+    trailing: @Composable () -> Unit = { Chevron() },
+) {
+    val c = Obsidian.colors
+    Column {
+        OptionRow(icon, title, description = description, onClick = onClick, trailing = trailing)
+        if (!last) HorizontalDivider(Modifier.padding(start = 52.dp), color = c.border.copy(alpha = 0.5f))
+    }
+}
+
+/** The once-ever things, behind a heading that says what is inside. */
+@Composable
+private fun SettingsFold(
+    title: String,
+    summary: String,
+    open: Boolean,
+    onToggle: () -> Unit,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val c = Obsidian.colors
+    Column(Modifier.fillMaxWidth()) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .clickable(onClick = onToggle)
+                .heightIn(min = 56.dp)
+                .padding(vertical = 8.dp, horizontal = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f).padding(end = 10.dp)) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
+                    color = if (open) c.accentText else c.textNormal,
+                )
+                Text(summary, style = MaterialTheme.typography.bodySmall, color = c.textFaint)
+            }
+            Icon(
+                if (open) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                contentDescription = null,
+                tint = c.textFaint,
+            )
+        }
+        AnimatedVisibility(open) { Column(content = content) }
+        HorizontalDivider(color = c.border.copy(alpha = if (open) 0f else 0.5f))
     }
 }

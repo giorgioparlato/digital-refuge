@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.ListSerializer
+import java.util.UUID
 
 private val Context.store: DataStore<Preferences> by preferencesDataStore(name = "bedtime")
 
@@ -28,6 +29,31 @@ class Repository private constructor(context: Context) {
     suspend fun upsert(schedule: Schedule) = updateSchedules { list ->
         if (list.any { it.id == schedule.id }) list.map { if (it.id == schedule.id) schedule else it }
         else list + schedule
+    }
+
+    /**
+     * Copies the schedule or block [id] under a fresh name, and returns the copy's id.
+     *
+     * The copy arrives switched off and with no hours restricting when it can be changed. Both are
+     * there to stop a copy being born out of reach: a duplicate of a schedule that is running right
+     * now would be running too, and a duplicate of one that can only be changed in the morning
+     * couldn't be touched until then. Everything else carries over, which is the point of it.
+     */
+    suspend fun duplicate(id: String): String? {
+        var copyId: String? = null
+        updateSchedules { list ->
+            val index = list.indexOfFirst { it.id == id }
+            if (index < 0) return@updateSchedules list
+            val copy = list[index].copy(
+                id = UUID.randomUUID().toString(),
+                name = copyName(list[index].name, list.mapTo(mutableSetOf()) { it.name }),
+                enabled = false,
+                editWindow = null,
+            )
+            copyId = copy.id
+            list.toMutableList().also { it.add(index + 1, copy) }
+        }
+        return copyId
     }
 
     suspend fun delete(id: String) {
@@ -162,3 +188,19 @@ class Repository private constructor(context: Context) {
         }
     }
 }
+
+/**
+ * "Bedtime" becomes "Bedtime copy", then "Bedtime copy 2" and on, never landing on a name already
+ * in use — two schedules with the same name would be indistinguishable everywhere they are listed.
+ */
+internal fun copyName(name: String, taken: Set<String>): String {
+    // Copying a copy counts on from it rather than stacking: "Bedtime copy 2", never "Bedtime copy copy".
+    val root = COPY_SUFFIX.find(name)?.groupValues?.get(1)?.takeIf { it.isNotBlank() } ?: name
+    val base = "$root copy"
+    if (base !in taken) return base
+    var n = 2
+    while ("$base $n" in taken) n++
+    return "$base $n"
+}
+
+private val COPY_SUFFIX = Regex("""^(.*?)\s+copy(?:\s+\d+)?$""")

@@ -110,11 +110,11 @@ class ScreenshotTest {
     }
 
     @Composable
-    private fun Edit(draft: Schedule, readOnly: Boolean = false, dndAvailable: Boolean = true) {
+    private fun Edit(draft: Schedule, readOnly: Boolean = false, dndAvailable: Boolean = true, isNew: Boolean = false) {
         ScheduleEditContent(
             draft = draft,
             onDraftChange = {},
-            isNew = false,
+            isNew = isNew,
             readOnly = readOnly,
             newPassword = "",
             onNewPasswordChange = {},
@@ -125,6 +125,7 @@ class ScreenshotTest {
             onBack = {},
             onSave = {},
             onDelete = {},
+            canDuplicate = true,
             onUnlock = {},
             onPickBlocked = {},
             onPickAllowed = {},
@@ -164,10 +165,14 @@ class ScreenshotTest {
     fun create() = shot(tall = true) { CreateContent(onBack = {}, onPick = {}) }
 
     @Test
-    fun editSchedule() = shot(tall = true) { Edit(Samples.bedtime) }
+    fun editSchedule() = shot { Edit(Samples.bedtime) }
+
+    /** A new schedule opens on its first section, which is where the folds get their coverage. */
+    @Test
+    fun editScheduleOpen() = shot(tall = true) { Edit(Samples.bedtime, isNew = true) }
 
     @Test
-    fun editBlock() = shot(tall = true) { Edit(Samples.focus, dndAvailable = false) }
+    fun editBlock() = shot { Edit(Samples.focus, dndAvailable = false) }
 
     @Test
     fun editReadOnly() = shot { Edit(Samples.bedtime, readOnly = true) }

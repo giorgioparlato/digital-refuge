@@ -243,7 +243,7 @@ class BlockerService : AccessibilityService() {
      */
     private fun guardSettings(pkg: String, event: AccessibilityEvent): Boolean {
         val current = state ?: return false
-        if (!current.isActive || !settings.lockSettingsDuringSessions) return false
+        if (!current.isActive || !current.lockSettings) return false
         if (System.currentTimeMillis() < SettingsGuard.graceUntil) return false
         val texts = buildList {
             addAll(event.text)
