@@ -401,9 +401,8 @@ internal fun WaitChallengeContent(remaining: Long?, total: Long) {
             )
             Text(
                 remaining?.let(::formatCountdown) ?: "\u2026",
-                fontSize = 54.sp,
-                fontWeight = FontWeight.Light,
                 style = MaterialTheme.typography.displaySmall.copy(fontFeatureSettings = "tnum"),
+                fontWeight = FontWeight.Medium,
                 color = if (done) c.green else c.textNormal,
             )
         }

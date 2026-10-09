@@ -200,7 +200,7 @@ internal fun SettingsContent(
     onGroups: () -> Unit = {},
     alwaysAvailableCount: Int = 0,
     onAlwaysAvailable: () -> Unit = {},
-    version: String = "0.7.8",
+    version: String = "0.7.8.1",
     canPinWidget: Boolean = true,
     onAddWidget: (Schedule) -> Unit = {},
     onExport: () -> Unit = {},
@@ -235,10 +235,8 @@ internal fun SettingsContent(
                     IconBadge(BedtimeIcons.Refuge, size = 46.dp)
                     Spacer(Modifier.width(14.dp))
                 }
-                Column {
-                    Text("settings", fontSize = 26.sp, fontWeight = FontWeight.Light, color = c.textNormal)
-                    Text("version $version · all on this phone", style = MaterialTheme.typography.bodySmall, color = c.textMuted)
-                }
+                // The version and where your data lives are said once, at the foot of the page.
+                Text("settings", fontSize = 26.sp, fontWeight = FontWeight.Light, color = c.textNormal)
             }
             Column(Modifier.padding(horizontal = 22.dp)) {
                 Spacer(Modifier.height(14.dp))
