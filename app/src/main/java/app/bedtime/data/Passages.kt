@@ -93,7 +93,7 @@ object Passages {
     )
 
     /**
-     * The longer selections from docs/quotes-review-3.md: too long to sit on the home screen as
+     * The longer selections from docs/quotes-review-3.md and -4: too long to sit on the home screen as
      * quotes, but worth reading while you copy one out. Each is a short attributed excerpt.
      */
     val OTHERS: List<String> = listOf(
@@ -136,6 +136,18 @@ object Passages {
             "responsibilities as human people is to find ways to enter into reciprocity with the more-than-human " +
             "world. We can do it through gratitude, through ceremony, through land stewardship, science, art, and " +
             "in everyday acts of practical reverence.",
+        // David Foster Wallace, This Is Water
+        "There are these two young fish swimming along, and they happen to meet an older fish swimming the other " +
+            "way who nods at them and says, \"Morning, boys. How's the water?\" And the two young fish swim on for " +
+            "a bit, and then eventually one of them looks over at the other and goes, \"What the hell is water?\"",
+        // David Foster Wallace, This Is Water
+        "Learning how to think really means learning how to exercise some control over how and what you think. " +
+            "It means being conscious and aware enough to choose what you pay attention to and to choose how you " +
+            "construct meaning from experience.",
+        // David Foster Wallace, This Is Water
+        "The really important kind of freedom involves attention and awareness and discipline, and being able " +
+            "truly to care about other people and to sacrifice for them over and over in myriad petty, unsexy " +
+            "ways every day.",
     )
 
     /** Everything a "passage" challenge can draw from: the app's quotes, plus the longer passages. */

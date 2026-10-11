@@ -8,8 +8,8 @@ import kotlin.random.Random
 data class Quote(val text: String, val author: String, val work: String? = null)
 
 /**
- * The quotes chosen in docs/quotes-review.md and docs/quotes-review-2.md, each checked against its
- * source there. Only add quotes that have been verified the same way.
+ * The quotes chosen in docs/quotes-review.md, -2 and -4, each checked against its source there.
+ * Only add quotes that have been verified the same way.
  */
 object Quotes {
     /** Ordered so neighbouring days never share an author. */
@@ -254,6 +254,25 @@ object Quotes {
         ),
         Quote("Between stimulus and response there is a space.", "Viktor Frankl", "attributed"),
         Quote("What we plant in the soil of contemplation we shall reap in the harvest of action.", "Meister Eckhart"),
+        Quote(
+            "The really important kind of freedom involves attention and awareness and discipline.",
+            "David Foster Wallace", "This Is Water",
+        ),
+        Quote(
+            "And did you get what you wanted from this life, even so? I did. And what did you want? To call myself " +
+            "beloved, to feel myself beloved on the earth.",
+            "Raymond Carver", "Late Fragment",
+        ),
+        Quote(
+            "In the day-to-day trenches of adult life, there is actually no such thing as atheism. There is no such " +
+            "thing as not worshipping. Everybody worships. The only choice we get is what to worship.",
+            "David Foster Wallace", "This Is Water",
+        ),
+        // Published as Hafiz, but Ladinsky has said these poems are his own rather than translations.
+        Quote(
+            "My dear, how can I be more loving to you; how can I be more kind?",
+            "Daniel Ladinsky", "The Gift",
+        ),
     )
 
     /**
