@@ -35,6 +35,7 @@ import app.bedtime.data.Repository
 import app.bedtime.data.UsageDay
 import app.bedtime.engine.Limits
 import app.bedtime.service.LimitPasses
+import app.bedtime.ui.components.BedtimeIcons
 import app.bedtime.ui.components.Breathing
 import app.bedtime.ui.components.CtaButton
 import app.bedtime.ui.components.StatusPill
@@ -90,40 +91,26 @@ private fun ordinal(n: Int): String {
 internal fun PauseContent(appLabel: String, secondsLeft: Int, opens: Int, onOpen: () -> Unit, onHome: () -> Unit) {
     val c = Obsidian.colors
     val done = secondsLeft <= 0
-    Column(
-        Modifier.fillMaxSize().background(c.bgPrimary).safeDrawingPadding().padding(horizontal = 28.dp, vertical = 24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Spacer(Modifier.weight(1f))
-        Text("about to open $appLabel", style = MaterialTheme.typography.titleMedium, color = c.textMuted)
-        if (opens > 1) {
-            Spacer(Modifier.height(10.dp))
-            StatusPill("the ${ordinal(opens)} time today", c.orange)
-        }
-        Spacer(Modifier.height(36.dp))
-        Breathing(running = !done, color = c.accent, modifier = Modifier.size(220.dp)) { inhaling ->
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    if (done) "and now?" else if (inhaling) "breathe in" else "breathe out",
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = c.textNormal,
-                )
-                if (!done) Text("$secondsLeft", style = MaterialTheme.typography.labelLarge, color = c.textFaint)
+    CoverLayout(
+        emblem = {
+            Breathing(running = !done, color = c.accent, modifier = Modifier.size(180.dp)) { inhaling ->
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        if (done) "and now?" else if (inhaling) "breathe in" else "breathe out",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = c.textNormal,
+                    )
+                    if (!done) Text("$secondsLeft", style = MaterialTheme.typography.labelLarge, color = c.textFaint)
+                }
             }
-        }
-        Spacer(Modifier.height(36.dp))
-        Text(
-            "Is this what you came to the phone for?",
-            style = MaterialTheme.typography.bodyLarge,
-            color = c.textMuted,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(Modifier.weight(1.3f))
-        CtaButton("Never mind", onClick = onHome, modifier = Modifier.fillMaxWidth())
-        TextButton(onClick = onOpen, enabled = done, modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) {
-            Text(if (done) "Open $appLabel" else "Open $appLabel in a moment", color = if (done) c.textMuted else c.textFaint)
-        }
-    }
+        },
+        pill = if (opens > 1) "the ${ordinal(opens)} time today" else null,
+        pillColor = c.orange,
+        title = "About to open $appLabel",
+        body = "Is this what you came to the phone for?",
+        primary = CoverAction("Never mind", onHome),
+        secondary = listOf(CoverAction(if (done) "Open $appLabel" else "Open $appLabel in a moment", onOpen, enabled = done)),
+    )
 }
 
 /** A limit's minutes are gone for today: what's left is home, or — if the limit allows — more time. */
@@ -214,50 +201,23 @@ internal fun LimitContent(
     onHome: () -> Unit,
     onMore: () -> Unit,
 ) {
-    val c = Obsidian.colors
     val budget = formatMinutes(dailyMinutes.toLong())
-    Column(
-        Modifier.fillMaxSize().background(c.bgPrimary).safeDrawingPadding().padding(horizontal = 28.dp, vertical = 24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Spacer(Modifier.weight(1f))
-        Breathing(running = false, color = c.accent, modifier = Modifier.size(124.dp)) {
-            Text(budget, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Light, color = c.accentText)
-        }
-        Spacer(Modifier.height(28.dp))
-        StatusPill("$limitName · $budget a day", c.accentText)
-        Spacer(Modifier.height(16.dp))
-        Text(
-            "$appLabel is done for today",
-            style = MaterialTheme.typography.headlineMedium,
-            color = c.textNormal,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(Modifier.height(12.dp))
-        Text(
-            when (outOfTime) {
-                OutOfTime.TOMORROW -> "That was today's $budget. It'll be back tomorrow."
-                OutOfTime.MORE_TIME -> "That was today's $budget. If it really can't wait, you can take $extraMinutes more minutes."
-                OutOfTime.REST_OF_DAY -> "That was today's $budget. If it really can't wait, you can lift the limit for the rest of today."
-                OutOfTime.CHOOSE -> "That was today's $budget. If it really can't wait, you can say how much more you need."
-            },
-            style = MaterialTheme.typography.bodyLarge,
-            color = c.textMuted,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(Modifier.weight(1.3f))
-        CtaButton("Go to home screen", onClick = onHome, modifier = Modifier.fillMaxWidth())
-        if (outOfTime != OutOfTime.TOMORROW) {
-            TextButton(onClick = onMore, modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) {
-                Text(
-                    when (outOfTime) {
-                        OutOfTime.MORE_TIME -> "Take $extraMinutes more minutes"
-                        OutOfTime.CHOOSE -> "Take more time"
-                        else -> "Lift it for today"
-                    },
-                    color = c.textMuted,
-                )
-            }
-        }
-    }
+    CoverLayout(
+        emblem = { CoverEmblem(BedtimeIcons.Hourglass) },
+        pill = "$limitName · $budget a day",
+        title = "$appLabel is done for today",
+        body = when (outOfTime) {
+            OutOfTime.TOMORROW -> "That was today's $budget. It'll be back tomorrow."
+            OutOfTime.MORE_TIME -> "That was today's $budget. If it really can't wait, you can take $extraMinutes more minutes."
+            OutOfTime.REST_OF_DAY -> "That was today's $budget. If it really can't wait, you can lift the limit for the rest of today."
+            OutOfTime.CHOOSE -> "That was today's $budget. If it really can't wait, you can say how much more you need."
+        },
+        primary = CoverAction("Go to home screen", onHome),
+        secondary = when (outOfTime) {
+            OutOfTime.TOMORROW -> emptyList()
+            OutOfTime.MORE_TIME -> listOf(CoverAction("Take $extraMinutes more minutes", onMore))
+            OutOfTime.CHOOSE -> listOf(CoverAction("Take more time", onMore))
+            OutOfTime.REST_OF_DAY -> listOf(CoverAction("Lift it for today", onMore))
+        },
+    )
 }

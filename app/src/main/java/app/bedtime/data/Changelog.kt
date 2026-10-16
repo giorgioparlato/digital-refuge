@@ -13,6 +13,16 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            37,
+            "0.8.2",
+            listOf(
+                "Every page now starts the same way: a large, light title on the same soft green fade.",
+                "In light mode that fade is a pale green, instead of the dark band some pages had.",
+                "The full screens in front of an app — blocked, paused, out of time — share one calm layout.",
+                "A limit's page looks like a schedule's: tap its name to rename it.",
+            ),
+        ),
+        ChangelogEntry(
             36,
             "0.8.1",
             listOf(

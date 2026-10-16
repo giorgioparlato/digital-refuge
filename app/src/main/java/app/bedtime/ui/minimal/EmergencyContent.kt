@@ -5,9 +5,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.filled.Call
+import app.bedtime.ui.components.PageGutter
+import app.bedtime.ui.components.ObsidianTopBar
 import app.bedtime.ui.components.BedtimeIcons
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.material3.Scaffold
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -52,58 +56,54 @@ internal fun EmergencyContent(
 ) {
     val minutes = "$breakMinutes ${if (breakMinutes == 1) "minute" else "minutes"}"
     val c = Obsidian.colors
-    Column(
-        Modifier
-            .fillMaxSize()
-            .background(c.bgPrimary)
-            .then(if (preview) Modifier else Modifier.safeDrawingPadding())
-            .verticalScroll(rememberScrollState())
-            .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "back", tint = c.textMuted) }
-            Text("emergency", style = MaterialTheme.typography.headlineSmall, color = c.textNormal)
-        }
-        Text(
-            "for when something really can't wait. your session stays in place.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = c.textMuted,
-        )
-
-        // Two that work no matter how the session is set up, so there is always something here.
-        SectionCard(title = "always works") {
-            ActionRow(onClick = onOpenRefuge, label = "digital refuge") {
-                Box(
-                    Modifier.size(36.dp).clip(CircleShape).background(c.accent.copy(alpha = 0.16f)),
-                    contentAlignment = Alignment.Center,
-                ) { Icon(BedtimeIcons.Refuge, contentDescription = null, tint = c.accent, modifier = Modifier.size(20.dp)) }
+    Scaffold(
+        containerColor = c.bgPrimary,
+        topBar = { ObsidianTopBar("emergency", onBack = onBack, subtitle = "for when something really can't wait. your session stays in place.") },
+    ) { padding ->
+        Column(
+            Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .then(if (preview) Modifier else Modifier.navigationBarsPadding())
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = PageGutter)
+                .padding(bottom = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            // Two that work no matter how the session is set up, so there is always something here.
+            SectionCard(title = "always works") {
+                ActionRow(onClick = onOpenRefuge, label = "digital refuge") {
+                    Box(
+                        Modifier.size(36.dp).clip(CircleShape).background(c.accent.copy(alpha = 0.16f)),
+                        contentAlignment = Alignment.Center,
+                    ) { Icon(BedtimeIcons.Refuge, contentDescription = null, tint = c.accent, modifier = Modifier.size(20.dp)) }
+                }
+                ActionRow(onClick = onCall, label = "phone") {
+                    Box(
+                        Modifier.size(36.dp).clip(CircleShape).background(c.accent.copy(alpha = 0.16f)),
+                        contentAlignment = Alignment.Center,
+                    ) { Icon(Icons.Default.Call, contentDescription = null, tint = c.accent, modifier = Modifier.size(20.dp)) }
+                }
             }
-            ActionRow(onClick = onCall, label = "phone") {
-                Box(
-                    Modifier.size(36.dp).clip(CircleShape).background(c.accent.copy(alpha = 0.16f)),
-                    contentAlignment = Alignment.Center,
-                ) { Icon(Icons.Default.Call, contentDescription = null, tint = c.accent, modifier = Modifier.size(20.dp)) }
-            }
-        }
 
-        SectionCard(title = "always available", subtitle = "never blocked, whatever the session") {
-            if (alwaysAvailable.isEmpty()) {
-                Body("none yet. add a few — maps, rides, your authenticator — in settings \u2192 emergency.")
-            } else {
-                alwaysAvailable.forEach { app ->
-                    ActionRow(onClick = { onOpenApp(app.packageName) }, label = app.label) {
-                        AppIcon(app.packageName, app.label, 36.dp)
+            SectionCard(title = "always available", subtitle = "never blocked, whatever the session") {
+                if (alwaysAvailable.isEmpty()) {
+                    Body("none yet. add a few — maps, rides, your authenticator — in settings \u2192 emergency.")
+                } else {
+                    alwaysAvailable.forEach { app ->
+                        ActionRow(onClick = { onOpenApp(app.packageName) }, label = app.label) {
+                            AppIcon(app.packageName, app.label, 36.dp)
+                        }
                     }
                 }
             }
-        }
 
-        if (pauseEnabled) {
-            SectionCard(title = "emergency break") {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Body("steps out for $minutes. a full screen brings you back when it ends.")
-                    PlainButton("pause blocking for $minutes", onClick = onPauseBlocking, modifier = Modifier.fillMaxWidth())
+            if (pauseEnabled) {
+                SectionCard(title = "emergency break") {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Body("steps out for $minutes. a full screen brings you back when it ends.")
+                        PlainButton("pause blocking for $minutes", onClick = onPauseBlocking, modifier = Modifier.fillMaxWidth())
+                    }
                 }
             }
         }

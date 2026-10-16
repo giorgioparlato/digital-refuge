@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -46,8 +48,6 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import app.bedtime.ui.components.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -82,29 +82,64 @@ import java.time.DayOfWeek
 import java.time.format.TextStyle as JavaTextStyle
 import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
+/** The page margin: content, headers and cards all line up on it. */
+val PageGutter = 20.dp
+
+/**
+ * The top of every page that isn't a hero: a large, light title on the app's fade, a back arrow
+ * beside it when there's somewhere to go back to, and an optional quiet line underneath. Tabs,
+ * detail pages and editors all start the same way, so moving between them never changes what the
+ * top of a page looks like. Meant for a Scaffold's top bar, so it clears the status bar itself.
+ */
 @Composable
-fun ObsidianTopBar(title: String, onBack: (() -> Unit)? = null, actions: @Composable RowScope.() -> Unit = {}) {
+fun ObsidianTopBar(
+    title: String,
+    onBack: (() -> Unit)? = null,
+    subtitle: String? = null,
+    actions: @Composable RowScope.() -> Unit = {},
+) {
     val c = Obsidian.colors
-    Column {
-        TopAppBar(
-            title = { Text(title, style = MaterialTheme.typography.titleLarge) },
-            navigationIcon = {
-                if (onBack != null) {
-                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
-                }
-            },
-            actions = actions,
-            colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = c.bgPrimary,
-                titleContentColor = c.textNormal,
-                navigationIconContentColor = c.textMuted,
-                actionIconContentColor = c.textMuted,
-            ),
-        )
-        HorizontalDivider(color = c.border)
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .background(Brush.verticalGradient(listOf(c.fade, c.bgPrimary)))
+            .statusBarsPadding()
+            .padding(horizontal = PageGutter)
+            .padding(top = 26.dp, bottom = 16.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (onBack != null) {
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Back",
+                    tint = c.textMuted,
+                    modifier = Modifier.clip(CircleShape).clickable(onClick = onBack).padding(4.dp).size(22.dp),
+                )
+                Spacer(Modifier.width(12.dp))
+            }
+            Text(title, fontSize = 26.sp, fontWeight = FontWeight.Light, color = c.textNormal, modifier = Modifier.weight(1f))
+            actions()
+        }
+        if (subtitle != null) {
+            Spacer(Modifier.height(6.dp))
+            Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = c.textFaint)
+        }
     }
 }
+
+/** A small green heading over a group of rows or controls. The one section label the app uses. */
+@Composable
+fun SectionLabel(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelLarge,
+        color = Obsidian.colors.accentText,
+        modifier = modifier.padding(top = 20.dp, bottom = 8.dp),
+    )
+}
+
+/** Every card's corners, so lists, settings and stats all share one shape. */
+val CardRadius = 18.dp
 
 /** Rounded card grouping related settings. */
 @Composable
@@ -115,7 +150,7 @@ fun SectionCard(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val c = Obsidian.colors
-    val shape = RoundedCornerShape(14.dp)
+    val shape = RoundedCornerShape(CardRadius)
     Column(
         modifier
             .fillMaxWidth()

@@ -58,7 +58,7 @@ fun SwipeToDelete(
                 Modifier
                     .width(88.dp)
                     .fillMaxHeight()
-                    .clip(RoundedCornerShape(14.dp))
+                    .clip(RoundedCornerShape(CardRadius))
                     .background(c.red)
                     .clickable(onClickLabel = "delete") {
                         scope.launch { offset.animateTo(0f) }

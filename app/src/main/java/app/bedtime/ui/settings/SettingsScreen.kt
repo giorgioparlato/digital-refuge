@@ -60,6 +60,10 @@ import app.bedtime.ui.components.ObsidianTopBar
 import app.bedtime.ui.components.ObsidianToggle
 import app.bedtime.ui.components.OptionRow
 import app.bedtime.ui.components.SectionCard
+import app.bedtime.ui.components.SectionLabel
+import app.bedtime.ui.components.ObsidianTopBar
+import app.bedtime.ui.components.PageGutter
+import androidx.compose.material3.Scaffold
 import app.bedtime.ui.formatMinutes
 import app.bedtime.ui.theme.Obsidian
 import kotlinx.coroutines.Dispatchers
@@ -210,36 +214,11 @@ internal fun SettingsContent(
 ) {
     val c = Obsidian.colors
     var otherOpen by rememberSaveable { mutableStateOf(false) }
-    Box(Modifier.fillMaxSize().background(c.bgPrimary)) {
-        // The home screen's fade, kept short so it dies out under the title instead of tinting the page.
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .height(240.dp)
-                .background(Brush.verticalGradient(listOf(Color(0xFF1F2C25), c.bgPrimary))),
-        )
-        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-            Row(
-                Modifier.padding(horizontal = 22.dp).padding(top = 30.dp, bottom = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                if (onBack != null) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back",
-                        tint = c.textMuted,
-                        modifier = Modifier.clip(CircleShape).clickable(onClick = onBack).padding(4.dp).size(22.dp),
-                    )
-                    Spacer(Modifier.width(12.dp))
-                } else {
-                    IconBadge(BedtimeIcons.Refuge, size = 46.dp)
-                    Spacer(Modifier.width(14.dp))
-                }
-                // The version and where your data lives are said once, at the foot of the page.
-                Text("settings", fontSize = 26.sp, fontWeight = FontWeight.Light, color = c.textNormal)
-            }
-            Column(Modifier.padding(horizontal = 22.dp)) {
-                Spacer(Modifier.height(14.dp))
+    // The version and where your data lives are said once, at the foot of the page.
+    Scaffold(containerColor = c.bgPrimary, topBar = { ObsidianTopBar("settings", onBack = onBack, subtitle = "set up once, then left alone") }) { padding ->
+        Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())) {
+            Column(Modifier.padding(horizontal = PageGutter)) {
+                Spacer(Modifier.height(4.dp))
                 // Not a preference but a health check: the one row that can be wrong, so it sits alone.
                 SettingsRow(
                     Icons.Default.Build,
@@ -263,7 +242,7 @@ internal fun SettingsContent(
                     last = true,
                 )
 
-                SettingsLabel("what a session is like")
+                SectionLabel("what a session is like")
                 SettingsRow(
                     Icons.Default.Home,
                     "Minimal home screen",
@@ -295,7 +274,7 @@ internal fun SettingsContent(
                     SettingsRow(Icons.Default.Share, "Export settings", "Save schedules, blocks, groups and stats to a file", onClick = onExport)
                     SettingsRow(BedtimeIcons.Refuge, "Import settings", "Replace everything with a saved file", onClick = onImport, last = true)
 
-                    SettingsLabel("home-screen widget")
+                    SectionLabel("home-screen widget")
                     Text(
                         if (canPinWidget) {
                             "A one-tap button on your home screen that starts a block. Add one for:"
@@ -327,7 +306,7 @@ internal fun SettingsContent(
                         }
                     }
 
-                    SettingsLabel("quick settings tile")
+                    SectionLabel("quick settings tile")
                     Text(
                         "Edit your quick settings and add the “refuge” tile. Tapping it starts:",
                         style = MaterialTheme.typography.bodySmall,
@@ -373,17 +352,6 @@ internal fun SettingsContent(
             }
         }
     }
-}
-
-/** A group's name, in the accent, above the rows it covers. */
-@Composable
-private fun SettingsLabel(text: String) {
-    Text(
-        text,
-        style = MaterialTheme.typography.labelLarge,
-        color = Obsidian.colors.accentText,
-        modifier = Modifier.padding(start = 2.dp, top = 22.dp, bottom = 2.dp),
-    )
 }
 
 /** A row on the bare background, with a hairline under it unless it closes its group. */

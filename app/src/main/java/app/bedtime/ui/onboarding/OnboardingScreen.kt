@@ -27,6 +27,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import app.bedtime.ui.components.PageGutter
+import app.bedtime.ui.components.ObsidianTopBar
 import app.bedtime.ui.components.BedtimeIcons
 import app.bedtime.ui.components.CtaButton
 import app.bedtime.ui.components.Text
@@ -36,19 +39,15 @@ import app.bedtime.ui.theme.Obsidian
 @Composable
 fun OnboardingScreen(onDone: () -> Unit) {
     val c = Obsidian.colors
-    Scaffold(containerColor = c.bgPrimary) { padding ->
+    Scaffold(containerColor = c.bgPrimary, topBar = { ObsidianTopBar("how it works", onBack = onDone) }) { padding ->
         Column(
             Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp, vertical = 20.dp),
+                .padding(horizontal = PageGutter)
+                .padding(bottom = 20.dp),
         ) {
-            Spacer(Modifier.height(12.dp))
-            Icon(BedtimeIcons.Refuge, contentDescription = null, tint = c.accent, modifier = Modifier.size(44.dp))
-            Spacer(Modifier.height(18.dp))
-            Text("how it works", style = MaterialTheme.typography.headlineMedium, color = c.textNormal)
-            Spacer(Modifier.height(10.dp))
             Text(
                 "digital refuge sets aside hours when your phone asks less of you. here is what happens in one of " +
                     "them, and how to leave if you need to.",
@@ -87,7 +86,7 @@ fun OnboardingScreen(onDone: () -> Unit) {
             Box(Modifier.fillMaxWidth().height(1.dp).background(c.border))
             Spacer(Modifier.height(28.dp))
 
-            Text("how firm to make it", style = MaterialTheme.typography.headlineSmall, color = c.textNormal)
+            Text("how firm to make it", fontSize = 22.sp, fontWeight = FontWeight.Light, color = c.textNormal)
             Spacer(Modifier.height(10.dp))
             Text(
                 "two things are always true: while a session runs its settings can't be changed, and leaving early " +

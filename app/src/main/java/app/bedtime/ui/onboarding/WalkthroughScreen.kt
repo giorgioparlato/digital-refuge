@@ -79,7 +79,7 @@ fun WalkthroughScreen(onDone: () -> Unit) {
             Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .background(Brush.verticalGradient(listOf(Color(0xFF1F2C25), c.bgPrimary))),
+                .background(Brush.verticalGradient(listOf(c.fade, c.bgPrimary))),
         ) {
             Row(Modifier.fillMaxWidth().padding(top = 16.dp, end = 26.dp), horizontalArrangement = Arrangement.End) {
                 Text(

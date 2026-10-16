@@ -35,6 +35,8 @@ data class ObsidianColors(
     val bgPrimaryAlt: Color,
     /** Raised surfaces: cards. */
     val bgSecondary: Color,
+    /** The soft green that hero headers, covers and the unlock pages fade down from into [bgPrimary]. */
+    val fade: Color,
     val border: Color,
     val interactive: Color,
     val interactiveHover: Color,
@@ -59,6 +61,7 @@ val DarkObsidian = ObsidianColors(
     bgPrimary = Color(0xFF282828),
     bgPrimaryAlt = Color(0xFF222222),
     bgSecondary = Color(0xFF2F2F2F),
+    fade = Color(0xFF1F2C25),
     border = Color(0xFF3A3A3A),
     interactive = Color(0xFF363636),
     interactiveHover = Color(0xFF424242),
@@ -80,6 +83,7 @@ val LightObsidian = ObsidianColors(
     bgPrimary = Color(0xFFF8F5F1), // l-gray-20
     bgPrimaryAlt = Color(0xFFF2ECE3), // l-gray-30
     bgSecondary = Color(0xFFFCFAF8), // l-gray-10
+    fade = Color(0xFFE2EDE3),
     border = Color(0xFFE4D8C3), // l-gray-60
     interactive = Color(0xFFEEE7DD), // l-gray-40
     interactiveHover = Color(0xFFE4D8C3), // l-gray-60

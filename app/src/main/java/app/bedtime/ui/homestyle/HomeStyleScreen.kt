@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Face
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import app.bedtime.ui.components.PageGutter
 import app.bedtime.ui.components.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -105,7 +106,7 @@ internal fun HomeStyleContent(
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
+                .padding(horizontal = PageGutter, vertical = 4.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(

@@ -24,6 +24,8 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import app.bedtime.ui.components.SectionLabel
+import app.bedtime.ui.components.PageGutter
 import app.bedtime.ui.components.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -171,7 +173,7 @@ internal fun AppPickerContent(
             ObsidianTextField(
                 value = query,
                 onValueChange = onQueryChange,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                modifier = Modifier.padding(horizontal = PageGutter, vertical = 12.dp),
                 placeholder = "Search apps",
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = c.textMuted) },
             )
@@ -193,7 +195,7 @@ internal fun AppPickerContent(
                             title = lock.title,
                             kind = CalloutKind.WARNING,
                             body = lock.body,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                            modifier = Modifier.padding(horizontal = PageGutter, vertical = 8.dp),
                         )
                     }
                 }
@@ -233,7 +235,7 @@ internal fun AppPickerContent(
 @Composable
 private fun AllowInfo(apps: List<AppEntry>, selected: Set<String>, essentials: Set<String>, alwaysAllowed: Set<String>) {
     val missing = (essentials - alwaysAllowed - selected).map { pkg -> apps.firstOrNull { it.packageName == pkg }?.label ?: pkg }
-    Column(Modifier.padding(horizontal = 16.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(Modifier.padding(horizontal = PageGutter, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Callout(
             title = "Keep a way out",
             kind = CalloutKind.INFO,
@@ -254,7 +256,7 @@ private fun AllowInfo(apps: List<AppEntry>, selected: Set<String>, essentials: S
 @Composable
 private fun AlwaysInfo(apps: List<AppEntry>, selected: Set<String>, riskyPackages: Set<String>) {
     val risky = (riskyPackages intersect selected).map { pkg -> apps.firstOrNull { it.packageName == pkg }?.label ?: pkg }
-    Column(Modifier.padding(horizontal = 16.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(Modifier.padding(horizontal = PageGutter, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Callout(
             title = "What belongs here",
             kind = CalloutKind.INFO,
@@ -288,8 +290,8 @@ private fun GroupChips(
     onSave: () -> Unit,
 ) {
     val c = Obsidian.colors
-    Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-        Text("Groups", style = MaterialTheme.typography.labelLarge, color = c.textMuted, modifier = Modifier.padding(bottom = 8.dp))
+    Column(Modifier.padding(horizontal = PageGutter, vertical = 8.dp)) {
+        SectionLabel("Groups", Modifier.padding(top = 0.dp))
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             groups.forEach { (group, available) ->
                 QuickChip("${group.name} · ${available.size}", selected = selected.containsAll(available)) { onToggleGroup(available) }
@@ -329,7 +331,7 @@ private fun AppRow(app: AppEntry, checked: Boolean, onToggle: () -> Unit, enable
         Modifier
             .fillMaxWidth()
             .then(if (enabled) Modifier.clickable(onClick = onToggle) else Modifier)
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+            .padding(horizontal = PageGutter, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         AppIcon(app.packageName, app.label)

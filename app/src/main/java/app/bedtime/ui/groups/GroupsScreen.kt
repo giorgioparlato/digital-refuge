@@ -10,6 +10,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import app.bedtime.ui.components.PageGutter
 import app.bedtime.ui.components.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -116,7 +117,7 @@ internal fun GroupsContent(
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
+                .padding(horizontal = PageGutter, vertical = 4.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(
@@ -172,7 +173,7 @@ internal fun GroupEditContent(
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
+                .padding(horizontal = PageGutter, vertical = 4.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             SectionCard {

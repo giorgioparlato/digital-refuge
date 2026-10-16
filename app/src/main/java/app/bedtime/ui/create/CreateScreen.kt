@@ -21,6 +21,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import app.bedtime.ui.components.PageGutter
+import app.bedtime.ui.components.CardRadius
+import app.bedtime.ui.components.SectionLabel
 import app.bedtime.ui.components.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -61,7 +64,7 @@ internal fun CreateContent(onBack: () -> Unit, onPick: (String) -> Unit, isInsta
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
+                .padding(horizontal = PageGutter, vertical = 4.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             GroupTitle("Start from scratch")
@@ -104,17 +107,16 @@ fun TemplateIcon.vector(): ImageVector = when (this) {
 
 @Composable
 private fun GroupTitle(title: String, subtitle: String? = null) {
-    val c = Obsidian.colors
-    Column(Modifier.fillMaxWidth().padding(top = 12.dp, start = 4.dp)) {
-        Text(title, style = MaterialTheme.typography.titleMedium, color = c.textNormal)
-        if (subtitle != null) Text(subtitle, style = MaterialTheme.typography.bodySmall, color = c.textMuted)
+    Column(Modifier.fillMaxWidth()) {
+        SectionLabel(title)
+        if (subtitle != null) Text(subtitle, style = MaterialTheme.typography.bodySmall, color = Obsidian.colors.textFaint)
     }
 }
 
 @Composable
 private fun ScratchCard(icon: ImageVector, title: String, description: String, modifier: Modifier, onClick: () -> Unit) {
     val c = Obsidian.colors
-    val shape = RoundedCornerShape(14.dp)
+    val shape = RoundedCornerShape(CardRadius)
     Column(
         modifier
             .fillMaxHeight()
@@ -135,7 +137,7 @@ private fun ScratchCard(icon: ImageVector, title: String, description: String, m
 private fun TemplateCard(template: Template, isInstalled: (String) -> Boolean, onClick: () -> Unit) {
     val context = LocalContext.current
     val c = Obsidian.colors
-    val shape = RoundedCornerShape(14.dp)
+    val shape = RoundedCornerShape(CardRadius)
     val sample = remember(template.key) { template.build(isInstalled) }
     val timing = if (sample.isBlock) {
         formatMinutes(sample.durationMinutes.toLong())

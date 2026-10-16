@@ -1,6 +1,7 @@
 package app.bedtime.ui.limits
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -29,12 +30,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.bedtime.ui.components.CardRadius
 import app.bedtime.data.AppLimit
 import app.bedtime.data.Repository
 import app.bedtime.data.UsageDay
 import app.bedtime.engine.Limits
 import app.bedtime.ui.components.CtaButton
 import app.bedtime.ui.components.Text
+import app.bedtime.ui.components.ObsidianTopBar
+import app.bedtime.ui.components.PageGutter
 import app.bedtime.ui.formatMinutes
 import app.bedtime.ui.formatWaitSeconds
 import app.bedtime.ui.pluralApps
@@ -70,6 +74,7 @@ internal fun LimitsContent(
     val todayUsage = usage.lastOrNull { it.day == today } ?: UsageDay(today)
     Scaffold(
         containerColor = c.bgPrimary,
+        topBar = { ObsidianTopBar("limits", subtitle = "every day, not only in a session") },
         floatingActionButton = {
             if (limits.isNotEmpty()) {
                 ExtendedFloatingActionButton(
@@ -85,16 +90,9 @@ internal fun LimitsContent(
     ) { padding ->
         LazyColumn(
             Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 28.dp, bottom = 110.dp),
+            contentPadding = PaddingValues(start = PageGutter, end = PageGutter, top = 4.dp, bottom = 110.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item(key = "header") {
-                Column(Modifier.padding(bottom = 6.dp)) {
-                    Text("limits", fontSize = 27.sp, fontWeight = FontWeight.Light, color = c.textNormal)
-                    Spacer(Modifier.height(6.dp))
-                    Text("every day, not only in a session", style = MaterialTheme.typography.bodyMedium, color = c.textFaint)
-                }
-            }
             if (limits.isEmpty()) {
                 item(key = "empty") {
                     Column(Modifier.fillMaxWidth().padding(top = 8.dp)) {
@@ -129,10 +127,10 @@ internal fun limitSummary(limit: AppLimit): String {
 @Composable
 private fun LimitCard(limit: AppLimit, today: UsageDay, todayDay: Long, onClick: () -> Unit) {
     val c = Obsidian.colors
-    val shape = RoundedCornerShape(18.dp)
+    val shape = RoundedCornerShape(CardRadius)
     val rules = limit.rules
     Column(
-        Modifier.fillMaxWidth().clip(shape).background(c.bgSecondary)
+        Modifier.fillMaxWidth().clip(shape).background(c.bgSecondary).border(1.dp, c.border, shape)
             .clickable(onClickLabel = "Edit ${limit.name}", onClick = onClick)
             .padding(18.dp),
     ) {

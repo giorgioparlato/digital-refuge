@@ -27,6 +27,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import app.bedtime.ui.components.PageGutter
 import app.bedtime.ui.components.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
@@ -86,6 +87,7 @@ import app.bedtime.ui.components.ObsidianTopBar
 import app.bedtime.ui.components.OptionRow
 import app.bedtime.ui.components.QuickChip
 import app.bedtime.ui.components.SectionCard
+import app.bedtime.ui.components.SectionLabel
 import app.bedtime.ui.components.SegmentedChoice
 import app.bedtime.ui.components.SubOptionRow
 import app.bedtime.ui.components.styledTime
@@ -123,6 +125,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 
 private val ScheduleSaver = Saver<Schedule, String>(
     save = { AppJson.encodeToString(Schedule.serializer(), it) },
@@ -459,7 +462,8 @@ internal fun ScheduleEditContent(
     if (renaming) {
         RenameDialog(
             name = draft.name,
-            isBlock = isBlock,
+            title = if (isBlock) "Name this block" else "Name this schedule",
+            placeholder = if (isBlock) "e.g. Deep work" else "e.g. Bedtime",
             onDismiss = { renaming = false },
             onDone = { onDraftChange(draft.copy(name = it)); renaming = false },
         )
@@ -619,7 +623,7 @@ internal fun ScheduleEditContent(
                             Chevron()
                         }
                     }
-                    FoldLabel("Notifications")
+                    SectionLabel("Notifications")
                     SegmentedChoice(
                         options = listOf("Off", "Priority", "Silence"),
                         selected = draft.dnd.ordinal,
@@ -661,9 +665,9 @@ internal fun ScheduleEditContent(
                     open = open == SECTION_LEAVING,
                     onToggle = { toggle(SECTION_LEAVING) },
                 ) {
-                    FoldLabel("The steps, in this order")
+                    SectionLabel("The steps, in this order")
                     UnlockStepsEditor(unlock, { u -> onDraftChange(draft.copy(unlock = u)) }, editable, newPassword, onNewPasswordChange)
-                    FoldLabel("What unlocking gets you")
+                    SectionLabel("What unlocking gets you")
                     SegmentedChoice(
                         // Three to a row, so the words are short; the line below says each in full.
                         options = listOf(if (isBlock) "End it" else "End today", "Set break", "You choose"),
@@ -824,6 +828,65 @@ internal fun ScheduleEditContent(
 }
 
 /**
+ * The top of an editor: the back arrow, the name (tap to rename), an optional ⓘ, and under them on
+ * the home screen's fade whatever the thing being edited is mostly about.
+ */
+@Composable
+internal fun EditorHeader(
+    name: String,
+    placeholder: String,
+    editable: Boolean,
+    onBack: () -> Unit,
+    onRename: () -> Unit,
+    onInfo: (() -> Unit)? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val c = Obsidian.colors
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .background(Brush.verticalGradient(listOf(c.fade, c.bgPrimary)))
+            .statusBarsPadding()
+            .padding(horizontal = PageGutter)
+            .padding(top = 26.dp, bottom = 18.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Back",
+                tint = c.textMuted,
+                modifier = Modifier.clip(CircleShape).clickable(onClick = onBack).padding(4.dp).size(22.dp),
+            )
+            Spacer(Modifier.width(10.dp))
+            Row(
+                Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable(enabled = editable, onClickLabel = "rename", onClick = onRename)
+                    .padding(vertical = 4.dp, horizontal = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(name.ifBlank { placeholder }, style = MaterialTheme.typography.labelLarge, color = c.textFaint)
+                if (editable) {
+                    Spacer(Modifier.width(7.dp))
+                    Icon(Icons.Default.Create, contentDescription = null, tint = c.textFaint, modifier = Modifier.size(13.dp))
+                }
+            }
+            if (onInfo != null) {
+                Icon(
+                    Icons.Default.Info,
+                    contentDescription = "How it works",
+                    tint = c.textFaint,
+                    modifier = Modifier.clip(CircleShape).clickable(onClick = onInfo).padding(4.dp).size(20.dp),
+                )
+            }
+        }
+        Spacer(Modifier.height(22.dp))
+        content()
+    }
+}
+
+/**
  * The top of the page: the back arrow, the name, and then the thing you came to change — the hours
  * for a schedule, the length for a block — on the home screen's fade.
  */
@@ -840,118 +903,83 @@ private fun ScheduleHeader(
 ) {
     val context = LocalContext.current
     val c = Obsidian.colors
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .background(Brush.verticalGradient(listOf(Color(0xFF1F2C25), c.bgPrimary)))
-            .padding(horizontal = 24.dp)
-            .padding(top = 30.dp, bottom = 18.dp),
+    EditorHeader(
+        name = draft.name,
+        placeholder = if (draft.isBlock) "name this block" else "name this schedule",
+        editable = editable,
+        onBack = onBack,
+        onRename = onRename,
+        onInfo = onHowItWorks,
     ) {
-        Column {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Back",
-                    tint = c.textMuted,
-                    modifier = Modifier.clip(CircleShape).clickable(onClick = onBack).padding(4.dp).size(22.dp),
-                )
-                Spacer(Modifier.width(10.dp))
-                Row(
-                    Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(8.dp))
-                        .clickable(enabled = editable, onClickLabel = "rename", onClick = onRename)
-                        .padding(vertical = 4.dp, horizontal = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        draft.name.ifBlank { if (draft.isBlock) "name this block" else "name this schedule" },
-                        style = MaterialTheme.typography.labelLarge,
-                        color = c.textFaint,
-                    )
-                    if (editable) {
-                        Spacer(Modifier.width(7.dp))
-                        Icon(Icons.Default.Create, contentDescription = null, tint = c.textFaint, modifier = Modifier.size(13.dp))
-                    }
-                }
-                Icon(
-                    Icons.Default.Info,
-                    contentDescription = "How it works",
-                    tint = c.textFaint,
-                    modifier = Modifier.clip(CircleShape).clickable(onClick = onHowItWorks).padding(4.dp).size(20.dp),
+        if (draft.isBlock) {
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text(
+                    formatMinutes(draft.durationMinutes.toLong()),
+                    fontSize = 40.sp,
+                    fontWeight = FontWeight.Light,
+                    color = c.textNormal,
                 )
             }
-            Spacer(Modifier.height(22.dp))
-            if (draft.isBlock) {
-                Row(verticalAlignment = Alignment.Bottom) {
-                    Text(
-                        formatMinutes(draft.durationMinutes.toLong()),
-                        fontSize = 40.sp,
-                        fontWeight = FontWeight.Light,
-                        color = c.textNormal,
-                    )
-                }
-                Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "you can change it each time you start the block",
+                style = MaterialTheme.typography.bodyMedium,
+                color = c.textMuted,
+            )
+            Spacer(Modifier.height(16.dp))
+            NumberStepper(
+                draft.durationMinutes,
+                { onDraftChange(draft.copy(durationMinutes = it)) },
+                5..480,
+                step = 5,
+                suffix = " min",
+                enabled = editable,
+                presets = listOf(15, 25, 30, 45, 60, 90, 120, 180),
+                title = "default length",
+            )
+        } else {
+            // A 12-hour clock adds " pm" to both ends, so the am/pm shrinks and nothing wraps.
+            val big = if (is24Hour(context)) 40.sp else 34.sp
+            Row(verticalAlignment = Alignment.Bottom) {
                 Text(
-                    "you can change it each time you start the block",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = c.textMuted,
+                    styledTime(formatMinuteOfDay(context, draft.startMinute), suffixSize = big * 0.5f),
+                    fontSize = big,
+                    fontWeight = FontWeight.Light,
+                    color = c.textNormal,
+                    maxLines = 1,
+                    softWrap = false,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable(enabled = editable, onClickLabel = "change the start", onClick = onEditStart)
+                        .padding(horizontal = 4.dp),
                 )
-                Spacer(Modifier.height(16.dp))
-                NumberStepper(
-                    draft.durationMinutes,
-                    { onDraftChange(draft.copy(durationMinutes = it)) },
-                    5..480,
-                    step = 5,
-                    suffix = " min",
-                    enabled = editable,
-                    presets = listOf(15, 25, 30, 45, 60, 90, 120, 180),
-                    title = "default length",
-                )
-            } else {
-                // A 12-hour clock adds " pm" to both ends, so the am/pm shrinks and nothing wraps.
-                val big = if (is24Hour(context)) 40.sp else 34.sp
-                Row(verticalAlignment = Alignment.Bottom) {
-                    Text(
-                        styledTime(formatMinuteOfDay(context, draft.startMinute), suffixSize = big * 0.5f),
-                        fontSize = big,
-                        fontWeight = FontWeight.Light,
-                        color = c.textNormal,
-                        maxLines = 1,
-                        softWrap = false,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .clickable(enabled = editable, onClickLabel = "change the start", onClick = onEditStart)
-                            .padding(horizontal = 4.dp),
-                    )
-                    Text(" \u2192 ", fontSize = 24.sp, color = c.textFaint, modifier = Modifier.padding(bottom = 5.dp))
-                    Text(
-                        styledTime(formatMinuteOfDay(context, draft.endMinute), suffixSize = big * 0.5f),
-                        fontSize = big,
-                        fontWeight = FontWeight.Light,
-                        color = c.textNormal,
-                        maxLines = 1,
-                        softWrap = false,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .clickable(enabled = editable, onClickLabel = "change the end", onClick = onEditEnd)
-                            .padding(horizontal = 4.dp),
-                    )
-                }
-                Spacer(Modifier.height(6.dp))
+                Text(" \u2192 ", fontSize = 24.sp, color = c.textFaint, modifier = Modifier.padding(bottom = 5.dp))
                 Text(
-                    "${formatDays(draft.days)} · ${formatMinutes(scheduleMinutes(draft).toLong())} each time" +
-                        if (draft.endMinute <= draft.startMinute) " · ends next day" else "",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = c.textMuted,
+                    styledTime(formatMinuteOfDay(context, draft.endMinute), suffixSize = big * 0.5f),
+                    fontSize = big,
+                    fontWeight = FontWeight.Light,
+                    color = c.textNormal,
+                    maxLines = 1,
+                    softWrap = false,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable(enabled = editable, onClickLabel = "change the end", onClick = onEditEnd)
+                        .padding(horizontal = 4.dp),
                 )
-                Spacer(Modifier.height(16.dp))
-                DaySelector(draft.days, onChange = { onDraftChange(draft.copy(days = it)) }, enabled = editable)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    QuickChip("Every day", draft.days.size == 7, editable) { onDraftChange(draft.copy(days = (1..7).toSet())) }
-                    QuickChip("Weekdays", draft.days == (1..5).toSet(), editable) { onDraftChange(draft.copy(days = (1..5).toSet())) }
-                    QuickChip("Weekends", draft.days == setOf(6, 7), editable) { onDraftChange(draft.copy(days = setOf(6, 7))) }
-                }
+            }
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "${formatDays(draft.days)} · ${formatMinutes(scheduleMinutes(draft).toLong())} each time" +
+                    if (draft.endMinute <= draft.startMinute) " · ends next day" else "",
+                style = MaterialTheme.typography.bodyMedium,
+                color = c.textMuted,
+            )
+            Spacer(Modifier.height(16.dp))
+            DaySelector(draft.days, onChange = { onDraftChange(draft.copy(days = it)) }, enabled = editable)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                QuickChip("Every day", draft.days.size == 7, editable) { onDraftChange(draft.copy(days = (1..7).toSet())) }
+                QuickChip("Weekdays", draft.days == (1..5).toSet(), editable) { onDraftChange(draft.copy(days = (1..5).toSet())) }
+                QuickChip("Weekends", draft.days == setOf(6, 7), editable) { onDraftChange(draft.copy(days = setOf(6, 7))) }
             }
         }
     }
@@ -1010,31 +1038,20 @@ internal fun FoldSection(
     }
 }
 
-/** A small heading inside an open fold, where one section holds two questions. */
-@Composable
-internal fun FoldLabel(text: String) {
-    Text(
-        text,
-        style = MaterialTheme.typography.labelLarge,
-        color = Obsidian.colors.accentText,
-        modifier = Modifier.padding(top = 18.dp, bottom = 8.dp),
-    )
-}
-
 /** Renaming, kept off the page itself: it is read far more often than it is changed. */
 @Composable
-private fun RenameDialog(name: String, isBlock: Boolean, onDismiss: () -> Unit, onDone: (String) -> Unit) {
+internal fun RenameDialog(name: String, title: String, placeholder: String, onDismiss: () -> Unit, onDone: (String) -> Unit) {
     val c = Obsidian.colors
     var text by remember { mutableStateOf(name) }
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = c.bgSecondary,
-        title = { Text(if (isBlock) "Name this block" else "Name this schedule") },
+        title = { Text(title) },
         text = {
             ObsidianTextField(
                 value = text,
                 onValueChange = { text = it },
-                placeholder = if (isBlock) "e.g. Deep work" else "e.g. Bedtime",
+                placeholder = placeholder,
             )
         },
         confirmButton = {

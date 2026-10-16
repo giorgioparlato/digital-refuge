@@ -279,7 +279,7 @@ internal fun UnlockLayout(
     content: @Composable () -> Unit,
 ) {
     val c = Obsidian.colors
-    val deep = Color(0xFF1F2C25)
+    val deep = c.fade
     Column(
         modifier
             .fillMaxSize()
@@ -393,7 +393,7 @@ internal fun UnlockSuccess(message: String) {
         Box(Modifier.size(88.dp).clip(CircleShape).background(c.green.copy(alpha = 0.15f)), contentAlignment = Alignment.Center) {
             Icon(Icons.Default.Check, contentDescription = null, tint = c.green, modifier = Modifier.size(44.dp))
         }
-        Text("Unlocked", style = MaterialTheme.typography.headlineSmall, color = c.textNormal)
+        Text("Unlocked", fontSize = 28.sp, fontWeight = FontWeight.Light, color = c.textNormal)
         Text(message, style = MaterialTheme.typography.bodyLarge, color = c.textMuted, textAlign = TextAlign.Center)
     }
 }

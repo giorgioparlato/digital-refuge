@@ -199,49 +199,14 @@ private fun BlockedScreen(pkg: String?, guardingSettings: Boolean, onHome: () ->
 
 @Composable
 internal fun BlockedContent(appLabel: String, scheduleName: String, until: String, onHome: () -> Unit, onUnlock: () -> Unit) {
-    val c = Obsidian.colors
-    Column(
-        Modifier
-            .fillMaxSize()
-            .background(c.bgPrimary)
-            .safeDrawingPadding()
-            .padding(horizontal = 28.dp, vertical = 24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Spacer(Modifier.weight(1f))
-        Box(
-            Modifier.size(124.dp).clip(CircleShape).background(c.accent.copy(alpha = 0.08f)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Box(
-                Modifier.size(88.dp).clip(CircleShape).background(c.accent.copy(alpha = 0.14f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(BedtimeIcons.Moon, contentDescription = null, tint = c.accent, modifier = Modifier.size(44.dp))
-            }
-        }
-        Spacer(Modifier.height(28.dp))
-        StatusPill("$scheduleName is on", c.accentText)
-        Spacer(Modifier.height(16.dp))
-        Text(
-            "$appLabel can wait",
-            style = MaterialTheme.typography.headlineMedium,
-            color = c.textNormal,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(Modifier.height(12.dp))
-        Text(
-            "You'll have it back at $until. Until then, maybe put the phone down for a bit.",
-            style = MaterialTheme.typography.bodyLarge,
-            color = c.textMuted,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(Modifier.weight(1.3f))
-        CtaButton("Go to home screen", onClick = onHome, modifier = Modifier.fillMaxWidth())
-        TextButton(onClick = onUnlock, modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) {
-            Text("I really need it", color = c.textMuted)
-        }
-    }
+    CoverLayout(
+        emblem = { CoverEmblem(BedtimeIcons.Moon) },
+        pill = "$scheduleName is on",
+        title = "$appLabel can wait",
+        body = "You'll have it back at $until. Until then, maybe put the phone down for a bit.",
+        primary = CoverAction("Go to home screen", onHome),
+        secondary = listOf(CoverAction("I really need it", onUnlock)),
+    )
 }
 
 /** Shown over the Settings screens that would switch blocking off during a session. */
@@ -254,61 +219,20 @@ internal fun SettingsGuardContent(
     onUnlock: () -> Unit,
     onBack: () -> Unit,
 ) {
-    val c = Obsidian.colors
     val minutes = "$breakMinutes ${if (breakMinutes == 1) "minute" else "minutes"}"
-    Column(
-        Modifier
-            .fillMaxSize()
-            .background(c.bgPrimary)
-            .safeDrawingPadding()
-            .padding(horizontal = 28.dp, vertical = 24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Spacer(Modifier.weight(1f))
-        Box(
-            Modifier.size(124.dp).clip(CircleShape).background(c.accent.copy(alpha = 0.08f)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Box(
-                Modifier.size(88.dp).clip(CircleShape).background(c.accent.copy(alpha = 0.14f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(BedtimeIcons.Refuge, contentDescription = null, tint = c.accent, modifier = Modifier.size(44.dp))
-            }
-        }
-        Spacer(Modifier.height(28.dp))
-        StatusPill("$scheduleName is on", c.accentText)
-        Spacer(Modifier.height(16.dp))
-        Text(
-            "This stays locked until $until",
-            style = MaterialTheme.typography.headlineMedium,
-            color = c.textNormal,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(Modifier.height(12.dp))
-        Text(
-            if (onPause != null) {
-                "Switching blocking off and uninstalling are locked while $scheduleName runs. If something truly can't " +
-                    "wait, take an emergency break; otherwise end the session with the unlock steps."
-            } else {
-                "Switching blocking off and uninstalling are locked while $scheduleName runs. To do either, end the session " +
-                    "first — the unlock steps still work."
-            },
-            style = MaterialTheme.typography.bodyLarge,
-            color = c.textMuted,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(Modifier.weight(1.3f))
-        if (onPause != null) {
-            CtaButton("Pause blocking for $minutes", onClick = onPause, modifier = Modifier.fillMaxWidth())
-            TextButton(onClick = onUnlock, modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) {
-                Text("End $scheduleName early", color = c.textMuted)
-            }
+    val end = CoverAction("End $scheduleName early", onUnlock)
+    CoverLayout(
+        emblem = { CoverEmblem(BedtimeIcons.Refuge) },
+        pill = "$scheduleName is on",
+        title = "This stays locked until $until",
+        body = if (onPause != null) {
+            "Switching blocking off and uninstalling are locked while $scheduleName runs. If something truly can't " +
+                "wait, take an emergency break; otherwise end the session with the unlock steps."
         } else {
-            CtaButton("End $scheduleName early", onClick = onUnlock, modifier = Modifier.fillMaxWidth())
-        }
-        TextButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) {
-            Text("Go back", color = c.textMuted)
-        }
-    }
+            "Switching blocking off and uninstalling are locked while $scheduleName runs. To do either, end the session " +
+                "first — the unlock steps still work."
+        },
+        primary = if (onPause != null) CoverAction("Pause blocking for $minutes", onPause) else end,
+        secondary = listOfNotNull(end.takeIf { onPause != null }, CoverAction("Go back", onBack)),
+    )
 }

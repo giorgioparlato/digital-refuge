@@ -19,6 +19,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.font.FontWeight
 import app.bedtime.ui.components.CtaButton
 import app.bedtime.ui.components.NumberStepper
 import app.bedtime.ui.components.QuickChip
@@ -68,7 +70,7 @@ internal fun UnlockLengthChoice(
         },
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("How long do you need?", style = MaterialTheme.typography.headlineSmall, color = c.textNormal)
+            Text("How long do you need?", fontSize = 28.sp, fontWeight = FontWeight.Light, color = c.textNormal)
             Spacer(Modifier.height(8.dp))
             Text(
                 "Decide first, then earn it.",

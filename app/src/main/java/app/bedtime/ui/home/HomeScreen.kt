@@ -52,6 +52,9 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.bedtime.ui.components.PageGutter
+import app.bedtime.ui.components.SectionLabel
+import app.bedtime.ui.components.CardRadius
 import app.bedtime.apps.AppCatalog
 import app.bedtime.data.AppSettings
 import app.bedtime.data.Changelog
@@ -221,37 +224,32 @@ internal fun HomeContent(
         item(key = "header") { HomeHeader(ui, onUnlock, onUndo) }
         if (needsSetup) {
             item(key = "setup") {
-                Box(Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
+                Box(Modifier.padding(horizontal = PageGutter, vertical = 8.dp)) {
                     SetupChecklist(ui.serviceOn, ui.greyscaleOk, if (usesDnd) ui.dndOk else null, onSetup)
                 }
             }
         }
         if (ui.whatsNew != null) {
             item(key = "whats-new") {
-                Box(Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) { WhatsNewCard(ui.whatsNew, onDismissWhatsNew) }
+                Box(Modifier.padding(horizontal = PageGutter, vertical = 8.dp)) { WhatsNewCard(ui.whatsNew, onDismissWhatsNew) }
             }
         }
         if (ui.schedules.isEmpty()) {
             item(key = "empty") {
-                Box(Modifier.padding(horizontal = 20.dp)) {
+                Box(Modifier.padding(horizontal = PageGutter)) {
                     EmptyState(onCreate = onCreate, onTemplate = onTemplate, isInstalled = isInstalled)
                 }
             }
         } else {
             item(key = "blocks-heading") {
-                Text(
-                    if (blocks.isEmpty()) "blocks" else "start a block",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = c.textMuted,
-                    modifier = Modifier.padding(start = 24.dp, top = 20.dp, bottom = 12.dp),
-                )
+                SectionLabel(if (blocks.isEmpty()) "blocks" else "start a block", Modifier.padding(start = PageGutter))
             }
             // Two to a row, with "new block" always closing the grid.
             val cells = blocks.map<Schedule, Schedule?> { it } + listOf(null)
             val rows = cells.chunked(2)
             items(rows.size, key = { rows[it].first()?.id ?: "new-block" }) { index ->
                 Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 20.dp).height(84.dp).padding(bottom = 12.dp),
+                    Modifier.fillMaxWidth().padding(horizontal = PageGutter).height(84.dp).padding(bottom = 12.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     rows[index].forEach { block ->
@@ -293,8 +291,8 @@ private fun HomeHeader(ui: HomeUiState, onUnlock: (String) -> Unit, onUndo: (Str
 
     Box(
         Modifier.fillMaxWidth()
-            .background(Brush.verticalGradient(listOf(Color(0xFF1F2C25), c.bgPrimary)))
-            .padding(horizontal = 24.dp).padding(top = 30.dp, bottom = 26.dp),
+            .background(Brush.verticalGradient(listOf(c.fade, c.bgPrimary)))
+            .padding(horizontal = PageGutter).padding(top = 30.dp, bottom = 26.dp),
     ) {
         Column {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -383,7 +381,7 @@ private fun BlockTile(
 ) {
     val context = LocalContext.current
     val c = Obsidian.colors
-    val shape = RoundedCornerShape(18.dp)
+    val shape = RoundedCornerShape(CardRadius)
     Row(
         modifier.clip(shape)
             .background(if (running != null) c.accent.copy(alpha = 0.12f) else c.bgSecondary)
@@ -467,7 +465,7 @@ private fun BlockLengthDialog(block: Schedule, onDismiss: () -> Unit, onDone: (I
 @Composable
 private fun NewBlockTile(onCreate: () -> Unit, modifier: Modifier) {
     val c = Obsidian.colors
-    val shape = RoundedCornerShape(18.dp)
+    val shape = RoundedCornerShape(CardRadius)
     Row(
         modifier.clip(shape).border(1.dp, c.border, shape)
             .clickable(onClickLabel = "New block", onClick = onCreate)
@@ -486,7 +484,7 @@ private fun NewBlockTile(onCreate: () -> Unit, modifier: Modifier) {
 @Composable
 private fun QuoteFooter(quote: Quote) {
     val c = Obsidian.colors
-    Column(Modifier.padding(horizontal = 24.dp).padding(top = 26.dp)) {
+    Column(Modifier.padding(horizontal = PageGutter).padding(top = 26.dp)) {
         Box(Modifier.fillMaxWidth().height(1.dp).background(c.border.copy(alpha = 0.6f)))
         Spacer(Modifier.height(22.dp))
         Text(
@@ -506,7 +504,7 @@ private fun QuoteFooter(quote: Quote) {
 @Composable
 private fun StatsLine(summary: String, onClick: () -> Unit) {
     val c = Obsidian.colors
-    Column(Modifier.padding(horizontal = 24.dp).padding(top = 26.dp)) {
+    Column(Modifier.padding(horizontal = PageGutter).padding(top = 26.dp)) {
         Box(Modifier.fillMaxWidth().height(1.dp).background(c.border.copy(alpha = 0.6f)))
         Row(
             Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))

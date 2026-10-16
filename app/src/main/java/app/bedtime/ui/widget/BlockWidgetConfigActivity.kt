@@ -31,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.bedtime.ui.components.PageGutter
 import app.bedtime.MainActivity
 import app.bedtime.Routes
 import app.bedtime.data.Repository
@@ -97,7 +98,7 @@ internal fun WidgetBlockPickerContent(blocks: List<Schedule>, onPick: (Schedule)
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
+                .padding(horizontal = PageGutter, vertical = 4.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(

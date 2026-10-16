@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -336,14 +337,15 @@ private fun UnlockScreen(scheduleId: String, onBack: () -> Unit) {
         if (state != null && occurrence == null) onBack()
     }
     if (occurrence == null) return
-    Scaffold(containerColor = Obsidian.colors.bgPrimary, topBar = { ObsidianTopBar("Unlock", onBack = onBack) }) { padding ->
+    // The unlock pages carry their own way back ("never mind") and say what they unlock, so no bar.
+    Box(Modifier.fillMaxSize().background(Obsidian.colors.bgPrimary)) {
         UnlockFlow(
             occurrence,
             onUnlocked = { },
             onCancel = onBack,
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
+                .safeDrawingPadding()
                 .imePadding(),
         )
     }

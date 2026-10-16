@@ -34,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import app.bedtime.ui.components.PageGutter
 import app.bedtime.apps.AppCatalog
 import app.bedtime.data.AppJson
 import app.bedtime.data.AppLimit
@@ -59,8 +60,11 @@ import app.bedtime.ui.components.QuickChip
 import app.bedtime.ui.components.SegmentedChoice
 import app.bedtime.ui.components.SubOptionRow
 import app.bedtime.ui.components.Text
-import app.bedtime.ui.edit.FoldLabel
+import app.bedtime.ui.components.SectionLabel
+import app.bedtime.ui.edit.EditorHeader
+import app.bedtime.ui.edit.RenameDialog
 import app.bedtime.ui.edit.UnlockStepsEditor
+import androidx.compose.ui.unit.sp
 import app.bedtime.ui.formatMinutes
 import app.bedtime.ui.formatWaitSeconds
 import app.bedtime.ui.pluralApps
@@ -234,9 +238,21 @@ internal fun LimitEditContent(
     val rules = draft.rules
     fun setRules(transform: (LimitRules) -> LimitRules) = onDraftChange(draft.copy(rules = transform(rules)))
 
+    var renaming by rememberSaveable { mutableStateOf(false) }
+    if (renaming) {
+        RenameDialog(
+            name = draft.name,
+            title = "Name this limit",
+            placeholder = "e.g. Social",
+            onDismiss = { renaming = false },
+            onDone = {
+                onDraftChange(draft.copy(name = it))
+                renaming = false
+            },
+        )
+    }
     Scaffold(
         containerColor = c.bgPrimary,
-        topBar = { ObsidianTopBar(if (isNew) "New limit" else "Limit", onBack = onBack) },
         bottomBar = {
             BottomActionBar {
                 CtaButton(
@@ -251,212 +267,231 @@ internal fun LimitEditContent(
             }
         },
     ) { padding ->
-        Column(
-            Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
-        ) {
-            Spacer(Modifier.height(8.dp))
-            ObsidianTextField(
-                value = draft.name,
-                onValueChange = { onDraftChange(draft.copy(name = it)) },
-                label = "Name, e.g. social",
-            )
-            if (error != null) {
-                Callout(title = "Almost there", kind = CalloutKind.WARNING, body = error, modifier = Modifier.padding(top = 14.dp))
-            }
-            if (loosens) {
-                Callout(
-                    title = "This loosens it, so it starts tomorrow",
-                    kind = CalloutKind.INFO,
-                    body = "Today keeps the limit as it was. Making a limit stricter always takes effect at once.",
-                    modifier = Modifier.padding(top = 14.dp),
+        Column(Modifier.fillMaxSize().padding(bottom = padding.calculateBottomPadding()).verticalScroll(rememberScrollState())) {
+            // Like a schedule's page: the name on top, and large under it what the limit mostly is.
+            EditorHeader(
+                name = draft.name,
+                placeholder = "name this limit",
+                editable = true,
+                onBack = onBack,
+                onRename = { renaming = true },
+            ) {
+                Text(
+                    when {
+                        rules.dailyMinutes != null -> "${formatMinutes(rules.dailyMinutes.toLong())} a day"
+                        (rules.pauseSeconds ?: 0) > 0 -> "${formatWaitSeconds(rules.pauseSeconds ?: 0)} pause"
+                        else -> "not set yet"
+                    },
+                    fontSize = 40.sp,
+                    fontWeight = FontWeight.Light,
+                    color = c.textNormal,
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    if (rules.apps.isEmpty()) "no apps yet · choose them below" else limitSummary(draft),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = c.textMuted,
                 )
             }
-            Spacer(Modifier.height(10.dp))
-            OptionRow(
-                BedtimeIcons.Grid,
-                "Apps",
-                description = if (rules.apps.isEmpty()) "None yet · tap to choose" else pluralApps(rules.apps.size),
-                onClick = onPickApps,
-            ) {
-                AppIconStack(rules.apps.sorted(), appLabel)
-                Chevron()
-            }
-
-            FoldLabel("Pause before opening")
-            OptionRow(
-                BedtimeIcons.Hourglass,
-                "A few breaths first",
-                description = "Before one of these apps opens, wait a moment and decide",
-            ) {
-                ObsidianToggle(
-                    (rules.pauseSeconds ?: 0) > 0,
-                    { on -> setRules { it.copy(pauseSeconds = if (on) 10 else null) } },
-                )
-            }
-            AnimatedVisibility((rules.pauseSeconds ?: 0) > 0) {
-                Column {
-                    SubOptionRow("How long") {
-                        NumberStepper(
-                            rules.pauseSeconds ?: 10,
-                            { v -> setRules { it.copy(pauseSeconds = v) } },
-                            3..120,
-                            presets = listOf(5, 10, 15, 20, 30, 60),
-                            title = "pause",
-                            format = { formatWaitSeconds(it) },
-                        )
-                    }
-                    SubOptionRow("Back within") {
-                        NumberStepper(
-                            rules.graceMinutes,
-                            { v -> setRules { it.copy(graceMinutes = v) } },
-                            0..60,
-                            presets = listOf(0, 1, 2, 5, 10, 15),
-                            title = "grace",
-                            format = { if (it == 0) "every time" else "$it min" },
-                        )
-                    }
-                    if (rules.apps.size > 1) {
-                        Text(
-                            "Opening one anyway lets you into",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = c.textMuted,
-                            modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
-                        )
-                        SegmentedChoice(
-                            options = listOf("Just that app", "All of them"),
-                            selected = if (rules.pauseForGroup) 1 else 0,
-                            onSelect = { i -> setRules { it.copy(pauseForGroup = i == 1) } },
-                        )
-                    }
-                    Text(
-                        if (rules.apps.size > 1 && rules.pauseForGroup) {
-                            if (rules.graceMinutes == 0) {
-                                "Getting through the pause once opens all of these apps, until you leave them for something else."
-                            } else {
-                                "Getting through the pause once opens the way to all of these apps. Leaving them and coming back " +
-                                    "within ${rules.graceMinutes} min doesn't ask again."
-                            }
-                        } else if (rules.graceMinutes == 0) {
-                            "The pause comes every time you open one of them."
-                        } else {
-                            "After you open one anyway, leaving and coming back within ${rules.graceMinutes} min doesn't ask again."
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = c.textMuted,
-                        modifier = Modifier.padding(top = 6.dp),
+            Column(Modifier.padding(horizontal = PageGutter)) {
+                if (error != null) {
+                    Callout(title = "Almost there", kind = CalloutKind.WARNING, body = error, modifier = Modifier.padding(top = 14.dp))
+                }
+                if (loosens) {
+                    Callout(
+                        title = "This loosens it, so it starts tomorrow",
+                        kind = CalloutKind.INFO,
+                        body = "Today keeps the limit as it was. Making a limit stricter always takes effect at once.",
+                        modifier = Modifier.padding(top = 14.dp),
                     )
                 }
-            }
+                Spacer(Modifier.height(10.dp))
+                OptionRow(
+                    BedtimeIcons.Grid,
+                    "Apps",
+                    description = if (rules.apps.isEmpty()) "None yet · tap to choose" else pluralApps(rules.apps.size),
+                    onClick = onPickApps,
+                ) {
+                    AppIconStack(rules.apps.sorted(), appLabel)
+                    Chevron()
+                }
 
-            FoldLabel("Daily budget")
-            OptionRow(
-                Icons.Default.Refresh,
-                "Minutes a day",
-                description = "Once they're used, the apps step aside until tomorrow",
-            ) {
-                ObsidianToggle(
-                    rules.dailyMinutes != null,
-                    { on -> setRules { it.copy(dailyMinutes = if (on) 30 else null) } },
-                )
-            }
-            AnimatedVisibility(rules.dailyMinutes != null) {
-                Column {
-                    SubOptionRow("Each day") {
-                        NumberStepper(
-                            rules.dailyMinutes ?: 30,
-                            { v -> setRules { it.copy(dailyMinutes = v) } },
-                            5..480,
-                            step = 5,
-                            suffix = " min",
-                            presets = listOf(10, 15, 20, 30, 45, 60, 90, 120),
-                            title = "minutes a day",
+                SectionLabel("Pause before opening")
+                OptionRow(
+                    BedtimeIcons.Hourglass,
+                    "A few breaths first",
+                    description = "Before one of these apps opens, wait a moment and decide",
+                ) {
+                    ObsidianToggle(
+                        (rules.pauseSeconds ?: 0) > 0,
+                        { on -> setRules { it.copy(pauseSeconds = if (on) 10 else null) } },
+                    )
+                }
+                AnimatedVisibility((rules.pauseSeconds ?: 0) > 0) {
+                    Column {
+                        SubOptionRow("How long") {
+                            NumberStepper(
+                                rules.pauseSeconds ?: 10,
+                                { v -> setRules { it.copy(pauseSeconds = v) } },
+                                3..120,
+                                presets = listOf(5, 10, 15, 20, 30, 60),
+                                title = "pause",
+                                format = { formatWaitSeconds(it) },
+                            )
+                        }
+                        SubOptionRow("Back within") {
+                            NumberStepper(
+                                rules.graceMinutes,
+                                { v -> setRules { it.copy(graceMinutes = v) } },
+                                0..60,
+                                presets = listOf(0, 1, 2, 5, 10, 15),
+                                title = "grace",
+                                format = { if (it == 0) "every time" else "$it min" },
+                            )
+                        }
+                        if (rules.apps.size > 1) {
+                            Text(
+                                "Opening one anyway lets you into",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = c.textMuted,
+                                modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
+                            )
+                            SegmentedChoice(
+                                options = listOf("Just that app", "All of them"),
+                                selected = if (rules.pauseForGroup) 1 else 0,
+                                onSelect = { i -> setRules { it.copy(pauseForGroup = i == 1) } },
+                            )
+                        }
+                        Text(
+                            if (rules.apps.size > 1 && rules.pauseForGroup) {
+                                if (rules.graceMinutes == 0) {
+                                    "Getting through the pause once opens all of these apps, until you leave them for something else."
+                                } else {
+                                    "Getting through the pause once opens the way to all of these apps. Leaving them and coming back " +
+                                        "within ${rules.graceMinutes} min doesn't ask again."
+                                }
+                            } else if (rules.graceMinutes == 0) {
+                                "The pause comes every time you open one of them."
+                            } else {
+                                "After you open one anyway, leaving and coming back within ${rules.graceMinutes} min doesn't ask again."
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = c.textMuted,
+                            modifier = Modifier.padding(top = 6.dp),
                         )
                     }
-                    if (rules.apps.size > 1) {
+                }
+
+                SectionLabel("Daily budget")
+                OptionRow(
+                    Icons.Default.Refresh,
+                    "Minutes a day",
+                    description = "Once they're used, the apps step aside until tomorrow",
+                ) {
+                    ObsidianToggle(
+                        rules.dailyMinutes != null,
+                        { on -> setRules { it.copy(dailyMinutes = if (on) 30 else null) } },
+                    )
+                }
+                AnimatedVisibility(rules.dailyMinutes != null) {
+                    Column {
+                        SubOptionRow("Each day") {
+                            NumberStepper(
+                                rules.dailyMinutes ?: 30,
+                                { v -> setRules { it.copy(dailyMinutes = v) } },
+                                5..480,
+                                step = 5,
+                                suffix = " min",
+                                presets = listOf(10, 15, 20, 30, 45, 60, 90, 120),
+                                title = "minutes a day",
+                            )
+                        }
+                        if (rules.apps.size > 1) {
+                            Text(
+                                "Shared or each",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = c.textMuted,
+                                modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
+                            )
+                            SegmentedChoice(
+                                options = listOf("Shared", "Each app"),
+                                selected = if (rules.shared) 0 else 1,
+                                onSelect = { i -> setRules { it.copy(shared = i == 0) } },
+                            )
+                            Text(
+                                if (rules.shared) {
+                                    "${formatMinutes((rules.dailyMinutes ?: 0).toLong())} across all of them, so time doesn't just move from one to another."
+                                } else {
+                                    "${formatMinutes((rules.dailyMinutes ?: 0).toLong())} in each of them."
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = c.textMuted,
+                                modifier = Modifier.padding(top = 8.dp),
+                            )
+                        }
                         Text(
-                            "Shared or each",
+                            "When it runs out",
                             style = MaterialTheme.typography.bodyMedium,
                             color = c.textMuted,
-                            modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
+                            modifier = Modifier.padding(top = 14.dp, bottom = 8.dp),
                         )
-                        SegmentedChoice(
-                            options = listOf("Shared", "Each app"),
-                            selected = if (rules.shared) 0 else 1,
-                            onSelect = { i -> setRules { it.copy(shared = i == 0) } },
-                        )
+                        // Four answers don't fit one row of segments, so they wrap as chips.
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            listOf(
+                                OutOfTime.TOMORROW to "Wait for tomorrow",
+                                OutOfTime.MORE_TIME to "Set extra time",
+                                OutOfTime.CHOOSE to "You choose",
+                                OutOfTime.REST_OF_DAY to "Rest of the day",
+                            ).forEach { (option, label) ->
+                                QuickChip(label, rules.outOfTime == option) { setRules { it.copy(outOfTime = option) } }
+                            }
+                        }
                         Text(
-                            if (rules.shared) {
-                                "${formatMinutes((rules.dailyMinutes ?: 0).toLong())} across all of them, so time doesn't just move from one to another."
-                            } else {
-                                "${formatMinutes((rules.dailyMinutes ?: 0).toLong())} in each of them."
+                            when (rules.outOfTime) {
+                                OutOfTime.TOMORROW -> "No way to get more. The apps come back at midnight."
+                                OutOfTime.MORE_TIME -> "The steps below give you a set amount more, and get longer each time if you choose."
+                                OutOfTime.CHOOSE -> "When you need more, you first say how much — some minutes, or the rest of today — then do the steps below."
+                                OutOfTime.REST_OF_DAY -> "The steps below lift the limit until midnight."
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = c.textMuted,
                             modifier = Modifier.padding(top = 8.dp),
                         )
-                    }
-                    Text(
-                        "When it runs out",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = c.textMuted,
-                        modifier = Modifier.padding(top = 14.dp, bottom = 8.dp),
-                    )
-                    // Four answers don't fit one row of segments, so they wrap as chips.
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf(
-                            OutOfTime.TOMORROW to "Wait for tomorrow",
-                            OutOfTime.MORE_TIME to "Set extra time",
-                            OutOfTime.CHOOSE to "You choose",
-                            OutOfTime.REST_OF_DAY to "Rest of the day",
-                        ).forEach { (option, label) ->
-                            QuickChip(label, rules.outOfTime == option) { setRules { it.copy(outOfTime = option) } }
+                        AnimatedVisibility(rules.outOfTime == OutOfTime.MORE_TIME) {
+                            SubOptionRow("Each time") {
+                                NumberStepper(
+                                    rules.extraMinutes,
+                                    { v -> setRules { it.copy(extraMinutes = v) } },
+                                    1..120,
+                                    suffix = " min",
+                                    presets = listOf(5, 10, 15, 20, 30),
+                                    title = "more time",
+                                )
+                            }
                         }
-                    }
-                    Text(
-                        when (rules.outOfTime) {
-                            OutOfTime.TOMORROW -> "No way to get more. The apps come back at midnight."
-                            OutOfTime.MORE_TIME -> "The steps below give you a set amount more, and get longer each time if you choose."
-                            OutOfTime.CHOOSE -> "When you need more, you first say how much — some minutes, or the rest of today — then do the steps below."
-                            OutOfTime.REST_OF_DAY -> "The steps below lift the limit until midnight."
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = c.textMuted,
-                        modifier = Modifier.padding(top = 8.dp),
-                    )
-                    AnimatedVisibility(rules.outOfTime == OutOfTime.MORE_TIME) {
-                        SubOptionRow("Each time") {
-                            NumberStepper(
-                                rules.extraMinutes,
-                                { v -> setRules { it.copy(extraMinutes = v) } },
-                                1..120,
-                                suffix = " min",
-                                presets = listOf(5, 10, 15, 20, 30),
-                                title = "more time",
-                            )
-                        }
-                    }
-                    AnimatedVisibility(rules.outOfTime != OutOfTime.TOMORROW) {
-                        Column {
-                            FoldLabel("The steps for more, in this order")
-                            UnlockStepsEditor(
-                                rules.unlock,
-                                { u -> setRules { it.copy(unlock = u) } },
-                                editable = true,
-                                newPassword = newPassword,
-                                onNewPasswordChange = onNewPasswordChange,
-                            )
+                        AnimatedVisibility(rules.outOfTime != OutOfTime.TOMORROW) {
+                            Column {
+                                SectionLabel("The steps for more, in this order")
+                                UnlockStepsEditor(
+                                    rules.unlock,
+                                    { u -> setRules { it.copy(unlock = u) } },
+                                    editable = true,
+                                    newPassword = newPassword,
+                                    onNewPasswordChange = onNewPasswordChange,
+                                )
+                            }
                         }
                     }
                 }
-            }
 
-            if (!isNew) {
-                Spacer(Modifier.height(18.dp))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                    TextButton(onClick = onDelete) { Text("Delete limit", color = c.red, fontWeight = FontWeight.Medium) }
+                if (!isNew) {
+                    Spacer(Modifier.height(18.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                        TextButton(onClick = onDelete) { Text("Delete limit", color = c.red, fontWeight = FontWeight.Medium) }
+                    }
                 }
+                Spacer(Modifier.height(24.dp))
             }
-            Spacer(Modifier.height(24.dp))
         }
     }
 }

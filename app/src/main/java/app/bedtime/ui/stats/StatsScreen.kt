@@ -45,6 +45,7 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.bedtime.ui.components.PageGutter
 import app.bedtime.data.AppLimit
 import app.bedtime.data.Repository
 import app.bedtime.data.SessionLog
@@ -111,7 +112,7 @@ internal fun StatsContent(
     val today = java.time.Instant.ofEpochMilli(now).atZone(zone).toLocalDate().toEpochDay()
     Scaffold(containerColor = c.bgPrimary, topBar = { ObsidianTopBar("Your refuge", onBack = onBack) }) { padding ->
         Column(
-            Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
+            Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = PageGutter),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Spacer(Modifier.height(2.dp))

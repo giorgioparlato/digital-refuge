@@ -40,6 +40,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.bedtime.ui.components.CardRadius
 import app.bedtime.data.DndMode
 import app.bedtime.data.EditWindow
 import app.bedtime.data.Repository
@@ -55,6 +56,8 @@ import app.bedtime.ui.components.ObsidianToggle
 import app.bedtime.ui.components.SwipeToDelete
 import app.bedtime.ui.components.Tag
 import app.bedtime.ui.components.Text
+import app.bedtime.ui.components.ObsidianTopBar
+import app.bedtime.ui.components.PageGutter
 import app.bedtime.ui.formatDays
 import app.bedtime.ui.formatMinuteOfDay
 import app.bedtime.ui.formatRelative
@@ -112,6 +115,7 @@ internal fun SchedulesContent(
     }
     Scaffold(
         containerColor = c.bgPrimary,
+        topBar = { ObsidianTopBar("schedules", subtitle = "hours that look after themselves") },
         floatingActionButton = {
             if (schedules.isNotEmpty()) {
                 ExtendedFloatingActionButton(
@@ -127,16 +131,9 @@ internal fun SchedulesContent(
     ) { padding ->
         LazyColumn(
             Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 28.dp, bottom = 110.dp),
+            contentPadding = PaddingValues(start = PageGutter, end = PageGutter, top = 4.dp, bottom = 110.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item(key = "header") {
-                Column(Modifier.padding(bottom = 6.dp)) {
-                    Text("schedules", fontSize = 27.sp, fontWeight = FontWeight.Light, color = c.textNormal)
-                    Spacer(Modifier.height(6.dp))
-                    Text("hours that look after themselves", style = MaterialTheme.typography.bodyMedium, color = c.textFaint)
-                }
-            }
             if (schedules.isEmpty()) {
                 item(key = "empty") {
                     Column(Modifier.fillMaxWidth().padding(top = 16.dp)) {
@@ -187,12 +184,12 @@ private fun ScheduleCard(
 ) {
     val context = LocalContext.current
     val c = Obsidian.colors
-    val shape = RoundedCornerShape(18.dp)
+    val shape = RoundedCornerShape(CardRadius)
     val next = remember(schedule, now) { ScheduleEvaluator.nextStart(schedule, now, ZoneId.systemDefault()) }
     Column(
         Modifier.fillMaxWidth().clip(shape)
             .background(if (running) c.accent.copy(alpha = 0.10f) else c.bgSecondary)
-            .then(if (running) Modifier.border(1.dp, c.accent.copy(alpha = 0.45f), shape) else Modifier)
+            .border(1.dp, if (running) c.accent.copy(alpha = 0.45f) else c.border, shape)
             .clickable(onClickLabel = "Edit ${schedule.name}", onClick = onClick)
             .padding(18.dp),
     ) {
