@@ -13,6 +13,16 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            36,
+            "0.8.1",
+            listOf(
+                "Your week is back on home, as one quiet line at the foot. Tap it for the full picture.",
+                "The days are now bars: how long you spent in refuge each day, green when it held. Tap one for its figures.",
+                "Unlocking can ask how long you need: pick a few minutes, or the rest of it, then do the steps. Set it under \"how hard to leave\", or \"when it runs out\" for a limit.",
+                "A limit's pause can let you into all its apps at once, or only the one you opened.",
+            ),
+        ),
+        ChangelogEntry(
             35,
             "0.8.0",
             listOf(

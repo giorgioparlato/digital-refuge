@@ -21,6 +21,9 @@ data class WeekStats(
 /** How a day went, for the strip of days: nothing ran, everything held, or something was escaped. */
 enum class DayMark { NONE, KEPT, ESCAPED }
 
+/** One day of the bars: minutes in refuge and how the day went. */
+data class DayBar(val date: LocalDate, val minutes: Long, val mark: DayMark)
+
 /** How one schedule or block has gone lately. */
 data class ScheduleStats(val scheduleId: String, val name: String, val sessions: Int, val kept: Int)
 
@@ -78,20 +81,25 @@ object Stats {
     }
 
     /**
-     * The last [count] days, oldest first and ending today: whether any session started that day,
-     * and if so whether any of them was escaped. A session still running counts as kept so far.
+     * The last [count] days, oldest first and ending today: minutes in refuge in the sessions that
+     * started that day, and whether any of them was escaped. A session still running counts so far,
+     * and as kept so far.
      */
-    fun days(history: List<SessionLog>, now: Long, zone: ZoneId, count: Int = 28): List<Pair<LocalDate, DayMark>> {
+    fun daily(history: List<SessionLog>, now: Long, zone: ZoneId, count: Int = 14): List<DayBar> {
         val today = Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
         val byDay = history.filter { it.start <= now }.groupBy { Instant.ofEpochMilli(it.start).atZone(zone).toLocalDate() }
         return (count - 1 downTo 0).map { back ->
             val day = today.minusDays(back.toLong())
             val logs = byDay[day].orEmpty()
-            day to when {
-                logs.isEmpty() -> DayMark.NONE
-                logs.any { it.escapes > 0 } -> DayMark.ESCAPED
-                else -> DayMark.KEPT
-            }
+            DayBar(
+                date = day,
+                minutes = logs.sumOf { ((it.endedEarlyAt ?: it.end).coerceAtMost(now) - it.start).coerceAtLeast(0L) } / 60_000,
+                mark = when {
+                    logs.isEmpty() -> DayMark.NONE
+                    logs.any { it.escapes > 0 } -> DayMark.ESCAPED
+                    else -> DayMark.KEPT
+                },
+            )
         }
     }
 

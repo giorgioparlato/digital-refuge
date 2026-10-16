@@ -17,7 +17,9 @@ import java.time.LocalDate
 
 /**
  * "Open anyway" passes from the pause before opening: an app you chose to open stays open, and
- * coming back to it within its grace doesn't ask again. Kept in memory only: a restart asks afresh.
+ * coming back to it within its grace doesn't ask again. A pass is kept under a key: the app's own
+ * package, or a whole limit's when "open anyway" lets you into all of its apps. Kept in memory only:
+ * a restart asks afresh.
  */
 object LimitPasses {
     private class Pass(val grantedAt: Long, var leftAt: Long? = null, var entered: Boolean = false)
@@ -28,14 +30,14 @@ object LimitPasses {
     private val passes = mutableMapOf<String, Pass>()
 
     @Synchronized
-    fun grant(pkg: String, now: Long) {
-        passes[pkg] = Pass(now)
+    fun grant(key: String, now: Long) {
+        passes[key] = Pass(now)
     }
 
-    /** [pkg] just came to the front: whether it may, without the pause. */
+    /** An app under [key] just came to the front: whether it may, without the pause. */
     @Synchronized
-    fun admit(pkg: String, graceMs: Long, now: Long): Boolean {
-        val pass = passes[pkg] ?: return false
+    fun admit(key: String, graceMs: Long, now: Long): Boolean {
+        val pass = passes[key] ?: return false
         val left = pass.leftAt
         val ok = when {
             left != null -> now - left <= graceMs
@@ -46,15 +48,15 @@ object LimitPasses {
             pass.entered = true
             pass.leftAt = null
         } else {
-            passes.remove(pkg)
+            passes.remove(key)
         }
         return ok
     }
 
-    /** [pkg] went to the background; its grace starts now. */
+    /** The app that came in under [key] went to the background; its grace starts now. */
     @Synchronized
-    fun left(pkg: String, now: Long) {
-        passes[pkg]?.takeIf { it.entered }?.leftAt = now
+    fun left(key: String, now: Long) {
+        passes[key]?.takeIf { it.entered }?.leftAt = now
     }
 }
 
@@ -81,6 +83,10 @@ internal class LimitTracker(
     /** The app in front, whether or not it's limited, and since when we've counted it (elapsed realtime). */
     private var current: String? = null
     private var since = 0L
+
+    /** The pass the app in front came in on, which starts its grace when it's left, and the apps it covers. */
+    private var currentPass: String? = null
+    private var currentPassApps: Set<String> = emptySet()
 
     /** Milliseconds counted but not yet written down, by package. */
     private val unsaved = mutableMapOf<String, Long>()
@@ -117,7 +123,12 @@ internal class LimitTracker(
         val previous = current
         if (pkg == previous) return false
         stopCounting()
-        previous?.let { LimitPasses.left(it, System.currentTimeMillis()) }
+        // Going straight from one of a pass's apps to another isn't leaving it.
+        if (pkg == null || pkg !in currentPassApps) {
+            currentPass?.let { LimitPasses.left(it, System.currentTimeMillis()) }
+            currentPass = null
+            currentPassApps = emptySet()
+        }
         current = pkg
         since = SystemClock.elapsedRealtime()
         return true
@@ -138,11 +149,18 @@ internal class LimitTracker(
             return true
         }
         if (arrived) {
-            val (seconds, grace) = Limits.pauseFor(limits, pkg, day.day) ?: (0 to 0)
-            if (seconds > 0 && !LimitPasses.admit(pkg, grace * 60_000L, System.currentTimeMillis())) {
-                writeScope.launch { repo.recordOpen(day.day, pkg) }
-                cover(BlockedActivity.pauseIntent(context, pkg, seconds, opens = (day.opens[pkg] ?: 0) + 1))
-                return true
+            val pause = Limits.pauseFor(limits, pkg, day.day)
+            if (pause != null) {
+                if (LimitPasses.admit(pause.passKey, pause.graceMinutes * 60_000L, System.currentTimeMillis())) {
+                    currentPass = pause.passKey
+                    currentPassApps = pause.group
+                } else {
+                    writeScope.launch { repo.recordOpen(day.day, pkg) }
+                    // A pass for the whole limit counts its apps' openings together, too.
+                    val opens = pause.group.sumOf { day.opens[it] ?: 0 } + 1
+                    cover(BlockedActivity.pauseIntent(context, pkg, pause.seconds, opens, pause.passKey))
+                    return true
+                }
             }
         }
         scheduleTick(pkg)

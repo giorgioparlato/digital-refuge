@@ -65,6 +65,7 @@ class BlockedActivity : ComponentActivity() {
     private var limitId by mutableStateOf<String?>(null)
     private var pauseSeconds by mutableIntStateOf(0)
     private var opens by mutableIntStateOf(0)
+    private var passKey by mutableStateOf<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -77,7 +78,7 @@ class BlockedActivity : ComponentActivity() {
                 val pkg = blockedPackage
                 when {
                     mode == MODE_PAUSE && pkg != null -> key(pkg, opens) {
-                        PauseScreen(pkg, pauseSeconds, opens, onHome = ::goHome, onFinish = ::finish)
+                        PauseScreen(pkg, pauseSeconds, opens, passKey ?: pkg, onHome = ::goHome, onFinish = ::finish)
                     }
                     mode == MODE_LIMIT && pkg != null -> key(pkg, limitId) {
                         LimitScreen(pkg, limitId.orEmpty(), onHome = ::goHome, onFinish = ::finish)
@@ -100,6 +101,7 @@ class BlockedActivity : ComponentActivity() {
         limitId = intent.getStringExtra(EXTRA_LIMIT)
         pauseSeconds = intent.getIntExtra(EXTRA_SECONDS, 0)
         opens = intent.getIntExtra(EXTRA_OPENS, 0)
+        passKey = intent.getStringExtra(EXTRA_PASS)
     }
 
     private fun goHome() {
@@ -114,6 +116,7 @@ class BlockedActivity : ComponentActivity() {
         private const val EXTRA_LIMIT = "limit"
         private const val EXTRA_SECONDS = "seconds"
         private const val EXTRA_OPENS = "opens"
+        private const val EXTRA_PASS = "pass"
         private const val MODE_PAUSE = "pause"
         private const val MODE_LIMIT = "limit"
 
@@ -122,9 +125,10 @@ class BlockedActivity : ComponentActivity() {
                 .putExtra(EXTRA_PACKAGE, pkg)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
-        /** The pause before opening [pkg]: [seconds] to breathe, then "open" or "never mind". */
-        fun pauseIntent(context: Context, pkg: String, seconds: Int, opens: Int): Intent =
-            intent(context, pkg).putExtra(EXTRA_MODE, MODE_PAUSE).putExtra(EXTRA_SECONDS, seconds).putExtra(EXTRA_OPENS, opens)
+        /** The pause before opening [pkg]: [seconds] to breathe, then "open" (granting [passKey]) or "never mind". */
+        fun pauseIntent(context: Context, pkg: String, seconds: Int, opens: Int, passKey: String): Intent =
+            intent(context, pkg).putExtra(EXTRA_MODE, MODE_PAUSE).putExtra(EXTRA_SECONDS, seconds)
+                .putExtra(EXTRA_OPENS, opens).putExtra(EXTRA_PASS, passKey)
 
         /** [pkg]'s minutes for today are gone under limit [limitId]. */
         fun limitIntent(context: Context, pkg: String, limitId: String): Intent =

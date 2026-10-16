@@ -47,8 +47,8 @@ Nothing here can be made impossible, and the app doesn't pretend otherwise — A
 
 - **Schedules and focus blocks.** Schedules repeat on days and times. Blocks start whenever you like and run for a set length. Started a block by mistake? For ten seconds there's an **undo**, on home and in the notification, and it doesn't count against you.
 - **Limits that hold every day**, not only in a session, for the apps that pull hardest (their own tab). Each limit covers some apps, or a group, and can have:
-  - **a pause before opening**: a few breaths, then "never mind" or open it. After opening anyway, coming back within a grace you choose (two minutes by default) doesn't ask again;
-  - **a daily budget**: minutes shared by all its apps, or for each of them. When they're gone, the limit decides what's left: nothing until tomorrow, more time after the unlock steps, or the rest of the day after them.
+  - **a pause before opening**: a few breaths, then "never mind" or open it. Opening anyway lets you into just that app or all of the limit's apps, as you choose, and coming back within a grace you set (two minutes by default) doesn't ask again;
+  - **a daily budget**: minutes shared by all its apps, or for each of them. When they're gone, the limit decides what's left: nothing until tomorrow, a set amount more after the unlock steps, as much as you say you need (then the steps), or the rest of the day after them.
 
   Making a limit stricter applies at once. Loosening it — fewer apps, more minutes, an easier way to get more, or deleting it — waits for midnight, so it can't be used to get round today. Time is counted from which app is in front, so it's close rather than exact.
 - **Templates**, always available from **New**:
@@ -59,7 +59,7 @@ Nothing here can be made impossible, and the app doesn't pretend otherwise — A
   2. type random text (no pasting, no typos);
   3. enter a password.
 
-  Each schedule decides whether unlocking **ends the session** or **pauses it for N minutes**. Optionally, both the wait and the text grow with every early unlock the same day, by a multiplier you set (1.5×, 2×…). That count resets at midnight.
+  Each schedule decides whether unlocking **ends the session**, **pauses it for N minutes**, or **asks how long you need** first (some minutes, or the rest of it; the steps are the same either way). Optionally, both the wait and the text grow with every early unlock the same day, by a multiplier you set (1.5×, 2×…). That count resets at midnight.
 - **No quick escapes mid-session.** While a session is running, you can't edit or delete its schedule. If Do Not Disturb is switched off from quick settings, the app switches it straight back on and tells you why.
 - **A calm lock screen.** During a session, the lock screen shows your home style's clock, date and session, without the apps. Tap it to unlock as usual (PIN, fingerprint…). You can switch it off in the minimal home screen settings.
 - **A quote** on the minimal home and lock screen — 72 lines on attention, nature and the sacred, from Thoreau, Emerson, the Buddha, Kimmerer, Weil, Dillard, Murakami, Bohm, Thich Nhat Hanh, Hafiz and others, each checked against its source. They rotate in a scrambled but complete cycle, so every one comes round before any repeats; choose whether that's hourly, every six hours, daily or weekly. Tap it on the home screen for another, or switch it off in the minimal home screen settings.
@@ -68,7 +68,7 @@ Nothing here can be made impossible, and the app doesn't pretend otherwise — A
 - **Easy number picking:** tap − or + for one step, hold to keep going faster, or tap the number to type a value or pick a preset.
 - **Safer defaults:** Settings, Phone and Messages start out allowed in minimal mode, and the app picker explains why.
 - **App groups** ("Social & feeds", "Essentials", or your own) let you tick many apps in one tap.
-- **Your refuge**, on the limits tab: time in refuge this week, the current and best run of kept sessions, four weeks of days at a glance, each schedule's record, and time in limited apps. Early unlocks, emergency breaks and blocking switched off are each counted on their own line, and all of them end a run.
+- **Your refuge**: the week in one line at the foot of home, and a tap away the full picture: time in refuge, the current and best run of kept sessions, a bar for each of the last fourteen days (green when kept, orange when a way out was taken; tap one for its figures), each schedule's record, and time in limited apps. Early unlocks, emergency breaks and blocking switched off are each counted on their own line, and all of them end a run.
 - **What's new** after each update, once, on the home screen.
 - **Quick Settings tile** that starts your favourite focus block.
 - **Home-screen widget** that starts a chosen block with one tap, and shows how long is left while it runs. Add one from settings → home-screen widget, or long-press your home screen → widgets → digital refuge.
@@ -141,6 +141,7 @@ The screens are checked with [Paparazzi](https://github.com/cashapp/paparazzi) s
 | Limits: what holds today, budgets, what counts as loosening | `engine/Limits.kt` |
 | Counting time in limited apps, the pause before opening | `service/LimitTracker.kt`, `ui/blocked/LimitCovers.kt` |
 | The limits tab and its editor | `ui/limits/` |
+| The stats page and its daily bars | `ui/stats/StatsScreen.kt` |
 | Foreground-app watcher: blocking, minimal mode, greyscale, Do Not Disturb | `service/BlockerService.kt` |
 | Greyscale and Do Not Disturb | `service/GreyscaleController.kt`, `service/ModeGreyscale.kt` (Android 15+), `service/DndController.kt` |
 | Quick Settings tile | `service/FocusTileService.kt` |

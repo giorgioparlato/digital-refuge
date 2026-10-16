@@ -67,6 +67,9 @@ import app.bedtime.engine.ActiveState
 import app.bedtime.engine.Engine
 import app.bedtime.engine.Occurrence
 import app.bedtime.engine.ScheduleEvaluator
+import app.bedtime.engine.Stats
+import app.bedtime.ui.stats.homeSummary
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import app.bedtime.service.DndController
 import app.bedtime.service.GreyscaleController
 import app.bedtime.service.SystemApps
@@ -114,6 +117,7 @@ fun HomeScreen(
     onTemplate: (String) -> Unit,
     onSetup: () -> Unit,
     onUnlock: (String) -> Unit,
+    onStats: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val repo = remember { Repository.get(context) }
@@ -173,6 +177,7 @@ fun HomeScreen(
         onUnlock = onUnlock,
         onUndo = { id -> scope.launch { repo.undoStart(id) } },
         onDismissWhatsNew = { scope.launch { repo.updateSettings { it.copy(lastSeenVersion = installed) } } },
+        onStats = onStats,
         isInstalled = { AppCatalog.isLaunchable(context, it) },
     )
 }
@@ -189,6 +194,7 @@ internal fun HomeContent(
     onUnlock: (String) -> Unit,
     onUndo: (String) -> Unit = {},
     onDismissWhatsNew: () -> Unit = {},
+    onStats: () -> Unit = {},
     isInstalled: (String) -> Boolean = { false },
 ) {
     val c = Obsidian.colors
@@ -267,6 +273,10 @@ internal fun HomeContent(
             }
             if (ui.quote != null) {
                 item(key = "quote") { QuoteFooter(ui.quote) }
+            }
+            // The week in one quiet line at the very foot; the full figures are a tap away.
+            homeSummary(Stats.week(ui.history, ui.now), Stats.streak(ui.history, ui.now))?.let { summary ->
+                item(key = "stats") { StatsLine(summary, onStats) }
             }
         }
     }
@@ -490,6 +500,23 @@ private fun QuoteFooter(quote: Quote) {
             style = MaterialTheme.typography.labelMedium,
             color = c.textFaint,
         )
+    }
+}
+
+@Composable
+private fun StatsLine(summary: String, onClick: () -> Unit) {
+    val c = Obsidian.colors
+    Column(Modifier.padding(horizontal = 24.dp).padding(top = 26.dp)) {
+        Box(Modifier.fillMaxWidth().height(1.dp).background(c.border.copy(alpha = 0.6f)))
+        Row(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
+                .clickable(onClickLabel = "Open your refuge", onClick = onClick)
+                .padding(vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(summary, style = MaterialTheme.typography.bodyMedium, color = c.textMuted, modifier = Modifier.weight(1f))
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = c.textFaint, modifier = Modifier.size(20.dp))
+        }
     }
 }
 

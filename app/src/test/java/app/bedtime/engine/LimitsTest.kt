@@ -55,9 +55,27 @@ class LimitsTest {
     @Test
     fun strictestPauseAndShortestGraceWin() {
         val other = AppLimit(id = "x", rules = LimitRules(apps = setOf("a"), pauseSeconds = 30, graceMinutes = 0))
-        assertEquals(30 to 0, Limits.pauseFor(listOf(social, other), "a", today))
-        assertEquals(10 to 2, Limits.pauseFor(listOf(social, other), "b", today))
+        assertEquals(PauseRule(30, 0, "a", setOf("a")), Limits.pauseFor(listOf(social, other), "a", today))
+        assertEquals(PauseRule(10, 2, "b", setOf("b")), Limits.pauseFor(listOf(social, other), "b", today))
         assertNull(Limits.pauseFor(listOf(social), "c", today))
+    }
+
+    @Test
+    fun aGroupPassCoversEveryAppOfItsLimit() {
+        val group = social.copy(rules = social.rules.copy(pauseForGroup = true))
+        assertEquals(PauseRule(10, 2, "limit:social", setOf("a", "b")), Limits.pauseFor(listOf(group), "b", today))
+        assertTrue(Limits.isLooser(social.rules, group.rules))
+        assertFalse(Limits.isLooser(group.rules, social.rules))
+    }
+
+    @Test
+    fun chosenExtraMinutesCountAsGivenAndOlderOnesAsSet() {
+        val spent = UsageDay(today, seconds = mapOf("a" to 30 * 60L))
+        // Two older grants (15 min each, the set amount) and one chosen 40.
+        val usage = spent.copy(extras = mapOf("social" to listOf(1L, 2L, 3L)), extraMinutes = mapOf("social" to listOf(40)))
+        assertEquals(70, Limits.extraMinutes(social, usage))
+        assertEquals(70 * 60L, Limits.secondsLeft(social, "a", usage))
+        assertTrue(Limits.isLooser(social.rules, social.rules.copy(outOfTime = OutOfTime.CHOOSE)))
     }
 
     @Test

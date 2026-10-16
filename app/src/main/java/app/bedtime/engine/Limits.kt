@@ -6,6 +6,12 @@ import app.bedtime.data.OutOfTime
 import app.bedtime.data.UnlockConfig
 import app.bedtime.data.UsageDay
 
+/**
+ * The pause before opening an app: how long, how long "open anyway" lasts once you leave, and the key
+ * that pass is kept under — the app itself, or a whole limit — with the apps it covers.
+ */
+data class PauseRule(val seconds: Int, val graceMinutes: Int, val passKey: String, val group: Set<String>)
+
 /** Pure rules for limits: what holds today, how much time is left, and what counts as loosening. */
 object Limits {
     /** [limits] as they stand on [today]: looser rules that have come due take over, due deletions go. */
@@ -27,8 +33,15 @@ object Limits {
         if (limit.id in usage.lifted) return null
         val counted = if (rules.shared) rules.apps else setOf(pkg)
         val used = counted.sumOf { (usage.seconds[it] ?: 0L) + (unsaved[it] ?: 0L) }
-        val extra = (usage.extras[limit.id]?.size ?: 0) * rules.extraMinutes * 60L
-        return minutes * 60L + extra - used
+        return minutes * 60L + extraMinutes(limit, usage) * 60L - used
+    }
+
+    /** Minutes of more time given to [limit] on [usage]'s day, whether set by the limit or chosen then. */
+    fun extraMinutes(limit: AppLimit, usage: UsageDay): Int {
+        val chosen = usage.extraMinutes[limit.id].orEmpty()
+        // Older entries, from before a length could be chosen, each gave the limit's set minutes.
+        val older = ((usage.extras[limit.id]?.size ?: 0) - chosen.size).coerceAtLeast(0)
+        return chosen.sum() + older * limit.rules.extraMinutes
     }
 
     /**
@@ -55,11 +68,20 @@ object Limits {
     fun leastLeft(limits: List<AppLimit>, pkg: String, usage: UsageDay, unsaved: Map<String, Long> = emptyMap()): Long? =
         covering(limits, pkg, usage.day).mapNotNull { secondsLeft(it, pkg, usage, unsaved) }.minOrNull()
 
-    /** The pause before opening [pkg], in seconds, and the grace after it in minutes; null if none applies. */
-    fun pauseFor(limits: List<AppLimit>, pkg: String, today: Long): Pair<Int, Int>? {
+    /**
+     * The pause before opening [pkg] if any limit asks for one: the longest pause, the shortest grace,
+     * and the pass that "open anyway" grants — for the app alone, or for all of the strictest limit's
+     * apps when it says so.
+     */
+    fun pauseFor(limits: List<AppLimit>, pkg: String, today: Long): PauseRule? {
         val pausing = covering(limits, pkg, today).filter { (it.rules.pauseSeconds ?: 0) > 0 }
-        if (pausing.isEmpty()) return null
-        return pausing.maxOf { it.rules.pauseSeconds ?: 0 } to pausing.minOf { it.rules.graceMinutes }
+        val strictest = pausing.maxByOrNull { it.rules.pauseSeconds ?: 0 } ?: return null
+        return PauseRule(
+            seconds = strictest.rules.pauseSeconds ?: 0,
+            graceMinutes = pausing.minOf { it.rules.graceMinutes },
+            passKey = if (strictest.rules.pauseForGroup) "limit:${strictest.id}" else pkg,
+            group = if (strictest.rules.pauseForGroup) strictest.rules.apps else setOf(pkg),
+        )
     }
 
     /**
@@ -87,6 +109,7 @@ object Limits {
         !new.apps.containsAll(old.apps) ||
             (new.pauseSeconds ?: 0) < (old.pauseSeconds ?: 0) ||
             ((old.pauseSeconds ?: 0) > 0 && new.graceMinutes > old.graceMinutes) ||
+            ((old.pauseSeconds ?: 0) > 0 && !old.pauseForGroup && new.pauseForGroup) ||
             budgetLooser(old, new) ||
             isLooser(old.unlock, new.unlock)
 
@@ -97,7 +120,7 @@ object Limits {
         // "Each app gets the minutes in full" allows more than "shared between them".
         if (old.shared && !new.shared && new.apps.size > 1) return true
         if (new.outOfTime.ordinal > old.outOfTime.ordinal) return true
-        return new.outOfTime == OutOfTime.MORE_TIME && new.extraMinutes > old.extraMinutes
+        return new.outOfTime == OutOfTime.MORE_TIME && old.outOfTime == OutOfTime.MORE_TIME && new.extraMinutes > old.extraMinutes
     }
 
     /** Whether the unlock steps got easier: a step dropped, or made shorter. */

@@ -97,8 +97,9 @@ data class UnlockConfig(
 @Serializable
 enum class TextSource { LETTERS, WORDS, PASSAGES }
 
+/** What a completed unlock gives: the rest of the session, a set break, or a length chosen there and then. */
 @Serializable
-enum class UnlockMode { END_SESSION, PAUSE }
+enum class UnlockMode { END_SESSION, PAUSE, CHOOSE }
 
 @Serializable
 data class UnlockAction(
@@ -192,9 +193,12 @@ data class AppSettings(
     val limits: List<AppLimit> = emptyList(),
 )
 
-/** What running out of a limit's daily minutes leads to. Ordered strictest first. */
+/**
+ * What running out of a limit's daily minutes leads to. Ordered strictest first: choosing there and
+ * then can reach the rest of the day too, so it counts as the loosest.
+ */
 @Serializable
-enum class OutOfTime { TOMORROW, MORE_TIME, REST_OF_DAY }
+enum class OutOfTime { TOMORROW, MORE_TIME, REST_OF_DAY, CHOOSE }
 
 /**
  * How one limit behaves, every day and not only in a session. Kept apart from its name so that a
@@ -207,6 +211,8 @@ data class LimitRules(
     val pauseSeconds: Int? = 10,
     /** After "open anyway", how long you can be away and come back without the pause; 0 = every open. */
     val graceMinutes: Int = 2,
+    /** Whether "open anyway" on one of the apps lets you into all of them, rather than only that one. */
+    val pauseForGroup: Boolean = false,
     /** Minutes a day in these apps; null means no budget. */
     val dailyMinutes: Int? = null,
     /** True: the minutes are shared by all the apps together. False: each app gets them in full. */
@@ -241,8 +247,13 @@ data class UsageDay(
     val seconds: Map<String, Long> = emptyMap(),
     /** Times the pause before opening was shown, by package. */
     val opens: Map<String, Int> = emptyMap(),
-    /** When more time was taken, by limit id. */
+    /** When more time was taken, by limit id; lifting for the rest of the day counts here too. */
     val extras: Map<String, List<Long>> = emptyMap(),
+    /**
+     * How many minutes each of those gave, by limit id. Entries in [extras] without one here are from
+     * before a length could be chosen, and gave the limit's set extra minutes.
+     */
+    val extraMinutes: Map<String, List<Int>> = emptyMap(),
     /** Limits lifted for the rest of this day. */
     val lifted: Set<String> = emptySet(),
 )

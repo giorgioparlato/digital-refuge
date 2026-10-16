@@ -4,6 +4,8 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -53,6 +55,7 @@ import app.bedtime.ui.components.ObsidianTextField
 import app.bedtime.ui.components.ObsidianToggle
 import app.bedtime.ui.components.ObsidianTopBar
 import app.bedtime.ui.components.OptionRow
+import app.bedtime.ui.components.QuickChip
 import app.bedtime.ui.components.SegmentedChoice
 import app.bedtime.ui.components.SubOptionRow
 import app.bedtime.ui.components.Text
@@ -211,6 +214,7 @@ fun LimitEditScreen(limitId: String?, onBack: () -> Unit) {
     )
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun LimitEditContent(
     draft: AppLimit,
@@ -311,8 +315,28 @@ internal fun LimitEditContent(
                             format = { if (it == 0) "every time" else "$it min" },
                         )
                     }
+                    if (rules.apps.size > 1) {
+                        Text(
+                            "Opening one anyway lets you into",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = c.textMuted,
+                            modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
+                        )
+                        SegmentedChoice(
+                            options = listOf("Just that app", "All of them"),
+                            selected = if (rules.pauseForGroup) 1 else 0,
+                            onSelect = { i -> setRules { it.copy(pauseForGroup = i == 1) } },
+                        )
+                    }
                     Text(
-                        if (rules.graceMinutes == 0) {
+                        if (rules.apps.size > 1 && rules.pauseForGroup) {
+                            if (rules.graceMinutes == 0) {
+                                "Getting through the pause once opens all of these apps, until you leave them for something else."
+                            } else {
+                                "Getting through the pause once opens the way to all of these apps. Leaving them and coming back " +
+                                    "within ${rules.graceMinutes} min doesn't ask again."
+                            }
+                        } else if (rules.graceMinutes == 0) {
                             "The pause comes every time you open one of them."
                         } else {
                             "After you open one anyway, leaving and coming back within ${rules.graceMinutes} min doesn't ask again."
@@ -377,15 +401,22 @@ internal fun LimitEditContent(
                         color = c.textMuted,
                         modifier = Modifier.padding(top = 14.dp, bottom = 8.dp),
                     )
-                    SegmentedChoice(
-                        options = listOf("Tomorrow", "More time", "Rest of day"),
-                        selected = rules.outOfTime.ordinal,
-                        onSelect = { i -> setRules { it.copy(outOfTime = OutOfTime.entries[i]) } },
-                    )
+                    // Four answers don't fit one row of segments, so they wrap as chips.
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(
+                            OutOfTime.TOMORROW to "Wait for tomorrow",
+                            OutOfTime.MORE_TIME to "Set extra time",
+                            OutOfTime.CHOOSE to "You choose",
+                            OutOfTime.REST_OF_DAY to "Rest of the day",
+                        ).forEach { (option, label) ->
+                            QuickChip(label, rules.outOfTime == option) { setRules { it.copy(outOfTime = option) } }
+                        }
+                    }
                     Text(
                         when (rules.outOfTime) {
                             OutOfTime.TOMORROW -> "No way to get more. The apps come back at midnight."
-                            OutOfTime.MORE_TIME -> "The steps below give you a little more, and get longer each time if you choose."
+                            OutOfTime.MORE_TIME -> "The steps below give you a set amount more, and get longer each time if you choose."
+                            OutOfTime.CHOOSE -> "When you need more, you first say how much — some minutes, or the rest of today — then do the steps below."
                             OutOfTime.REST_OF_DAY -> "The steps below lift the limit until midnight."
                         },
                         style = MaterialTheme.typography.bodySmall,

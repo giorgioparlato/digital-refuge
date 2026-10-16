@@ -398,6 +398,7 @@ internal fun leavingSummary(draft: Schedule, hasNewPassword: Boolean): String {
     val then = when (draft.unlockAction.mode) {
         UnlockMode.END_SESSION -> if (draft.isBlock) "ends the block" else "off until its next start"
         UnlockMode.PAUSE -> "a ${draft.unlockAction.pauseMinutes}-minute break"
+        UnlockMode.CHOOSE -> "as long as you say"
     }
     return "${steps.joinToString(", then ")} · $then"
 }
@@ -664,7 +665,8 @@ internal fun ScheduleEditContent(
                     UnlockStepsEditor(unlock, { u -> onDraftChange(draft.copy(unlock = u)) }, editable, newPassword, onNewPasswordChange)
                     FoldLabel("What unlocking gets you")
                     SegmentedChoice(
-                        options = listOf(if (isBlock) "End the block" else "End for today", "Take a break"),
+                        // Three to a row, so the words are short; the line below says each in full.
+                        options = listOf(if (isBlock) "End it" else "End today", "Set break", "You choose"),
                         selected = draft.unlockAction.mode.ordinal,
                         onSelect = { onDraftChange(draft.copy(unlockAction = draft.unlockAction.copy(mode = UnlockMode.entries[it]))) },
                         enabled = editable,
@@ -673,6 +675,9 @@ internal fun ScheduleEditContent(
                         when (draft.unlockAction.mode) {
                             UnlockMode.END_SESSION -> if (isBlock) "The block stops there." else "The schedule stays off until its next start."
                             UnlockMode.PAUSE -> "It switches itself back on after your break."
+                            UnlockMode.CHOOSE ->
+                                "When you unlock, you first say how long: a few minutes, or the rest of " +
+                                    (if (isBlock) "the block." else "the session.") + " The steps are the same either way."
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = c.textMuted,

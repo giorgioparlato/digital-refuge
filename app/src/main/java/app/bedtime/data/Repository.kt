@@ -165,12 +165,13 @@ class Repository private constructor(context: Context) {
     /** Counts one more time the pause before opening [pkg] was shown. */
     suspend fun recordOpen(day: Long, pkg: String) = updateUsage(day) { it.copy(opens = it.opens + (pkg to (it.opens[pkg] ?: 0) + 1)) }
 
-    /** Gives [limitId] more time today, or lifts it for the rest of the day. */
-    suspend fun grantLimit(day: Long, limitId: String, at: Long, restOfDay: Boolean) = updateUsage(day) {
-        if (restOfDay) {
-            it.copy(lifted = it.lifted + limitId, extras = it.extras + (limitId to it.extras[limitId].orEmpty() + at))
+    /** Gives [limitId] [minutes] more today, or with null lifts it for the rest of the day. */
+    suspend fun grantLimit(day: Long, limitId: String, at: Long, minutes: Int?) = updateUsage(day) {
+        val taken = it.copy(extras = it.extras + (limitId to it.extras[limitId].orEmpty() + at))
+        if (minutes == null) {
+            taken.copy(lifted = taken.lifted + limitId)
         } else {
-            it.copy(extras = it.extras + (limitId to it.extras[limitId].orEmpty() + at))
+            taken.copy(extraMinutes = taken.extraMinutes + (limitId to taken.extraMinutes[limitId].orEmpty() + minutes))
         }
     }
 

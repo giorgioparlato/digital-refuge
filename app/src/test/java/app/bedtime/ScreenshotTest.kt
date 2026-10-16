@@ -177,8 +177,6 @@ class ScreenshotTest {
                     extras = mapOf("youtube" to listOf(1L)),
                 ),
             ),
-            history = ui.history + Samples.escapes(ui.now),
-            now = ui.now,
             today = today,
             onEdit = {},
             onCreate = {},
@@ -187,13 +185,13 @@ class ScreenshotTest {
 
     @Test
     fun limitsEmpty() = shot {
-        app.bedtime.ui.limits.LimitsContent(emptyList(), emptyList(), emptyList(), Samples.home().now, LocalDate.now().toEpochDay(), {}, {})
+        app.bedtime.ui.limits.LimitsContent(emptyList(), emptyList(), LocalDate.now().toEpochDay(), {}, {})
     }
 
     @Test
     fun limitEdit() = shot(tall = true) {
         app.bedtime.ui.limits.LimitEditContent(
-            draft = Samples.limits.first(),
+            draft = Samples.limits.first().let { it.copy(rules = it.rules.copy(pauseForGroup = true, outOfTime = app.bedtime.data.OutOfTime.CHOOSE)) },
             onDraftChange = {},
             isNew = false,
             loosens = true,
@@ -206,6 +204,28 @@ class ScreenshotTest {
             onPickApps = {},
             appLabel = Samples::label,
         )
+    }
+
+    @Test
+    fun stats() = shot(tall = true) {
+        val ui = Samples.home()
+        val today = LocalDate.now().toEpochDay()
+        app.bedtime.ui.stats.StatsContent(
+            history = Samples.fortnight(ui.now),
+            limits = Samples.limits,
+            usage = listOf(app.bedtime.data.UsageDay(today, seconds = mapOf("com.instagram.android" to 41 * 60L), extras = mapOf("social" to listOf(1L)))),
+            now = ui.now,
+            zone = ZoneId.systemDefault(),
+            onBack = {},
+        )
+    }
+
+    @Test
+    fun homeStats() = shot(tall = true) { Home(Samples.home().let { it.copy(history = Samples.fortnight(it.now)) }) }
+
+    @Test
+    fun unlockChoose() = shot {
+        FullScreen { app.bedtime.unlock.UnlockLengthChoice("Bedtime", maxMinutes = 95, restLabel = "the rest of the session", onChoose = {}, onCancel = {}) }
     }
 
     @Test
@@ -698,11 +718,29 @@ private object Samples {
         ),
     )
 
-    /** A week with one of each way out, for the stats. */
-    fun escapes(now: Long): List<SessionLog> = listOf(
-        SessionLog("focus", "Focus", now - 2 * DAY, now - 2 * DAY + HOUR, breakTimes = listOf(now - 2 * DAY + 10 * MIN)),
-        SessionLog("bedtime", "Bedtime", now - 3 * DAY - 2 * HOUR, now - 3 * DAY + 7 * HOUR, unlockTimes = listOf(now - 3 * DAY)),
-    )
+    /**
+     * Two weeks of evenings: bedtimes most nights, a few focus blocks, two nights with a way out and a
+     * day with nothing on.
+     */
+    fun fortnight(now: Long): List<SessionLog> {
+        val today = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        return (1..13).filter { it != 5 }.flatMap { back ->
+            val evening = today - back * DAY + 22 * HOUR + 30 * MIN
+            val hours = listOf(8, 7, 8, 6, 8, 9, 7, 8, 5, 8, 7, 8, 8)[back - 1]
+            val bed = SessionLog(
+                "bedtime", "Bedtime", evening, evening + hours * HOUR,
+                unlockTimes = if (back == 3) listOf(evening + HOUR) else emptyList(),
+                endedEarlyAt = if (back == 3) evening + 4 * HOUR else null,
+                breakTimes = if (back == 9) listOf(evening + 2 * HOUR) else emptyList(),
+            )
+            val focus = if (back % 3 == 0) {
+                listOf(SessionLog("focus", "Focus", today - back * DAY + 10 * HOUR, today - back * DAY + 11 * HOUR + 30 * MIN))
+            } else {
+                emptyList()
+            }
+            listOf(bed) + focus
+        } + SessionLog("focus", "Focus", today + 9 * HOUR, today + 10 * HOUR)
+    }
 
     /** Five kept bedtimes, and an older focus block that was unlocked early. */
     private fun history(now: Long): List<SessionLog> =

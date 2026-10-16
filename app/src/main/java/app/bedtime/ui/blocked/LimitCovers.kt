@@ -19,7 +19,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -42,13 +41,17 @@ import app.bedtime.ui.components.StatusPill
 import app.bedtime.ui.components.Text
 import app.bedtime.ui.formatMinutes
 import app.bedtime.ui.theme.Obsidian
+import app.bedtime.unlock.REST
+import app.bedtime.unlock.UnlockLengthChoice
 import app.bedtime.unlock.UnlockSteps
+import java.time.Duration
+import java.time.LocalDateTime
 import kotlinx.coroutines.delay
 import java.time.LocalDate
 
 /** The pause before opening an app with a limit: a few breaths, then open it or let it be. */
 @Composable
-internal fun PauseScreen(pkg: String, seconds: Int, opens: Int, onHome: () -> Unit, onFinish: () -> Unit) {
+internal fun PauseScreen(pkg: String, seconds: Int, opens: Int, passKey: String, onHome: () -> Unit, onFinish: () -> Unit) {
     val context = LocalContext.current
     val label = remember(pkg) { AppCatalog.label(context, pkg) }
     var left by rememberSaveable(pkg, opens) { mutableIntStateOf(seconds) }
@@ -63,7 +66,7 @@ internal fun PauseScreen(pkg: String, seconds: Int, opens: Int, onHome: () -> Un
         secondsLeft = left,
         opens = opens,
         onOpen = {
-            LimitPasses.grant(pkg, System.currentTimeMillis())
+            LimitPasses.grant(passKey, System.currentTimeMillis())
             AppCatalog.launch(context, pkg)
             onFinish()
         },
@@ -129,11 +132,12 @@ internal fun LimitScreen(pkg: String, limitId: String, onHome: () -> Unit, onFin
     val context = LocalContext.current
     val c = Obsidian.colors
     val repo = remember { Repository.get(context) }
-    val scope = rememberCoroutineScope()
     val settings by repo.settings.collectAsStateWithLifecycle(initialValue = null)
     val usage by repo.usage.collectAsStateWithLifecycle(initialValue = null)
     val label = remember(pkg) { AppCatalog.label(context, pkg) }
     var unlocking by rememberSaveable { mutableStateOf(false) }
+    /** With "choose then": minutes picked, [REST] for the rest of today, or -1 before choosing. */
+    var chosen by rememberSaveable { mutableIntStateOf(-1) }
     var granted by remember { mutableStateOf(false) }
     val today = LocalDate.now().toEpochDay()
     val day = usage?.lastOrNull { it.day == today } ?: UsageDay(today)
@@ -148,25 +152,42 @@ internal fun LimitScreen(pkg: String, limitId: String, onHome: () -> Unit, onFin
     Surface(Modifier.fillMaxSize(), color = c.bgPrimary) {
         if (limit == null) return@Surface
         val rules = limit.rules
-        val restOfDay = rules.outOfTime == OutOfTime.REST_OF_DAY
         val name = limit.name.ifBlank { "this limit" }
-        if (unlocking) {
+        val choosing = rules.outOfTime == OutOfTime.CHOOSE
+        if (unlocking && choosing && chosen < 0) {
+            val untilMidnight = Duration.between(LocalDateTime.now(), LocalDate.now().plusDays(1).atStartOfDay()).toMinutes().toInt()
+            UnlockLengthChoice(
+                name = name,
+                maxMinutes = untilMidnight,
+                restLabel = "the rest of today",
+                onChoose = { chosen = it ?: REST },
+                onCancel = { unlocking = false },
+                modifier = Modifier.fillMaxSize().safeDrawingPadding().imePadding(),
+            )
+        } else if (unlocking) {
+            // Minutes given, or null to lift the limit until midnight.
+            val minutes: Int? = when (rules.outOfTime) {
+                OutOfTime.CHOOSE -> chosen.takeIf { it != REST }
+                OutOfTime.REST_OF_DAY -> null
+                else -> rules.extraMinutes
+            }
             UnlockSteps(
                 key = "$limitId-$today",
                 name = name,
                 config = rules.unlock,
                 recentUnlocks = day.extras[limitId]?.size ?: 0,
-                outcome = if (restOfDay) "This lifts $name for the rest of today." else "This gives you ${rules.extraMinutes} more minutes today.",
-                success = if (restOfDay) "$name is lifted until tomorrow." else "${rules.extraMinutes} more minutes. Spend them well.",
+                outcome = if (minutes == null) "This lifts $name for the rest of today." else "This gives you $minutes more minutes today.",
+                success = if (minutes == null) "$name is lifted until tomorrow." else "$minutes more minutes. Spend them well.",
                 onComplete = {
                     granted = true
-                    repo.grantLimit(today, limitId, System.currentTimeMillis(), restOfDay)
+                    repo.grantLimit(today, limitId, System.currentTimeMillis(), minutes)
                 },
                 onUnlocked = {
                     AppCatalog.launch(context, pkg)
                     onFinish()
                 },
-                onCancel = { unlocking = false },
+                // Backing out of the steps goes back to choosing, when there was a choice.
+                onCancel = { if (choosing) chosen = -1 else unlocking = false },
                 modifier = Modifier.fillMaxSize().safeDrawingPadding().imePadding(),
             )
         } else {
@@ -218,6 +239,7 @@ internal fun LimitContent(
                 OutOfTime.TOMORROW -> "That was today's $budget. It'll be back tomorrow."
                 OutOfTime.MORE_TIME -> "That was today's $budget. If it really can't wait, you can take $extraMinutes more minutes."
                 OutOfTime.REST_OF_DAY -> "That was today's $budget. If it really can't wait, you can lift the limit for the rest of today."
+                OutOfTime.CHOOSE -> "That was today's $budget. If it really can't wait, you can say how much more you need."
             },
             style = MaterialTheme.typography.bodyLarge,
             color = c.textMuted,
@@ -228,7 +250,11 @@ internal fun LimitContent(
         if (outOfTime != OutOfTime.TOMORROW) {
             TextButton(onClick = onMore, modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) {
                 Text(
-                    if (outOfTime == OutOfTime.MORE_TIME) "Take $extraMinutes more minutes" else "Lift it for today",
+                    when (outOfTime) {
+                        OutOfTime.MORE_TIME -> "Take $extraMinutes more minutes"
+                        OutOfTime.CHOOSE -> "Take more time"
+                        else -> "Lift it for today"
+                    },
                     color = c.textMuted,
                 )
             }

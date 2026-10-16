@@ -100,16 +100,32 @@ fun UnlockFlow(occurrence: Occurrence, onUnlocked: () -> Unit, onCancel: () -> U
     val recentUnlocks = remember(history == null) {
         history?.let { Escalation.recentUnlocks(it, schedule.id, System.currentTimeMillis()) }
     }
+    // With "choose then", the length comes first: NOT_CHOSEN until it's picked, REST for the rest of it.
+    val choosing = schedule.unlockAction.mode == UnlockMode.CHOOSE
+    var chosen by rememberSaveable(occurrence.start) { mutableIntStateOf(NOT_CHOSEN) }
+    if (choosing && chosen == NOT_CHOSEN) {
+        UnlockLengthChoice(
+            name = schedule.name,
+            maxMinutes = ((occurrence.end - System.currentTimeMillis()) / 60_000).toInt(),
+            restLabel = if (schedule.isBlock) "the rest of the block" else "the rest of the session",
+            onChoose = { chosen = it ?: REST },
+            onCancel = onCancel,
+            modifier = modifier,
+        )
+        return
+    }
+    val minutes = if (choosing) chosen.takeIf { it != REST } else UnlockManager.setLength(schedule)
     UnlockSteps(
         key = occurrence.start,
         name = schedule.name,
         config = schedule.unlock,
         recentUnlocks = recentUnlocks,
-        outcome = outcomeText(schedule),
-        success = successText(schedule),
-        onComplete = { UnlockManager.complete(context, occurrence) },
+        outcome = outcomeText(schedule, minutes),
+        success = successText(schedule, minutes),
+        onComplete = { UnlockManager.complete(context, occurrence, minutes) },
         onUnlocked = onUnlocked,
-        onCancel = onCancel,
+        // Backing out of the steps goes back to choosing, not all the way out.
+        onCancel = if (choosing) ({ chosen = NOT_CHOSEN }) else onCancel,
         modifier = modifier,
     )
 }
@@ -233,15 +249,18 @@ private fun footnoteFor(step: Challenge?, outcome: String): String = when (step)
     else -> outcome
 }
 
-internal fun outcomeText(schedule: Schedule): String = when (schedule.unlockAction.mode) {
-    UnlockMode.END_SESSION -> if (schedule.isBlock) "This ends the block." else "This ends the current session."
-    UnlockMode.PAUSE -> "This gives you a ${schedule.unlockAction.pauseMinutes}-minute break."
+/** Before a length has been chosen. */
+private const val NOT_CHOSEN = -1
+
+/** What the unlock will do: a break of [minutes], or with null the end of the session. */
+internal fun outcomeText(schedule: Schedule, minutes: Int?): String = when (minutes) {
+    null -> if (schedule.isBlock) "This ends the block." else "This ends the current session."
+    else -> "This gives you a $minutes-minute break."
 }
 
-internal fun successText(schedule: Schedule): String = when (schedule.unlockAction.mode) {
-    UnlockMode.END_SESSION ->
-        if (schedule.isBlock) "${schedule.name} is over. Start it again whenever you like." else "${schedule.name} is off until its next scheduled start."
-    UnlockMode.PAUSE -> "Enjoy your ${schedule.unlockAction.pauseMinutes}-minute break. ${schedule.name} switches back on afterwards."
+internal fun successText(schedule: Schedule, minutes: Int?): String = when (minutes) {
+    null -> if (schedule.isBlock) "${schedule.name} is over. Start it again whenever you like." else "${schedule.name} is off until its next scheduled start."
+    else -> "Enjoy your $minutes-minute break. ${schedule.name} switches back on afterwards."
 }
 
 @Composable

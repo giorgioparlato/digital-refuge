@@ -134,8 +134,9 @@ class StatsBreaksTest {
             SessionLog("s", "S", now - day + hour, now - day + 2 * hour),
             SessionLog("s", "S", now - 2 * day + hour, now - 2 * day + 2 * hour, unlockTimes = listOf(1)),
         )
-        val days = Stats.days(history, now + hour, zone, count = 4).map { it.second }
-        assertEquals(listOf(DayMark.NONE, DayMark.ESCAPED, DayMark.KEPT, DayMark.NONE), days)
+        val days = Stats.daily(history, now + hour, zone, count = 4)
+        assertEquals(listOf(DayMark.NONE, DayMark.ESCAPED, DayMark.KEPT, DayMark.NONE), days.map { it.mark })
+        assertEquals(listOf(0L, 60L, 60L, 0L), days.map { it.minutes })
     }
 
     @Test
