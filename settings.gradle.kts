@@ -16,6 +16,3 @@ dependencyResolutionManagement {
 
 rootProject.name = "DigitalRefuge"
 include(":app")
-
-// Throwaway diagnostic app; remove once the BankID question is settled.
-include(":probe")

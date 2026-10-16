@@ -2,7 +2,6 @@ package app.bedtime.service
 
 import android.accessibilityservice.AccessibilityService
 import android.app.NotificationManager
-import android.database.ContentObserver
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -86,23 +85,13 @@ class BlockerService : AccessibilityService() {
         }
     }
 
-    /** Colour correction switched off mid-session: switch greyscale straight back on. */
-    private val greyscaleObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
-        override fun onChange(selfChange: Boolean) {
-            val owner = state?.active?.firstOrNull { it.schedule.greyscale } ?: return
-            scope.launch {
-                if (applyGreyscale()) notice("Greyscale stays on during ${owner.schedule.name}.")
-            }
-        }
-    }
-
     /** Our greyscale mode (Android 15+) switched off by hand mid-session: switch it straight back on. */
     private val modeReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             if (ModeGreyscale.isSelfChange()) return
             val owner = state?.active?.firstOrNull { it.schedule.greyscale } ?: return
             if (homeInFront && state?.keepHomeInColour == true) return
-            if (GreyscaleController.hasPermission(context) || !ModeGreyscale.isUserDeactivation(context, intent)) return
+            if (!ModeGreyscale.isUserDeactivation(context, intent)) return
             ModeGreyscale.apply(context, on = true, reassert = true)
             notice("Greyscale stays on during ${owner.schedule.name}.")
         }
@@ -112,16 +101,24 @@ class BlockerService : AccessibilityService() {
     /** Not cancelled on destroy, so restoring colours and sound can finish after the service stops. */
     private val releaseScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
+    /** Time in limited apps, the pause before opening them, and the cover once their minutes are gone. */
+    private val limitTracker by lazy { LimitTracker(this, scope, releaseScope) }
+
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             if (intent.action == Intent.ACTION_SCREEN_OFF) {
+                // Nothing is being used with the screen off, whatever was last in front.
+                limitTracker.moveTo(null)
+                limitTracker.flush()
                 showLockScreen()
                 return
             }
+            // Back in, so whatever is in front starts counting again (and may be due its pause).
+            if (intent.action == Intent.ACTION_USER_PRESENT) lastPackage?.let(::settle)
             Engine.refresh()
             refreshSystemPackages()
             // Re-assert greyscale in case it was switched off from quick settings.
-            scope.launch { applyGreyscale() }
+            applyGreyscale()
         }
     }
 
@@ -146,7 +143,6 @@ class BlockerService : AccessibilityService() {
             IntentFilter(NotificationManager.ACTION_INTERRUPTION_FILTER_CHANGED),
             ContextCompat.RECEIVER_NOT_EXPORTED,
         )
-        GreyscaleController.observedUris.forEach { contentResolver.registerContentObserver(it, false, greyscaleObserver) }
         watchersRegistered = true
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
             ContextCompat.registerReceiver(
@@ -159,9 +155,11 @@ class BlockerService : AccessibilityService() {
         }
 
         val repo = Repository.get(this)
+        limitTracker.start()
         scope.launch {
             repo.settings.collect {
                 settings = it
+                limitTracker.limits = it.limits
                 applyGreyscale()
             }
         }
@@ -195,7 +193,7 @@ class BlockerService : AccessibilityService() {
         val home = pkg == packageName && className != null && className in colourScreens
         if (home != homeInFront) {
             homeInFront = home
-            scope.launch { applyGreyscale() }
+            applyGreyscale()
         }
         // First, and on every window of Settings: its fragments and dialogs are not activities of their
         // own, and the cover over them can't wait for the settle either — the event's text dies with it.
@@ -254,7 +252,7 @@ class BlockerService : AccessibilityService() {
         return true
     }
 
-    private suspend fun applyGreyscale(): Boolean =
+    private fun applyGreyscale() =
         GreyscaleController.apply(
             this,
             wanted = state?.greyscale == true,
@@ -297,16 +295,28 @@ class BlockerService : AccessibilityService() {
         // Whatever window we were waiting on is no longer the question; this is.
         pendingSettle?.let(handler::removeCallbacks)
         pendingSettle = null
+        // Counted first, before anything below can return: our own covers stop the clock too.
+        val arrived = limitTracker.moveTo(pkg)
         val current = state ?: return
-        if (pkg == null || !current.isActive || pkg == packageName || pkg in alwaysAllowed) return
-        // Always-available apps (maps, rides, authenticators…) are never blocked by any session.
+        if (pkg == null || pkg == packageName || pkg in alwaysAllowed) return
+        // Always-available apps (maps, rides, authenticators…) are never blocked by any session or limit.
         if (pkg in settings.alwaysAvailable) return
-        val minimal = current.minimalAllowlist
-        when {
-            pkg in current.blocked -> startActivity(BlockedActivity.intent(this, pkg))
-            // In minimal mode the stock launcher and recents are "not allowed" too, so Home lands here.
-            minimal != null && pkg !in minimal && opensAsApp(pkg) -> startActivity(MinimalHomeActivity.intent(this))
+        if (current.isActive) {
+            val minimal = current.minimalAllowlist
+            when {
+                pkg in current.blocked -> {
+                    startActivity(BlockedActivity.intent(this, pkg))
+                    return
+                }
+                // In minimal mode the stock launcher and recents are "not allowed" too, so Home lands here.
+                minimal != null && pkg !in minimal && opensAsApp(pkg) -> {
+                    startActivity(MinimalHomeActivity.intent(this))
+                    return
+                }
+            }
         }
+        // Limits hold every day, and inside a session for the apps it lets through.
+        limitTracker.check(pkg, arrived)
     }
 
     /**
@@ -355,11 +365,9 @@ class BlockerService : AccessibilityService() {
     override fun onDestroy() {
         BlockingState.service = null
         pendingSettle?.let(handler::removeCallbacks)
+        limitTracker.stop()
         if (receiverRegistered) unregisterReceiver(receiver)
-        if (watchersRegistered) {
-            unregisterReceiver(zenReceiver)
-            contentResolver.unregisterContentObserver(greyscaleObserver)
-        }
+        if (watchersRegistered) unregisterReceiver(zenReceiver)
         if (modeReceiverRegistered) unregisterReceiver(modeReceiver)
         scope.cancel()
         super.onDestroy()

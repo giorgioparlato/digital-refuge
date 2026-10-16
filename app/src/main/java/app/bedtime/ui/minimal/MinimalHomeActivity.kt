@@ -58,6 +58,9 @@ import app.bedtime.data.HomeStyle
 import app.bedtime.data.Quote
 import app.bedtime.data.Quotes
 import app.bedtime.data.Repository
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.text.font.FontWeight
+import kotlinx.coroutines.launch
 import app.bedtime.engine.Engine
 import app.bedtime.service.BlockingState
 import app.bedtime.service.SystemApps
@@ -104,6 +107,7 @@ private fun MinimalHomeScreen(onFinish: () -> Unit, onLightBackground: (Boolean)
     val context = LocalContext.current
     val c = Obsidian.colors
     val repo = remember { Repository.get(context) }
+    val scope = rememberCoroutineScope()
     val state by Engine.state(context).collectAsStateWithLifecycle()
     val settings by repo.settings.collectAsStateWithLifecycle(initialValue = AppSettings())
     val occurrence = state?.minimalOccurrence
@@ -176,6 +180,12 @@ private fun MinimalHomeScreen(onFinish: () -> Unit, onLightBackground: (Boolean)
             onLaunch = { AppCatalog.launch(context, it) },
             onUnlock = { unlocking = true },
             onEmergency = { emergency = true },
+            // Re-read every second with the clock, so it goes back to "unlock" once the moment passes.
+            onUndo = if (occurrence.schedule.isBlock && Repository.canUndo(occurrence.start, System.currentTimeMillis())) {
+                { scope.launch { repo.undoStart(occurrence.schedule.id) } }
+            } else {
+                null
+            },
             quote = Quotes.forPeriod(now, style.quoteRefresh, quoteOffset),
             onNextQuote = { quoteOffset++ },
         )
@@ -199,6 +209,8 @@ internal fun MinimalHomeContent(
     onLaunch: (String) -> Unit,
     onUnlock: () -> Unit,
     onEmergency: () -> Unit = {},
+    /** Set for the first seconds of a block, when starting it can still be taken back. */
+    onUndo: (() -> Unit)? = null,
     quote: Quote? = null,
     onNextQuote: () -> Unit = {},
     preview: Boolean = false,
@@ -246,10 +258,14 @@ internal fun MinimalHomeContent(
             }
         }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onClick = onUnlock) {
-                Icon(Icons.Default.Lock, contentDescription = null, tint = p.faint, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("unlock", color = p.faint)
+            if (onUndo != null) {
+                TextButton(onClick = onUndo) { Text("undo", color = p.accent, fontWeight = FontWeight.SemiBold) }
+            } else {
+                TextButton(onClick = onUnlock) {
+                    Icon(Icons.Default.Lock, contentDescription = null, tint = p.faint, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("unlock", color = p.faint)
+                }
             }
             Spacer(Modifier.weight(1f))
             TextButton(onClick = onEmergency) {

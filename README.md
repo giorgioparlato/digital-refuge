@@ -45,12 +45,17 @@ Nothing here can be made impossible, and the app doesn't pretend otherwise — A
 
 ## Features
 
-- **Schedules and focus blocks.** Schedules repeat on days and times. Blocks start whenever you like and run for a set length.
+- **Schedules and focus blocks.** Schedules repeat on days and times. Blocks start whenever you like and run for a set length. Started a block by mistake? For ten seconds there's an **undo**, on home and in the notification, and it doesn't count against you.
+- **Limits that hold every day**, not only in a session, for the apps that pull hardest (their own tab). Each limit covers some apps, or a group, and can have:
+  - **a pause before opening**: a few breaths, then "never mind" or open it. After opening anyway, coming back within a grace you choose (two minutes by default) doesn't ask again;
+  - **a daily budget**: minutes shared by all its apps, or for each of them. When they're gone, the limit decides what's left: nothing until tomorrow, more time after the unlock steps, or the rest of the day after them.
+
+  Making a limit stricter applies at once. Loosening it — fewer apps, more minutes, an easier way to get more, or deleting it — waits for midnight, so it can't be used to get round today. Time is counted from which app is in front, so it's close rather than exact.
 - **Templates**, always available from **New**:
   - schedules: Bedtime, Work focus, Slow morning, Weekend detox;
   - blocks: Focus 60, Deep work 90, Pomodoro 25, Study 45.
 - **Leaving early takes effort**, Cold Turkey style. Stack any mix of steps, completed in this order:
-  1. wait out a timer (it only runs while its screen is open, and starts over if you back out);
+  1. wait out a timer, breathing along with it (it only runs while its screen is open, and starts over if you back out);
   2. type random text (no pasting, no typos);
   3. enter a password.
 
@@ -63,7 +68,8 @@ Nothing here can be made impossible, and the app doesn't pretend otherwise — A
 - **Easy number picking:** tap − or + for one step, hold to keep going faster, or tap the number to type a value or pick a preset.
 - **Safer defaults:** Settings, Phone and Messages start out allowed in minimal mode, and the app picker explains why.
 - **App groups** ("Social & feeds", "Essentials", or your own) let you tick many apps in one tap.
-- **Stats:** a streak, time spent in refuge this week, and early unlocks.
+- **Your refuge**, on the limits tab: time in refuge this week, the current and best run of kept sessions, four weeks of days at a glance, each schedule's record, and time in limited apps. Early unlocks, emergency breaks and blocking switched off are each counted on their own line, and all of them end a run.
+- **What's new** after each update, once, on the home screen.
 - **Quick Settings tile** that starts your favourite focus block.
 - **Home-screen widget** that starts a chosen block with one tap, and shows how long is left while it runs. Add one from settings → home-screen widget, or long-press your home screen → widgets → digital refuge.
 - **Design:** based on the [Primary](https://primary-theme.github.io/start-here/) Obsidian theme, with green accents and the Inter font. Dark mode uses neutral grays around `#282828`; light mode uses Primary's cream palette. All text in the app is lowercase, and the icon is a lotus, the Buddhist image of calm, with a warm centre petal rising from the water.
@@ -132,6 +138,9 @@ The screens are checked with [Paparazzi](https://github.com/cashapp/paparazzi) s
 | Pure "what's active now" logic (midnight crossing, blocks, overrides) | `engine/ScheduleEvaluator.kt` |
 | Live state, re-evaluated at each boundary | `engine/Engine.kt` |
 | Stats and streaks | `engine/Stats.kt` |
+| Limits: what holds today, budgets, what counts as loosening | `engine/Limits.kt` |
+| Counting time in limited apps, the pause before opening | `service/LimitTracker.kt`, `ui/blocked/LimitCovers.kt` |
+| The limits tab and its editor | `ui/limits/` |
 | Foreground-app watcher: blocking, minimal mode, greyscale, Do Not Disturb | `service/BlockerService.kt` |
 | Greyscale and Do Not Disturb | `service/GreyscaleController.kt`, `service/ModeGreyscale.kt` (Android 15+), `service/DndController.kt` |
 | Quick Settings tile | `service/FocusTileService.kt` |

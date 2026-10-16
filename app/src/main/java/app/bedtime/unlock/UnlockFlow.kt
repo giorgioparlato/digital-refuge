@@ -70,6 +70,7 @@ import app.bedtime.data.TextSource
 import app.bedtime.data.UnlockConfig
 import app.bedtime.data.UnlockMode
 import app.bedtime.engine.Occurrence
+import app.bedtime.ui.components.Breathing
 import app.bedtime.ui.components.Callout
 import app.bedtime.ui.components.CalloutKind
 import app.bedtime.ui.components.CtaButton
@@ -92,10 +93,47 @@ private enum class Challenge(val label: String) { WAIT("Wait"), TEXT("Type"), PA
 @Composable
 fun UnlockFlow(occurrence: Occurrence, onUnlocked: () -> Unit, onCancel: () -> Unit, modifier: Modifier = Modifier) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     val repo = remember { Repository.get(context) }
     val schedule = occurrence.schedule
-    val config = schedule.unlock
+    val history: List<SessionLog>? by repo.history.collectAsStateWithLifecycle(initialValue = null)
+    // Counted once when the flow opens, so the challenge can't change length half-way through.
+    val recentUnlocks = remember(history == null) {
+        history?.let { Escalation.recentUnlocks(it, schedule.id, System.currentTimeMillis()) }
+    }
+    UnlockSteps(
+        key = occurrence.start,
+        name = schedule.name,
+        config = schedule.unlock,
+        recentUnlocks = recentUnlocks,
+        outcome = outcomeText(schedule),
+        success = successText(schedule),
+        onComplete = { UnlockManager.complete(context, occurrence) },
+        onUnlocked = onUnlocked,
+        onCancel = onCancel,
+        modifier = modifier,
+    )
+}
+
+/**
+ * The steps themselves, for anything that can be unlocked: a session, or a limit's extra time.
+ * [key] ties the step you're on and the wait's progress to one thing being unlocked; [recentUnlocks]
+ * (null while loading) makes the steps longer when "harder each time" is on; [onComplete] does the
+ * unlocking once the last step is passed.
+ */
+@Composable
+internal fun UnlockSteps(
+    key: Any,
+    name: String,
+    config: UnlockConfig,
+    recentUnlocks: Int?,
+    outcome: String,
+    success: String,
+    onComplete: suspend () -> Unit,
+    onUnlocked: () -> Unit,
+    onCancel: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val scope = rememberCoroutineScope()
     val challenges = remember(config) {
         buildList {
             if (config.waitEnabled) add(Challenge.WAIT)
@@ -103,13 +141,8 @@ fun UnlockFlow(occurrence: Occurrence, onUnlocked: () -> Unit, onCancel: () -> U
             if (config.passwordEnabled && config.hasPassword) add(Challenge.PASSWORD)
         }
     }
-    var index by rememberSaveable(occurrence.start) { mutableIntStateOf(0) }
+    var index by rememberSaveable(key) { mutableIntStateOf(0) }
     var succeeded by remember { mutableStateOf(false) }
-    val history: List<SessionLog>? by repo.history.collectAsStateWithLifecycle(initialValue = null)
-    // Counted once when the flow opens, so the challenge can't change length half-way through.
-    val recentUnlocks = remember(history == null) {
-        history?.let { Escalation.recentUnlocks(it, schedule.id, System.currentTimeMillis()) }
-    }
 
     fun passCurrent() {
         if (index + 1 < challenges.size) {
@@ -118,7 +151,7 @@ fun UnlockFlow(occurrence: Occurrence, onUnlocked: () -> Unit, onCancel: () -> U
             succeeded = true
             scope.launch {
                 delay(1_400) // Let the success state register before the screen closes.
-                UnlockManager.complete(context, occurrence)
+                onComplete()
                 onUnlocked()
             }
         }
@@ -137,11 +170,11 @@ fun UnlockFlow(occurrence: Occurrence, onUnlocked: () -> Unit, onCancel: () -> U
     val step = if (succeeded) null else challenges.getOrNull(index)
     // The timer is hoisted out of the page so the ring and the button, which sit at opposite ends of
     // it, can both read the same countdown.
-    val remaining = if (step == Challenge.WAIT) waitCountdown(occurrence, waitMs) else null
+    val remaining = if (step == Challenge.WAIT) waitCountdown(key, waitMs) else null
 
     UnlockLayout(
-        scheduleName = schedule.name,
-        footnote = if (succeeded) null else footnoteFor(step, outcomeText(schedule)),
+        scheduleName = name,
+        footnote = if (succeeded) null else footnoteFor(step, outcome),
         stepLabels = challenges.map { it.label },
         current = if (succeeded) challenges.size else index,
         showCancel = !succeeded,
@@ -169,7 +202,7 @@ fun UnlockFlow(occurrence: Occurrence, onUnlocked: () -> Unit, onCancel: () -> U
         },
     ) {
         if (succeeded) {
-            UnlockSuccess(successText(schedule))
+            UnlockSuccess(success)
         } else {
             when (step) {
                 null -> Unit
@@ -351,8 +384,8 @@ internal fun UnlockSuccess(message: String) {
  * the app pauses it, and backing out drops it, so the next attempt starts from scratch.
  */
 @Composable
-private fun waitCountdown(occurrence: Occurrence, total: Long): Long {
-    var elapsed by rememberSaveable(occurrence.start) { mutableLongStateOf(0L) }
+private fun waitCountdown(key: Any, total: Long): Long {
+    var elapsed by rememberSaveable(key) { mutableLongStateOf(0L) }
     var inFront by remember { mutableStateOf(false) }
     LifecycleResumeEffect(Unit) {
         inFront = true
@@ -399,12 +432,24 @@ internal fun WaitChallengeContent(remaining: Long?, total: Long) {
                 trackColor = ring.copy(alpha = 0.10f),
                 strokeCap = StrokeCap.Round,
             )
-            Text(
-                remaining?.let(::formatCountdown) ?: "\u2026",
-                style = MaterialTheme.typography.displaySmall.copy(fontFeatureSettings = "tnum"),
-                fontWeight = FontWeight.Medium,
-                color = if (done) c.green else c.textNormal,
-            )
+            // Something to do with the wait besides watching it: breathe with the disc.
+            Breathing(running = remaining != null && !done, color = ring, modifier = Modifier.size(200.dp)) { inhaling ->
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        remaining?.let(::formatCountdown) ?: "\u2026",
+                        style = MaterialTheme.typography.displaySmall.copy(fontFeatureSettings = "tnum"),
+                        fontWeight = FontWeight.Medium,
+                        color = if (done) c.green else c.textNormal,
+                    )
+                    if (!done) {
+                        Text(
+                            if (inhaling) "breathe in" else "breathe out",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = c.textFaint,
+                        )
+                    }
+                }
+            }
         }
     }
 }

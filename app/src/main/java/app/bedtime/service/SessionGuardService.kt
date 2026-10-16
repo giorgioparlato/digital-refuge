@@ -40,6 +40,9 @@ class SessionGuardService : Service() {
     /** So one switch-off is recorded once, not on every settings change. */
     private var recorded = false
 
+    /** The end of the break already counted, so "take more minutes" on the reminder counts as another. */
+    private var countedBreakEnd = 0L
+
     /** Whether the takeover could be drawn last time we looked, and whether losing it was counted. */
     private var overlayOk = true
     private var overlayRecorded = false
@@ -98,14 +101,14 @@ class SessionGuardService : Service() {
             wasOn && !nowOn -> {
                 if (!recorded) {
                     recorded = true
-                    val occurrence = state?.active?.firstOrNull()
-                    if (occurrence != null) {
-                        scope.launch { Repository.get(this@SessionGuardService).recordPause(occurrence, System.currentTimeMillis()) }
-                    }
+                    // An emergency break sets its end before switching blocking off; anything else doesn't.
+                    countedBreakEnd = BlockingState.breakEndsAt()
+                    record(asBreak = BlockingState.isOnBreak())
                 }
             }
             !wasOn && nowOn -> {
                 recorded = false
+                countedBreakEnd = 0L
                 BlockingState.clearBreak()
                 Engine.refresh() // Pick the session back up straight away.
             }
@@ -139,9 +142,22 @@ class SessionGuardService : Service() {
         }
     }
 
+    /** Counts a way out of the running session: an emergency break, or blocking switched off otherwise. */
+    private fun record(asBreak: Boolean) {
+        val occurrence = state?.active?.firstOrNull() ?: return
+        val repo = Repository.get(this)
+        val at = System.currentTimeMillis()
+        scope.launch { if (asBreak) repo.recordBreak(occurrence, at) else repo.recordPause(occurrence, at) }
+    }
+
     /** Shows or hides the full-screen takeover and updates the ongoing notification for the phase. */
     private fun updateAlert() {
         checkOverlay()
+        val breakEnd = BlockingState.breakEndsAt()
+        if (!blockingOn && recorded && breakEnd > countedBreakEnd) {
+            countedBreakEnd = breakEnd
+            record(asBreak = true)
+        }
         val current = state
         val takeover = !blockingOn &&
             current?.isActive == true &&

@@ -14,14 +14,13 @@ object UnlockManager {
         val now = System.currentTimeMillis()
         val endsSession = schedule.unlockAction.mode == UnlockMode.END_SESSION
         repo.updateRuntime { runtime ->
-            val cleared = runtime.copy(pendingWaits = runtime.pendingWaits - schedule.id)
             when {
-                endsSession && schedule.isBlock -> cleared.copy(activeRuns = cleared.activeRuns - schedule.id)
-                endsSession -> cleared.copy(
-                    overrides = cleared.overrides + (schedule.id to ScheduleOverride(endedOccurrenceStart = occurrence.start)),
+                endsSession && schedule.isBlock -> runtime.copy(activeRuns = runtime.activeRuns - schedule.id)
+                endsSession -> runtime.copy(
+                    overrides = runtime.overrides + (schedule.id to ScheduleOverride(endedOccurrenceStart = occurrence.start)),
                 )
-                else -> cleared.copy(
-                    overrides = cleared.overrides +
+                else -> runtime.copy(
+                    overrides = runtime.overrides +
                         (schedule.id to ScheduleOverride(pausedUntil = now + schedule.unlockAction.pauseMinutes * 60_000L)),
                 )
             }

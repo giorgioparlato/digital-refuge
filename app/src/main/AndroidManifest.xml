@@ -123,6 +123,10 @@
             android:exported="false" />
 
         <receiver
+            android:name=".service.UndoStartReceiver"
+            android:exported="false" />
+
+        <receiver
             android:name=".service.BootReceiver"
             android:exported="true">
             <intent-filter>

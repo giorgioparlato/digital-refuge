@@ -5,14 +5,19 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.os.Handler
+import android.os.Looper
+import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import app.bedtime.MainActivity
 import app.bedtime.Routes
 import app.bedtime.R
 import app.bedtime.data.DndMode
+import app.bedtime.data.Repository
 import app.bedtime.engine.ActiveState
 import app.bedtime.ui.formatTime
 
@@ -66,6 +71,12 @@ object SessionNotifier {
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
+        // A block started moments ago can be taken back, for the mis-tap on a widget or the tile.
+        val undoable = if (blockingOn) {
+            state?.active?.firstOrNull { it.schedule.isBlock && Repository.canUndo(it.start, System.currentTimeMillis()) }
+        } else {
+            null
+        }
         return NotificationCompat.Builder(context, CHANNEL)
             .setSmallIcon(R.drawable.ic_tile)
             .setColor(ACCENT)
@@ -85,6 +96,7 @@ object SessionNotifier {
             // Alarms always pass our own Do Not Disturb, so "hide notifications" doesn't hide this one.
             .setCategory(if (blockingOn) NotificationCompat.CATEGORY_ALARM else NotificationCompat.CATEGORY_REMINDER)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .apply { if (undoable != null) addAction(0, "undo", UndoStartReceiver.pending(context, undoable.schedule.id)) }
             .build()
     }
 
@@ -124,5 +136,30 @@ object SessionNotifier {
             setBypassDnd(true)
         }
         manager.createNotificationChannel(channel)
+    }
+}
+
+/** The notification's "undo": takes back a block started a moment ago, if that moment hasn't passed. */
+class UndoStartReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        val id = intent.getStringExtra(EXTRA_ID) ?: return
+        val app = context.applicationContext
+        async {
+            val undone = Repository.get(app).undoStart(id)
+            val message = if (undone) "taken back, as if it never started" else "too late to undo · leave early instead"
+            Handler(Looper.getMainLooper()).post { Toast.makeText(app, message, Toast.LENGTH_SHORT).show() }
+        }
+    }
+
+    companion object {
+        private const val EXTRA_ID = "schedule"
+
+        fun pending(context: Context, scheduleId: String): PendingIntent =
+            PendingIntent.getBroadcast(
+                context,
+                2,
+                Intent(context, UndoStartReceiver::class.java).putExtra(EXTRA_ID, scheduleId),
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+            )
     }
 }

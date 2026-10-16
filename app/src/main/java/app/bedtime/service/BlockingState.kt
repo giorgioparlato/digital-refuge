@@ -28,6 +28,9 @@ object BlockingState {
 
     fun isOnBreak(): Boolean = SystemClock.elapsedRealtime() < breakUntil
 
+    /** When the current break ends (elapsed-realtime millis), so a longer one can be noticed; 0 if none. */
+    fun breakEndsAt(): Long = breakUntil
+
     fun breakRemainingMs(): Long = (breakUntil - SystemClock.elapsedRealtime()).coerceAtLeast(0L)
 
     /**

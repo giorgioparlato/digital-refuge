@@ -54,6 +54,8 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.bedtime.apps.AppCatalog
 import app.bedtime.data.AppSettings
+import app.bedtime.data.Changelog
+import app.bedtime.data.ChangelogEntry
 import app.bedtime.data.DndMode
 import app.bedtime.data.Quote
 import app.bedtime.data.Quotes
@@ -98,6 +100,10 @@ internal data class HomeUiState(
     val now: Long,
     /** Today's quote, or null when the home style hides it. */
     val quote: Quote? = null,
+    /** A block started moments ago, which can still be taken back as if it never began. */
+    val undoBlockId: String? = null,
+    /** What changed in the update you haven't seen yet. */
+    val whatsNew: ChangelogEntry? = null,
 )
 
 /** The home tab: what's running now, how the week has gone, and the blocks you can start. */
@@ -134,16 +140,30 @@ fun HomeScreen(
             now = System.currentTimeMillis()
         }
     }
+    // A block started a moment ago can still be taken back; this clock only runs for those seconds.
+    var undoBlockId by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(active) {
+        while (true) {
+            val at = System.currentTimeMillis()
+            val fresh = active?.active?.firstOrNull { it.schedule.isBlock && Repository.canUndo(it.start, at) }
+            undoBlockId = fresh?.schedule?.id
+            if (fresh == null) break
+            delay(fresh.start + Repository.UNDO_MS - at)
+        }
+    }
     // Show nothing for the split second before schedules load, rather than flashing the empty state.
     val loaded = schedules ?: return
     val style = settings.homeStyle
+    val installed = remember { Changelog.installedVersion(context) }
+    // Before the walk-through there's nothing to compare with; it marks the version as seen itself.
+    val whatsNew = if (settings.onboarded) Changelog.unseen(settings.lastSeenVersion, installed) else null
     val quote = if (style.showQuote) {
         Quotes.forPeriod(Instant.ofEpochMilli(now).atZone(ZoneId.systemDefault()).toLocalDateTime(), style.quoteRefresh)
     } else {
         null
     }
     HomeContent(
-        ui = HomeUiState(loaded, active, runtime, history, serviceOn, greyscaleOk, dndOk, now, quote),
+        ui = HomeUiState(loaded, active, runtime, history, serviceOn, greyscaleOk, dndOk, now, quote, undoBlockId, whatsNew),
         onEdit = onEdit,
         onCreate = onCreate,
         onTemplate = onTemplate,
@@ -151,6 +171,8 @@ fun HomeScreen(
         onDuration = { block, minutes -> scope.launch { repo.upsert(block.copy(durationMinutes = minutes)) } },
         onSetup = onSetup,
         onUnlock = onUnlock,
+        onUndo = { id -> scope.launch { repo.undoStart(id) } },
+        onDismissWhatsNew = { scope.launch { repo.updateSettings { it.copy(lastSeenVersion = installed) } } },
         isInstalled = { AppCatalog.isLaunchable(context, it) },
     )
 }
@@ -165,6 +187,8 @@ internal fun HomeContent(
     onDuration: (Schedule, Int) -> Unit = { _, _ -> },
     onSetup: () -> Unit,
     onUnlock: (String) -> Unit,
+    onUndo: (String) -> Unit = {},
+    onDismissWhatsNew: () -> Unit = {},
     isInstalled: (String) -> Boolean = { false },
 ) {
     val c = Obsidian.colors
@@ -188,12 +212,17 @@ internal fun HomeContent(
         Modifier.fillMaxSize().background(c.bgPrimary),
         contentPadding = PaddingValues(bottom = 28.dp),
     ) {
-        item(key = "header") { HomeHeader(ui, onUnlock) }
+        item(key = "header") { HomeHeader(ui, onUnlock, onUndo) }
         if (needsSetup) {
             item(key = "setup") {
                 Box(Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
                     SetupChecklist(ui.serviceOn, ui.greyscaleOk, if (usesDnd) ui.dndOk else null, onSetup)
                 }
+            }
+        }
+        if (ui.whatsNew != null) {
+            item(key = "whats-new") {
+                Box(Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) { WhatsNewCard(ui.whatsNew, onDismissWhatsNew) }
             }
         }
         if (ui.schedules.isEmpty()) {
@@ -246,7 +275,7 @@ internal fun HomeContent(
 /** The calm top of the screen: what is happening, in as few words as possible. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun HomeHeader(ui: HomeUiState, onUnlock: (String) -> Unit) {
+private fun HomeHeader(ui: HomeUiState, onUnlock: (String) -> Unit, onUndo: (String) -> Unit) {
     val context = LocalContext.current
     val c = Obsidian.colors
     val state = ui.active
@@ -285,6 +314,19 @@ private fun HomeHeader(ui: HomeUiState, onUnlock: (String) -> Unit) {
                 }
                 Spacer(Modifier.height(16.dp))
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    val undoing = state.active.firstOrNull { it.schedule.id == ui.undoBlockId }
+                    if (undoing != null) {
+                        // Only for the first few seconds: a mis-tap costs nothing, a block you meant still holds.
+                        Text(
+                            if (state.active.size == 1) "undo" else "undo ${undoing.schedule.name}",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            color = c.accentText,
+                            modifier = Modifier.clip(RoundedCornerShape(50)).background(c.accent.copy(alpha = 0.18f))
+                                .clickable(onClickLabel = "Undo starting ${undoing.schedule.name}") { onUndo(undoing.schedule.id) }
+                                .padding(horizontal = 12.dp, vertical = 2.dp),
+                        )
+                    }
                     Text(
                         "leave early",
                         style = MaterialTheme.typography.labelLarge,
@@ -448,6 +490,24 @@ private fun QuoteFooter(quote: Quote) {
             style = MaterialTheme.typography.labelMedium,
             color = c.textFaint,
         )
+    }
+}
+
+/** Shown once after an update: a few lines on what changed, gone for good after "got it". */
+@Composable
+private fun WhatsNewCard(entry: ChangelogEntry, onDismiss: () -> Unit) {
+    val c = Obsidian.colors
+    SectionCard(title = "new in ${entry.versionName}") {
+        entry.lines.forEach { line ->
+            Row(Modifier.padding(vertical = 4.dp)) {
+                Box(Modifier.padding(top = 8.dp).size(5.dp).clip(CircleShape).background(c.accent))
+                Spacer(Modifier.width(12.dp))
+                Text(line, style = MaterialTheme.typography.bodyMedium, color = c.textMuted)
+            }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            TextButton(onClick = onDismiss) { Text("got it", color = c.accentText, fontWeight = FontWeight.SemiBold) }
+        }
     }
 }
 

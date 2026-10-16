@@ -30,6 +30,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -59,24 +60,46 @@ class BlockedActivity : ComponentActivity() {
     /** Covering one of the Settings screens that switch blocking off, rather than a blocked app. */
     private var guardingSettings by mutableStateOf(false)
 
+    /** Not a session at all but a limit: the pause before opening, or a day's minutes gone. */
+    private var mode by mutableStateOf<String?>(null)
+    private var limitId by mutableStateOf<String?>(null)
+    private var pauseSeconds by mutableIntStateOf(0)
+    private var opens by mutableIntStateOf(0)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        blockedPackage = intent.getStringExtra(EXTRA_PACKAGE)
-        guardingSettings = intent.getBooleanExtra(EXTRA_SETTINGS, false)
+        read(intent)
         // Back would reveal the blocked app underneath, so it goes home instead.
         onBackPressedDispatcher.addCallback(this) { goHome() }
         setContent {
             BedtimeTheme {
-                BlockedScreen(blockedPackage, guardingSettings, onHome = ::goHome, onFinish = ::finish)
+                val pkg = blockedPackage
+                when {
+                    mode == MODE_PAUSE && pkg != null -> key(pkg, opens) {
+                        PauseScreen(pkg, pauseSeconds, opens, onHome = ::goHome, onFinish = ::finish)
+                    }
+                    mode == MODE_LIMIT && pkg != null -> key(pkg, limitId) {
+                        LimitScreen(pkg, limitId.orEmpty(), onHome = ::goHome, onFinish = ::finish)
+                    }
+                    else -> BlockedScreen(pkg, guardingSettings, onHome = ::goHome, onFinish = ::finish)
+                }
             }
         }
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        read(intent)
+    }
+
+    private fun read(intent: Intent) {
         blockedPackage = intent.getStringExtra(EXTRA_PACKAGE)
         guardingSettings = intent.getBooleanExtra(EXTRA_SETTINGS, false)
+        mode = intent.getStringExtra(EXTRA_MODE)
+        limitId = intent.getStringExtra(EXTRA_LIMIT)
+        pauseSeconds = intent.getIntExtra(EXTRA_SECONDS, 0)
+        opens = intent.getIntExtra(EXTRA_OPENS, 0)
     }
 
     private fun goHome() {
@@ -87,11 +110,25 @@ class BlockedActivity : ComponentActivity() {
     companion object {
         private const val EXTRA_PACKAGE = "package"
         private const val EXTRA_SETTINGS = "settings"
+        private const val EXTRA_MODE = "mode"
+        private const val EXTRA_LIMIT = "limit"
+        private const val EXTRA_SECONDS = "seconds"
+        private const val EXTRA_OPENS = "opens"
+        private const val MODE_PAUSE = "pause"
+        private const val MODE_LIMIT = "limit"
 
         fun intent(context: Context, pkg: String): Intent =
             Intent(context, BlockedActivity::class.java)
                 .putExtra(EXTRA_PACKAGE, pkg)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+        /** The pause before opening [pkg]: [seconds] to breathe, then "open" or "never mind". */
+        fun pauseIntent(context: Context, pkg: String, seconds: Int, opens: Int): Intent =
+            intent(context, pkg).putExtra(EXTRA_MODE, MODE_PAUSE).putExtra(EXTRA_SECONDS, seconds).putExtra(EXTRA_OPENS, opens)
+
+        /** [pkg]'s minutes for today are gone under limit [limitId]. */
+        fun limitIntent(context: Context, pkg: String, limitId: String): Intent =
+            intent(context, pkg).putExtra(EXTRA_MODE, MODE_LIMIT).putExtra(EXTRA_LIMIT, limitId)
 
         /** Covers a Settings screen that would switch blocking off. */
         fun settingsIntent(context: Context): Intent =

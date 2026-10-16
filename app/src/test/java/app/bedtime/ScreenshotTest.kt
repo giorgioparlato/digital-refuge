@@ -146,6 +146,12 @@ class ScreenshotTest {
     fun homeActive() = shot { Home(Samples.home(hour = 15, runningFocus = true)) }
 
     @Test
+    fun homeUndo() = shot { Home(Samples.home(hour = 15, runningFocus = true).copy(undoBlockId = "focus")) }
+
+    @Test
+    fun homeWhatsNew() = shot(tall = true) { Home(Samples.home().copy(whatsNew = app.bedtime.data.Changelog.entries.last())) }
+
+    @Test
     fun schedules() = shot(tall = true) {
         val ui = Samples.home()
         app.bedtime.ui.schedules.SchedulesContent(
@@ -156,6 +162,61 @@ class ScreenshotTest {
             onCreate = {},
             onToggle = { _, _ -> },
         )
+    }
+
+    @Test
+    fun limits() = shot(tall = true) {
+        val ui = Samples.home()
+        val today = LocalDate.now().toEpochDay()
+        app.bedtime.ui.limits.LimitsContent(
+            limits = Samples.limits,
+            usage = listOf(
+                app.bedtime.data.UsageDay(
+                    today,
+                    seconds = mapOf("com.instagram.android" to 21 * 60L, "com.zhiliaoapp.musically" to 9 * 60L, "com.google.android.youtube" to 38 * 60L),
+                    extras = mapOf("youtube" to listOf(1L)),
+                ),
+            ),
+            history = ui.history + Samples.escapes(ui.now),
+            now = ui.now,
+            today = today,
+            onEdit = {},
+            onCreate = {},
+        )
+    }
+
+    @Test
+    fun limitsEmpty() = shot {
+        app.bedtime.ui.limits.LimitsContent(emptyList(), emptyList(), emptyList(), Samples.home().now, LocalDate.now().toEpochDay(), {}, {})
+    }
+
+    @Test
+    fun limitEdit() = shot(tall = true) {
+        app.bedtime.ui.limits.LimitEditContent(
+            draft = Samples.limits.first(),
+            onDraftChange = {},
+            isNew = false,
+            loosens = true,
+            newPassword = "",
+            onNewPasswordChange = {},
+            error = null,
+            onBack = {},
+            onSave = {},
+            onDelete = {},
+            onPickApps = {},
+            appLabel = Samples::label,
+        )
+    }
+
+    @Test
+    fun pauseBeforeOpening() = shot { app.bedtime.ui.blocked.PauseContent("Instagram", secondsLeft = 7, opens = 4, onOpen = {}, onHome = {}) }
+
+    @Test
+    fun pauseDone() = shot { app.bedtime.ui.blocked.PauseContent("Instagram", secondsLeft = 0, opens = 1, onOpen = {}, onHome = {}) }
+
+    @Test
+    fun limitOut() = shot {
+        app.bedtime.ui.blocked.LimitContent("YouTube", "youtube", 30, app.bedtime.data.OutOfTime.MORE_TIME, 15, onHome = {}, onMore = {})
     }
 
     @Test
@@ -613,6 +674,35 @@ private object Samples {
             now = now,
         )
     }
+
+    val limits: List<app.bedtime.data.AppLimit> get() = listOf(
+        app.bedtime.data.AppLimit(
+            id = "social",
+            name = "Social",
+            rules = app.bedtime.data.LimitRules(
+                apps = setOf("com.instagram.android", "com.zhiliaoapp.musically"),
+                pauseSeconds = 10,
+                dailyMinutes = 45,
+            ),
+        ),
+        app.bedtime.data.AppLimit(
+            id = "youtube",
+            name = "YouTube",
+            rules = app.bedtime.data.LimitRules(apps = setOf("com.google.android.youtube"), pauseSeconds = null, dailyMinutes = 30),
+        ),
+        app.bedtime.data.AppLimit(
+            id = "news",
+            name = "News",
+            rules = app.bedtime.data.LimitRules(apps = setOf("com.reddit.frontpage"), pauseSeconds = 20),
+            deleteFromDay = Long.MAX_VALUE,
+        ),
+    )
+
+    /** A week with one of each way out, for the stats. */
+    fun escapes(now: Long): List<SessionLog> = listOf(
+        SessionLog("focus", "Focus", now - 2 * DAY, now - 2 * DAY + HOUR, breakTimes = listOf(now - 2 * DAY + 10 * MIN)),
+        SessionLog("bedtime", "Bedtime", now - 3 * DAY - 2 * HOUR, now - 3 * DAY + 7 * HOUR, unlockTimes = listOf(now - 3 * DAY)),
+    )
 
     /** Five kept bedtimes, and an older focus block that was unlocked early. */
     private fun history(now: Long): List<SessionLog> =

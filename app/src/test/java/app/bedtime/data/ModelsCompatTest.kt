@@ -40,12 +40,19 @@ class ModelsCompatTest {
 
     @Test
     fun v1RuntimeStateLoads() {
+        // pendingWaits and savedDaltonizer are gone from the model; old saves holding them still load.
         val runtime = AppJson.decodeFromString(
             RuntimeState.serializer(),
-            """{"overrides":{},"pendingWaits":{},"savedDaltonizer":{"enabled":0,"mode":12}}""",
+            """{"overrides":{},"pendingWaits":{"x":{"occurrenceStart":1,"readyAt":2}},"savedDaltonizer":{"enabled":0,"mode":12},
+               "activeRuns":{"b":{"start":1,"end":2}}}""",
         )
-        assertTrue(runtime.activeRuns.isEmpty())
+        assertEquals(Run(1, 2), runtime.activeRuns["b"])
         assertNull(runtime.savedZen)
-        assertEquals(SavedDaltonizer(0, 12), runtime.savedDaltonizer)
+    }
+
+    @Test
+    fun settingsWithoutLastSeenVersionLoad() {
+        val settings = AppJson.decodeFromString(AppSettings.serializer(), """{"onboarded":true}""")
+        assertEquals(0, settings.lastSeenVersion)
     }
 }

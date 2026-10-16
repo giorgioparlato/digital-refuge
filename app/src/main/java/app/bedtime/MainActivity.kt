@@ -53,6 +53,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.bedtime.apps.AppCatalog
+import app.bedtime.data.Changelog
 import app.bedtime.data.Repository
 import app.bedtime.data.Templates
 import app.bedtime.engine.Engine
@@ -70,6 +71,8 @@ import app.bedtime.ui.components.ProvideAppIcons
 import app.bedtime.ui.create.CreateScreen
 import app.bedtime.ui.edit.ScheduleEditScreen
 import app.bedtime.ui.home.HomeScreen
+import app.bedtime.ui.limits.LimitEditScreen
+import app.bedtime.ui.limits.LimitsScreen
 import app.bedtime.ui.onboarding.OnboardingScreen
 import app.bedtime.ui.onboarding.WalkthroughScreen
 import app.bedtime.ui.homestyle.HomeStyleScreen
@@ -82,11 +85,12 @@ import app.bedtime.unlock.UnlockFlow
 
 /** String routes for the app's small back stack; also used by the Quick Settings tile. */
 object Routes {
-    /** The three tabs; everything else is pushed on top of them. */
-    val TABS = listOf(HOME, SCHEDULES, SETTINGS)
+    /** The four tabs; everything else is pushed on top of them. */
+    val TABS = listOf(HOME, SCHEDULES, LIMITS, SETTINGS)
 
     const val HOME = "home"
     const val SCHEDULES = "schedules"
+    const val LIMITS = "limits"
     const val SETTINGS = "settings"
     const val SETUP = "setup"
     const val HOME_STYLE = "homestyle"
@@ -98,6 +102,7 @@ object Routes {
     const val EDIT = "edit/"
     const val TEMPLATE = "template/"
     const val UNLOCK = "unlock/"
+    const val LIMIT = "limit/"
 
     fun unlock(scheduleId: String) = UNLOCK + scheduleId
 }
@@ -188,7 +193,13 @@ private fun BedtimeNavigation(pendingRoute: String?, onRouteConsumed: () -> Unit
     val scope = rememberCoroutineScope()
     val loaded = settings
     if (loaded != null && !loaded.onboarded) {
-        WalkthroughScreen(onDone = { scope.launch { repo.updateSettings { it.copy(onboarded = true) } } })
+        // A fresh install has nothing to catch up on, so its version counts as seen.
+        WalkthroughScreen(onDone = {
+            scope.launch {
+                val installed = Changelog.installedVersion(context)
+                repo.updateSettings { it.copy(onboarded = true, lastSeenVersion = installed) }
+            }
+        })
         return
     }
 
@@ -204,6 +215,10 @@ private fun BedtimeNavigation(pendingRoute: String?, onRouteConsumed: () -> Unit
                     Routes.SCHEDULES -> SchedulesScreen(
                         onEdit = { id -> push(Routes.EDIT + id) },
                         onCreate = { push(Routes.CREATE) },
+                    )
+                    Routes.LIMITS -> LimitsScreen(
+                        onEdit = { id -> push(Routes.LIMIT + id) },
+                        onCreate = { push(Routes.LIMIT) },
                     )
                     Routes.SETTINGS -> SettingsScreen(
                         onSetup = { push(Routes.SETUP) },
@@ -257,11 +272,12 @@ private fun BedtimeNavigation(pendingRoute: String?, onRouteConsumed: () -> Unit
                 onHowItWorks = { push(Routes.ONBOARDING) },
             )
             top.startsWith(Routes.UNLOCK) -> UnlockScreen(top.removePrefix(Routes.UNLOCK), onBack = ::pop)
+            top.startsWith(Routes.LIMIT) -> LimitEditScreen(top.removePrefix(Routes.LIMIT).ifEmpty { null }, onBack = ::pop)
         }
     }
 }
 
-/** The three-tab frame every root screen sits in. */
+/** The four-tab frame every root screen sits in. */
 @Composable
 private fun TabShell(tab: String, onTab: (String) -> Unit, content: @Composable () -> Unit) {
     val c = Obsidian.colors
@@ -278,6 +294,7 @@ private fun TabShell(tab: String, onTab: (String) -> Unit, content: @Composable 
                 ) {
                     TabItem(BedtimeIcons.Refuge, "home", tab == Routes.HOME) { onTab(Routes.HOME) }
                     TabItem(Icons.Default.DateRange, "schedules", tab == Routes.SCHEDULES) { onTab(Routes.SCHEDULES) }
+                    TabItem(BedtimeIcons.Hourglass, "limits", tab == Routes.LIMITS) { onTab(Routes.LIMITS) }
                     TabItem(Icons.Default.Settings, "settings", tab == Routes.SETTINGS) { onTab(Routes.SETTINGS) }
                 }
             }

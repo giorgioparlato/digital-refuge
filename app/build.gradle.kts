@@ -24,8 +24,8 @@ android {
         applicationId = "app.bedtime"
         minSdk = 26
         targetSdk = 35
-        versionCode = 33
-        versionName = "0.7.8.2"
+        versionCode = 35
+        versionName = "0.8.0"
     }
 
     signingConfigs {

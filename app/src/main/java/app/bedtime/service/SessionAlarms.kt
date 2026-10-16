@@ -77,7 +77,7 @@ object SessionAlarms {
 }
 
 /** Runs [work] off the main thread while keeping the broadcast alive. */
-private fun BroadcastReceiver.async(work: suspend () -> Unit) {
+internal fun BroadcastReceiver.async(work: suspend () -> Unit) {
     val result = goAsync()
     CoroutineScope(Dispatchers.Default).launch {
         try {

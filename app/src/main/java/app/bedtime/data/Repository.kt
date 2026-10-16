@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import app.bedtime.engine.Limits
 import app.bedtime.engine.Occurrence
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -25,6 +26,9 @@ class Repository private constructor(context: Context) {
     val runtime: Flow<RuntimeState> = observe(RUNTIME, RuntimeState.serializer(), RuntimeState())
     val settings: Flow<AppSettings> = observe(SETTINGS, AppSettings.serializer(), AppSettings())
     val history: Flow<List<SessionLog>> = observe(HISTORY, historySerializer, emptyList())
+
+    /** Time in limited apps, a day per entry, newest last. Kept apart so counting never re-runs the engine. */
+    val usage: Flow<List<UsageDay>> = observe(USAGE, usageSerializer, emptyList())
 
     suspend fun upsert(schedule: Schedule) = updateSchedules { list ->
         if (list.any { it.id == schedule.id }) list.map { if (it.id == schedule.id) schedule else it }
@@ -59,7 +63,7 @@ class Repository private constructor(context: Context) {
     suspend fun delete(id: String) {
         updateSchedules { list -> list.filterNot { it.id == id } }
         updateRuntime {
-            it.copy(overrides = it.overrides - id, pendingWaits = it.pendingWaits - id, activeRuns = it.activeRuns - id)
+            it.copy(overrides = it.overrides - id, activeRuns = it.activeRuns - id)
         }
         updateSettings { if (it.tileBlockId == id) it.copy(tileBlockId = null) else it }
     }
@@ -80,9 +84,29 @@ class Repository private constructor(context: Context) {
             it.copy(
                 activeRuns = it.activeRuns + (schedule.id to Run(now, now + minutes * 60_000L)),
                 overrides = it.overrides - schedule.id,
-                pendingWaits = it.pendingWaits - schedule.id,
             )
         }
+    }
+
+    /**
+     * Takes back a block started moments ago, as if it had never begun: no history and no escape.
+     * Only within [UNDO_MS] of its start, so a mis-tap costs nothing while a block you meant still
+     * can't be left this way. Returns false once that moment has passed.
+     */
+    suspend fun undoStart(id: String): Boolean {
+        val now = System.currentTimeMillis()
+        var undone = false
+        // One edit for both keys, so the session never lingers in the history without its run.
+        store.edit { prefs ->
+            val runtime = decode(prefs[RUNTIME], RuntimeState.serializer(), RuntimeState())
+            val run = runtime.activeRuns[id]
+            if (run == null || !canUndo(run.start, now)) return@edit
+            prefs[RUNTIME] = AppJson.encodeToString(RuntimeState.serializer(), runtime.copy(activeRuns = runtime.activeRuns - id))
+            val history = decode(prefs[HISTORY], historySerializer, emptyList())
+            prefs[HISTORY] = AppJson.encodeToString(historySerializer, history.filterNot { it.scheduleId == id && it.start == run.start })
+            undone = true
+        }
+        return undone
     }
 
     /** Adds history entries for occurrences seen for the first time. */
@@ -92,26 +116,63 @@ class Repository private constructor(context: Context) {
         else (log + fresh.map { SessionLog(it.schedule.id, it.schedule.name, it.start, it.end) }).takeLast(MAX_HISTORY)
     }
 
-    suspend fun recordUnlock(occurrence: Occurrence, endedEarly: Boolean, at: Long) =
+    suspend fun recordUnlock(occurrence: Occurrence, endedEarly: Boolean, at: Long) = recordEscape(occurrence) {
+        it.copy(unlockTimes = it.unlockTimes + at, endedEarlyAt = if (endedEarly) at else it.endedEarlyAt)
+    }
+
+    /** Notes that blocking was switched off during [occurrence], so the stats show it. */
+    suspend fun recordPause(occurrence: Occurrence, at: Long) = recordEscape(occurrence) { it.copy(pausedAt = it.pausedAt + at) }
+
+    /** Notes an emergency break taken during [occurrence]. */
+    suspend fun recordBreak(occurrence: Occurrence, at: Long) = recordEscape(occurrence) { it.copy(breakTimes = it.breakTimes + at) }
+
+    private suspend fun recordEscape(occurrence: Occurrence, change: (SessionLog) -> SessionLog) =
         update(HISTORY, historySerializer, emptyList()) { log ->
             val index = log.indexOfFirst { it.scheduleId == occurrence.schedule.id && it.start == occurrence.start }
             val base = if (index >= 0) log[index] else {
                 SessionLog(occurrence.schedule.id, occurrence.schedule.name, occurrence.start, occurrence.end)
             }
-            val entry = base.copy(unlockTimes = base.unlockTimes + at, endedEarlyAt = if (endedEarly) at else base.endedEarlyAt)
+            val entry = change(base)
             if (index >= 0) log.toMutableList().also { it[index] = entry } else (log + entry).takeLast(MAX_HISTORY)
         }
 
-    /** Notes that blocking was switched off during [occurrence], so the stats show it. */
-    suspend fun recordPause(occurrence: Occurrence, at: Long) =
-        update(HISTORY, historySerializer, emptyList()) { log ->
-            val index = log.indexOfFirst { it.scheduleId == occurrence.schedule.id && it.start == occurrence.start }
-            val base = if (index >= 0) log[index] else {
-                SessionLog(occurrence.schedule.id, occurrence.schedule.name, occurrence.start, occurrence.end)
-            }
-            val entry = base.copy(pausedAt = base.pausedAt + at)
-            if (index >= 0) log.toMutableList().also { it[index] = entry } else (log + entry).takeLast(MAX_HISTORY)
+    /** Saves a new or edited limit; loosening waits for midnight (see [Limits.save]). */
+    suspend fun saveLimit(limit: AppLimit, today: Long) = updateSettings { settings ->
+        val existing = settings.limits.firstOrNull { it.id == limit.id }
+        val saved = Limits.save(existing, limit, today)
+        val limits = if (existing == null) settings.limits + saved else settings.limits.map { if (it.id == limit.id) saved else it }
+        settings.copy(limits = Limits.settle(limits, today))
+    }
+
+    /** Deletes a limit at once if it was made today, otherwise at midnight. */
+    suspend fun deleteLimit(id: String, today: Long) = updateSettings { settings ->
+        val limits = settings.limits.mapNotNull { if (it.id == id) Limits.delete(it, today) else it }
+        settings.copy(limits = Limits.settle(limits, today))
+    }
+
+    /** Changes [day]'s usage, creating it if needed, and keeps only the last [USAGE_DAYS] days. */
+    suspend fun updateUsage(day: Long, transform: (UsageDay) -> UsageDay) =
+        update(USAGE, usageSerializer, emptyList()) { days ->
+            val today = days.lastOrNull { it.day == day } ?: UsageDay(day)
+            (days.filterNot { it.day == day } + transform(today)).sortedBy { it.day }.takeLast(USAGE_DAYS)
         }
+
+    /** Adds time spent in front, by package. */
+    suspend fun addUsage(day: Long, seconds: Map<String, Long>) = updateUsage(day) { usage ->
+        usage.copy(seconds = usage.seconds + seconds.map { (pkg, s) -> pkg to (usage.seconds[pkg] ?: 0L) + s })
+    }
+
+    /** Counts one more time the pause before opening [pkg] was shown. */
+    suspend fun recordOpen(day: Long, pkg: String) = updateUsage(day) { it.copy(opens = it.opens + (pkg to (it.opens[pkg] ?: 0) + 1)) }
+
+    /** Gives [limitId] more time today, or lifts it for the rest of the day. */
+    suspend fun grantLimit(day: Long, limitId: String, at: Long, restOfDay: Boolean) = updateUsage(day) {
+        if (restOfDay) {
+            it.copy(lifted = it.lifted + limitId, extras = it.extras + (limitId to it.extras[limitId].orEmpty() + at))
+        } else {
+            it.copy(extras = it.extras + (limitId to it.extras[limitId].orEmpty() + at))
+        }
+    }
 
     /** Fills the always-available list once with suggested apps that are installed. */
     suspend fun seedAlwaysAvailable(suggested: Set<String>) = updateSettings {
@@ -176,7 +237,18 @@ class Repository private constructor(context: Context) {
         private val RUNTIME = stringPreferencesKey("runtime")
         private val SETTINGS = stringPreferencesKey("settings")
         private val HISTORY = stringPreferencesKey("history")
-        private const val MAX_HISTORY = 200
+        private val USAGE = stringPreferencesKey("usage")
+        /** About three years of nightly sessions, or several months of a busy mix: still a small file. */
+        private const val MAX_HISTORY = 1000
+        /** Five weeks, enough for the week's figures and the strip of days on the limits tab. */
+        private const val USAGE_DAYS = 35
+        private val usageSerializer = ListSerializer(UsageDay.serializer())
+
+        /** How long after starting a block it can still be taken back with "undo". */
+        const val UNDO_MS = 10_000L
+
+        /** Whether a block that started at [start] can still be undone at [now]. */
+        fun canUndo(start: Long, now: Long): Boolean = now - start in 0 until UNDO_MS
         private val schedulesSerializer = ListSerializer(Schedule.serializer())
         private val historySerializer = ListSerializer(SessionLog.serializer())
 

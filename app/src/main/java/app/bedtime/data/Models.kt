@@ -113,17 +113,9 @@ data class ScheduleOverride(
     val pausedUntil: Long? = null,
 )
 
-/** A started wait challenge; tied to one occurrence so a stale timer never carries over to the next night. */
-@Serializable
-data class PendingWait(val occurrenceStart: Long, val readyAt: Long)
-
 /** A running block, as epoch-millis [start, end). */
 @Serializable
 data class Run(val start: Long, val end: Long)
-
-/** Colour-correction settings from before we switched greyscale on, restored when we switch it off. */
-@Serializable
-data class SavedDaltonizer(val enabled: Int, val mode: Int)
 
 /** Do Not Disturb state from before a session changed it, restored afterwards. */
 @Serializable
@@ -136,13 +128,13 @@ data class SavedZen(
     val conversationSenders: Int = -1,
 )
 
+// Older saves also carry "pendingWaits" and "savedDaltonizer", from a wait timer that used to be
+// persisted and a greyscale route that needed a permission the app no longer asks for. The decoder
+// ignores unknown keys, so they are simply dropped.
 @Serializable
 data class RuntimeState(
     val overrides: Map<String, ScheduleOverride> = emptyMap(),
-    val pendingWaits: Map<String, PendingWait> = emptyMap(),
     val activeRuns: Map<String, Run> = emptyMap(),
-    /** Non-null means greyscale is currently switched on by us. */
-    val savedDaltonizer: SavedDaltonizer? = null,
     /** Non-null means Do Not Disturb is currently managed by us. */
     val savedZen: SavedZen? = null,
 )
@@ -194,6 +186,65 @@ data class AppSettings(
     // decoder ignores unknown keys, so they are simply dropped.
     /** True once the one-time explainer has been shown. */
     val onboarded: Boolean = false,
+    /** The newest version whose "what's new" has been seen (or skipped by a fresh install). */
+    val lastSeenVersion: Int = 0,
+    /** Pauses before opening and daily budgets, which hold every day rather than in a session. */
+    val limits: List<AppLimit> = emptyList(),
+)
+
+/** What running out of a limit's daily minutes leads to. Ordered strictest first. */
+@Serializable
+enum class OutOfTime { TOMORROW, MORE_TIME, REST_OF_DAY }
+
+/**
+ * How one limit behaves, every day and not only in a session. Kept apart from its name so that a
+ * looser version can be saved now and wait for midnight (see [AppLimit.next]).
+ */
+@Serializable
+data class LimitRules(
+    val apps: Set<String> = emptySet(),
+    /** Seconds of quiet before one of these apps opens; null means it opens straight away. */
+    val pauseSeconds: Int? = 10,
+    /** After "open anyway", how long you can be away and come back without the pause; 0 = every open. */
+    val graceMinutes: Int = 2,
+    /** Minutes a day in these apps; null means no budget. */
+    val dailyMinutes: Int? = null,
+    /** True: the minutes are shared by all the apps together. False: each app gets them in full. */
+    val shared: Boolean = true,
+    val outOfTime: OutOfTime = OutOfTime.MORE_TIME,
+    /** What "more time" gives each time, in minutes. */
+    val extraMinutes: Int = 15,
+    /** The steps that getting more time, or the rest of the day, takes. */
+    val unlock: UnlockConfig = UnlockConfig(),
+)
+
+/** A limit on some apps: a pause before opening them, a daily budget, or both. */
+@Serializable
+data class AppLimit(
+    val id: String = UUID.randomUUID().toString(),
+    val name: String = "",
+    val rules: LimitRules = LimitRules(),
+    /** Looser rules saved today, which take over from local day [nextFromDay] (an epoch day). */
+    val next: LimitRules? = null,
+    val nextFromDay: Long = 0,
+    /** Deleting is the loosest change of all, so it waits for midnight too. */
+    val deleteFromDay: Long? = null,
+    /** The day it was made. Until that day ends it can be changed freely: nothing has been given up yet. */
+    val createdDay: Long = 0,
+)
+
+/** One day of time spent in limited apps, and what was done about it. Days are local epoch days. */
+@Serializable
+data class UsageDay(
+    val day: Long,
+    /** Seconds in front, by package. Only apps that belong to a limit are counted. */
+    val seconds: Map<String, Long> = emptyMap(),
+    /** Times the pause before opening was shown, by package. */
+    val opens: Map<String, Int> = emptyMap(),
+    /** When more time was taken, by limit id. */
+    val extras: Map<String, List<Long>> = emptyMap(),
+    /** Limits lifted for the rest of this day. */
+    val lifted: Set<String> = emptySet(),
 )
 
 /** A named set of apps for ticking many at once in the app picker. Copied into schedules, never linked. */
@@ -213,11 +264,20 @@ data class SessionLog(
     val end: Long,
     val unlockTimes: List<Long> = emptyList(),
     val endedEarlyAt: Long? = null,
-    /** Times blocking was switched off during this session (an emergency break, or Settings). */
+    /**
+     * Times blocking was switched off during this session some other way than an emergency break:
+     * from Settings, safe mode, or by taking away "display over other apps". Before v0.8 this also
+     * held emergency breaks, which couldn't be told apart then.
+     */
     val pausedAt: List<Long> = emptyList(),
+    /** Emergency breaks taken during this session, including "take more minutes" on the reminder. */
+    val breakTimes: List<Long> = emptyList(),
 ) {
     val unlocks: Int get() = unlockTimes.size
 
-    /** Early unlocks and pauses together: every way out of a session. */
-    val escapes: Int get() = unlockTimes.size + pausedAt.size
+    /** Early unlocks, emergency breaks and blocking switched off: every way out of a session. */
+    val escapes: Int get() = unlockTimes.size + pausedAt.size + breakTimes.size
+
+    /** Every moment this session was escaped, of whichever kind. */
+    val escapeTimes: List<Long> get() = unlockTimes + pausedAt + breakTimes
 }

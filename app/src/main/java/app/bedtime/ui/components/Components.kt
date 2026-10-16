@@ -665,28 +665,3 @@ fun DaySelector(days: Set<Int>, onChange: (Set<Int>) -> Unit, enabled: Boolean =
         }
     }
 }
-
-@Composable
-fun CodeBlock(code: String, onCopy: () -> Unit) {
-    val c = Obsidian.colors
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
-            .background(c.bgPrimaryAlt)
-            .border(1.dp, c.border, RoundedCornerShape(10.dp))
-            .padding(start = 12.dp, top = 4.dp, bottom = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        // Commands are case-sensitive, so they're shown exactly as written.
-        VerbatimText(
-            code,
-            modifier = Modifier.weight(1f).padding(vertical = 8.dp),
-            fontFamily = FontFamily.Monospace,
-            fontSize = 12.sp,
-            lineHeight = 18.sp,
-            color = c.textNormal,
-        )
-        TextButton(onClick = onCopy) { Text("Copy", color = c.accentText, fontWeight = FontWeight.Medium) }
-    }
-}
