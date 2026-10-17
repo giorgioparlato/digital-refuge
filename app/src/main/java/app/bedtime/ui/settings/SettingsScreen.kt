@@ -100,6 +100,7 @@ fun SettingsScreen(
     onAlwaysAvailable: () -> Unit,
     onHowItWorks: () -> Unit,
     onWalkthrough: () -> Unit = {},
+    onRecentsTest: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val repo = remember { Repository.get(context) }
@@ -186,6 +187,7 @@ fun SettingsScreen(
         onAddWidget = { block -> BlockWidget.requestPin(context, block) },
         onHowItWorks = onHowItWorks,
         onWalkthrough = onWalkthrough,
+        onRecentsTest = onRecentsTest,
         onExport = { exportFile.launch("digital-refuge-${LocalDate.now()}.json") },
         onImport = { pickFile.launch(arrayOf("application/json", "text/plain", "*/*")) },
     )
@@ -211,6 +213,7 @@ internal fun SettingsContent(
     onImport: () -> Unit = {},
     onHowItWorks: () -> Unit = {},
     onWalkthrough: () -> Unit = {},
+    onRecentsTest: () -> Unit = {},
 ) {
     val c = Obsidian.colors
     var otherOpen by rememberSaveable { mutableStateOf(false) }
@@ -272,7 +275,8 @@ internal fun SettingsContent(
                     SettingsRow(Icons.Default.Info, "How it works", "What a session locks, and your ways out", onClick = onHowItWorks)
                     SettingsRow(BedtimeIcons.Leaf, "The intro again", "The walk-through from the first launch", onClick = onWalkthrough)
                     SettingsRow(Icons.Default.Share, "Export settings", "Save schedules, blocks, groups and stats to a file", onClick = onExport)
-                    SettingsRow(BedtimeIcons.Refuge, "Import settings", "Replace everything with a saved file", onClick = onImport, last = true)
+                    SettingsRow(BedtimeIcons.Refuge, "Import settings", "Replace everything with a saved file", onClick = onImport)
+                    SettingsRow(Icons.Default.Info, "Recent apps test", "Whether this phone's recent-apps view can be recognised", onClick = onRecentsTest, last = true)
 
                     SectionLabel("home-screen widget")
                     Text(
