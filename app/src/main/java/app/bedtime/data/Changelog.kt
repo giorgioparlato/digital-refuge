@@ -13,6 +13,14 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            41,
+            "0.8.6",
+            listOf(
+                "Minimal mode now lets the recent-apps view through, where your phone shows it as a screen of its own: close stuck or unused apps there. Anything you open from it follows the usual rules.",
+                "The calendar line only appears when something is still to come today.",
+            ),
+        ),
+        ChangelogEntry(
             40,
             "0.8.5",
             listOf(

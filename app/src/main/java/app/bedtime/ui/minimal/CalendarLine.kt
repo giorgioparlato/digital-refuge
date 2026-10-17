@@ -52,15 +52,16 @@ object CalendarSource {
 }
 
 /**
- * The line under the date: what's on now, or what's next, today. With [showNames] off — the lock
- * screen, unless you said otherwise — it says when, not what.
+ * The line under the date: what's on now, or what's next, today — or null with nothing to come, so the
+ * line simply isn't there. With [showNames] off (the lock screen, unless you said otherwise) it says
+ * when, not what.
  */
-fun calendarLine(events: List<CalendarEvent>, now: Long, showNames: Boolean, time: (Long) -> String): String {
+fun calendarLine(events: List<CalendarEvent>, now: Long, showNames: Boolean, time: (Long) -> String): String? {
     val current = events.firstOrNull { it.begin <= now && it.end > now }
     if (current != null) {
         return if (showNames && current.title.isNotBlank()) "now · ${current.title} until ${time(current.end)}" else "an event until ${time(current.end)}"
     }
-    val next = events.firstOrNull { it.begin > now } ?: return "nothing else today"
+    val next = events.firstOrNull { it.begin > now } ?: return null
     return if (showNames && next.title.isNotBlank()) "next · ${next.title} at ${time(next.begin)}" else "next event at ${time(next.begin)}"
 }
 

@@ -1,6 +1,7 @@
 package app.bedtime.ui.minimal
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class CalendarLineTest {
@@ -22,10 +23,10 @@ class CalendarLineTest {
     }
 
     @Test
-    fun anEmptyRestOfTheDay() {
-        assertEquals("nothing else today", calendarLine(emptyList(), now, showNames = true, time))
+    fun anEmptyRestOfTheDayShowsNoLine() {
+        assertNull(calendarLine(emptyList(), now, showNames = true, time))
         // An event that already ended isn't "next".
-        assertEquals("nothing else today", calendarLine(listOf(CalendarEvent("lunch", now - 900, now - 1)), now, true, time))
+        assertNull(calendarLine(listOf(CalendarEvent("lunch", now - 900, now - 1)), now, true, time))
     }
 
     @Test

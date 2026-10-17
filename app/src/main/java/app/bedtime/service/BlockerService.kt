@@ -48,6 +48,9 @@ class BlockerService : AccessibilityService() {
 
     /** The app we believe is in front: the last window that was a move to somewhere else, not a float. */
     private var lastPackage: String? = null
+
+    /** Whether the screen in front is the recent-apps view, which minimal mode lets through. */
+    private var recentsInFront = false
     private var homeInFront = false
 
     /** The settle timer for the window change we have not acted on yet. */
@@ -206,6 +209,7 @@ class BlockerService : AccessibilityService() {
         // tell, so it counts as an app, as it always did.
         if (className != null && !isActivity(pkg, className)) return
         lastPackage = pkg
+        recentsInFront = RecentsScreens.matches(className)
         val boundary = state?.nextBoundary
         if (boundary != null && System.currentTimeMillis() >= boundary) {
             // A session has just started or ended, so what we hold is stale: an app the new state
@@ -311,7 +315,9 @@ class BlockerService : AccessibilityService() {
                     return
                 }
                 // In minimal mode the stock launcher and recents are "not allowed" too, so Home lands here.
-                minimal != null && pkg !in minimal && opensAsApp(pkg) -> {
+                // The recent-apps view is let through: closing apps there is harmless, and whatever is
+                // opened from it is judged as itself.
+                minimal != null && pkg !in minimal && !recentsInFront && opensAsApp(pkg) -> {
                     startActivity(MinimalHomeActivity.intent(this))
                     return
                 }
