@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.runtime.mutableIntStateOf
 import kotlinx.coroutines.delay
 import java.time.LocalTime
+import app.bedtime.ui.components.MessageChoiceRow
 import app.bedtime.ui.formatMinuteOfDay
 import app.bedtime.ui.components.TimeTile
 import app.bedtime.ui.edit.TimePickerDialog
@@ -571,6 +572,14 @@ internal fun LimitEditContent(
                         }
                     }
                 }
+
+                SectionLabel("What it says")
+                MessageChoiceRow(
+                    "What the cover says",
+                    draft.message,
+                    { onDraftChange(draft.copy(message = it)) },
+                    enabled = editable,
+                )
 
                 SectionLabel("When it can be changed")
                 OptionRow(

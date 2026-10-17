@@ -24,6 +24,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import app.bedtime.data.Repository
+import app.bedtime.data.CoverMessages
 import app.bedtime.ui.components.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -151,6 +153,12 @@ private fun BlockedScreen(pkg: String?, guardingSettings: Boolean, onHome: () ->
     val blocker = if (guardingSettings) state?.active?.maxByOrNull { it.end } else pkg?.let { state?.blockerOf(it) }
     var unlocking by rememberSaveable { mutableStateOf(false) }
     val appLabel = remember(pkg) { pkg?.let { AppCatalog.label(context, it) }.orEmpty() }
+    val settings by Repository.get(context).settings.collectAsStateWithLifecycle(initialValue = null)
+    // Drawn once each time the cover comes up, so "a different one each time" doesn't change as you read.
+    val message = remember(pkg, blocker?.schedule?.id, settings == null) {
+        val loaded = settings ?: return@remember null
+        blocker?.let { CoverMessages.pick(it.schedule.message, loaded.customMessages) }
+    }
 
     // Unlocked, schedule ended, or opened without a package: nothing left to cover.
     LaunchedEffect(state, pkg) {
@@ -192,18 +200,28 @@ private fun BlockedScreen(pkg: String?, guardingSettings: Boolean, onHome: () ->
                 until = formatTime(context, blocker.end),
                 onHome = onHome,
                 onUnlock = { unlocking = true },
+                message = message,
             )
         }
     }
 }
 
 @Composable
-internal fun BlockedContent(appLabel: String, scheduleName: String, until: String, onHome: () -> Unit, onUnlock: () -> Unit) {
+internal fun BlockedContent(
+    appLabel: String,
+    scheduleName: String,
+    until: String,
+    onHome: () -> Unit,
+    onUnlock: () -> Unit,
+    message: String? = null,
+) {
     CoverLayout(
         emblem = { CoverEmblem(BedtimeIcons.Moon) },
         pill = "$scheduleName is on",
         title = "$appLabel can wait",
-        body = "You'll have it back at $until. Until then, maybe put the phone down for a bit.",
+        // With words of its own, the cover says only when; the words say the rest.
+        body = if (message == null) "You'll have it back at $until. Until then, maybe put the phone down for a bit." else "You'll have it back at $until.",
+        message = message,
         primary = CoverAction("Go to home screen", onHome),
         secondary = listOf(CoverAction("I really need it", onUnlock)),
     )

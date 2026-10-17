@@ -27,6 +27,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import app.bedtime.ui.components.MessageChoiceRow
 import app.bedtime.ui.components.PageGutter
 import app.bedtime.ui.components.Text
 import androidx.compose.material3.TextButton
@@ -572,6 +573,12 @@ internal fun ScheduleEditContent(
                         AppIconStack(draft.blockedApps.sorted(), appLabel)
                         Chevron()
                     }
+                    MessageChoiceRow(
+                        "What the cover says",
+                        draft.message,
+                        { onDraftChange(draft.copy(message = it)) },
+                        enabled = editable,
+                    )
                     OptionRow(
                         BedtimeIcons.Contrast,
                         "Greyscale",

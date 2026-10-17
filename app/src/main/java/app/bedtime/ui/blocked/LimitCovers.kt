@@ -28,6 +28,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.bedtime.data.CoverMessages
 import app.bedtime.apps.AppCatalog
 import app.bedtime.data.AppLimit
 import app.bedtime.data.OutOfTime
@@ -55,6 +56,15 @@ import java.time.LocalDate
 internal fun PauseScreen(pkg: String, seconds: Int, opens: Int, passKey: String, onHome: () -> Unit, onFinish: () -> Unit) {
     val context = LocalContext.current
     val label = remember(pkg) { AppCatalog.label(context, pkg) }
+    val settings by Repository.get(context).settings.collectAsStateWithLifecycle(initialValue = null)
+    // The words of the limit whose pause this is: the one asking the longest, as the pause itself is.
+    val message = remember(pkg, opens, settings == null) {
+        val loaded = settings ?: return@remember null
+        Limits.covering(loaded.limits, pkg, LocalDate.now().toEpochDay())
+            .filter { (it.rules.pauseSeconds ?: 0) > 0 }
+            .maxByOrNull { it.rules.pauseSeconds ?: 0 }
+            ?.let { CoverMessages.pick(it.message, loaded.customMessages) }
+    }
     var left by rememberSaveable(pkg, opens) { mutableIntStateOf(seconds) }
     LaunchedEffect(pkg, opens) {
         while (left > 0) {
@@ -72,6 +82,7 @@ internal fun PauseScreen(pkg: String, seconds: Int, opens: Int, passKey: String,
             onFinish()
         },
         onHome = onHome,
+        message = message,
     )
 }
 
@@ -88,7 +99,7 @@ private fun ordinal(n: Int): String {
 }
 
 @Composable
-internal fun PauseContent(appLabel: String, secondsLeft: Int, opens: Int, onOpen: () -> Unit, onHome: () -> Unit) {
+internal fun PauseContent(appLabel: String, secondsLeft: Int, opens: Int, onOpen: () -> Unit, onHome: () -> Unit, message: String? = null) {
     val c = Obsidian.colors
     val done = secondsLeft <= 0
     CoverLayout(
@@ -106,7 +117,7 @@ internal fun PauseContent(appLabel: String, secondsLeft: Int, opens: Int, onOpen
         pill = if (opens > 1) "the ${ordinal(opens)} time today" else null,
         pillColor = c.orange,
         title = "About to open $appLabel",
-        body = "Is this what you came to the phone for?",
+        body = message ?: "Is this what you came to the phone for?",
         primary = CoverAction("Never mind", onHome),
         secondary = listOf(CoverAction(if (done) "Open $appLabel" else "Open $appLabel in a moment", onOpen, enabled = done)),
     )
@@ -128,6 +139,10 @@ internal fun LimitScreen(pkg: String, limitId: String, onHome: () -> Unit, onFin
     val today = LocalDate.now().toEpochDay()
     val day = usage?.lastOrNull { it.day == today } ?: UsageDay(today)
     val limit: AppLimit? = settings?.let { s -> Limits.settle(s.limits, today).firstOrNull { it.id == limitId } }
+    val message = remember(limitId, limit == null) {
+        val loaded = settings ?: return@remember null
+        limit?.let { CoverMessages.pick(it.message, loaded.customMessages) }
+    }
     // A minute's slack: the last seconds counted may still be on their way to storage.
     val stillOut = limit != null && (Limits.secondsLeft(limit, pkg, day) ?: Long.MAX_VALUE) <= 60L
 
@@ -185,6 +200,7 @@ internal fun LimitScreen(pkg: String, limitId: String, onHome: () -> Unit, onFin
                 extraMinutes = rules.extraMinutes,
                 onHome = onHome,
                 onMore = { unlocking = true },
+                message = message,
             )
         }
     }
@@ -199,9 +215,11 @@ internal fun LimitContent(
     extraMinutes: Int,
     onHome: () -> Unit,
     onMore: () -> Unit,
+    message: String? = null,
 ) {
     val budget = formatMinutes(dailyMinutes.toLong())
     CoverLayout(
+        message = message,
         emblem = { CoverEmblem(BedtimeIcons.Hourglass) },
         pill = "$limitName · $budget a day",
         title = "$appLabel is done for today",

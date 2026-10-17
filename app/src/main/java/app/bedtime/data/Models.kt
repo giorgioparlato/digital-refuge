@@ -56,6 +56,8 @@ data class Schedule(
     val lockSettings: Boolean = true,
     /** Take over the screen if blocking is switched off while this runs, until it's back on. */
     val fullScreenAlert: Boolean = true,
+    /** The words on the cover when you open an app this blocks. */
+    val message: CoverMessage = CoverMessage(),
 ) {
     val isBlock: Boolean get() = kind == ScheduleKind.BLOCK
 }
@@ -231,7 +233,21 @@ data class AppSettings(
     val limits: List<AppLimit> = emptyList(),
     /** True once a style still on the old default green has moved to the sage — once, so it can be chosen again. */
     val homeGreenMigrated: Boolean = false,
+    /** Messages you wrote for covers, shared by every schedule, block and limit. */
+    val customMessages: List<CustomMessage> = emptyList(),
 )
+
+/** How a cover picks its words: the usual ones, one you chose, or a different one each time. */
+@Serializable
+enum class MessageMode { USUAL, CHOSEN, RANDOM }
+
+/** A cover's words. [text] is the chosen message when [mode] is [MessageMode.CHOSEN]. */
+@Serializable
+data class CoverMessage(val mode: MessageMode = MessageMode.USUAL, val text: String? = null)
+
+/** A message you wrote. [inRandom] puts it in the mix for covers set to a different one each time. */
+@Serializable
+data class CustomMessage(val text: String, val inRandom: Boolean = true)
 
 /**
  * What running out of a limit's daily minutes leads to. Ordered strictest first: choosing there and
@@ -279,6 +295,8 @@ data class AppLimit(
     val createdDay: Long = 0,
     /** Hours outside which this can't be changed or deleted at all; null means any time. */
     val editWindow: EditWindow? = null,
+    /** The words on the pause before opening, and on the cover once the day's minutes are gone. */
+    val message: CoverMessage = CoverMessage(),
 )
 
 /** One day of time spent in limited apps, and what was done about it. Days are local epoch days. */

@@ -31,7 +31,7 @@ Nothing here can be made impossible, and the app doesn't pretend otherwise — A
 
 ### What a session can do
 
-- **Block distracting apps**: a gentle full-screen cover appears over them.
+- **Block distracting apps**: a gentle full-screen cover appears over them. Each schedule, block and limit chooses what its cover says: the usual words, one message in particular, a different one each time, or words you wrote yourself (which can join that mix).
 - **Swap your home screen for a minimal launcher** where only the apps you choose can be opened. Its colours, text size (app names down to very small, so many apps fit) and what it shows are yours to customize.
 - **Quiet the phone** with Do Not Disturb ("Priority only" or "Silence") and **hold notifications back** until the session ends. Media and alarms are never muted, so music, videos and alarms keep playing.
 

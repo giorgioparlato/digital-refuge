@@ -13,6 +13,14 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            40,
+            "0.8.5",
+            listOf(
+                "Choose the words a cover shows, for each schedule, block and limit: one in particular, a different one each time, or your own.",
+                "Your own words can join the mix, or wait to be picked.",
+            ),
+        ),
+        ChangelogEntry(
             39,
             "0.8.4",
             listOf(

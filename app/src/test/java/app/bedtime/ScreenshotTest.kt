@@ -248,6 +248,11 @@ class ScreenshotTest {
     }
 
     @Test
+    fun blockedWithMessage() = shot {
+        BlockedContent("Instagram", "Bedtime", "07:00", onHome = {}, onUnlock = {}, message = "You said you'd read tonight.")
+    }
+
+    @Test
     fun pauseBeforeOpening() = shot { app.bedtime.ui.blocked.PauseContent("Instagram", secondsLeft = 7, opens = 4, onOpen = {}, onHome = {}) }
 
     @Test

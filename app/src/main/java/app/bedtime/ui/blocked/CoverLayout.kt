@@ -25,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.font.FontStyle
 import app.bedtime.ui.components.SoftPillButton
 import app.bedtime.ui.components.StatusPill
 import app.bedtime.ui.components.Text
@@ -49,6 +50,8 @@ internal fun CoverLayout(
     pill: String? = null,
     pillColor: Color = Obsidian.colors.accentText,
     secondary: List<CoverAction> = emptyList(),
+    /** Words chosen for this cover (yours, or one of the app's), set apart under the explanation. */
+    message: String? = null,
 ) {
     val c = Obsidian.colors
     Column(
@@ -70,6 +73,15 @@ internal fun CoverLayout(
         if (body != null) {
             Spacer(Modifier.height(12.dp))
             Text(body, style = MaterialTheme.typography.bodyLarge, color = c.textMuted, textAlign = TextAlign.Center)
+        }
+        if (message != null) {
+            Spacer(Modifier.height(18.dp))
+            Text(
+                "“$message”",
+                style = MaterialTheme.typography.bodyLarge.copy(fontStyle = FontStyle.Italic),
+                color = c.textNormal,
+                textAlign = TextAlign.Center,
+            )
         }
         Spacer(Modifier.weight(1.3f))
         SoftPillButton(primary.label, onClick = primary.onClick, enabled = primary.enabled)
