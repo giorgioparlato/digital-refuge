@@ -105,6 +105,9 @@ class BootReceiver : BroadcastReceiver() {
         // Only the two we registered for; anything else isn't ours to act on.
         if (intent.action != Intent.ACTION_BOOT_COMPLETED && intent.action != Intent.ACTION_MY_PACKAGE_REPLACED) return
         SessionGuardService.start(context) // Stops itself again if nothing is running.
-        async { SessionAlarms.schedule(context) }
+        async {
+            Repository.get(context).migrateHomeGreen()
+            SessionAlarms.schedule(context)
+        }
     }
 }

@@ -35,19 +35,19 @@ import java.util.Locale
 
 /** Greeting, clock, date and the session pill: the top of the minimal home and the lock screen. */
 @Composable
-internal fun SessionHeader(now: LocalDateTime, scheduleName: String, until: String, style: HomeStyle) {
+internal fun SessionHeader(now: LocalDateTime, scheduleName: String, until: String, style: HomeStyle, calendar: String? = null) {
     val context = LocalContext.current
     val p = style.palette()
-    val scale = style.textSize.scale
+    val clock = style.clockSize.scale
     Column {
         if (style.showGreeting) {
             Text(greeting(now.hour), style = MaterialTheme.typography.titleMedium, color = p.accent)
         }
         Text(
-            styledTime(timeFormatter(context).format(now), suffixSize = (30 * scale).sp),
+            styledTime(timeFormatter(context).format(now), suffixSize = (30 * clock).sp),
             style = MaterialTheme.typography.displayLarge.copy(
-                fontSize = (76 * scale).sp,
-                lineHeight = (84 * scale).sp,
+                fontSize = (76 * clock).sp,
+                lineHeight = (84 * clock).sp,
                 fontFeatureSettings = "tnum",
             ),
             color = p.text,
@@ -60,6 +60,9 @@ internal fun SessionHeader(now: LocalDateTime, scheduleName: String, until: Stri
                 fontWeight = FontWeight.Normal,
                 color = p.muted,
             )
+        }
+        if (calendar != null) {
+            Text(calendar, style = MaterialTheme.typography.bodyMedium, color = p.muted, modifier = Modifier.padding(top = 4.dp))
         }
         Spacer(Modifier.height(16.dp))
         Row(

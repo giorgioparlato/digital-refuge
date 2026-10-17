@@ -81,6 +81,13 @@ fun OnboardingScreen(onDone: () -> Unit) {
                 "if a block allows one, you can step out for a few minutes without ending the session — for whatever " +
                     "genuinely can't wait. it counts as an escape, and a full screen brings you back when it is over.",
             )
+            Point(
+                BedtimeIcons.Leaf,
+                "limits hold every day",
+                "outside any session too, a limit can ask for a few breaths before an app opens, or give it a daily " +
+                    "budget. making one stricter takes effect at once; loosening it, or deleting it, waits until the " +
+                    "next day, so it can't be used to get round today.",
+            )
 
             Spacer(Modifier.height(6.dp))
             Box(Modifier.fillMaxWidth().height(1.dp).background(c.border))

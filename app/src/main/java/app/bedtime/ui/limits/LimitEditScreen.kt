@@ -367,6 +367,20 @@ internal fun LimitEditContent(
                         body = "Today keeps the limit as it was. Making a limit stricter always takes effect at once.",
                         modifier = Modifier.padding(top = 14.dp),
                     )
+                } else if (shutWindow == null) {
+                    // Said before any change is made, not only once one loosens it.
+                    Text(
+                        if (isNew) {
+                            "Once it's saved, making it stricter takes effect at once, while loosening it or deleting it " +
+                                "waits until the next day. Until tonight, while it's new, you can still change it freely."
+                        } else {
+                            "Making it stricter takes effect at once. Loosening it — fewer apps, a shorter pause, more " +
+                                "minutes, an easier way to get more — or deleting it waits until the next day."
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = c.textFaint,
+                        modifier = Modifier.padding(top = 14.dp),
+                    )
                 }
                 Spacer(Modifier.height(10.dp))
                 OptionRow(

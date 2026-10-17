@@ -30,6 +30,23 @@ import android.widget.Toast
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.foundation.layout.Spacer
+import android.Manifest
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.material3.AlertDialog
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.layout.heightIn
+import app.bedtime.ui.components.Chevron
+import app.bedtime.ui.minimal.CalendarSource
+import app.bedtime.data.GESTURE_CAMERA
+import app.bedtime.data.Swipe
+import app.bedtime.data.ClockSize
 import app.bedtime.ui.components.QuickChip
 import app.bedtime.ui.theme.AppFonts
 import app.bedtime.data.AppFont
@@ -83,9 +100,17 @@ fun HomeStyleScreen(onBack: () -> Unit) {
     val repo = remember { Repository.get(context) }
     val scope = rememberCoroutineScope()
     val settings: AppSettings? by repo.settings.collectAsStateWithLifecycle(initialValue = null)
-    var apps by remember { mutableStateOf(emptyList<AppEntry>()) }
+    var allApps by remember { mutableStateOf(emptyList<AppEntry>()) }
     LaunchedEffect(Unit) {
-        apps = withContext(Dispatchers.IO) { AppCatalog.launchableApps(context).take(4) }
+        allApps = withContext(Dispatchers.IO) { AppCatalog.launchableApps(context).sortedBy { it.label.lowercase() } }
+    }
+    // Calendar access is asked for only when the line is switched on, and the line stays off without it.
+    val askCalendar = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) {
+            scope.launch { repo.updateSettings { it.copy(homeStyle = it.homeStyle.copy(showCalendar = true)) } }
+        } else {
+            Toast.makeText(context, "calendar access wasn't allowed", Toast.LENGTH_SHORT).show()
+        }
     }
     // Which choice "add your own font" was tapped under, so the new font lands there.
     var addingForQuote by rememberSaveable { mutableStateOf(false) }
@@ -107,7 +132,15 @@ fun HomeStyleScreen(onBack: () -> Unit) {
     HomeStyleContent(
         style = current.homeStyle,
         onChange = { style -> scope.launch { repo.updateSettings { it.copy(homeStyle = style) } } },
-        previewApps = apps,
+        previewApps = allApps.take(4),
+        allApps = allApps,
+        onShowCalendar = { on ->
+            if (on && !CalendarSource.hasPermission(context)) {
+                askCalendar.launch(Manifest.permission.READ_CALENDAR)
+            } else {
+                scope.launch { repo.updateSettings { it.copy(homeStyle = it.homeStyle.copy(showCalendar = on)) } }
+            }
+        },
         now = LocalDateTime.now(),
         onBack = onBack,
         quote = Quotes.forPeriod(LocalDateTime.now(), current.homeStyle.quoteRefresh),
@@ -128,9 +161,25 @@ internal fun HomeStyleContent(
     quote: Quote? = null,
     /** Opens the file picker for your own font, for the quote or for the rest. */
     onAddFont: (forQuote: Boolean) -> Unit = {},
+    /** Every app that can be opened, for the lock-screen swipes. */
+    allApps: List<AppEntry> = emptyList(),
+    /** Switches the calendar line, asking for calendar access first if needed. */
+    onShowCalendar: (Boolean) -> Unit = {},
 ) {
     val context = LocalContext.current
     val c = Obsidian.colors
+    var pickingSwipe by rememberSaveable { mutableStateOf<Swipe?>(null) }
+    pickingSwipe?.let { swipe ->
+        SwipeTargetDialog(
+            swipe = swipe,
+            apps = allApps,
+            onDismiss = { pickingSwipe = null },
+            onPick = { target ->
+                onChange(style.copy(lockGestures = if (target == null) style.lockGestures - swipe else style.lockGestures + (swipe to target)))
+                pickingSwipe = null
+            },
+        )
+    }
     Scaffold(containerColor = c.bgPrimary, topBar = { ObsidianTopBar("Minimal home screen", onBack = onBack) }) { padding ->
         Column(
             Modifier
@@ -174,8 +223,20 @@ internal fun HomeStyleContent(
                 SwatchRow(AccentPresets, style.accent) { onChange(style.copy(accent = it)) }
                 HexField(style.accent) { onChange(style.copy(accent = it)) }
             }
-            SectionCard(title = "Text size") {
-                SizeLabel("Clock and text", Modifier.padding(bottom = 8.dp))
+            SectionCard(title = "Text", subtitle = "Automatic is cream on a dark background, ink on a light one") {
+                QuickChip("Automatic", style.textColor == null) { onChange(style.copy(textColor = null)) }
+                Spacer(Modifier.height(12.dp))
+                SwatchRow(TextPresets, style.textColor ?: -1L) { onChange(style.copy(textColor = it)) }
+                HexField(style.textColor ?: style.palette().text.toArgb().toLong() and 0xFFFFFFFFL) { onChange(style.copy(textColor = it)) }
+            }
+            SectionCard(title = "Sizes") {
+                SizeLabel("Clock", Modifier.padding(bottom = 8.dp))
+                SegmentedChoice(
+                    options = listOf("Very small", "Small", "Medium", "Large"),
+                    selected = style.clockSize.ordinal,
+                    onSelect = { onChange(style.copy(clockSize = ClockSize.entries[it])) },
+                )
+                SizeLabel("Text", Modifier.padding(top = 16.dp, bottom = 8.dp))
                 SegmentedChoice(
                     options = listOf("Small", "Medium", "Large"),
                     selected = style.textSize.ordinal,
@@ -222,12 +283,48 @@ internal fun HomeStyleContent(
                     )
                 }
             }
+            SectionCard(title = "Calendar") {
+                OptionRow(
+                    Icons.Default.DateRange,
+                    "Today's next event",
+                    description = "Under the date, read from the calendar already on this phone. Nothing is fetched",
+                ) { ObsidianToggle(style.showCalendar, onShowCalendar) }
+                if (style.showCalendar) {
+                    OptionRow(
+                        Icons.Default.Lock,
+                        "Event names on the lock screen",
+                        description = "Off, the lock screen only says when the next one is",
+                    ) { ObsidianToggle(style.calendarNamesOnLock, { onChange(style.copy(calendarNamesOnLock = it)) }) }
+                }
+            }
             SectionCard {
                 OptionRow(
                     BedtimeIcons.Refuge,
                     "Show on the lock screen",
                     description = "During any session, the lock screen shows this clock and the session, without the apps",
                 ) { ObsidianToggle(style.lockScreen, { onChange(style.copy(lockScreen = it)) }) }
+                if (style.lockScreen) {
+                    SizeLabel("Swipes from the middle of the lock screen", Modifier.padding(top = 12.dp, bottom = 4.dp))
+                    Text(
+                        "Each can open an app once you've unlocked, or the camera straight away. From the bottom, any swipe just unlocks.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = c.textFaint,
+                        modifier = Modifier.padding(bottom = 4.dp),
+                    )
+                    Swipe.entries.forEach { swipe ->
+                        val target = style.lockGestures[swipe]
+                        OptionRow(
+                            swipe.icon(),
+                            "Swipe ${swipe.name.lowercase()}",
+                            description = when (target) {
+                                null -> "Just unlocks"
+                                GESTURE_CAMERA -> "Camera"
+                                else -> allApps.firstOrNull { it.packageName == target }?.label ?: target
+                            },
+                            onClick = { pickingSwipe = swipe },
+                        ) { Chevron() }
+                    }
+                }
             }
             // Your own font's file stays, so resetting keeps it on offer.
             TextButton(onClick = { onChange(HomeStyle(customFontName = style.customFontName)) }, modifier = Modifier.align(Alignment.CenterHorizontally)) {
@@ -235,6 +332,43 @@ internal fun HomeStyleContent(
             }
         }
     }
+}
+
+private fun Swipe.icon(): ImageVector = when (this) {
+    Swipe.UP -> Icons.Default.KeyboardArrowUp
+    Swipe.DOWN -> Icons.Default.KeyboardArrowDown
+    Swipe.LEFT -> Icons.AutoMirrored.Filled.KeyboardArrowLeft
+    Swipe.RIGHT -> Icons.AutoMirrored.Filled.KeyboardArrowRight
+}
+
+/** What a swipe opens: nothing (it just unlocks), the camera, or any app on the phone. */
+@Composable
+private fun SwipeTargetDialog(swipe: Swipe, apps: List<AppEntry>, onDismiss: () -> Unit, onPick: (String?) -> Unit) {
+    val c = Obsidian.colors
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = c.bgSecondary,
+        title = { Text("Swipe ${swipe.name.lowercase()} opens") },
+        text = {
+            LazyColumn(Modifier.heightIn(max = 420.dp)) {
+                item { DialogChoice("Nothing, it just unlocks") { onPick(null) } }
+                item { DialogChoice("Camera, without unlocking") { onPick(GESTURE_CAMERA) } }
+                items(apps.size) { i -> DialogChoice(apps[i].label) { onPick(apps[i].packageName) } }
+            }
+        },
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = c.textMuted) } },
+    )
+}
+
+@Composable
+private fun DialogChoice(label: String, onClick: () -> Unit) {
+    Text(
+        label,
+        style = MaterialTheme.typography.bodyLarge,
+        color = Obsidian.colors.textNormal,
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 12.dp),
+    )
 }
 
 /** The fonts as chips, then your own one if you have added it, and a way to add or replace it. */

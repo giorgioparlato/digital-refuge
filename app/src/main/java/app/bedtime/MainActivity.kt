@@ -176,6 +176,7 @@ private fun BedtimeNavigation(pendingRoute: String?, onRouteConsumed: () -> Unit
             SystemApps.ALWAYS_AVAILABLE_SUGGESTIONS.filter { AppCatalog.isLaunchable(context, it) }.toSet()
         }
         Repository.get(context).seedAlwaysAvailable(suggested)
+        Repository.get(context).migrateHomeGreen()
         SessionAlarms.schedule(context)
     }
 

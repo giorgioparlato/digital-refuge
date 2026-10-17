@@ -32,6 +32,12 @@
     <!-- Do Not Disturb and hidden notifications; granted by the user in "Do Not Disturb access". -->
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
 
+    <!--
+      Today's next event on the minimal home and lock screen, if you switch that line on. It reads the
+      calendar already on the phone; with no internet permission, nothing it reads can leave.
+    -->
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
+
     <!-- The status-bar lotus while a session runs; asked for in Setup (Android 13+). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 

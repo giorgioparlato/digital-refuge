@@ -25,7 +25,6 @@ class Repository private constructor(context: Context) {
     val schedules: Flow<List<Schedule>> = observe(SCHEDULES, schedulesSerializer, emptyList())
     val runtime: Flow<RuntimeState> = observe(RUNTIME, RuntimeState.serializer(), RuntimeState())
     val settings: Flow<AppSettings> = observe(SETTINGS, AppSettings.serializer(), AppSettings())
-        .map { it.copy(homeStyle = it.homeStyle.withCurrentGreen()) }
     val history: Flow<List<SessionLog>> = observe(HISTORY, historySerializer, emptyList())
 
     /** Time in limited apps, a day per entry, newest last. Kept apart so counting never re-runs the engine. */
@@ -174,6 +173,14 @@ class Repository private constructor(context: Context) {
         } else {
             taken.copy(extraMinutes = taken.extraMinutes + (limitId to taken.extraMinutes[limitId].orEmpty() + minutes))
         }
+    }
+
+    /**
+     * Moves a minimal home still on the old default green to the sage, once. Doing it once, and
+     * remembering, is what lets the old green be picked again afterwards without being moved back.
+     */
+    suspend fun migrateHomeGreen() = updateSettings {
+        if (it.homeGreenMigrated) it else it.copy(homeStyle = it.homeStyle.withCurrentGreen(), homeGreenMigrated = true)
     }
 
     /** Fills the always-available list once with suggested apps that are installed. */

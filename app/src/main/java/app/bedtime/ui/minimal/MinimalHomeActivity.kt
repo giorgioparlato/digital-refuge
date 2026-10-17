@@ -189,6 +189,7 @@ private fun MinimalHomeScreen(onFinish: () -> Unit, onLightBackground: (Boolean)
                 null
             },
             quote = Quotes.forPeriod(now, style.quoteRefresh, quoteOffset),
+            calendar = rememberCalendarLine(style, now, onLockScreen = false),
             onNextQuote = { quoteOffset++ },
         )
     }
@@ -213,6 +214,8 @@ internal fun MinimalHomeContent(
     onEmergency: () -> Unit = {},
     /** Set for the first seconds of a block, when starting it can still be taken back. */
     onUndo: (() -> Unit)? = null,
+    /** Today's next event, when the calendar line is on. */
+    calendar: String? = null,
     quote: Quote? = null,
     onNextQuote: () -> Unit = {},
     preview: Boolean = false,
@@ -229,7 +232,7 @@ internal fun MinimalHomeContent(
                 .padding(horizontal = 28.dp, vertical = 24.dp),
         ) {
             Spacer(Modifier.height(if (preview) 12.dp else 32.dp))
-            SessionHeader(now, scheduleName, until, style)
+            SessionHeader(now, scheduleName, until, style, calendar)
             if (quote != null && style.showQuote) {
                 Spacer(Modifier.height(if (preview) 20.dp else 28.dp))
                 QuoteBlock(

@@ -78,8 +78,8 @@ class ScreenshotTest {
         showSystemUi = false,
     )
 
-    private fun shot(tall: Boolean = false, content: @Composable () -> Unit) {
-        if (tall) paparazzi.unsafeUpdateConfig(deviceConfig = DeviceConfig.PIXEL_5.copy(screenHeight = 5200))
+    private fun shot(tall: Boolean = false, height: Int = 5200, content: @Composable () -> Unit) {
+        if (tall) paparazzi.unsafeUpdateConfig(deviceConfig = DeviceConfig.PIXEL_5.copy(screenHeight = height))
         // The app is dark only (v0.8.3).
         paparazzi.snapshot("dark") { BedtimeTheme { content() } }
     }
@@ -388,8 +388,15 @@ class ScreenshotTest {
     }
 
     @Test
-    fun homeStyle() = shot(tall = true) {
-        HomeStyleContent(style = HomeStyle(), onChange = {}, previewApps = Samples.minimalApps, now = Samples.lateEvening, onBack = {}, quote = Samples.shortQuote)
+    fun homeStyle() = shot(tall = true, height = 9000) {
+        HomeStyleContent(
+            style = HomeStyle(showCalendar = true, lockGestures = mapOf(app.bedtime.data.Swipe.UP to app.bedtime.data.GESTURE_CAMERA)),
+            onChange = {},
+            previewApps = Samples.minimalApps,
+            now = Samples.lateEvening,
+            onBack = {},
+            quote = Samples.shortQuote,
+        )
     }
 
     @Test
@@ -429,6 +436,21 @@ class ScreenshotTest {
             onLaunch = {},
             onUnlock = {},
             quote = Samples.shortQuote,
+        )
+    }
+
+    @Test
+    fun minimalHomeSmallClock() = shot {
+        MinimalHomeContent(
+            now = Samples.lateEvening,
+            scheduleName = "Bedtime",
+            until = "07:00",
+            apps = Samples.minimalApps,
+            style = HomeStyle(clockSize = app.bedtime.data.ClockSize.VERY_SMALL, textColor = 0xFFFFFFFF),
+            onLaunch = {},
+            onUnlock = {},
+            quote = Samples.shortQuote,
+            calendar = "next · dentist at 9:30 am",
         )
     }
 

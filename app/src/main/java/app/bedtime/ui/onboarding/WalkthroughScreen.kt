@@ -52,6 +52,13 @@ private val pages = listOf(
         "notifications wait. music and alarms are never silenced.",
     ),
     Page(
+        BedtimeIcons.Leaf,
+        "limits for every day",
+        "outside any session, the apps that pull hardest can ask for a few breaths before they open, or keep to " +
+            "a daily budget.",
+        "making a limit stricter takes effect at once. loosening it, or deleting it, waits until the next day.",
+    ),
+    Page(
         BedtimeIcons.Hourglass,
         "the way out is slow on purpose",
         "a wait, a passage to copy, a password. long enough for the instinct to pass.",

@@ -1,5 +1,14 @@
 package app.bedtime.ui.lock
 
+import app.bedtime.ui.minimal.rememberCalendarLine
+import app.bedtime.data.Swipe
+import app.bedtime.data.GESTURE_CAMERA
+import app.bedtime.apps.AppCatalog
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.foundation.gestures.detectDragGestures
+import android.provider.MediaStore
 import android.app.KeyguardManager
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -91,7 +100,9 @@ class LockScreenActivity : ComponentActivity() {
             }
         }
         setContent {
-            BedtimeTheme { LockScreen(onOpen = ::openPhone, onFinish = ::finish, onLightBackground = ::useLightSystemBars) }
+            BedtimeTheme {
+                LockScreen(onOpen = ::openPhone, onOpenApp = ::openApp, onFinish = ::finish, onLightBackground = ::useLightSystemBars)
+            }
         }
     }
 
@@ -128,6 +139,36 @@ class LockScreenActivity : ComponentActivity() {
         )
     }
 
+    /**
+     * A swipe's app. The camera opens over the lock screen as it is; anything else asks for the usual
+     * unlock first and opens once it succeeds. A session still blocks what it blocks once it's open.
+     */
+    private fun openApp(target: String) {
+        val keyguard = getSystemService(KeyguardManager::class.java)
+        if (target == GESTURE_CAMERA) {
+            val action = if (keyguard.isKeyguardLocked) MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA_SECURE else MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA
+            runCatching { startActivity(Intent(action).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+            finish()
+            return
+        }
+        if (!keyguard.isKeyguardLocked) {
+            AppCatalog.launch(this, target)
+            finish()
+            return
+        }
+        keyguard.requestDismissKeyguard(
+            this,
+            object : KeyguardManager.KeyguardDismissCallback() {
+                override fun onDismissSucceeded() {
+                    AppCatalog.launch(this@LockScreenActivity, target)
+                    finish()
+                }
+
+                override fun onDismissError() = finish()
+            },
+        )
+    }
+
     private fun useLightSystemBars(light: Boolean) {
         val transparent = android.graphics.Color.TRANSPARENT
         val style = if (light) SystemBarStyle.light(transparent, transparent) else SystemBarStyle.dark(transparent)
@@ -142,7 +183,7 @@ class LockScreenActivity : ComponentActivity() {
 }
 
 @Composable
-private fun LockScreen(onOpen: () -> Unit, onFinish: () -> Unit, onLightBackground: (Boolean) -> Unit) {
+private fun LockScreen(onOpen: () -> Unit, onOpenApp: (String) -> Unit, onFinish: () -> Unit, onLightBackground: (Boolean) -> Unit) {
     val context = LocalContext.current
     val repo = remember { Repository.get(context) }
     val state by Engine.state(context).collectAsStateWithLifecycle()
@@ -174,7 +215,10 @@ private fun LockScreen(onOpen: () -> Unit, onFinish: () -> Unit, onLightBackgrou
         until = formatTime(context, occurrence.end),
         style = style,
         onOpen = onOpen,
+        // A swipe from the middle opens its app, if one is set; every other swipe just unlocks.
+        onSwipe = { swipe -> style.lockGestures[swipe]?.let(onOpenApp) ?: onOpen() },
         quote = Quotes.forPeriod(now, style.quoteRefresh),
+        calendar = rememberCalendarLine(style, now, onLockScreen = true),
     )
 }
 
@@ -185,10 +229,13 @@ internal fun LockScreenContent(
     until: String,
     style: HomeStyle,
     onOpen: () -> Unit = {},
+    onSwipe: (Swipe) -> Unit = {},
     quote: Quote? = null,
+    calendar: String? = null,
     preview: Boolean = false,
 ) {
     val p = style.palette()
+    val minDistance = with(LocalDensity.current) { 64.dp.toPx() }
     WithFontFamily(AppFonts.family(LocalContext.current, style.font)) {
         Column(
             Modifier
@@ -200,11 +247,34 @@ internal fun LockScreenContent(
                     onClickLabel = "unlock the phone",
                     onClick = onOpen,
                 )
+                .pointerInput(onSwipe, onOpen) {
+                    var start = Offset.Zero
+                    var travel = Offset.Zero
+                    detectDragGestures(
+                        onDragStart = {
+                            start = it
+                            travel = Offset.Zero
+                        },
+                        onDrag = { change, amount ->
+                            change.consume()
+                            travel += amount
+                        },
+                        onDragEnd = {
+                            val w = size.width.toFloat()
+                            val h = size.height.toFloat()
+                            when (val read = readLockSwipe(start.x, start.y, w, h, travel.x, travel.y, minDistance)) {
+                                LockSwipe.None -> Unit
+                                LockSwipe.Unlock -> onOpen()
+                                is LockSwipe.From -> onSwipe(read.swipe)
+                            }
+                        },
+                    )
+                }
                 .then(if (preview) Modifier else Modifier.safeDrawingPadding())
                 .padding(horizontal = 28.dp, vertical = 24.dp),
         ) {
             Spacer(Modifier.height(if (preview) 12.dp else 32.dp))
-            SessionHeader(now, scheduleName, until, style)
+            SessionHeader(now, scheduleName, until, style, calendar)
             Spacer(Modifier.weight(1f))
             if (quote != null && style.showQuote) {
                 QuoteBlock(quote, style)

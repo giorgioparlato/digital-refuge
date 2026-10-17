@@ -1,5 +1,6 @@
 package app.bedtime.ui.homestyle
 
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import app.bedtime.data.HomeStyle
@@ -14,8 +15,18 @@ internal val BackgroundPresets: List<Pair<String, Long>> = listOf(
     "Sand" to 0xFFEFE6D8,
 )
 
+internal val TextPresets: List<Pair<String, Long>> = listOf(
+    "Cream" to 0xFFD7C0A3,
+    "Warm white" to 0xFFE8E0D4,
+    "White" to 0xFFFFFFFF,
+    "Sage" to 0xFFB7D3C2,
+    "Ink" to 0xFF2B2620,
+    "Brown" to 0xFF593E22,
+)
+
 internal val AccentPresets: List<Pair<String, Long>> = listOf(
-    "Green" to 0xFF86BC9F,
+    "Sage" to 0xFF86BC9F,
+    "Bright green" to 0xFF4EC68E,
     "Cream" to 0xFFD7C0A3,
     "Amber" to 0xFFE0B243,
     "Sky" to 0xFF4DB2D1,
@@ -46,12 +57,15 @@ data class HomePalette(
 fun HomeStyle.palette(): HomePalette {
     val bg = Color(background)
     val light = bg.luminance() > 0.5f
+    // The app's own cream on a dark background, ink on a light one, unless a colour was chosen.
+    val text = textColor?.let { Color(it) } ?: if (light) Color(0xFF2B2620) else Color(0xFFD7C0A3)
     return HomePalette(
         background = bg,
         accent = Color(accent),
-        text = if (light) Color(0xFF2B2620) else Color(0xFFE8E0D4),
-        muted = if (light) Color(0xFF6E6253) else Color(0xFFB3A791),
-        faint = if (light) Color(0xFFA0937F) else Color(0xFF7E7466),
+        text = text,
+        // The quieter shades are the text eased toward the background, so any text colour keeps its family.
+        muted = lerp(bg, text, 0.75f),
+        faint = lerp(bg, text, 0.5f),
         chip = if (light) Color(0x14000000) else Color(0x1AFFFFFF),
         isLight = light,
     )

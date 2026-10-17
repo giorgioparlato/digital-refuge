@@ -13,6 +13,17 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            39,
+            "0.8.4",
+            listOf(
+                "The minimal home's text is the app's cream again, and you can choose its colour.",
+                "The clock has a size of its own now, and can go much smaller.",
+                "The bright green is back among the accents, if you miss it. Sage stays the default.",
+                "On the lock screen, a swipe from the middle can open an app, or the camera without unlocking.",
+                "Today's next event can sit under the date, read from the calendar already on your phone.",
+            ),
+        ),
+        ChangelogEntry(
             38,
             "0.8.3",
             listOf(

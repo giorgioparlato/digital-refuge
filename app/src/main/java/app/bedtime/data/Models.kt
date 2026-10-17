@@ -147,6 +147,10 @@ enum class AppNameSize(val scale: Float) { VERY_SMALL(0.55f), SMALL(0.75f), MEDI
 @Serializable
 enum class TextSize(val scale: Float) { SMALL(0.85f), MEDIUM(1f), LARGE(1.2f) }
 
+/** The clock's own size, apart from the rest of the text, so it can go well below it. */
+@Serializable
+enum class ClockSize(val scale: Float) { VERY_SMALL(0.5f), SMALL(0.7f), MEDIUM(1f), LARGE(1.2f) }
+
 /** How long a quote stays before the next one comes round. */
 @Serializable
 enum class QuoteRefresh(val hours: Int) { HOURLY(1), SIX_HOURS(6), DAILY(24), WEEKLY(168) }
@@ -154,8 +158,8 @@ enum class QuoteRefresh(val hours: Int) { HOURLY(1), SIX_HOURS(6), DAILY(24), WE
 /** The minimal home's green: the app's sage text green. */
 const val DEFAULT_HOME_ACCENT = 0xFF86BC9F
 
-/** Its green before the sage palette (v0.8.3), which a saved style still holding it reads as the new one. */
-private const val OLD_HOME_ACCENT = 0xFF4EC68E
+/** Its green before the sage palette (v0.8.3). Still on offer as "bright green" once a style has moved on. */
+const val OLD_HOME_ACCENT = 0xFF4EC68E
 
 fun HomeStyle.withCurrentGreen(): HomeStyle = if (accent == OLD_HOME_ACCENT) copy(accent = DEFAULT_HOME_ACCENT) else this
 
@@ -181,7 +185,23 @@ data class HomeStyle(
     val quoteFont: AppFont = AppFont.INTER,
     /** The name of the font file you added, if any; the file itself lives in the app's own storage. */
     val customFontName: String? = null,
+    val clockSize: ClockSize = ClockSize.MEDIUM,
+    /** The text colour; null picks for you: cream on a dark background, ink on a light one. */
+    val textColor: Long? = null,
+    /** What a swipe from the middle of the lock screen opens: a package name, or [GESTURE_CAMERA]. */
+    val lockGestures: Map<Swipe, String> = emptyMap(),
+    /** Today's next event under the date, read from the calendar already on the phone. */
+    val showCalendar: Boolean = false,
+    /** Whether the lock screen names the event, or only says when it is. */
+    val calendarNamesOnLock: Boolean = false,
 )
+
+/** The four swipes the lock screen knows, each starting in the middle of the screen. */
+@Serializable
+enum class Swipe { UP, DOWN, LEFT, RIGHT }
+
+/** The camera, which unlike any other app can open over the lock screen without unlocking. */
+const val GESTURE_CAMERA = "camera"
 
 /** The fonts the minimal home can use: four that ship with the app, and one you add. */
 @Serializable
@@ -209,6 +229,8 @@ data class AppSettings(
     val lastSeenVersion: Int = 0,
     /** Pauses before opening and daily budgets, which hold every day rather than in a session. */
     val limits: List<AppLimit> = emptyList(),
+    /** True once a style still on the old default green has moved to the sage — once, so it can be chosen again. */
+    val homeGreenMigrated: Boolean = false,
 )
 
 /**
