@@ -55,4 +55,18 @@ class ModelsCompatTest {
         val settings = AppJson.decodeFromString(AppSettings.serializer(), """{"onboarded":true}""")
         assertEquals(0, settings.lastSeenVersion)
     }
+
+    @Test
+    fun theOldDefaultGreenReadsAsTheSage() {
+        assertEquals(DEFAULT_HOME_ACCENT, HomeStyle(accent = 0xFF4EC68E).withCurrentGreen().accent)
+        // Any other colour, chosen on purpose, stays.
+        assertEquals(0xFF123456, HomeStyle(accent = 0xFF123456).withCurrentGreen().accent)
+    }
+
+    @Test
+    fun homeStyleWithoutFontsLoadsAsInter() {
+        val style = AppJson.decodeFromString(HomeStyle.serializer(), """{"showQuote":true}""")
+        assertEquals(AppFont.INTER, style.font)
+        assertEquals(AppFont.INTER, style.quoteFont)
+    }
 }

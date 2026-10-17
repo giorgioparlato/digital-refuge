@@ -25,7 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import app.bedtime.ui.components.CtaButton
+import app.bedtime.ui.components.SoftPillButton
 import app.bedtime.ui.components.StatusPill
 import app.bedtime.ui.components.Text
 import app.bedtime.ui.theme.Obsidian
@@ -72,7 +72,7 @@ internal fun CoverLayout(
             Text(body, style = MaterialTheme.typography.bodyLarge, color = c.textMuted, textAlign = TextAlign.Center)
         }
         Spacer(Modifier.weight(1.3f))
-        CtaButton(primary.label, onClick = primary.onClick, enabled = primary.enabled, modifier = Modifier.fillMaxWidth())
+        SoftPillButton(primary.label, onClick = primary.onClick, enabled = primary.enabled)
         secondary.forEachIndexed { i, action ->
             TextButton(
                 onClick = action.onClick,

@@ -188,10 +188,9 @@ private fun Figure(value: String, label: String, modifier: Modifier) {
     }
 }
 
-/** Kept and escaped, validated against both surfaces for colour-blind separation and contrast. */
+/** Kept and escaped, validated against the card for colour-blind separation, chroma and contrast. */
 @Composable
-private fun barColours(): Pair<Color, Color> =
-    if (Obsidian.colors.isDark) Color(0xFF2EA873) to Color(0xFFD9762B) else Color(0xFF24945F) to Color(0xFFC0661E)
+private fun barColours(): Pair<Color, Color> = Obsidian.colors.accent to Color(0xFFD9762B)
 
 private val DAY = DateTimeFormatter.ofPattern("EEE d MMM", Locale.getDefault())
 

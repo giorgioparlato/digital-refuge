@@ -21,7 +21,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.font.FontWeight
-import app.bedtime.ui.components.CtaButton
+import app.bedtime.ui.components.SoftPillButton
 import app.bedtime.ui.components.NumberStepper
 import app.bedtime.ui.components.QuickChip
 import app.bedtime.ui.components.Text
@@ -62,10 +62,9 @@ internal fun UnlockLengthChoice(
         modifier = modifier,
         footnote = "The steps come next, and they're the same whichever length you choose.",
         action = {
-            CtaButton(
+            SoftPillButton(
                 if (picked == REST) "Continue · $restLabel" else "Continue · ${formatMinutes(picked.toLong())}",
                 onClick = { onChoose(picked.takeIf { it != REST }) },
-                modifier = Modifier.fillMaxWidth(),
             )
         },
     ) {

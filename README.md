@@ -50,7 +50,7 @@ Nothing here can be made impossible, and the app doesn't pretend otherwise — A
   - **a pause before opening**: a few breaths, then "never mind" or open it. Opening anyway lets you into just that app or all of the limit's apps, as you choose, and coming back within a grace you set (two minutes by default) doesn't ask again;
   - **a daily budget**: minutes shared by all its apps, or for each of them. When they're gone, the limit decides what's left: nothing until tomorrow, a set amount more after the unlock steps, as much as you say you need (then the steps), or the rest of the day after them.
 
-  Making a limit stricter applies at once. Loosening it — fewer apps, more minutes, an easier way to get more, or deleting it — waits for midnight, so it can't be used to get round today. Time is counted from which app is in front, so it's close rather than exact.
+  A limit can also be changeable only at hours you pick, like a schedule. Making a limit stricter applies at once. Loosening it — fewer apps, more minutes, an easier way to get more, or deleting it — waits for midnight, so it can't be used to get round today. Time is counted from which app is in front, so it's close rather than exact.
 - **Templates**, always available from **New**:
   - schedules: Bedtime, Work focus, Slow morning, Weekend detox;
   - blocks: Focus 60, Deep work 90, Pomodoro 25, Study 45.
@@ -62,6 +62,7 @@ Nothing here can be made impossible, and the app doesn't pretend otherwise — A
   Each schedule decides whether unlocking **ends the session**, **pauses it for N minutes**, or **asks how long you need** first (some minutes, or the rest of it; the steps are the same either way). Optionally, both the wait and the text grow with every early unlock the same day, by a multiplier you set (1.5×, 2×…). That count resets at midnight.
 - **No quick escapes mid-session.** While a session is running, you can't edit or delete its schedule. If Do Not Disturb is switched off from quick settings, the app switches it straight back on and tells you why.
 - **A calm lock screen.** During a session, the lock screen shows your home style's clock, date and session, without the apps. Tap it to unlock as usual (PIN, fingerprint…). You can switch it off in the minimal home screen settings.
+- **Fonts for the minimal home**: one choice for the clock, date and app names, another for the quote — Inter, Nunito, or Literata, Fraunces and Spectral (which set the quote in italics) — or a .ttf/.otf font of your own, kept on the phone.
 - **A quote** on the minimal home and lock screen — 72 lines on attention, nature and the sacred, from Thoreau, Emerson, the Buddha, Kimmerer, Weil, Dillard, Murakami, Bohm, Thich Nhat Hanh, Hafiz and others, each checked against its source. They rotate in a scrambled but complete cycle, so every one comes round before any repeats; choose whether that's hourly, every six hours, daily or weekly. Tap it on the home screen for another, or switch it off in the minimal home screen settings.
 - **A lotus in the status bar** while a session runs, with a countdown in the notification. It's silent and stays visible even when notifications are hidden.
 - **Emergency button** on the minimal home screen, which keeps the session in place. It offers calling someone, and your **always-available apps** (maps, rides, authenticators…), which no session ever blocks.
@@ -72,7 +73,7 @@ Nothing here can be made impossible, and the app doesn't pretend otherwise — A
 - **What's new** after each update, once, on the home screen.
 - **Quick Settings tile** that starts your favourite focus block.
 - **Home-screen widget** that starts a chosen block with one tap, and shows how long is left while it runs. Add one from settings → home-screen widget, or long-press your home screen → widgets → digital refuge.
-- **Design:** based on the [Primary](https://primary-theme.github.io/start-here/) Obsidian theme, with green accents and the Inter font. Dark mode uses neutral grays around `#282828`; light mode uses Primary's cream palette. All text in the app is lowercase, and the icon is a lotus, the Buddhist image of calm, with a warm centre petal rising from the water.
+- **Design:** based on the [Primary](https://primary-theme.github.io/start-here/) Obsidian theme, with a sage green and the Inter font, worked out in Claude Design. The app is dark only, with neutral grays around `#282828`, whatever the phone is set to. All text in the app is lowercase, and the icon is a lotus, the Buddhist image of calm, with a warm centre petal rising from the water.
 
 ## Install
 
@@ -149,6 +150,8 @@ The screens are checked with [Paparazzi](https://github.com/cashapp/paparazzi) s
 | Home-screen widget | `ui/widget/` |
 | Unlock challenges and escalation | `unlock/` |
 | Screens and the Primary-based theme | `ui/` |
+
+The bundled fonts (Literata, Fraunces, Spectral, Nunito) are under the SIL Open Font License; their licences ship in `app/src/main/assets/licenses/`.
 
 The internal package name is still `app.bedtime`, from the app's first name, so updates install over existing copies.
 

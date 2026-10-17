@@ -80,8 +80,8 @@ class ScreenshotTest {
 
     private fun shot(tall: Boolean = false, content: @Composable () -> Unit) {
         if (tall) paparazzi.unsafeUpdateConfig(deviceConfig = DeviceConfig.PIXEL_5.copy(screenHeight = 5200))
-        paparazzi.snapshot("dark") { BedtimeTheme(darkTheme = true) { content() } }
-        paparazzi.snapshot("light") { BedtimeTheme(darkTheme = false) { content() } }
+        // The app is dark only (v0.8.3).
+        paparazzi.snapshot("dark") { BedtimeTheme { content() } }
     }
 
     /** Background + padding for pieces that don't draw their own screen. */
@@ -226,6 +226,25 @@ class ScreenshotTest {
     @Test
     fun unlockChoose() = shot {
         FullScreen { app.bedtime.unlock.UnlockLengthChoice("Bedtime", maxMinutes = 95, restLabel = "the rest of the session", onChoose = {}, onCancel = {}) }
+    }
+
+    @Test
+    fun limitEditShut() = shot(tall = true) {
+        app.bedtime.ui.limits.LimitEditContent(
+            draft = Samples.limits.first().copy(editWindow = app.bedtime.data.EditWindow(9 * 60, 10 * 60)),
+            onDraftChange = {},
+            isNew = false,
+            loosens = false,
+            newPassword = "",
+            onNewPasswordChange = {},
+            error = null,
+            onBack = {},
+            onSave = {},
+            onDelete = {},
+            onPickApps = {},
+            appLabel = Samples::label,
+            shutWindow = app.bedtime.data.EditWindow(9 * 60, 10 * 60),
+        )
     }
 
     @Test
@@ -400,6 +419,34 @@ class ScreenshotTest {
     }
 
     @Test
+    fun minimalHomeSerifQuote() = shot {
+        MinimalHomeContent(
+            now = Samples.lateEvening,
+            scheduleName = "Bedtime",
+            until = "07:00",
+            apps = Samples.minimalApps,
+            style = HomeStyle(quoteFont = app.bedtime.data.AppFont.LITERATA),
+            onLaunch = {},
+            onUnlock = {},
+            quote = Samples.shortQuote,
+        )
+    }
+
+    @Test
+    fun minimalHomeFraunces() = shot {
+        MinimalHomeContent(
+            now = Samples.lateEvening,
+            scheduleName = "Bedtime",
+            until = "07:00",
+            apps = Samples.minimalApps,
+            style = HomeStyle(font = app.bedtime.data.AppFont.FRAUNCES, quoteFont = app.bedtime.data.AppFont.FRAUNCES),
+            onLaunch = {},
+            onUnlock = {},
+            quote = Samples.shortQuote,
+        )
+    }
+
+    @Test
     fun minimalHomeCustom() = shot {
         MinimalHomeContent(
             now = Samples.lateEvening,
@@ -481,7 +528,7 @@ class ScreenshotTest {
                 footnote = "This ends the current session. The timer only runs while this screen is open, " +
                     "and starts over if you back out.",
                 note = "2nd unlock today \u00b7 the steps are longer",
-                action = { CtaButton("Waiting\u2026", onClick = {}, enabled = false, modifier = Modifier.fillMaxWidth()) },
+                action = { app.bedtime.ui.components.SoftPillButton("Waiting\u2026", onClick = {}, enabled = false) },
             ) {
                 WaitChallengeContent(remaining = 372_000, total = 600_000)
             }

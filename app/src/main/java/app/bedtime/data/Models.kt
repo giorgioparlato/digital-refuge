@@ -151,11 +151,19 @@ enum class TextSize(val scale: Float) { SMALL(0.85f), MEDIUM(1f), LARGE(1.2f) }
 @Serializable
 enum class QuoteRefresh(val hours: Int) { HOURLY(1), SIX_HOURS(6), DAILY(24), WEEKLY(168) }
 
+/** The minimal home's green: the app's sage text green. */
+const val DEFAULT_HOME_ACCENT = 0xFF86BC9F
+
+/** Its green before the sage palette (v0.8.3), which a saved style still holding it reads as the new one. */
+private const val OLD_HOME_ACCENT = 0xFF4EC68E
+
+fun HomeStyle.withCurrentGreen(): HomeStyle = if (accent == OLD_HOME_ACCENT) copy(accent = DEFAULT_HOME_ACCENT) else this
+
 /** Look of the minimal home screen. Colours are ARGB. */
 @Serializable
 data class HomeStyle(
     val background: Long = 0xFF282828,
-    val accent: Long = 0xFF4EC68E,
+    val accent: Long = DEFAULT_HOME_ACCENT,
     val textSize: TextSize = TextSize.MEDIUM,
     val appNameSize: AppNameSize = AppNameSize.MEDIUM,
     val showGreeting: Boolean = true,
@@ -167,7 +175,17 @@ data class HomeStyle(
     val quoteRefresh: QuoteRefresh = QuoteRefresh.DAILY,
     /** During sessions, show the clock and session over the lock screen. */
     val lockScreen: Boolean = true,
+    /** The clock, date and app names. */
+    val font: AppFont = AppFont.INTER,
+    /** The quote, chosen apart from the rest: Inter as it always was, or a serif in italics. */
+    val quoteFont: AppFont = AppFont.INTER,
+    /** The name of the font file you added, if any; the file itself lives in the app's own storage. */
+    val customFontName: String? = null,
 )
+
+/** The fonts the minimal home can use: four that ship with the app, and one you add. */
+@Serializable
+enum class AppFont { INTER, NUNITO, LITERATA, FRAUNCES, SPECTRAL, CUSTOM }
 
 @Serializable
 data class AppSettings(
@@ -237,6 +255,8 @@ data class AppLimit(
     val deleteFromDay: Long? = null,
     /** The day it was made. Until that day ends it can be changed freely: nothing has been given up yet. */
     val createdDay: Long = 0,
+    /** Hours outside which this can't be changed or deleted at all; null means any time. */
+    val editWindow: EditWindow? = null,
 )
 
 /** One day of time spent in limited apps, and what was done about it. Days are local epoch days. */

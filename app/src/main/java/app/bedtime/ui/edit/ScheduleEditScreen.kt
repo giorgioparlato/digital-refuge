@@ -1064,7 +1064,7 @@ internal fun RenameDialog(name: String, title: String, placeholder: String, onDi
 /** Start/end time: Android's clock dial (hour first, then minutes), following the phone's 12/24-hour setting. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun TimePickerDialog(title: String, initialMinute: Int, onDismiss: () -> Unit, onConfirm: (Int) -> Unit) {
+internal fun TimePickerDialog(title: String, initialMinute: Int, onDismiss: () -> Unit, onConfirm: (Int) -> Unit) {
     val context = LocalContext.current
     val state = rememberTimePickerState(initialMinute / 60, initialMinute % 60, is24Hour(context))
     Dialog(onDismissRequest = onDismiss) {

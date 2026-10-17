@@ -43,6 +43,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import app.bedtime.ui.theme.WithFontFamily
+import app.bedtime.ui.theme.AppFonts
 import app.bedtime.data.AppSettings
 import app.bedtime.data.HomeStyle
 import app.bedtime.data.Quote
@@ -187,31 +189,33 @@ internal fun LockScreenContent(
     preview: Boolean = false,
 ) {
     val p = style.palette()
-    Column(
-        Modifier
-            .fillMaxSize()
-            .background(p.background)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClickLabel = "unlock the phone",
-                onClick = onOpen,
-            )
-            .then(if (preview) Modifier else Modifier.safeDrawingPadding())
-            .padding(horizontal = 28.dp, vertical = 24.dp),
-    ) {
-        Spacer(Modifier.height(if (preview) 12.dp else 32.dp))
-        SessionHeader(now, scheduleName, until, style)
-        Spacer(Modifier.weight(1f))
-        if (quote != null && style.showQuote) {
-            QuoteBlock(quote, style)
-            Spacer(Modifier.height(40.dp))
+    WithFontFamily(AppFonts.family(LocalContext.current, style.font)) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .background(p.background)
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClickLabel = "unlock the phone",
+                    onClick = onOpen,
+                )
+                .then(if (preview) Modifier else Modifier.safeDrawingPadding())
+                .padding(horizontal = 28.dp, vertical = 24.dp),
+        ) {
+            Spacer(Modifier.height(if (preview) 12.dp else 32.dp))
+            SessionHeader(now, scheduleName, until, style)
+            Spacer(Modifier.weight(1f))
+            if (quote != null && style.showQuote) {
+                QuoteBlock(quote, style)
+                Spacer(Modifier.height(40.dp))
+            }
+            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(BedtimeIcons.Refuge, contentDescription = null, tint = p.accent, modifier = Modifier.size(28.dp))
+                Spacer(Modifier.height(10.dp))
+                Text("tap to open", style = MaterialTheme.typography.labelLarge, color = p.faint)
+            }
+            Spacer(Modifier.height(12.dp))
         }
-        Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(BedtimeIcons.Refuge, contentDescription = null, tint = p.accent, modifier = Modifier.size(28.dp))
-            Spacer(Modifier.height(10.dp))
-            Text("tap to open", style = MaterialTheme.typography.labelLarge, color = p.faint)
-        }
-        Spacer(Modifier.height(12.dp))
     }
 }

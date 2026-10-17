@@ -46,6 +46,10 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.TextFieldColors
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.material.icons.filled.Add
 import app.bedtime.ui.components.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -414,6 +418,43 @@ fun ObsidianToggle(checked: Boolean, onCheckedChange: (Boolean) -> Unit, enabled
 }
 
 /** Obsidian's `mod-cta` button. */
+/**
+ * The main way on from a cover or an unlock step: a soft tinted pill rather than a solid bar, so a
+ * screen asking you to pause doesn't shout. Disabled, it keeps its tint and mutes its words.
+ */
+@Composable
+fun SoftPillButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
+    val c = Obsidian.colors
+    Box(
+        modifier
+            .heightIn(min = 48.dp)
+            .clip(RoundedCornerShape(50))
+            .background(c.accent.copy(alpha = 0.16f))
+            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+            .padding(horizontal = 28.dp, vertical = 12.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text, fontSize = 16.sp, fontWeight = FontWeight.Medium, color = if (enabled) c.accentText else c.textMuted)
+    }
+}
+
+/** "New schedule", "new limit": a small tinted circle with a plus, no shadow, named for screen readers. */
+@Composable
+fun AddCircleButton(label: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val c = Obsidian.colors
+    Box(
+        modifier
+            .size(52.dp)
+            .clip(CircleShape)
+            .background(c.accent.copy(alpha = 0.18f))
+            .clickable(onClickLabel = label, role = Role.Button, onClick = onClick)
+            .semantics { contentDescription = label },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(Icons.Default.Add, contentDescription = null, tint = c.accentText, modifier = Modifier.size(22.dp))
+    }
+}
+
 @Composable
 fun CtaButton(
     text: String,

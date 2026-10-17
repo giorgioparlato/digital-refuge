@@ -29,6 +29,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import app.bedtime.ui.components.SoftPillButton
 import app.bedtime.ui.components.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -201,17 +202,12 @@ internal fun UnlockSteps(
         action = when {
             succeeded -> null
             challenges.isEmpty() -> {
-                { CtaButton("Unlock", onClick = ::passCurrent, modifier = Modifier.fillMaxWidth()) }
+                { SoftPillButton("Unlock", onClick = ::passCurrent) }
             }
             step == Challenge.WAIT -> {
                 {
                     val done = remaining == 0L
-                    CtaButton(
-                        if (done) "Continue" else "Waiting\u2026",
-                        onClick = ::passCurrent,
-                        enabled = done,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
+                    SoftPillButton(if (done) "Continue" else "Waiting\u2026", onClick = ::passCurrent, enabled = done)
                 }
             }
             else -> null
@@ -456,8 +452,8 @@ internal fun WaitChallengeContent(remaining: Long?, total: Long) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
                         remaining?.let(::formatCountdown) ?: "\u2026",
-                        style = MaterialTheme.typography.displaySmall.copy(fontFeatureSettings = "tnum"),
-                        fontWeight = FontWeight.Medium,
+                        style = MaterialTheme.typography.displaySmall.copy(fontSize = 26.sp, lineHeight = 32.sp, fontFeatureSettings = "tnum"),
+                        fontWeight = FontWeight.Light,
                         color = if (done) c.green else c.textNormal,
                     )
                     if (!done) {
@@ -661,11 +657,11 @@ internal fun PasswordChallengeContent(
             isError = wrong,
             supportingText = if (wrong) "That's not it. Try again." else null,
         )
-        CtaButton(
+        SoftPillButton(
             if (checking) "Checking…" else "Continue",
             onClick = onSubmit,
             enabled = input.isNotEmpty() && !checking,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.align(Alignment.CenterHorizontally),
         )
     }
 }

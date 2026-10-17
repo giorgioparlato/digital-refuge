@@ -1,6 +1,5 @@
 package app.bedtime.ui.theme
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
@@ -54,6 +53,8 @@ data class ObsidianColors(
     val orange: Color,
     val green: Color,
     val blue: Color,
+    /** Between normal and muted: second lines that still need to be read, like a limit's details. */
+    val textSoft: Color,
 )
 
 val DarkObsidian = ObsidianColors(
@@ -61,23 +62,27 @@ val DarkObsidian = ObsidianColors(
     bgPrimary = Color(0xFF282828),
     bgPrimaryAlt = Color(0xFF222222),
     bgSecondary = Color(0xFF2F2F2F),
-    fade = Color(0xFF1F2C25),
+    fade = Color(0xFF232926),
     border = Color(0xFF3A3A3A),
     interactive = Color(0xFF363636),
     interactiveHover = Color(0xFF424242),
     textNormal = Color(0xFFD7C0A3), // d-gray-20
     textMuted = Color(0xFFAB916D), // d-gray-40
     textFaint = Color(0xFF917959), // d-gray-50
-    accent = Color(0xFF2EA873), // d-green-20
-    accentFill = Color(0xFF117449), // d-green-40
+    // A sage green, chosen in Claude Design (2026-10-17) over Primary's brighter one: calmer, and
+    // still rich enough to tell from orange in the charts.
+    accent = Color(0xFF58A87C),
+    accentFill = Color(0xFF3A5F4A),
     textOnAccent = Color(0xFFEBD8C6), // d-gray-10
-    accentText = Color(0xFF4EC68E), // d-green-10
+    accentText = Color(0xFF86BC9F),
     red = Color(0xFFF7685E), // d-red-20
     orange = Color(0xFFEF8839), // d-orange-10
-    green = Color(0xFF4EC68E), // d-green-10
+    green = Color(0xFF86BC9F),
     blue = Color(0xFF4DB2D1), // d-blue-20
+    textSoft = Color(0xFFC2A982),
 )
 
+/** The app is dark only (2026-10-17). This palette stays for the archived design mock-up tests. */
 val LightObsidian = ObsidianColors(
     isDark = false,
     bgPrimary = Color(0xFFF8F5F1), // l-gray-20
@@ -98,6 +103,7 @@ val LightObsidian = ObsidianColors(
     orange = Color(0xFFD58534),
     green = Color(0xFF329562), // l-green-30
     blue = Color(0xFF3079B0),
+    textSoft = Color(0xFF73593A),
 )
 
 val Inter = FontFamily(
@@ -177,7 +183,7 @@ object Obsidian {
 }
 
 @Composable
-fun BedtimeTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
+fun BedtimeTheme(darkTheme: Boolean = true, content: @Composable () -> Unit) {
     val colors = if (darkTheme) DarkObsidian else LightObsidian
     CompositionLocalProvider(LocalObsidianColors provides colors) {
         MaterialTheme(

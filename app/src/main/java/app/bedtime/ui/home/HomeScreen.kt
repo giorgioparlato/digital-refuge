@@ -57,6 +57,9 @@ import app.bedtime.ui.components.SectionLabel
 import app.bedtime.ui.components.CardRadius
 import app.bedtime.apps.AppCatalog
 import app.bedtime.data.AppSettings
+import app.bedtime.data.AppFont
+import app.bedtime.ui.theme.AppFonts
+import androidx.compose.ui.text.font.FontStyle
 import app.bedtime.data.Changelog
 import app.bedtime.data.ChangelogEntry
 import app.bedtime.data.DndMode
@@ -110,6 +113,8 @@ internal data class HomeUiState(
     val undoBlockId: String? = null,
     /** What changed in the update you haven't seen yet. */
     val whatsNew: ChangelogEntry? = null,
+    /** The quote's font, the one chosen for the minimal home. */
+    val quoteFont: AppFont = AppFont.INTER,
 )
 
 /** The home tab: what's running now, how the week has gone, and the blocks you can start. */
@@ -170,7 +175,7 @@ fun HomeScreen(
         null
     }
     HomeContent(
-        ui = HomeUiState(loaded, active, runtime, history, serviceOn, greyscaleOk, dndOk, now, quote, undoBlockId, whatsNew),
+        ui = HomeUiState(loaded, active, runtime, history, serviceOn, greyscaleOk, dndOk, now, quote, undoBlockId, whatsNew, style.quoteFont),
         onEdit = onEdit,
         onCreate = onCreate,
         onTemplate = onTemplate,
@@ -270,7 +275,7 @@ internal fun HomeContent(
                 }
             }
             if (ui.quote != null) {
-                item(key = "quote") { QuoteFooter(ui.quote) }
+                item(key = "quote") { QuoteFooter(ui.quote, ui.quoteFont) }
             }
             // The week in one quiet line at the very foot; the full figures are a tap away.
             homeSummary(Stats.week(ui.history, ui.now), Stats.streak(ui.history, ui.now))?.let { summary ->
@@ -482,14 +487,20 @@ private fun NewBlockTile(onCreate: () -> Unit, modifier: Modifier) {
 }
 
 @Composable
-private fun QuoteFooter(quote: Quote) {
+private fun QuoteFooter(quote: Quote, font: AppFont) {
     val c = Obsidian.colors
+    val serif = AppFonts.quoteStyle(font) == FontStyle.Italic
     Column(Modifier.padding(horizontal = PageGutter).padding(top = 26.dp)) {
         Box(Modifier.fillMaxWidth().height(1.dp).background(c.border.copy(alpha = 0.6f)))
         Spacer(Modifier.height(22.dp))
         Text(
             "“${quote.text}”",
-            style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp, lineHeight = 25.sp),
+            style = MaterialTheme.typography.bodyLarge.copy(
+                fontSize = if (serif) 17.sp else 16.sp,
+                lineHeight = if (serif) 26.sp else 25.sp,
+                fontFamily = AppFonts.family(LocalContext.current, font),
+                fontStyle = AppFonts.quoteStyle(font),
+            ),
             color = c.textMuted,
         )
         Spacer(Modifier.height(8.dp))

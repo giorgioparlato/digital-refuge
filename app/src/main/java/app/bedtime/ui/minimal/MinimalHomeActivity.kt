@@ -33,6 +33,8 @@ import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import app.bedtime.ui.theme.WithFontFamily
+import app.bedtime.ui.theme.AppFonts
 import app.bedtime.ui.components.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -218,60 +220,62 @@ internal fun MinimalHomeContent(
     val p = style.palette()
     val scale = style.textSize.scale
     val names = scale * style.appNameSize.scale
-    Column(
-        Modifier
-            .fillMaxSize()
-            .background(p.background)
-            .then(if (preview) Modifier else Modifier.safeDrawingPadding())
-            .padding(horizontal = 28.dp, vertical = 24.dp),
-    ) {
-        Spacer(Modifier.height(if (preview) 12.dp else 32.dp))
-        SessionHeader(now, scheduleName, until, style)
-        if (quote != null && style.showQuote) {
-            Spacer(Modifier.height(if (preview) 20.dp else 28.dp))
-            QuoteBlock(
-                quote,
-                style,
-                Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClickLabel = "show another quote", onClick = onNextQuote),
-            )
-        }
-        Spacer(Modifier.height(if (preview) 28.dp else 44.dp))
-        LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
-            items(apps, key = { it.packageName }) { app ->
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .clickable(onClickLabel = "open ${app.label}") { onLaunch(app.packageName) }
-                        .padding(vertical = (12 * names).dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    if (style.showIcons) {
-                        AppIcon(app.packageName, app.label, (30 * names).dp)
-                        Spacer(Modifier.width(16.dp))
+    WithFontFamily(AppFonts.family(LocalContext.current, style.font)) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .background(p.background)
+                .then(if (preview) Modifier else Modifier.safeDrawingPadding())
+                .padding(horizontal = 28.dp, vertical = 24.dp),
+        ) {
+            Spacer(Modifier.height(if (preview) 12.dp else 32.dp))
+            SessionHeader(now, scheduleName, until, style)
+            if (quote != null && style.showQuote) {
+                Spacer(Modifier.height(if (preview) 20.dp else 28.dp))
+                QuoteBlock(
+                    quote,
+                    style,
+                    Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClickLabel = "show another quote", onClick = onNextQuote),
+                )
+            }
+            Spacer(Modifier.height(if (preview) 28.dp else 44.dp))
+            LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
+                items(apps, key = { it.packageName }) { app ->
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable(onClickLabel = "open ${app.label}") { onLaunch(app.packageName) }
+                            .padding(vertical = (12 * names).dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        if (style.showIcons) {
+                            AppIcon(app.packageName, app.label, (30 * names).dp)
+                            Spacer(Modifier.width(16.dp))
+                        }
+                        Text(app.label, fontSize = (26 * names).sp, color = p.text)
                     }
-                    Text(app.label, fontSize = (26 * names).sp, color = p.text)
+                }
+                if (apps.isEmpty()) {
+                    item { Text("nothing to open right now. enjoy the quiet.", fontSize = (18 * scale).sp, color = p.faint) }
                 }
             }
-            if (apps.isEmpty()) {
-                item { Text("nothing to open right now. enjoy the quiet.", fontSize = (18 * scale).sp, color = p.faint) }
-            }
-        }
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            if (onUndo != null) {
-                TextButton(onClick = onUndo) { Text("undo", color = p.accent, fontWeight = FontWeight.SemiBold) }
-            } else {
-                TextButton(onClick = onUnlock) {
-                    Icon(Icons.Default.Lock, contentDescription = null, tint = p.faint, modifier = Modifier.size(16.dp))
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                if (onUndo != null) {
+                    TextButton(onClick = onUndo) { Text("undo", color = p.accent, fontWeight = FontWeight.SemiBold) }
+                } else {
+                    TextButton(onClick = onUnlock) {
+                        Icon(Icons.Default.Lock, contentDescription = null, tint = p.faint, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("unlock", color = p.faint)
+                    }
+                }
+                Spacer(Modifier.weight(1f))
+                TextButton(onClick = onEmergency) {
+                    Icon(Icons.Default.Warning, contentDescription = null, tint = p.faint, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("unlock", color = p.faint)
+                    Text("emergency", color = p.faint)
                 }
-            }
-            Spacer(Modifier.weight(1f))
-            TextButton(onClick = onEmergency) {
-                Icon(Icons.Default.Warning, contentDescription = null, tint = p.faint, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("emergency", color = p.faint)
             }
         }
     }

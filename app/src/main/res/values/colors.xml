@@ -1,9 +1,9 @@
 <resources>
-    <color name="window_background">#F8F5F1</color>
+    <color name="window_background">#282828</color>
     <color name="ic_launcher_background">#282828</color>
-    <color name="ic_launcher_accent">#2EA873</color>
+    <color name="ic_launcher_accent">#58A87C</color>
     <color name="ic_launcher_glow">#F2D8A7</color>
-    <color name="ic_launcher_deep">#1C6B48</color>
+    <color name="ic_launcher_deep">#36654B</color>
     <!-- Block widget text: the dark theme's normal and muted text. -->
     <color name="widget_text">#D7C0A3</color>
     <color name="widget_muted">#AB916D</color>

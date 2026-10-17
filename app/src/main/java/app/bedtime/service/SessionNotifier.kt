@@ -31,7 +31,7 @@ object SessionNotifier {
     private const val CHANNEL = "session_running"
     private const val OLD_CHANNEL = "session"
     private const val ID = 1
-    private const val ACCENT = 0xFF2EA873.toInt()
+    private const val ACCENT = 0xFF58A87C.toInt()
 
     /** Builds the notification for the phase: on, on a break, or off and asking to be switched back on. */
     fun build(context: Context, state: ActiveState?, blockingOn: Boolean, breakMs: Long, overlayMissing: Boolean = false): Notification {

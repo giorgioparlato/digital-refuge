@@ -15,7 +15,7 @@ internal val BackgroundPresets: List<Pair<String, Long>> = listOf(
 )
 
 internal val AccentPresets: List<Pair<String, Long>> = listOf(
-    "Green" to 0xFF4EC68E,
+    "Green" to 0xFF86BC9F,
     "Cream" to 0xFFD7C0A3,
     "Amber" to 0xFFE0B243,
     "Sky" to 0xFF4DB2D1,

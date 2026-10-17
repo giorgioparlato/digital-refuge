@@ -40,6 +40,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.bedtime.ui.components.AddCircleButton
 import app.bedtime.ui.components.CardRadius
 import app.bedtime.data.DndMode
 import app.bedtime.data.EditWindow
@@ -118,14 +119,7 @@ internal fun SchedulesContent(
         topBar = { ObsidianTopBar("schedules", subtitle = "hours that look after themselves") },
         floatingActionButton = {
             if (schedules.isNotEmpty()) {
-                ExtendedFloatingActionButton(
-                    text = { Text("new schedule", fontWeight = FontWeight.SemiBold) },
-                    icon = { Icon(Icons.Default.Add, contentDescription = null) },
-                    onClick = onCreate,
-                    shape = RoundedCornerShape(16.dp),
-                    containerColor = c.accentFill,
-                    contentColor = c.textOnAccent,
-                )
+                AddCircleButton("new schedule", onClick = onCreate)
             }
         },
     ) { padding ->

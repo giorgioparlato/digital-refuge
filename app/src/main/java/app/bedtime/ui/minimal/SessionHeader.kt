@@ -21,6 +21,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.bedtime.data.HomeStyle
 import app.bedtime.data.Quote
+import app.bedtime.ui.theme.AppFonts
+import androidx.compose.ui.text.font.FontStyle
 import app.bedtime.ui.components.BedtimeIcons
 import app.bedtime.ui.components.Text
 import app.bedtime.ui.components.styledTime
@@ -79,10 +81,17 @@ internal fun SessionHeader(now: LocalDateTime, scheduleName: String, until: Stri
 internal fun QuoteBlock(quote: Quote, style: HomeStyle, modifier: Modifier = Modifier) {
     val p = style.palette()
     val scale = style.textSize.scale
+    // Serifs read a size smaller than Inter at the same number, so they get a point more.
+    val serif = AppFonts.quoteStyle(style.quoteFont) == FontStyle.Italic
     Column(modifier) {
         Text(
             "“${quote.text}”",
-            style = MaterialTheme.typography.bodyLarge.copy(fontSize = (17 * scale).sp, lineHeight = (25 * scale).sp),
+            style = MaterialTheme.typography.bodyLarge.copy(
+                fontSize = ((if (serif) 18 else 17) * scale).sp,
+                lineHeight = ((if (serif) 27 else 25) * scale).sp,
+                fontFamily = AppFonts.family(LocalContext.current, style.quoteFont),
+                fontStyle = AppFonts.quoteStyle(style.quoteFont),
+            ),
             color = p.muted,
         )
         Spacer(Modifier.height(8.dp))

@@ -34,6 +34,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.runtime.mutableIntStateOf
+import kotlinx.coroutines.delay
+import java.time.LocalTime
+import app.bedtime.ui.formatMinuteOfDay
+import app.bedtime.ui.components.TimeTile
+import app.bedtime.ui.edit.TimePickerDialog
+import app.bedtime.engine.EditWindows
+import app.bedtime.data.EditWindow
 import app.bedtime.ui.components.PageGutter
 import app.bedtime.apps.AppCatalog
 import app.bedtime.data.AppJson
@@ -109,6 +118,15 @@ fun LimitEditScreen(limitId: String?, onBack: () -> Unit) {
     var confirmDelete by remember { mutableStateOf(false) }
     var confirmDiscard by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    var editingWindow by rememberSaveable { mutableStateOf<String?>(null) }
+    // Ticks so a window that closes (or opens) while the page is open is noticed.
+    var nowMinuteOfDay by remember { mutableIntStateOf(LocalTime.now().let { it.hour * 60 + it.minute }) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(20_000)
+            nowMinuteOfDay = LocalTime.now().let { it.hour * 60 + it.minute }
+        }
+    }
 
     LaunchedEffect(limitId) {
         if (!loaded && limitId != null) {
@@ -134,7 +152,9 @@ fun LimitEditScreen(limitId: String?, onBack: () -> Unit) {
     }
 
     val isNew = limitId == null
-    val dirty = draft != original || newPassword.isNotEmpty()
+    // A limit made today can't shut itself yet: the hours are being chosen right now.
+    val shutWindow = held.editWindow?.takeIf { !isNew && held.createdDay != today && !EditWindows.isOpen(it, nowMinuteOfDay) }
+    val dirty = shutWindow == null && (draft != original || newPassword.isNotEmpty())
     // Compared with what holds today, not with a looser version already waiting.
     val loosens = !isNew && held.createdDay != today && Limits.isLooser(held.rules, draft.rules)
     fun requestBack() {
@@ -157,6 +177,19 @@ fun LimitEditScreen(limitId: String?, onBack: () -> Unit) {
             repo.saveLimit(toSave, today)
             onBack()
         }
+    }
+
+    editingWindow?.let { which ->
+        val window = draft.editWindow ?: EditWindow()
+        TimePickerDialog(
+            title = if (which == WINDOW_START) "Can be changed from" else "Can be changed until",
+            initialMinute = if (which == WINDOW_START) window.startMinute else window.endMinute,
+            onDismiss = { editingWindow = null },
+            onConfirm = { minute ->
+                draft = draft.copy(editWindow = if (which == WINDOW_START) window.copy(startMinute = minute) else window.copy(endMinute = minute))
+                editingWindow = null
+            },
+        )
     }
 
     if (confirmDelete) {
@@ -215,8 +248,14 @@ fun LimitEditScreen(limitId: String?, onBack: () -> Unit) {
         onDelete = { confirmDelete = true },
         onPickApps = { picking = true },
         appLabel = { AppCatalog.label(context, it) },
+        shutWindow = shutWindow,
+        onEditWindowStart = { editingWindow = WINDOW_START },
+        onEditWindowEnd = { editingWindow = WINDOW_END },
     )
 }
+
+private const val WINDOW_START = "start"
+private const val WINDOW_END = "end"
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -233,9 +272,15 @@ internal fun LimitEditContent(
     onDelete: () -> Unit,
     onPickApps: () -> Unit,
     appLabel: (String) -> String = { it },
+    /** Set while outside the hours this limit may be changed in: the page is then read-only. */
+    shutWindow: EditWindow? = null,
+    onEditWindowStart: () -> Unit = {},
+    onEditWindowEnd: () -> Unit = {},
 ) {
+    val context = LocalContext.current
     val c = Obsidian.colors
     val rules = draft.rules
+    val editable = shutWindow == null
     fun setRules(transform: (LimitRules) -> LimitRules) = onDraftChange(draft.copy(rules = transform(rules)))
 
     var renaming by rememberSaveable { mutableStateOf(false) }
@@ -255,15 +300,24 @@ internal fun LimitEditContent(
         containerColor = c.bgPrimary,
         bottomBar = {
             BottomActionBar {
-                CtaButton(
-                    when {
-                        isNew -> "Create limit"
-                        loosens -> "Save, starting tomorrow"
-                        else -> "Save changes"
-                    },
-                    onClick = onSave,
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                if (shutWindow != null) {
+                    CtaButton(
+                        "Can be changed from ${formatMinuteOfDay(context, shutWindow.startMinute)}",
+                        onClick = {},
+                        enabled = false,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                } else {
+                    CtaButton(
+                        when {
+                            isNew -> "Create limit"
+                            loosens -> "Save, starting tomorrow"
+                            else -> "Save changes"
+                        },
+                        onClick = onSave,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
             }
         },
     ) { padding ->
@@ -272,7 +326,7 @@ internal fun LimitEditContent(
             EditorHeader(
                 name = draft.name,
                 placeholder = "name this limit",
-                editable = true,
+                editable = editable,
                 onBack = onBack,
                 onRename = { renaming = true },
             ) {
@@ -294,6 +348,15 @@ internal fun LimitEditContent(
                 )
             }
             Column(Modifier.padding(horizontal = PageGutter)) {
+                if (shutWindow != null) {
+                    Callout(
+                        title = "Outside the hours you set",
+                        body = "You chose to let this one be changed only between " +
+                            "${formatMinuteOfDay(context, shutWindow.startMinute)} and " +
+                            "${formatMinuteOfDay(context, shutWindow.endMinute)}. Until then it can't be edited or deleted.",
+                        modifier = Modifier.padding(top = 14.dp),
+                    )
+                }
                 if (error != null) {
                     Callout(title = "Almost there", kind = CalloutKind.WARNING, body = error, modifier = Modifier.padding(top = 14.dp))
                 }
@@ -310,6 +373,7 @@ internal fun LimitEditContent(
                     BedtimeIcons.Grid,
                     "Apps",
                     description = if (rules.apps.isEmpty()) "None yet · tap to choose" else pluralApps(rules.apps.size),
+                    enabled = editable,
                     onClick = onPickApps,
                 ) {
                     AppIconStack(rules.apps.sorted(), appLabel)
@@ -321,10 +385,12 @@ internal fun LimitEditContent(
                     BedtimeIcons.Hourglass,
                     "A few breaths first",
                     description = "Before one of these apps opens, wait a moment and decide",
+                    enabled = editable,
                 ) {
                     ObsidianToggle(
                         (rules.pauseSeconds ?: 0) > 0,
                         { on -> setRules { it.copy(pauseSeconds = if (on) 10 else null) } },
+                        enabled = editable,
                     )
                 }
                 AnimatedVisibility((rules.pauseSeconds ?: 0) > 0) {
@@ -336,6 +402,7 @@ internal fun LimitEditContent(
                                 3..120,
                                 presets = listOf(5, 10, 15, 20, 30, 60),
                                 title = "pause",
+                                enabled = editable,
                                 format = { formatWaitSeconds(it) },
                             )
                         }
@@ -346,6 +413,7 @@ internal fun LimitEditContent(
                                 0..60,
                                 presets = listOf(0, 1, 2, 5, 10, 15),
                                 title = "grace",
+                                enabled = editable,
                                 format = { if (it == 0) "every time" else "$it min" },
                             )
                         }
@@ -360,6 +428,7 @@ internal fun LimitEditContent(
                                 options = listOf("Just that app", "All of them"),
                                 selected = if (rules.pauseForGroup) 1 else 0,
                                 onSelect = { i -> setRules { it.copy(pauseForGroup = i == 1) } },
+                                enabled = editable,
                             )
                         }
                         Text(
@@ -387,10 +456,12 @@ internal fun LimitEditContent(
                     Icons.Default.Refresh,
                     "Minutes a day",
                     description = "Once they're used, the apps step aside until tomorrow",
+                    enabled = editable,
                 ) {
                     ObsidianToggle(
                         rules.dailyMinutes != null,
                         { on -> setRules { it.copy(dailyMinutes = if (on) 30 else null) } },
+                        enabled = editable,
                     )
                 }
                 AnimatedVisibility(rules.dailyMinutes != null) {
@@ -404,6 +475,7 @@ internal fun LimitEditContent(
                                 suffix = " min",
                                 presets = listOf(10, 15, 20, 30, 45, 60, 90, 120),
                                 title = "minutes a day",
+                                enabled = editable,
                             )
                         }
                         if (rules.apps.size > 1) {
@@ -417,6 +489,7 @@ internal fun LimitEditContent(
                                 options = listOf("Shared", "Each app"),
                                 selected = if (rules.shared) 0 else 1,
                                 onSelect = { i -> setRules { it.copy(shared = i == 0) } },
+                                enabled = editable,
                             )
                             Text(
                                 if (rules.shared) {
@@ -443,7 +516,7 @@ internal fun LimitEditContent(
                                 OutOfTime.CHOOSE to "You choose",
                                 OutOfTime.REST_OF_DAY to "Rest of the day",
                             ).forEach { (option, label) ->
-                                QuickChip(label, rules.outOfTime == option) { setRules { it.copy(outOfTime = option) } }
+                                QuickChip(label, rules.outOfTime == option, editable) { setRules { it.copy(outOfTime = option) } }
                             }
                         }
                         Text(
@@ -466,6 +539,7 @@ internal fun LimitEditContent(
                                     suffix = " min",
                                     presets = listOf(5, 10, 15, 20, 30),
                                     title = "more time",
+                                    enabled = editable,
                                 )
                             }
                         }
@@ -475,7 +549,7 @@ internal fun LimitEditContent(
                                 UnlockStepsEditor(
                                     rules.unlock,
                                     { u -> setRules { it.copy(unlock = u) } },
-                                    editable = true,
+                                    editable = editable,
                                     newPassword = newPassword,
                                     onNewPasswordChange = onNewPasswordChange,
                                 )
@@ -484,7 +558,44 @@ internal fun LimitEditContent(
                     }
                 }
 
-                if (!isNew) {
+                SectionLabel("When it can be changed")
+                OptionRow(
+                    Icons.Default.Lock,
+                    "Changeable only at certain hours",
+                    description = "Outside them it can't be edited or deleted",
+                    enabled = editable,
+                ) {
+                    ObsidianToggle(
+                        draft.editWindow != null,
+                        { on -> onDraftChange(draft.copy(editWindow = if (on) EditWindow() else null)) },
+                        enabled = editable,
+                    )
+                }
+                AnimatedVisibility(draft.editWindow != null) {
+                    val window = draft.editWindow ?: EditWindow()
+                    Column(Modifier.padding(top = 8.dp)) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            TimeTile("From", formatMinuteOfDay(context, window.startMinute), Modifier.weight(1f), enabled = editable, onClick = onEditWindowStart)
+                            TimeTile(
+                                "Until",
+                                formatMinuteOfDay(context, window.endMinute),
+                                Modifier.weight(1f),
+                                caption = if (window.endMinute <= window.startMinute) "next day" else null,
+                                enabled = editable,
+                                onClick = onEditWindowEnd,
+                            )
+                        }
+                        Text(
+                            "Outside these hours this page is read-only, and the limit can't be deleted. " +
+                                "Loosening it still waits for midnight either way.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = c.textMuted,
+                            modifier = Modifier.padding(top = 10.dp),
+                        )
+                    }
+                }
+
+                if (!isNew && editable) {
                     Spacer(Modifier.height(18.dp))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
                         TextButton(onClick = onDelete) { Text("Delete limit", color = c.red, fontWeight = FontWeight.Medium) }

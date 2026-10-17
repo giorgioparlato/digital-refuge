@@ -25,6 +25,7 @@ class Repository private constructor(context: Context) {
     val schedules: Flow<List<Schedule>> = observe(SCHEDULES, schedulesSerializer, emptyList())
     val runtime: Flow<RuntimeState> = observe(RUNTIME, RuntimeState.serializer(), RuntimeState())
     val settings: Flow<AppSettings> = observe(SETTINGS, AppSettings.serializer(), AppSettings())
+        .map { it.copy(homeStyle = it.homeStyle.withCurrentGreen()) }
     val history: Flow<List<SessionLog>> = observe(HISTORY, historySerializer, emptyList())
 
     /** Time in limited apps, a day per entry, newest last. Kept apart so counting never re-runs the engine. */

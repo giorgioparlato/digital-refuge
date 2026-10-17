@@ -24,6 +24,15 @@ import androidx.compose.material.icons.filled.Face
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import android.widget.Toast
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import app.bedtime.ui.components.QuickChip
+import app.bedtime.ui.theme.AppFonts
+import app.bedtime.data.AppFont
 import app.bedtime.ui.components.PageGutter
 import app.bedtime.ui.components.Text
 import androidx.compose.material3.TextButton
@@ -78,6 +87,22 @@ fun HomeStyleScreen(onBack: () -> Unit) {
     LaunchedEffect(Unit) {
         apps = withContext(Dispatchers.IO) { AppCatalog.launchableApps(context).take(4) }
     }
+    // Which choice "add your own font" was tapped under, so the new font lands there.
+    var addingForQuote by rememberSaveable { mutableStateOf(false) }
+    val pickFont = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            val name = withContext(Dispatchers.IO) { AppFonts.importCustom(context, uri) }
+            if (name == null) {
+                Toast.makeText(context, "that file isn't a font this phone can read", Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+            repo.updateSettings { s ->
+                val style = s.homeStyle.copy(customFontName = name)
+                s.copy(homeStyle = if (addingForQuote) style.copy(quoteFont = AppFont.CUSTOM) else style.copy(font = AppFont.CUSTOM))
+            }
+        }
+    }
     val current = settings ?: return
     HomeStyleContent(
         style = current.homeStyle,
@@ -86,6 +111,10 @@ fun HomeStyleScreen(onBack: () -> Unit) {
         now = LocalDateTime.now(),
         onBack = onBack,
         quote = Quotes.forPeriod(LocalDateTime.now(), current.homeStyle.quoteRefresh),
+        onAddFont = { forQuote ->
+            addingForQuote = forQuote
+            pickFont.launch(arrayOf("font/ttf", "font/otf", "font/sfnt", "application/x-font-ttf", "application/x-font-otf", "application/octet-stream"))
+        },
     )
 }
 
@@ -97,6 +126,8 @@ internal fun HomeStyleContent(
     now: LocalDateTime,
     onBack: () -> Unit,
     quote: Quote? = null,
+    /** Opens the file picker for your own font, for the quote or for the rest. */
+    onAddFont: (forQuote: Boolean) -> Unit = {},
 ) {
     val context = LocalContext.current
     val c = Obsidian.colors
@@ -157,6 +188,18 @@ internal fun HomeStyleContent(
                     onSelect = { onChange(style.copy(appNameSize = AppNameSize.entries[it])) },
                 )
             }
+            SectionCard(title = "Fonts", subtitle = "Two choices: one for the clock, date and apps, one for the quote") {
+                SizeLabel("Clock, date and apps", Modifier.padding(bottom = 8.dp))
+                FontChoices(style.font, style.customFontName, onPick = { onChange(style.copy(font = it)) }, onAdd = { onAddFont(false) })
+                SizeLabel("Quote", Modifier.padding(top = 16.dp, bottom = 8.dp))
+                FontChoices(style.quoteFont, style.customFontName, onPick = { onChange(style.copy(quoteFont = it)) }, onAdd = { onAddFont(true) })
+                Text(
+                    "Serifs set the quote in italics. Your own font is a .ttf or .otf file; it stays on this phone and isn't part of a backup.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = c.textFaint,
+                    modifier = Modifier.padding(top = 12.dp),
+                )
+            }
             SectionCard(title = "Show") {
                 OptionRow(Icons.Default.Face, "Greeting", description = "“Good evening”, “Good morning”…") {
                     ObsidianToggle(style.showGreeting, { onChange(style.copy(showGreeting = it)) })
@@ -186,10 +229,22 @@ internal fun HomeStyleContent(
                     description = "During any session, the lock screen shows this clock and the session, without the apps",
                 ) { ObsidianToggle(style.lockScreen, { onChange(style.copy(lockScreen = it)) }) }
             }
-            TextButton(onClick = { onChange(HomeStyle()) }, modifier = Modifier.align(Alignment.CenterHorizontally)) {
+            // Your own font's file stays, so resetting keeps it on offer.
+            TextButton(onClick = { onChange(HomeStyle(customFontName = style.customFontName)) }, modifier = Modifier.align(Alignment.CenterHorizontally)) {
                 Text("Reset to default", color = c.textMuted)
             }
         }
+    }
+}
+
+/** The fonts as chips, then your own one if you have added it, and a way to add or replace it. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun FontChoices(selected: AppFont, customName: String?, onPick: (AppFont) -> Unit, onAdd: () -> Unit) {
+    val choices = AppFont.entries.filter { it != AppFont.CUSTOM || customName != null }
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        choices.forEach { font -> QuickChip(AppFonts.label(font, customName), selected == font) { onPick(font) } }
+        QuickChip(if (customName == null) "+ your own font" else "+ another", false, onClick = onAdd)
     }
 }
 

@@ -5,6 +5,9 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.Alignment
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
@@ -30,6 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.bedtime.ui.components.AddCircleButton
 import app.bedtime.ui.components.CardRadius
 import app.bedtime.data.AppLimit
 import app.bedtime.data.Repository
@@ -77,14 +81,7 @@ internal fun LimitsContent(
         topBar = { ObsidianTopBar("limits", subtitle = "every day, not only in a session") },
         floatingActionButton = {
             if (limits.isNotEmpty()) {
-                ExtendedFloatingActionButton(
-                    text = { Text("new limit", fontWeight = FontWeight.SemiBold) },
-                    icon = { Icon(Icons.Default.Add, contentDescription = null) },
-                    onClick = onCreate,
-                    shape = RoundedCornerShape(16.dp),
-                    containerColor = c.accentFill,
-                    contentColor = c.textOnAccent,
-                )
+                AddCircleButton("new limit", onClick = onCreate)
             }
         },
     ) { padding ->
@@ -124,52 +121,61 @@ internal fun limitSummary(limit: AppLimit): String {
     }.joinToString(" · ")
 }
 
+/**
+ * A limit as a card that fills like a tide as the day's minutes go: what's left on the right, and
+ * underneath the limit itself in a line. No border; the fill and the card's own tone carry it.
+ */
 @Composable
 private fun LimitCard(limit: AppLimit, today: UsageDay, todayDay: Long, onClick: () -> Unit) {
     val c = Obsidian.colors
     val shape = RoundedCornerShape(CardRadius)
     val rules = limit.rules
-    Column(
-        Modifier.fillMaxWidth().clip(shape).background(c.bgSecondary).border(1.dp, c.border, shape)
-            .clickable(onClickLabel = "Edit ${limit.name}", onClick = onClick)
-            .padding(18.dp),
+    val budget = rules.dailyMinutes
+    val lifted = limit.id in today.lifted
+    val extra = Limits.extraMinutes(limit, today)
+    val total = (budget ?: 0) + extra
+    val used = Limits.usedSeconds(limit, today) / 60
+    val pause = rules.pauseSeconds?.takeIf { it > 0 }?.let { "${formatWaitSeconds(it)} pause" }
+    val tide = if (budget == null || lifted) 0f else (used.toFloat() / total.coerceAtLeast(1)).coerceIn(0f, 1f)
+    val left = when {
+        budget == null -> pause.orEmpty()
+        lifted -> "lifted today"
+        used >= total -> "none left"
+        else -> "${formatMinutes(total - used)} left"
+    }
+    val details = buildList {
+        budget?.let { add("${formatMinutes(it.toLong())} a day" + if (!rules.shared && rules.apps.size > 1) " each" else "") }
+        if (budget == null || rules.apps.size > 1) add(pluralApps(rules.apps.size))
+        if (budget != null && pause != null) add(pause)
+        if (extra > 0) add("$extra extra today")
+        when {
+            limit.deleteFromDay != null -> add("ends at midnight")
+            limit.next != null && limit.nextFromDay > todayDay -> add("looser from tomorrow")
+        }
+    }.joinToString(" · ")
+    Box(
+        Modifier.fillMaxWidth().clip(shape).background(c.bgSecondary)
+            .clickable(onClickLabel = "Edit ${limit.name}", onClick = onClick),
     ) {
-        Text(limit.name.ifBlank { "unnamed limit" }, style = MaterialTheme.typography.titleMedium, color = c.textNormal)
-        Spacer(Modifier.height(3.dp))
-        Text(limitSummary(limit), style = MaterialTheme.typography.bodyMedium, color = c.textMuted)
-        val budget = rules.dailyMinutes
-        if (budget != null) {
-            val usedMinutes = Limits.usedSeconds(limit, today) / 60
-            val extra = (today.extras[limit.id]?.size ?: 0) * rules.extraMinutes
-            val total = budget + extra
-            val lifted = limit.id in today.lifted
-            Spacer(Modifier.height(14.dp))
-            Box(Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(50)).background(c.accent.copy(alpha = 0.15f))) {
-                val share = if (lifted) 1f else (usedMinutes.toFloat() / total.coerceAtLeast(1)).coerceIn(0f, 1f)
-                Box(
-                    Modifier.fillMaxWidth(share).height(4.dp).clip(RoundedCornerShape(50))
-                        .background(if (share >= 1f) c.orange else c.accent),
-                )
+        if (tide > 0f) {
+            Box(Modifier.matchParentSize()) {
+                Box(Modifier.fillMaxHeight().fillMaxWidth(tide).background(c.accent.copy(alpha = 0.16f)))
             }
-            Spacer(Modifier.height(8.dp))
-            Text(
-                when {
-                    lifted -> "lifted for the rest of today"
-                    extra > 0 -> "${formatMinutes(usedMinutes)} of ${formatMinutes(total.toLong())} today, with $extra extra"
-                    else -> "${formatMinutes(usedMinutes)} of ${formatMinutes(budget.toLong())} today"
-                },
-                style = MaterialTheme.typography.labelMedium,
-                color = c.textFaint,
-            )
         }
-        val pending = when {
-            limit.deleteFromDay != null -> "goes at midnight"
-            limit.next != null && limit.nextFromDay > todayDay -> "looser rules start tomorrow"
-            else -> null
-        }
-        if (pending != null) {
-            Spacer(Modifier.height(8.dp))
-            Text(pending, style = MaterialTheme.typography.labelMedium, color = c.accentText)
+        Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 16.dp)) {
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text(
+                    limit.name.ifBlank { "unnamed limit" },
+                    fontSize = 16.sp,
+                    lineHeight = 24.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = c.textNormal,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(left, style = MaterialTheme.typography.bodyMedium, color = c.textNormal)
+            }
+            Spacer(Modifier.height(2.dp))
+            Text(details, fontSize = 13.sp, lineHeight = 18.sp, color = c.textSoft)
         }
     }
 }

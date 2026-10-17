@@ -94,13 +94,12 @@ internal fun PauseContent(appLabel: String, secondsLeft: Int, opens: Int, onOpen
     CoverLayout(
         emblem = {
             Breathing(running = !done, color = c.accent, modifier = Modifier.size(180.dp)) { inhaling ->
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        if (done) "and now?" else if (inhaling) "breathe in" else "breathe out",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = c.textNormal,
-                    )
-                    if (!done) Text("$secondsLeft", style = MaterialTheme.typography.labelLarge, color = c.textFaint)
+                // Once the breaths are done the disc rests empty: the choice is yours, nothing to read.
+                if (!done) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(if (inhaling) "breathe in" else "breathe out", style = MaterialTheme.typography.titleMedium, color = c.textNormal)
+                        Text("$secondsLeft", style = MaterialTheme.typography.labelLarge, color = c.textFaint)
+                    }
                 }
             }
         },
