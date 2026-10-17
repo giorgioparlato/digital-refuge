@@ -75,7 +75,6 @@ import app.bedtime.ui.home.HomeScreen
 import app.bedtime.ui.limits.LimitEditScreen
 import app.bedtime.ui.limits.LimitsScreen
 import app.bedtime.ui.stats.StatsScreen
-import app.bedtime.ui.settings.WindowEventsScreen
 import app.bedtime.ui.onboarding.OnboardingScreen
 import app.bedtime.ui.onboarding.WalkthroughScreen
 import app.bedtime.ui.homestyle.HomeStyleScreen
@@ -107,7 +106,6 @@ object Routes {
     const val UNLOCK = "unlock/"
     const val LIMIT = "limit/"
     const val STATS = "stats"
-    const val RECENTS_TEST = "recentstest"
 
     fun unlock(scheduleId: String) = UNLOCK + scheduleId
 }
@@ -233,7 +231,6 @@ private fun BedtimeNavigation(pendingRoute: String?, onRouteConsumed: () -> Unit
                         onAlwaysAvailable = { push(Routes.ALWAYS_AVAILABLE) },
                         onHowItWorks = { push(Routes.ONBOARDING) },
                         onWalkthrough = { push(Routes.WALKTHROUGH) },
-                        onRecentsTest = { push(Routes.RECENTS_TEST) },
                     )
                     else -> HomeScreen(
                         onEdit = { id -> push(Routes.EDIT + id) },
@@ -259,7 +256,6 @@ private fun BedtimeNavigation(pendingRoute: String?, onRouteConsumed: () -> Unit
             top == Routes.ONBOARDING -> OnboardingScreen(onDone = ::pop)
             top == Routes.WALKTHROUGH -> WalkthroughScreen(onDone = ::pop)
             top == Routes.STATS -> StatsScreen(onBack = ::pop)
-            top == Routes.RECENTS_TEST -> WindowEventsScreen(onBack = ::pop)
             top.startsWith(Routes.EDIT) -> ScheduleEditScreen(
                 scheduleId = top.removePrefix(Routes.EDIT).ifEmpty { null },
                 template = null,

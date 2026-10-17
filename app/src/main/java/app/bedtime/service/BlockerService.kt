@@ -187,8 +187,6 @@ class BlockerService : AccessibilityService() {
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
         if (event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
-        // The recent-apps test, if it's running: before anything is filtered out, as the phone sent it.
-        WindowEventLog.record(event)
         val pkg = event.packageName?.toString() ?: return
         // A keyboard or the notification shade appearing is not a move to another app, so it must not
         // become what we think is in front: that both bounced people out of apps a session allows and
