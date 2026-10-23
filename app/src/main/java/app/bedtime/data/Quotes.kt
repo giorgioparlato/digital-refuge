@@ -1,11 +1,20 @@
 package app.bedtime.data
 
+import kotlinx.serialization.Serializable
 import java.time.LocalDate
 import java.time.LocalDateTime
 import kotlin.random.Random
 
-/** A short line for the minimal home and the lock screen. [work] is null when no book could be confirmed. */
-data class Quote(val text: String, val author: String, val work: String? = null)
+/**
+ * A short line for the minimal home and the lock screen. [work] is null when no book could be
+ * confirmed; one of your own may have no author either.
+ */
+@Serializable
+data class Quote(val text: String, val author: String = "", val work: String? = null)
+
+/** "Author, work", either part left out when missing; null when there's nothing to credit. */
+fun Quote.credit(): String? = listOfNotNull(author.takeIf { it.isNotBlank() }, work?.takeIf { it.isNotBlank() })
+    .joinToString(", ").ifEmpty { null }
 
 /**
  * The quotes chosen in docs/quotes-review.md, -2 and -4, each checked against its source there.
@@ -284,19 +293,93 @@ object Quotes {
      * that's four list-neighbours a day. The seed is fixed, so every screen agrees on today's quote
      * and it survives restarts.
      */
-    private val rotation: List<Int> = all.indices.shuffled(Random(20260922))
+    private const val SEED = 20260922L
+    private val rotation: List<Int> = all.indices.shuffled(Random(SEED))
 
-    private fun at(step: Long): Quote = all[rotation[Math.floorMod(step, all.size.toLong()).toInt()]]
+    /** How many times a favourite comes round in one full round of the deck. */
+    const val FAVOURITE_TIMES = 3
+
+    /**
+     * The round the quotes go through, for [prefs]: the quotes that may show, scrambled, with each
+     * favourite in three times, a third of a round apart. With nothing chosen it is exactly the app's
+     * own rotation. It never comes out empty: an empty choice falls back to the app's and yours, and
+     * those to the app's own.
+     */
+    fun deck(prefs: QuotePrefs = QuotePrefs()): List<Quote> {
+        cached?.let { (key, deck) -> if (key == prefs) return deck }
+        return build(prefs).also { cached = prefs to it }
+    }
+
+    @Volatile
+    private var cached: Pair<QuotePrefs, List<Quote>>? = null
+
+    private fun build(prefs: QuotePrefs): List<Quote> {
+        val everything = all + prefs.mine
+        val chosen = when (prefs.source) {
+            QuoteSource.ALL -> everything
+            QuoteSource.MINE -> prefs.mine
+            QuoteSource.FAVOURITES -> everything.filter { it.text in prefs.favourites }
+        }.filterNot { it.text in prefs.hidden }
+        val pool = chosen.ifEmpty { everything.filterNot { it.text in prefs.hidden } }.ifEmpty { all }
+        // The app's own list keeps its own scramble, so nothing moves for anyone who changes nothing.
+        val base = if (pool == all) {
+            rotation.map { all[it] }
+        } else {
+            pool.distinctBy { it.text }.sortedBy { it.text }.shuffled(Random(SEED))
+        }
+        if (prefs.source == QuoteSource.FAVOURITES || prefs.favourites.isEmpty()) return base
+        // Each entry gets a place in the round; a favourite gets two more, a third and two thirds on.
+        val n = base.size.toDouble()
+        val placed = base.flatMapIndexed { i, quote ->
+            if (quote.text !in prefs.favourites) {
+                listOf(i.toDouble() to quote)
+            } else {
+                (0 until FAVOURITE_TIMES).map { k -> ((i + k * n / FAVOURITE_TIMES + if (k == 0) 0.0 else 0.5) % n) to quote }
+            }
+        }
+        return placed.sortedBy { it.first }.map { it.second }
+    }
+
+    private fun at(step: Long, prefs: QuotePrefs): Quote {
+        val deck = deck(prefs)
+        return deck[Math.floorMod(step, deck.size.toLong()).toInt()]
+    }
+
+    private fun step(now: LocalDateTime, refresh: QuoteRefresh): Long {
+        val hours = now.toLocalDate().toEpochDay() * 24 + now.hour
+        return Math.floorDiv(hours, refresh.hours.toLong())
+    }
 
     /** Today's quote; [offset] steps to the following ones ("tap for another"). */
-    fun forDay(date: LocalDate, offset: Int = 0): Quote = at(date.toEpochDay() + offset)
+    fun forDay(date: LocalDate, offset: Int = 0, prefs: QuotePrefs = QuotePrefs()): Quote = at(date.toEpochDay() + offset, prefs)
 
     /**
      * The quote for the stretch of time [now] falls in, so it changes as often as [refresh] says.
      * At [QuoteRefresh.DAILY] this matches [forDay]: a new one at local midnight.
      */
-    fun forPeriod(now: LocalDateTime, refresh: QuoteRefresh, offset: Int = 0): Quote {
-        val hours = now.toLocalDate().toEpochDay() * 24 + now.hour
-        return at(Math.floorDiv(hours, refresh.hours.toLong()) + offset)
+    fun forPeriod(now: LocalDateTime, refresh: QuoteRefresh, offset: Int = 0, prefs: QuotePrefs = QuotePrefs()): Quote =
+        at(step(now, refresh) + offset, prefs)
+
+    /** The quotes of the last [count] periods, newest first and each once: for keeping one you saw. */
+    fun recent(now: LocalDateTime, refresh: QuoteRefresh, prefs: QuotePrefs = QuotePrefs(), count: Int = 10): List<Quote> {
+        val current = step(now, refresh)
+        return (0 until count * FAVOURITE_TIMES).map { at(current - it, prefs) }.distinctBy { it.text }.take(count)
+    }
+
+    /**
+     * Your quotes pasted in one go: one a line, each optionally ending in "— author" or
+     * "— author, work" (an em dash, an en dash or a spaced hyphen). Quote marks around the line go.
+     */
+    fun parseMany(text: String): List<Quote> = text.lines().mapNotNull { line ->
+        val trimmed = line.trim()
+        if (trimmed.isEmpty()) return@mapNotNull null
+        val dash = Regex("""\s+[—–-]\s+(?=[^—–]*$)""").findAll(trimmed).lastOrNull()
+        val body = if (dash != null) trimmed.substring(0, dash.range.first) else trimmed
+        val credit = dash?.let { trimmed.substring(it.range.last + 1).trim() }.orEmpty()
+        val words = body.trim().trim('"', '“', '”', '\'', '‘', '’').trim()
+        if (words.isEmpty()) return@mapNotNull null
+        val author = credit.substringBefore(",").trim()
+        val work = credit.substringAfter(",", "").trim().ifEmpty { null }
+        Quote(words, author, work)
     }
 }

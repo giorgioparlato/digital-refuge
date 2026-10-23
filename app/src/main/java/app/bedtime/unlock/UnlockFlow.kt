@@ -64,6 +64,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.bedtime.data.Passages
 import app.bedtime.data.Repository
 import app.bedtime.data.Schedule
 import app.bedtime.data.SessionLog
@@ -472,7 +473,10 @@ internal fun WaitChallengeContent(remaining: Long?, total: Long) {
 @Composable
 private fun TextChallengeInput(length: Int, source: TextSource, onPassed: () -> Unit) {
     val scope = rememberCoroutineScope()
-    val target = rememberSaveable { TextChallenge.generate(length, source) }
+    // Passages follow your quote choices, so wait for them before choosing what to copy.
+    val settings by Repository.get(LocalContext.current).settings.collectAsStateWithLifecycle(initialValue = null)
+    val loaded = settings ?: return
+    val target = rememberSaveable { TextChallenge.generate(length, source, passages = Passages.forPrefs(loaded.quotes)) }
     var typed by rememberSaveable { mutableStateOf("") }
     var rejected by rememberSaveable { mutableIntStateOf(0) }
     val shake = remember { Animatable(0f) }

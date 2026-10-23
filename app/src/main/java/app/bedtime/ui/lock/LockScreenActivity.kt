@@ -217,7 +217,7 @@ private fun LockScreen(onOpen: () -> Unit, onOpenApp: (String) -> Unit, onFinish
         onOpen = onOpen,
         // A swipe from the middle opens its app, if one is set; every other swipe just unlocks.
         onSwipe = { swipe -> style.lockGestures[swipe]?.let(onOpenApp) ?: onOpen() },
-        quote = Quotes.forPeriod(now, style.quoteRefresh),
+        quote = Quotes.forPeriod(now, style.quoteRefresh, prefs = settings.quotes),
         calendar = rememberCalendarLine(style, now, onLockScreen = true),
     )
 }

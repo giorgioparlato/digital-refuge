@@ -405,6 +405,21 @@ class ScreenshotTest {
     }
 
     @Test
+    fun quotes() = shot {
+        val mine = listOf(
+            app.bedtime.data.Quote("Rest is not idleness.", "John Lubbock", "The Use of Life"),
+            app.bedtime.data.Quote("Phone down, eyes up."),
+        )
+        val all = app.bedtime.data.Quotes.all
+        val prefs = app.bedtime.data.QuotePrefs(
+            mine = mine,
+            favourites = setOf(all[1].text, all[4].text, mine[1].text),
+            hidden = setOf(all[2].text, mine[0].text),
+        )
+        app.bedtime.ui.quotes.QuotesContent(prefs = prefs, recent = all.take(4), onChange = {}, onBack = {})
+    }
+
+    @Test
     fun blocked() = shot { BlockedContent("Instagram", "Bedtime", "07:00", {}, {}) }
 
     @Test

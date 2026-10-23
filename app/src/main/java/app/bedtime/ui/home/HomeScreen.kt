@@ -1,5 +1,11 @@
 package app.bedtime.ui.home
 
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
+import app.bedtime.data.credit
+import app.bedtime.ui.quotes.rememberQuoteActions
+import app.bedtime.ui.quotes.QuoteMenu
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -115,6 +121,8 @@ internal data class HomeUiState(
     val whatsNew: ChangelogEntry? = null,
     /** The quote's font, the one chosen for the minimal home. */
     val quoteFont: AppFont = AppFont.INTER,
+    /** Whether the quote is one of your favourites, for its long-press menu. */
+    val quoteFavourite: Boolean = false,
 )
 
 /** The home tab: what's running now, how the week has gone, and the blocks you can start. */
@@ -163,6 +171,8 @@ fun HomeScreen(
             delay(fresh.start + Repository.UNDO_MS - at)
         }
     }
+    var quoteOffset by rememberSaveable { mutableIntStateOf(0) }
+    val quoteActions = rememberQuoteActions()
     // Show nothing for the split second before schedules load, rather than flashing the empty state.
     val loaded = schedules ?: return
     val style = settings.homeStyle
@@ -170,12 +180,18 @@ fun HomeScreen(
     // Before the walk-through there's nothing to compare with; it marks the version as seen itself.
     val whatsNew = if (settings.onboarded) Changelog.unseen(settings.lastSeenVersion, installed) else null
     val quote = if (style.showQuote) {
-        Quotes.forPeriod(Instant.ofEpochMilli(now).atZone(ZoneId.systemDefault()).toLocalDateTime(), style.quoteRefresh)
+        Quotes.forPeriod(Instant.ofEpochMilli(now).atZone(ZoneId.systemDefault()).toLocalDateTime(), style.quoteRefresh, quoteOffset, settings.quotes)
     } else {
         null
     }
     HomeContent(
-        ui = HomeUiState(loaded, active, runtime, history, serviceOn, greyscaleOk, dndOk, now, quote, undoBlockId, whatsNew, style.quoteFont),
+        ui = HomeUiState(
+            loaded, active, runtime, history, serviceOn, greyscaleOk, dndOk, now, quote, undoBlockId, whatsNew, style.quoteFont,
+            quoteFavourite = quote != null && quote.text in settings.quotes.favourites,
+        ),
+        onQuoteFavourite = { quote?.let(quoteActions.favourite) },
+        onQuoteHide = { quote?.let(quoteActions.hide) },
+        onQuoteAnother = { quoteOffset++ },
         onEdit = onEdit,
         onCreate = onCreate,
         onTemplate = onTemplate,
@@ -203,6 +219,9 @@ internal fun HomeContent(
     onUndo: (String) -> Unit = {},
     onDismissWhatsNew: () -> Unit = {},
     onStats: () -> Unit = {},
+    onQuoteFavourite: () -> Unit = {},
+    onQuoteHide: () -> Unit = {},
+    onQuoteAnother: () -> Unit = {},
     isInstalled: (String) -> Boolean = { false },
 ) {
     val c = Obsidian.colors
@@ -275,7 +294,9 @@ internal fun HomeContent(
                 }
             }
             if (ui.quote != null) {
-                item(key = "quote") { QuoteFooter(ui.quote, ui.quoteFont) }
+                item(key = "quote") {
+                    QuoteFooter(ui.quote, ui.quoteFont, ui.quoteFavourite, onQuoteFavourite, onQuoteHide, onQuoteAnother)
+                }
             }
             // The week in one quiet line at the very foot; the full figures are a tap away.
             homeSummary(Stats.week(ui.history, ui.now), Stats.streak(ui.history, ui.now))?.let { summary ->
@@ -487,12 +508,22 @@ private fun NewBlockTile(onCreate: () -> Unit, modifier: Modifier) {
 }
 
 @Composable
-private fun QuoteFooter(quote: Quote, font: AppFont) {
+@OptIn(ExperimentalFoundationApi::class)
+private fun QuoteFooter(
+    quote: Quote,
+    font: AppFont,
+    favourite: Boolean,
+    onFavourite: () -> Unit,
+    onHide: () -> Unit,
+    onAnother: () -> Unit,
+) {
     val c = Obsidian.colors
     val serif = AppFonts.quoteStyle(font) == FontStyle.Italic
+    var menu by remember { mutableStateOf(false) }
     Column(Modifier.padding(horizontal = PageGutter).padding(top = 26.dp)) {
         Box(Modifier.fillMaxWidth().height(1.dp).background(c.border.copy(alpha = 0.6f)))
         Spacer(Modifier.height(22.dp))
+        QuoteMenu(menu, onDismiss = { menu = false }, favourite = favourite, onFavourite = onFavourite, onHide = onHide, onAnother = onAnother)
         Text(
             "“${quote.text}”",
             style = MaterialTheme.typography.bodyLarge.copy(
@@ -502,13 +533,16 @@ private fun QuoteFooter(quote: Quote, font: AppFont) {
                 fontStyle = AppFonts.quoteStyle(font),
             ),
             color = c.textMuted,
+            modifier = Modifier.combinedClickable(
+                onLongClickLabel = "favourite or hide this quote",
+                onLongClick = { menu = true },
+                onClick = {},
+            ),
         )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            "— " + listOfNotNull(quote.author, quote.work).joinToString(", "),
-            style = MaterialTheme.typography.labelMedium,
-            color = c.textFaint,
-        )
+        quote.credit()?.let { credit ->
+            Spacer(Modifier.height(8.dp))
+            Text("— $credit", style = MaterialTheme.typography.labelMedium, color = c.textFaint)
+        }
     }
 }
 

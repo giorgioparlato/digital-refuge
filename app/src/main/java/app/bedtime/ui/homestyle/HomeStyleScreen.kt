@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Face
@@ -95,7 +96,7 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 
 @Composable
-fun HomeStyleScreen(onBack: () -> Unit) {
+fun HomeStyleScreen(onBack: () -> Unit, onQuotes: () -> Unit = {}) {
     val context = LocalContext.current
     val repo = remember { Repository.get(context) }
     val scope = rememberCoroutineScope()
@@ -143,7 +144,8 @@ fun HomeStyleScreen(onBack: () -> Unit) {
         },
         now = LocalDateTime.now(),
         onBack = onBack,
-        quote = Quotes.forPeriod(LocalDateTime.now(), current.homeStyle.quoteRefresh),
+        quote = Quotes.forPeriod(LocalDateTime.now(), current.homeStyle.quoteRefresh, prefs = current.quotes),
+        onQuotes = onQuotes,
         onAddFont = { forQuote ->
             addingForQuote = forQuote
             pickFont.launch(arrayOf("font/ttf", "font/otf", "font/sfnt", "application/x-font-ttf", "application/x-font-otf", "application/octet-stream"))
@@ -165,6 +167,8 @@ internal fun HomeStyleContent(
     allApps: List<AppEntry> = emptyList(),
     /** Switches the calendar line, asking for calendar access first if needed. */
     onShowCalendar: (Boolean) -> Unit = {},
+    /** Opens the quotes page: your own, favourites, hidden ones. */
+    onQuotes: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val c = Obsidian.colors
@@ -271,7 +275,7 @@ internal fun HomeStyleContent(
                 OptionRow(BedtimeIcons.Grid, "App icons", description = "Small icons next to app names") {
                     ObsidianToggle(style.showIcons, { onChange(style.copy(showIcons = it)) })
                 }
-                OptionRow(BedtimeIcons.Leaf, "Quote", description = "Here and on the lock screen. Tap it on the home screen for another") {
+                OptionRow(BedtimeIcons.Leaf, "Quote", description = "Here and on the lock screen. Tap it for another, hold it to favourite or hide it") {
                     ObsidianToggle(style.showQuote, { onChange(style.copy(showQuote = it)) })
                 }
                 if (style.showQuote) {
@@ -281,6 +285,12 @@ internal fun HomeStyleContent(
                         selected = style.quoteRefresh.ordinal,
                         onSelect = { onChange(style.copy(quoteRefresh = QuoteRefresh.entries[it])) },
                     )
+                    OptionRow(
+                        Icons.Default.FavoriteBorder,
+                        "Quotes",
+                        description = "Add your own, pick favourites, hide some",
+                        onClick = onQuotes,
+                    ) { Chevron() }
                 }
             }
             SectionCard(title = "Calendar") {

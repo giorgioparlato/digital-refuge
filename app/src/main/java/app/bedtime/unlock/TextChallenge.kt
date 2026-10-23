@@ -14,11 +14,16 @@ object TextChallenge {
 
     data class Step(val typed: String, val outcome: Outcome)
 
-    fun generate(length: Int, source: TextSource = TextSource.LETTERS, random: Random = SecureRandom()): String =
+    fun generate(
+        length: Int,
+        source: TextSource = TextSource.LETTERS,
+        random: Random = SecureRandom(),
+        passages: List<String> = Passages.ALL,
+    ): String =
         when (source) {
             TextSource.LETTERS -> buildString(length) { repeat(length) { append(ALPHABET[random.nextInt(ALPHABET.length)]) } }
             TextSource.WORDS -> fromPieces(length, random) { Passages.WORDS[random.nextInt(Passages.WORDS.size)] }
-            TextSource.PASSAGES -> fromPieces(length, random) { Passages.ALL[random.nextInt(Passages.ALL.size)] }
+            TextSource.PASSAGES -> fromPieces(length, random) { passages[random.nextInt(passages.size)] }
         }
 
     /**

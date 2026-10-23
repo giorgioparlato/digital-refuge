@@ -235,6 +235,24 @@ data class AppSettings(
     val homeGreenMigrated: Boolean = false,
     /** Messages you wrote for covers, shared by every schedule, block and limit. */
     val customMessages: List<CustomMessage> = emptyList(),
+    /** Your own quotes, favourites, hidden ones, and which of them rotate. */
+    val quotes: QuotePrefs = QuotePrefs(),
+)
+
+/** Which quotes rotate: the app's and yours, only yours, or only favourites. */
+@Serializable
+enum class QuoteSource { ALL, MINE, FAVOURITES }
+
+/**
+ * How the quotes rotate for you. Favourites and hidden ones are kept by their text, which works for
+ * the app's quotes (fixed) and for yours (moved along if you edit one).
+ */
+@Serializable
+data class QuotePrefs(
+    val source: QuoteSource = QuoteSource.ALL,
+    val mine: List<Quote> = emptyList(),
+    val favourites: Set<String> = emptySet(),
+    val hidden: Set<String> = emptySet(),
 )
 
 /** How a cover picks its words: the usual ones, one you chose, or a different one each time. */

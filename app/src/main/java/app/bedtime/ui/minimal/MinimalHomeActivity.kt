@@ -1,5 +1,10 @@
 package app.bedtime.ui.minimal
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.combinedClickable
+import app.bedtime.ui.quotes.rememberQuoteActions
+import app.bedtime.ui.quotes.QuoteMenu
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
@@ -116,6 +121,7 @@ private fun MinimalHomeScreen(onFinish: () -> Unit, onLightBackground: (Boolean)
     var unlocking by rememberSaveable { mutableStateOf(false) }
     var emergency by rememberSaveable { mutableStateOf(false) }
     var quoteOffset by rememberSaveable { mutableIntStateOf(0) }
+    val quoteActions = rememberQuoteActions()
     val style = settings.homeStyle
     val light = style.palette().isLight
 
@@ -143,6 +149,7 @@ private fun MinimalHomeScreen(onFinish: () -> Unit, onLightBackground: (Boolean)
         Surface(Modifier.fillMaxSize(), color = style.palette().background) { }
         return
     }
+    val shownQuote = Quotes.forPeriod(now, style.quoteRefresh, quoteOffset, settings.quotes)
     when {
         emergency -> {
             BackHandler { emergency = false }
@@ -188,7 +195,10 @@ private fun MinimalHomeScreen(onFinish: () -> Unit, onLightBackground: (Boolean)
             } else {
                 null
             },
-            quote = Quotes.forPeriod(now, style.quoteRefresh, quoteOffset),
+            quote = shownQuote,
+            quoteFavourite = shownQuote.text in settings.quotes.favourites,
+            onQuoteFavourite = { quoteActions.favourite(shownQuote) },
+            onQuoteHide = { quoteActions.hide(shownQuote) },
             calendar = rememberCalendarLine(style, now, onLockScreen = false),
             onNextQuote = { quoteOffset++ },
         )
@@ -202,6 +212,7 @@ private fun entries(context: Context, packages: Set<String>): List<AppEntry> =
         .map { AppEntry(it, AppCatalog.label(context, it)) }
         .sortedBy { it.label.lowercase() }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun MinimalHomeContent(
     now: LocalDateTime,
@@ -217,6 +228,10 @@ internal fun MinimalHomeContent(
     /** Today's next event, when the calendar line is on. */
     calendar: String? = null,
     quote: Quote? = null,
+    /** Whether [quote] is one of your favourites, and the long-press menu's two choices for it. */
+    quoteFavourite: Boolean = false,
+    onQuoteFavourite: () -> Unit = {},
+    onQuoteHide: () -> Unit = {},
     onNextQuote: () -> Unit = {},
     preview: Boolean = false,
 ) {
@@ -235,11 +250,28 @@ internal fun MinimalHomeContent(
             SessionHeader(now, scheduleName, until, style, calendar)
             if (quote != null && style.showQuote) {
                 Spacer(Modifier.height(if (preview) 20.dp else 28.dp))
-                QuoteBlock(
-                    quote,
-                    style,
-                    Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClickLabel = "show another quote", onClick = onNextQuote),
-                )
+                // A tap moves on, as it always has; a long press offers to keep it or never see it again.
+                var menu by remember { mutableStateOf(false) }
+                Box {
+                    QuoteBlock(
+                        quote,
+                        style,
+                        Modifier.clip(RoundedCornerShape(8.dp)).combinedClickable(
+                            onClickLabel = "show another quote",
+                            onLongClickLabel = "favourite or hide this quote",
+                            onLongClick = { menu = true },
+                            onClick = onNextQuote,
+                        ),
+                    )
+                    QuoteMenu(
+                        expanded = menu,
+                        onDismiss = { menu = false },
+                        favourite = quoteFavourite,
+                        onFavourite = onQuoteFavourite,
+                        onHide = onQuoteHide,
+                        onAnother = onNextQuote,
+                    )
+                }
             }
             Spacer(Modifier.height(if (preview) 28.dp else 44.dp))
             LazyColumn(Modifier.weight(1f).fillMaxWidth()) {

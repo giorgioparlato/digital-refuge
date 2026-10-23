@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.bedtime.data.HomeStyle
 import app.bedtime.data.Quote
+import app.bedtime.data.credit
 import app.bedtime.ui.theme.AppFonts
 import androidx.compose.ui.text.font.FontStyle
 import app.bedtime.ui.components.BedtimeIcons
@@ -97,11 +98,9 @@ internal fun QuoteBlock(quote: Quote, style: HomeStyle, modifier: Modifier = Mod
             ),
             color = p.muted,
         )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            "— " + listOfNotNull(quote.author, quote.work).joinToString(", "),
-            style = MaterialTheme.typography.labelMedium,
-            color = p.faint,
-        )
+        quote.credit()?.let { credit ->
+            Spacer(Modifier.height(8.dp))
+            Text("— $credit", style = MaterialTheme.typography.labelMedium, color = p.faint)
+        }
     }
 }

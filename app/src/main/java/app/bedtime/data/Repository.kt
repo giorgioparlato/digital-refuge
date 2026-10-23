@@ -183,6 +183,9 @@ class Repository private constructor(context: Context) {
         if (it.homeGreenMigrated) it else it.copy(homeStyle = it.homeStyle.withCurrentGreen(), homeGreenMigrated = true)
     }
 
+    /** Changes your quote choices: your own quotes, favourites, hidden ones, and which rotate. */
+    suspend fun updateQuotes(transform: (QuotePrefs) -> QuotePrefs) = updateSettings { it.copy(quotes = transform(it.quotes)) }
+
     /** Fills the always-available list once with suggested apps that are installed. */
     suspend fun seedAlwaysAvailable(suggested: Set<String>) = updateSettings {
         if (it.alwaysAvailableSeeded) it else it.copy(alwaysAvailable = it.alwaysAvailable + suggested, alwaysAvailableSeeded = true)

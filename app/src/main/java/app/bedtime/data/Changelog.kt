@@ -13,6 +13,16 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            43,
+            "0.8.7",
+            listOf(
+                "Hold the quote on either home screen to make it a favourite, never see it again, or move on to another. Favourites come round three times as often.",
+                "A quotes page, under the minimal home's settings: add your own, or paste many at once, and choose to see the app's and yours, only yours, or only favourites.",
+                "Look back at the last ten quotes shown, and keep the one you liked.",
+                "The typing challenge draws on the same quotes: your own in, hidden ones out.",
+            ),
+        ),
+        ChangelogEntry(
             41,
             "0.8.6",
             listOf(

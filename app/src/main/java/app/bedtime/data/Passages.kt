@@ -153,6 +153,16 @@ object Passages {
     /** Everything a "passage" challenge can draw from: the app's quotes, plus the longer passages. */
     val ALL: List<String> get() = Quotes.all.map { it.text } + TAO + OTHERS
 
+    /**
+     * The same, as your quote choices shape it: hidden quotes left out, your own in, and favourites
+     * counted as often as they come round on the home screen.
+     */
+    fun forPrefs(prefs: QuotePrefs): List<String> {
+        val quotes = (Quotes.all + prefs.mine).distinctBy { it.text }.filterNot { it.text in prefs.hidden }
+        val weighted = quotes.flatMap { q -> List(if (q.text in prefs.favourites) Quotes.FAVOURITE_TIMES else 1) { q.text } }
+        return weighted + TAO + OTHERS
+    }
+
     /** Plain, unhurried words; nothing you'd need to squint at on a keyboard at midnight. */
     val WORDS: List<String> = (
         "able about above across after again against air all almost alone along already also always among " +

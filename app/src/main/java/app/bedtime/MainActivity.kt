@@ -78,6 +78,7 @@ import app.bedtime.ui.stats.StatsScreen
 import app.bedtime.ui.onboarding.OnboardingScreen
 import app.bedtime.ui.onboarding.WalkthroughScreen
 import app.bedtime.ui.homestyle.HomeStyleScreen
+import app.bedtime.ui.quotes.QuotesScreen
 import app.bedtime.ui.schedules.SchedulesScreen
 import app.bedtime.ui.settings.SettingsScreen
 import app.bedtime.ui.setup.SetupScreen
@@ -106,6 +107,7 @@ object Routes {
     const val UNLOCK = "unlock/"
     const val LIMIT = "limit/"
     const val STATS = "stats"
+    const val QUOTES = "quotes"
 
     fun unlock(scheduleId: String) = UNLOCK + scheduleId
 }
@@ -250,12 +252,13 @@ private fun BedtimeNavigation(pendingRoute: String?, onRouteConsumed: () -> Unit
         when {
             top == Routes.CREATE -> CreateScreen(onBack = ::pop, onPick = { key -> push(Routes.TEMPLATE + key) })
             top == Routes.SETUP -> SetupScreen(onBack = ::pop, onAlwaysAvailable = { push(Routes.ALWAYS_AVAILABLE) })
-            top == Routes.HOME_STYLE -> HomeStyleScreen(onBack = ::pop)
+            top == Routes.HOME_STYLE -> HomeStyleScreen(onBack = ::pop, onQuotes = { push(Routes.QUOTES) })
             top == Routes.GROUPS -> GroupsScreen(onBack = ::pop)
             top == Routes.ALWAYS_AVAILABLE -> AlwaysAvailableScreen(onBack = ::pop)
             top == Routes.ONBOARDING -> OnboardingScreen(onDone = ::pop)
             top == Routes.WALKTHROUGH -> WalkthroughScreen(onDone = ::pop)
             top == Routes.STATS -> StatsScreen(onBack = ::pop)
+            top == Routes.QUOTES -> QuotesScreen(onBack = ::pop)
             top.startsWith(Routes.EDIT) -> ScheduleEditScreen(
                 scheduleId = top.removePrefix(Routes.EDIT).ifEmpty { null },
                 template = null,

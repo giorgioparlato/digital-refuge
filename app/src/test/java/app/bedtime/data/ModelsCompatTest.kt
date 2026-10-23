@@ -69,4 +69,11 @@ class ModelsCompatTest {
         assertEquals(AppFont.INTER, style.font)
         assertEquals(AppFont.INTER, style.quoteFont)
     }
+
+    @Test
+    fun settingsWithoutQuoteChoicesLoad() {
+        val settings = AppJson.decodeFromString(AppSettings.serializer(), """{"onboarded":true}""")
+        assertEquals(QuotePrefs(), settings.quotes)
+        assertEquals(QuoteSource.ALL, settings.quotes.source)
+    }
 }
