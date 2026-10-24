@@ -43,8 +43,23 @@ object LockNotifications {
         fun cancel(key: String)
     }
 
+    /** Swiped away, by key and post time: gone at once, and an update to the same one can still show. */
+    private val dismissed = mutableSetOf<Pair<String, Long>>()
+
     internal fun publish(list: List<LockNotification>) {
-        _current.value = list
+        synchronized(dismissed) {
+            dismissed.retainAll { gone -> list.any { it.key == gone.first } }
+            _current.value = list.filterNot { (it.key to it.postedAt) in dismissed }
+        }
+    }
+
+    /** Clears it as Android's own shade does, and keeps it off the lock screen even if that fails. */
+    fun dismiss(note: LockNotification) {
+        synchronized(dismissed) {
+            dismissed += note.key to note.postedAt
+            _current.value = _current.value.filterNot { it.key == note.key }
+        }
+        cancel(note.key)
     }
 
     fun refresh() = listener?.refresh()

@@ -1,5 +1,10 @@
 package app.bedtime.ui.lock
 
+import androidx.compose.runtime.key
+import androidx.compose.material3.rememberSwipeToDismissBoxState
+import androidx.compose.material3.SwipeToDismissBoxValue
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.ExperimentalMaterial3Api
 import app.bedtime.ui.components.ProvideAppIcons
 import app.bedtime.ui.components.AppIcon
 import app.bedtime.data.NoteDetail
@@ -75,6 +80,7 @@ import app.bedtime.engine.Engine
 import app.bedtime.ui.components.BedtimeIcons
 import app.bedtime.ui.components.Text
 import app.bedtime.ui.formatTime
+import app.bedtime.ui.homestyle.HomePalette
 import app.bedtime.ui.homestyle.palette
 import app.bedtime.ui.minimal.QuoteBlock
 import app.bedtime.ui.minimal.SessionHeader
@@ -279,6 +285,7 @@ private fun LockScreen(
         calendar = rememberCalendarLine(style, now, onLockScreen = true),
         notifications = if (style.lockNotifications) notifications.filter { it.packageName in style.lockNotificationApps } else emptyList(),
         onOpenNotification = onOpenNotification,
+        onDismissNotification = LockNotifications::dismiss,
     )
 }
 
@@ -295,6 +302,7 @@ internal fun LockScreenContent(
     preview: Boolean = false,
     notifications: List<LockNotification> = emptyList(),
     onOpenNotification: (String) -> Unit = {},
+    onDismissNotification: (LockNotification) -> Unit = {},
 ) {
     val p = style.palette()
     val minDistance = with(LocalDensity.current) { 64.dp.toPx() }
@@ -339,7 +347,7 @@ internal fun LockScreenContent(
             SessionHeader(now, scheduleName, until, style, calendar)
             if (notifications.isNotEmpty()) {
                 Spacer(Modifier.height(28.dp))
-                NotificationList(notifications, style, onOpenNotification)
+                NotificationList(notifications, style, onOpenNotification, onDismissNotification)
             }
             Spacer(Modifier.weight(1f))
             if (quote != null && style.showQuote) {
@@ -359,33 +367,24 @@ internal fun LockScreenContent(
 /** How many notifications the lock screen lists before "and N more". */
 private const val MAX_NOTIFICATIONS = 4
 
-/** The newest notifications, quietly: app, time, and as much as Android's own lock screen would show. */
+/**
+ * The newest notifications, quietly: app, time, and as much as Android's own lock screen would show.
+ * Swiped aside, one is cleared as in Android's own shade.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun NotificationList(notes: List<LockNotification>, style: HomeStyle, onOpen: (String) -> Unit) {
+private fun NotificationList(notes: List<LockNotification>, style: HomeStyle, onOpen: (String) -> Unit, onDismiss: (LockNotification) -> Unit) {
     val p = style.palette()
-    val context = LocalContext.current
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         notes.take(MAX_NOTIFICATIONS).forEach { note ->
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(p.text.copy(alpha = 0.06f))
-                    .clickable(onClickLabel = "unlock and open") { onOpen(note.key) }
-                    .padding(horizontal = 14.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.Top,
-            ) {
-                Box(Modifier.padding(top = 2.dp)) { AppIcon(note.packageName, note.app, 22.dp) }
-                Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(note.app, style = MaterialTheme.typography.labelMedium, color = p.faint, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                        Text(formatTime(context, note.postedAt), style = MaterialTheme.typography.labelSmall, color = p.faint)
-                    }
-                    val title = note.title ?: if (note.detail == NoteDetail.APP_ONLY) "New notification" else null
-                    title?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = p.text, maxLines = 1, overflow = TextOverflow.Ellipsis) }
-                    note.text?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = p.muted, maxLines = 1, overflow = TextOverflow.Ellipsis) }
-                }
+            key(note.key) {
+                val swipe = rememberSwipeToDismissBoxState(
+                    confirmValueChange = { value ->
+                        if (value != SwipeToDismissBoxValue.Settled) onDismiss(note)
+                        true
+                    },
+                )
+                SwipeToDismissBox(swipe, backgroundContent = {}) { NotificationRow(note, p, onOpen) }
             }
         }
         if (notes.size > MAX_NOTIFICATIONS) {
@@ -395,6 +394,31 @@ private fun NotificationList(notes: List<LockNotification>, style: HomeStyle, on
                 color = p.faint,
                 modifier = Modifier.padding(start = 14.dp, top = 2.dp),
             )
+        }
+    }
+}
+
+@Composable
+private fun NotificationRow(note: LockNotification, p: HomePalette, onOpen: (String) -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(p.text.copy(alpha = 0.06f))
+            .clickable(onClickLabel = "unlock and open") { onOpen(note.key) }
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Box(Modifier.padding(top = 2.dp)) { AppIcon(note.packageName, note.app, 22.dp) }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(note.app, style = MaterialTheme.typography.labelMedium, color = p.faint, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                Text(formatTime(LocalContext.current, note.postedAt), style = MaterialTheme.typography.labelSmall, color = p.faint)
+            }
+            val title = note.title ?: if (note.detail == NoteDetail.APP_ONLY) "New notification" else null
+            title?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = p.text, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+            note.text?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = p.muted, maxLines = 1, overflow = TextOverflow.Ellipsis) }
         }
     }
 }

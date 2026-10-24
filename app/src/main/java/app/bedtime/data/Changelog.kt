@@ -13,6 +13,14 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            45,
+            "0.8.8.1",
+            listOf(
+                "Swipe a notification on the lock screen aside to clear it, as in Android's own shade.",
+                "The lock screen's app swipes now start at the top, around the clock. The middle is the notifications', and the bottom still unlocks.",
+            ),
+        ),
+        ChangelogEntry(
             44,
             "0.8.8",
             listOf(

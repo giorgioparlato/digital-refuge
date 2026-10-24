@@ -385,7 +385,7 @@ internal fun HomeStyleContent(
                         description = if (style.lockNotifications && !notificationAccess) {
                             "Notification access is off, so none can show. Switch this on again to allow it"
                         } else {
-                            "Those the session lets through, as private as Android's own lock screen. Tap one to unlock and open it"
+                            "Those the session lets through, as private as Android's own lock screen. Tap one to unlock and open it, or swipe it aside to clear it"
                         },
                     ) { ObsidianToggle(style.lockNotifications && notificationAccess, onLockNotifications) }
                     if (style.lockNotifications && notificationAccess) {
@@ -401,9 +401,9 @@ internal fun HomeStyleContent(
                             onClick = onPickNotificationApps,
                         ) { Chevron() }
                     }
-                    SizeLabel("Swipes from the middle of the lock screen", Modifier.padding(top = 12.dp, bottom = 4.dp))
+                    SizeLabel("Swipes from the top of the lock screen", Modifier.padding(top = 12.dp, bottom = 4.dp))
                     Text(
-                        "Each can open an app once you've unlocked, or the camera straight away. From the bottom, any swipe just unlocks.",
+                        "Start around the clock: each can open an app once you've unlocked, or the camera straight away. The middle is for swiping notifications away. From the bottom, any swipe just unlocks.",
                         style = MaterialTheme.typography.bodySmall,
                         color = c.textFaint,
                         modifier = Modifier.padding(bottom = 4.dp),
