@@ -68,6 +68,8 @@ class ModelsCompatTest {
         val style = AppJson.decodeFromString(HomeStyle.serializer(), """{"showQuote":true}""")
         assertEquals(AppFont.INTER, style.font)
         assertEquals(AppFont.INTER, style.quoteFont)
+        assertEquals(false, style.lockNotifications)
+        assertEquals(emptySet<String>(), style.lockNotificationApps)
     }
 
     @Test

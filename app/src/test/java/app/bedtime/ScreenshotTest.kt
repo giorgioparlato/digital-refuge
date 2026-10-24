@@ -420,6 +420,18 @@ class ScreenshotTest {
     }
 
     @Test
+    fun homeStyleNotifications() = shot(tall = true, height = 9000) {
+        HomeStyleContent(
+            style = HomeStyle(lockNotifications = true, lockNotificationApps = setOf("com.android.dialer", "org.thoughtcrime.securesms")),
+            onChange = {},
+            previewApps = Samples.minimalApps,
+            now = Samples.lateEvening,
+            onBack = {},
+            notificationAccess = true,
+        )
+    }
+
+    @Test
     fun blocked() = shot { BlockedContent("Instagram", "Bedtime", "07:00", {}, {}) }
 
     @Test
@@ -519,6 +531,28 @@ class ScreenshotTest {
     @Test
     fun lockScreen() = shot {
         app.bedtime.ui.lock.LockScreenContent(now = Samples.lateEvening, scheduleName = "Bedtime", until = "07:00", style = HomeStyle(), quote = Samples.mediumQuote)
+    }
+
+    @Test
+    fun lockScreenNotifications() = shot {
+        val at = Samples.lateEvening.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+        fun note(i: Int, label: String, title: String?, text: String?, detail: app.bedtime.data.NoteDetail) =
+            app.bedtime.data.LockNotification("k$i", "com.example.$i", label, title, text, at - i * 7 * 60_000L, detail)
+        app.bedtime.ui.lock.LockScreenContent(
+            now = Samples.lateEvening,
+            scheduleName = "Bedtime",
+            until = "07:00",
+            style = HomeStyle(),
+            quote = Samples.shortQuote,
+            notifications = listOf(
+                note(0, "Phone", "Missed call", "Mum", app.bedtime.data.NoteDetail.FULL),
+                note(1, "Messages", null, null, app.bedtime.data.NoteDetail.APP_ONLY),
+                note(2, "Clock", "Alarm set for 06:45", null, app.bedtime.data.NoteDetail.FULL),
+                note(3, "Signal", "2 new messages", null, app.bedtime.data.NoteDetail.APP_ONLY),
+                note(4, "Calendar", "Dentist", "Tomorrow 09:00", app.bedtime.data.NoteDetail.FULL),
+                note(5, "Mail", null, null, app.bedtime.data.NoteDetail.APP_ONLY),
+            ),
+        )
     }
 
     @Test

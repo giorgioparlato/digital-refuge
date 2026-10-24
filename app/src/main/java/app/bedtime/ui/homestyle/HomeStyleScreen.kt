@@ -1,5 +1,13 @@
 package app.bedtime.ui.homestyle
 
+import app.bedtime.ui.apps.PickerMode
+import app.bedtime.ui.apps.AppPickerScreen
+import app.bedtime.service.LockNotificationListener
+import androidx.lifecycle.compose.LifecycleResumeEffect
+import androidx.compose.material.icons.filled.Notifications
+import android.provider.Settings
+import android.os.Build
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -113,6 +121,24 @@ fun HomeStyleScreen(onBack: () -> Unit, onQuotes: () -> Unit = {}) {
             Toast.makeText(context, "calendar access wasn't allowed", Toast.LENGTH_SHORT).show()
         }
     }
+    // Notifications on the lock screen need notification access, granted on Android's own page. Asked
+    // for only when switched on; it switches on by itself on return, once granted.
+    var notificationAccess by remember { mutableStateOf(LockNotificationListener.hasAccess(context)) }
+    var askedForNotifications by rememberSaveable { mutableStateOf(false) }
+    var pickingNotificationApps by rememberSaveable { mutableStateOf(false) }
+    val switchOnNotifications = {
+        scope.launch { repo.updateSettings { it.copy(homeStyle = it.homeStyle.copy(lockNotifications = true)) } }
+        // Nothing shows until you choose whose notifications to see, so the choice comes straight away.
+        if (settings?.homeStyle?.lockNotificationApps.isNullOrEmpty()) pickingNotificationApps = true
+    }
+    LifecycleResumeEffect(Unit) {
+        notificationAccess = LockNotificationListener.hasAccess(context)
+        if (askedForNotifications && notificationAccess) {
+            askedForNotifications = false
+            switchOnNotifications()
+        }
+        onPauseOrDispose { }
+    }
     // Which choice "add your own font" was tapped under, so the new font lands there.
     var addingForQuote by rememberSaveable { mutableStateOf(false) }
     val pickFont = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -130,6 +156,19 @@ fun HomeStyleScreen(onBack: () -> Unit, onQuotes: () -> Unit = {}) {
         }
     }
     val current = settings ?: return
+    if (pickingNotificationApps) {
+        AppPickerScreen(
+            "Notifications from",
+            current.homeStyle.lockNotificationApps,
+            PickerMode.NOTIFY,
+            onDone = { apps ->
+                scope.launch { repo.updateSettings { it.copy(homeStyle = it.homeStyle.copy(lockNotificationApps = apps)) } }
+                pickingNotificationApps = false
+            },
+            onBack = { pickingNotificationApps = false },
+        )
+        return
+    }
     HomeStyleContent(
         style = current.homeStyle,
         onChange = { style -> scope.launch { repo.updateSettings { it.copy(homeStyle = style) } } },
@@ -142,6 +181,27 @@ fun HomeStyleScreen(onBack: () -> Unit, onQuotes: () -> Unit = {}) {
                 scope.launch { repo.updateSettings { it.copy(homeStyle = it.homeStyle.copy(showCalendar = on)) } }
             }
         },
+        onLockNotifications = { on ->
+            if (on && !notificationAccess) {
+                askedForNotifications = true
+                val detail = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
+                val intent = if (detail) {
+                    Intent(Settings.ACTION_NOTIFICATION_LISTENER_DETAIL_SETTINGS)
+                        .putExtra(Settings.EXTRA_NOTIFICATION_LISTENER_COMPONENT_NAME, LockNotificationListener.component(context).flattenToString())
+                } else {
+                    Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+                }
+                runCatching { context.startActivity(intent) }
+                    .recoverCatching { context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
+                Toast.makeText(context, "allow notification access for digital refuge", Toast.LENGTH_LONG).show()
+            } else if (on) {
+                switchOnNotifications()
+            } else {
+                scope.launch { repo.updateSettings { it.copy(homeStyle = it.homeStyle.copy(lockNotifications = false)) } }
+            }
+        },
+        notificationAccess = notificationAccess,
+        onPickNotificationApps = { pickingNotificationApps = true },
         now = LocalDateTime.now(),
         onBack = onBack,
         quote = Quotes.forPeriod(LocalDateTime.now(), current.homeStyle.quoteRefresh, prefs = current.quotes),
@@ -169,6 +229,11 @@ internal fun HomeStyleContent(
     onShowCalendar: (Boolean) -> Unit = {},
     /** Opens the quotes page: your own, favourites, hidden ones. */
     onQuotes: () -> Unit = {},
+    /** Switches lock-screen notifications, sending you to grant notification access first if needed. */
+    onLockNotifications: (Boolean) -> Unit = {},
+    notificationAccess: Boolean = false,
+    /** Opens the choice of apps whose notifications the lock screen shows. */
+    onPickNotificationApps: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val c = Obsidian.colors
@@ -314,6 +379,28 @@ internal fun HomeStyleContent(
                     description = "During any session, the lock screen shows this clock and the session, without the apps",
                 ) { ObsidianToggle(style.lockScreen, { onChange(style.copy(lockScreen = it)) }) }
                 if (style.lockScreen) {
+                    OptionRow(
+                        Icons.Default.Notifications,
+                        "Notifications",
+                        description = if (style.lockNotifications && !notificationAccess) {
+                            "Notification access is off, so none can show. Switch this on again to allow it"
+                        } else {
+                            "Those the session lets through, as private as Android's own lock screen. Tap one to unlock and open it"
+                        },
+                    ) { ObsidianToggle(style.lockNotifications && notificationAccess, onLockNotifications) }
+                    if (style.lockNotifications && notificationAccess) {
+                        val labels = style.lockNotificationApps.map { pkg -> allApps.firstOrNull { it.packageName == pkg }?.label ?: pkg }.sorted()
+                        OptionRow(
+                            BedtimeIcons.Grid,
+                            "From these apps",
+                            description = when (labels.size) {
+                                0 -> "None yet, so none show. Pick the apps you want to hear from"
+                                in 1..3 -> labels.joinToString(", ")
+                                else -> labels.take(2).joinToString(", ") + " and ${labels.size - 2} more"
+                            },
+                            onClick = onPickNotificationApps,
+                        ) { Chevron() }
+                    }
                     SizeLabel("Swipes from the middle of the lock screen", Modifier.padding(top = 12.dp, bottom = 4.dp))
                     Text(
                         "Each can open an app once you've unlocked, or the camera straight away. From the bottom, any swipe just unlocks.",

@@ -63,7 +63,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /** What the picked apps are for; changes the guidance and whether groups are offered. */
-enum class PickerMode { BLOCK, ALLOW, ALWAYS, GROUP }
+enum class PickerMode { BLOCK, ALLOW, ALWAYS, GROUP, NOTIFY }
 
 /**
  * Why a picker can be read but not changed: shown as a notice above the list, and on the button in

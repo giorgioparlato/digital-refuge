@@ -13,6 +13,14 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            44,
+            "0.8.8",
+            listOf(
+                "Notifications can show on the session lock screen, from the apps you choose: only those the session lets through, and only as much as Android's own lock screen would show.",
+                "Tap one to unlock and open it. Switch it on in the minimal home's settings; it asks for notification access.",
+            ),
+        ),
+        ChangelogEntry(
             43,
             "0.8.7",
             listOf(

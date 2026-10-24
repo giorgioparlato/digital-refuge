@@ -181,6 +181,10 @@ data class HomeStyle(
     val quoteRefresh: QuoteRefresh = QuoteRefresh.DAILY,
     /** During sessions, show the clock and session over the lock screen. */
     val lockScreen: Boolean = true,
+    /** Notifications on that lock screen: those the session lets through, as private as Android's own. Needs notification access. */
+    val lockNotifications: Boolean = false,
+    /** The apps whose notifications that lock screen may show; none until you pick them. */
+    val lockNotificationApps: Set<String> = emptySet(),
     /** The clock, date and app names. */
     val font: AppFont = AppFont.INTER,
     /** The quote, chosen apart from the rest: Inter as it always was, or a serif in italics. */

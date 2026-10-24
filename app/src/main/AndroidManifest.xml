@@ -163,6 +163,17 @@
                 android:value="watches whether blocking is still on during a session, and reminds the user if it was switched off" />
         </service>
 
+        <!-- Only reads notifications for the session lock screen, and only once notification access is granted. -->
+        <service
+            android:name=".service.LockNotificationListener"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
         <service
             android:name=".service.FocusTileService"
             android:exported="true"
