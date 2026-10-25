@@ -1,5 +1,19 @@
 package app.bedtime.ui.minimal
 
+import app.bedtime.ui.components.rememberTodayHours
+import app.bedtime.ui.components.HourDetailDialog
+import app.bedtime.data.HourlyUse
+import app.bedtime.ui.components.HourDots
+import app.bedtime.data.HourState
+import app.bedtime.data.SearchOrder
+import app.bedtime.data.NoteTarget
+import app.bedtime.data.HomeGesture
+import app.bedtime.data.HomeActions
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectDragGestures
+import android.provider.MediaStore
+import android.os.Build
+import android.accessibilityservice.AccessibilityService
 import app.bedtime.data.HomeApps
 import android.content.pm.ShortcutInfo
 import android.os.UserHandle
@@ -204,6 +218,9 @@ private fun MinimalHomeScreen(
     val breezy = remember { Weather.APPS.firstOrNull { AppCatalog.isLaunchable(context, it) } }
     var query by rememberSaveable { mutableStateOf("") }
     var notesOpen by rememberSaveable { mutableStateOf(false) }
+    var quickNote by rememberSaveable { mutableStateOf(false) }
+    var hoursDetail by remember { mutableStateOf(false) }
+    val todayHours = rememberTodayHours()
     // Looked for when the drawer first opens, so Home itself comes up at once.
     val searchTargets by produceState(emptyList<SearchTarget>(), drawer) {
         if (drawer && value.isEmpty()) value = withContext(Dispatchers.IO) { SearchTargets.find(context) }
@@ -237,6 +254,7 @@ private fun MinimalHomeScreen(
         drawer = false
         query = ""
         notesOpen = false
+        quickNote = false
         week = null
         actionsFor = null
         emergency = false
@@ -288,6 +306,48 @@ private fun MinimalHomeScreen(
         drawer = false
         query = ""
     }
+    // A quick note, from the search or a gesture: to the app's own notes, or one of your files.
+    val saveNote: (String, NoteTarget?) -> Unit = { words, target ->
+        scope.launch {
+            if (target == null) {
+                repo.addNote(words)
+                Toast.makeText(context, "saved in refuge notes", Toast.LENGTH_SHORT).show()
+            } else {
+                val at = LocalDateTime.now()
+                val line = Notes.line(words, at, target.style, target.withDate)
+                val added = withContext(Dispatchers.IO) {
+                    if (target.daily) {
+                        Notes.appendDaily(context, Uri.parse(target.uri), target.dailyFormat, at.toLocalDate(), line)
+                    } else {
+                        Notes.append(context, Uri.parse(target.uri), line)
+                    }
+                }
+                // Never lost: if the file can't be reached, it waits in the app's notes.
+                if (!added) repo.addNote(words)
+                Toast.makeText(
+                    context,
+                    if (added) "added to ${target.name.lowercase()}" else "couldn't reach ${target.name.lowercase()}, so it's in refuge notes",
+                    Toast.LENGTH_SHORT,
+                ).show()
+            }
+        }
+    }
+    // What a gesture on the home screen does, as you set it.
+    val onGesture: (HomeGesture) -> Unit = { gesture ->
+        when (val action = style.homeGestures[gesture]) {
+            null -> Unit
+            HomeActions.NOTIFICATIONS -> globalAction(context, AccessibilityService.GLOBAL_ACTION_NOTIFICATIONS)
+            HomeActions.LOCK -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) globalAction(context, AccessibilityService.GLOBAL_ACTION_LOCK_SCREEN)
+            HomeActions.NOTE -> quickNote = true
+            HomeActions.SEARCH -> drawer = true
+            HomeActions.NOTES -> notesOpen = true
+            HomeActions.WEEK -> scope.launch { week = loadCalendarWeek(context, LocalDateTime.now()) }
+            HomeActions.CAMERA -> runCatching {
+                context.startActivity(Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            }
+            else -> AppCatalog.launch(context, action)
+        }
+    }
     val onResult: (DrawerResult) -> Unit = { result ->
         val words = query.trim()
         when (result) {
@@ -301,31 +361,8 @@ private fun MinimalHomeScreen(
                 closeDrawer()
             }
             is DrawerResult.AddNote -> {
-                val target = result.target
-                scope.launch {
-                    if (target == null) {
-                        repo.addNote(words)
-                        Toast.makeText(context, "saved in refuge notes", Toast.LENGTH_SHORT).show()
-                    } else {
-                        val at = LocalDateTime.now()
-                        val line = Notes.line(words, at, target.style, target.withDate)
-                        val added = withContext(Dispatchers.IO) {
-                            if (target.daily) {
-                                Notes.appendDaily(context, Uri.parse(target.uri), target.dailyFormat, at.toLocalDate(), line)
-                            } else {
-                                Notes.append(context, Uri.parse(target.uri), line)
-                            }
-                        }
-                        // Never lost: if the file can't be reached, it waits in the app's notes.
-                        if (!added) repo.addNote(words)
-                        Toast.makeText(
-                            context,
-                            if (added) "added to ${target.name.lowercase()}" else "couldn't reach ${target.name.lowercase()}, so it's in refuge notes",
-                            Toast.LENGTH_SHORT,
-                        ).show()
-                    }
-                    query = ""
-                }
+                saveNote(words, result.target)
+                query = ""
             }
             is DrawerResult.AddEvent -> if (CalendarSource.hasPermission(context) && CalendarSource.canWrite(context)) {
                 saveEvent(result.event)
@@ -357,6 +394,7 @@ private fun MinimalHomeScreen(
                     SearchTargets.offered(searchTargets, openable.map { it.packageName }.toSet()),
                     settings.noteTargets,
                     EventParser.parse(query, LocalDateTime.now()),
+                    SearchOrder.arrange(SearchOrder.defaults(searchTargets, settings.noteTargets), settings.searchChoices),
                 ),
                 onLaunch = { pkg ->
                     AppCatalog.launch(context, pkg)
@@ -420,12 +458,21 @@ private fun MinimalHomeScreen(
             calendar = rememberCalendarLine(style, now, onLockScreen = false),
             onCalendar = { scope.launch { week = loadCalendarWeek(context, LocalDateTime.now()) } },
             onOpenDrawer = { drawer = true },
+            onGesture = onGesture,
+            hours = todayHours.takeIf { style.hoursOnHome && settings.distractingApps.isNotEmpty() }
+                ?.let { HourlyUse.states(it, now.hour, settings.distractionMinutes) },
+            onHours = { hoursDetail = true },
             weather = rememberWeather(style, now),
             onWeather = breezy?.let { app -> { AppCatalog.launch(context, app) } },
             onNextQuote = { quoteOffset++ },
         )
     }
     week?.let { CalendarWeekDialog(it, style, onDismiss = { week = null }) }
+    if (quickNote) QuickNoteDialog(style, settings.noteTargets, onSave = saveNote, onDismiss = { quickNote = false })
+    if (hoursDetail) {
+        val p = style.palette()
+        HourDetailDialog(todayHours, settings.distractionMinutes, p.background, p.text, p.faint, p.accent, onDismiss = { hoursDetail = false })
+    }
     actionsFor?.let { app ->
         val shortcuts by produceState(emptyList<ShortcutInfo>(), app.packageName) {
             value = withContext(Dispatchers.IO) { AppShortcuts.of(context, app.packageName) }
@@ -497,6 +544,11 @@ internal fun MinimalHomeContent(
     onWeather: (() -> Unit)? = null,
     /** Opens every available app with search, from a swipe up or the handle at the foot. */
     onOpenDrawer: () -> Unit = {},
+    /** A swipe down, left or right, or a double tap on an empty spot. */
+    onGesture: (HomeGesture) -> Unit = {},
+    /** Today by the hour, when it's shown here, and a tap for the minutes. */
+    hours: List<HourState>? = null,
+    onHours: (() -> Unit)? = null,
     quote: Quote? = null,
     /** Whether [quote] is one of your favourites, and the long-press menu's two choices for it. */
     quoteFavourite: Boolean = false,
@@ -510,16 +562,20 @@ internal fun MinimalHomeContent(
     val names = scale * style.appNameSize.scale
     val pull = with(LocalDensity.current) { 72.dp.toPx() }
     // Pulling on past the end of the app list opens the drawer, as a swipe up does anywhere else.
-    val overscroll = remember(onOpenDrawer) {
+    val overscroll = remember(onOpenDrawer, onGesture) {
         object : NestedScrollConnection {
             var travel = 0f
 
             override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
-                if (source == NestedScrollSource.UserInput && available.y < 0) {
-                    travel -= available.y
-                    if (travel > pull) {
+                if (source == NestedScrollSource.UserInput && available.y != 0f) {
+                    // Past the end opens all apps; past the top is a swipe down, as anywhere else.
+                    travel += available.y
+                    if (travel < -pull) {
                         travel = 0f
                         onOpenDrawer()
+                    } else if (travel > pull) {
+                        travel = 0f
+                        onGesture(HomeGesture.SWIPE_DOWN)
                     }
                 }
                 return Offset.Zero
@@ -536,15 +592,30 @@ internal fun MinimalHomeContent(
             Modifier
                 .fillMaxSize()
                 .background(p.background)
-                .pointerInput(onOpenDrawer) {
-                    var travel = 0f
-                    detectVerticalDragGestures(onDragStart = { travel = 0f }, onDragEnd = { if (travel < -pull) onOpenDrawer() }) { _, amount -> travel += amount }
+                .pointerInput(onOpenDrawer, onGesture) {
+                    var travel = Offset.Zero
+                    detectDragGestures(
+                        onDragStart = { travel = Offset.Zero },
+                        onDragEnd = {
+                            when (val read = readHomeDrag(travel.x, travel.y, pull)) {
+                                HomeDrag.None -> Unit
+                                HomeDrag.AllApps -> onOpenDrawer()
+                                is HomeDrag.Gesture -> onGesture(read.gesture)
+                            }
+                        },
+                    ) { _, amount -> travel += amount }
                 }
+                // Only on empty spots: apps and the quote take their own taps first.
+                .pointerInput(onGesture) { detectTapGestures(onDoubleTap = { onGesture(HomeGesture.DOUBLE_TAP) }) }
                 .then(if (preview) Modifier else Modifier.safeDrawingPadding())
-                .padding(horizontal = 28.dp, vertical = 24.dp),
+                .padding(horizontal = 28.dp)
+                .padding(bottom = 24.dp),
         ) {
-            Spacer(Modifier.height(if (preview) 12.dp else 32.dp))
+            Spacer(Modifier.height(if (preview) 12.dp else style.topSpace.dp.dp))
             SessionHeader(now, scheduleName, until, style, calendar, onCalendar, weather, onWeather)
+            if (hours != null) {
+                HourDots(hours, text = style.palette().text, accent = style.palette().accent, modifier = Modifier.padding(top = 12.dp), onClick = onHours)
+            }
             if (quote != null && style.showQuote) {
                 Spacer(Modifier.height(if (preview) 20.dp else 28.dp))
                 // A tap moves on, as it always has; a long press offers to keep it or never see it again.
@@ -626,5 +697,12 @@ internal fun MinimalHomeContent(
                 }
             }
         }
+    }
+}
+
+/** Android's own actions (the notification shade, locking), through the blocking service you switched on. */
+private fun globalAction(context: Context, action: Int) {
+    if (BlockingState.service?.performGlobalAction(action) != true) {
+        Toast.makeText(context, "this needs digital refuge's blocking switched on", Toast.LENGTH_SHORT).show()
     }
 }

@@ -106,6 +106,7 @@ class BlockerService : AccessibilityService() {
 
     /** Time in limited apps, the pause before opening them, and the cover once their minutes are gone. */
     private val limitTracker by lazy { LimitTracker(this, scope, releaseScope) }
+    private val distractionClock by lazy { DistractionClock(Repository.get(this), releaseScope) }
 
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -113,6 +114,7 @@ class BlockerService : AccessibilityService() {
                 // Nothing is being used with the screen off, whatever was last in front.
                 limitTracker.moveTo(null)
                 limitTracker.flush()
+                distractionClock.moveTo(null)
                 showLockScreen()
                 return
             }
@@ -163,6 +165,7 @@ class BlockerService : AccessibilityService() {
             repo.settings.collect {
                 settings = it
                 limitTracker.limits = it.limits
+                distractionClock.distracting = it.distractingApps
                 applyGreyscale()
             }
         }
@@ -263,9 +266,14 @@ class BlockerService : AccessibilityService() {
             pausedForHome = homeInFront && state?.keepHomeInColour == true,
         )
 
-    /** Screen just went off mid-session: put the session's clock over the lock screen for next time. */
+    /**
+     * Screen just went off: put the clock over the lock screen for next time, mid-session, or always
+     * when digital refuge is your launcher and you asked for it.
+     */
     private fun showLockScreen() {
-        if (state?.isActive != true || !settings.homeStyle.lockScreen) return
+        val inSession = state?.isActive == true && settings.homeStyle.lockScreen
+        val always = settings.homeScreen && settings.homeStyle.lockAlways
+        if (!inSession && !always) return
         runCatching { startActivity(LockScreenActivity.intent(this)) }
     }
 
@@ -301,6 +309,7 @@ class BlockerService : AccessibilityService() {
         pendingSettle = null
         // Counted first, before anything below can return: our own covers stop the clock too.
         val arrived = limitTracker.moveTo(pkg)
+        distractionClock.moveTo(pkg)
         val current = state ?: return
         if (pkg == null || pkg == packageName || pkg in alwaysAllowed) return
         // Always-available apps (maps, rides, authenticators…) are never blocked by any session or limit.
@@ -372,6 +381,7 @@ class BlockerService : AccessibilityService() {
         BlockingState.service = null
         pendingSettle?.let(handler::removeCallbacks)
         limitTracker.stop()
+        distractionClock.moveTo(null)
         if (receiverRegistered) unregisterReceiver(receiver)
         if (watchersRegistered) unregisterReceiver(zenReceiver)
         if (modeReceiverRegistered) unregisterReceiver(modeReceiver)

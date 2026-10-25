@@ -153,6 +153,9 @@ enum class TextSize(val scale: Float) { SMALL(0.85f), MEDIUM(1f), LARGE(1.2f) }
 @Serializable
 enum class ClockSize(val scale: Float) { VERY_SMALL(0.5f), SMALL(0.7f), MEDIUM(1f), LARGE(1.2f) }
 
+/** Room above the greeting and clock, in dp, under the phone's own status bar. Medium is how it always was. */
+enum class TopSpace(val dp: Int) { NONE(0), SMALL(20), MEDIUM(56), LARGE(96) }
+
 /** How long a quote stays before the next one comes round. */
 @Serializable
 enum class QuoteRefresh(val hours: Int) { HOURLY(1), SIX_HOURS(6), DAILY(24), WEEKLY(168) }
@@ -183,6 +186,8 @@ data class HomeStyle(
     val quoteRefresh: QuoteRefresh = QuoteRefresh.DAILY,
     /** During sessions, show the clock and session over the lock screen. */
     val lockScreen: Boolean = true,
+    /** Outside sessions too, when digital refuge is your launcher. */
+    val lockAlways: Boolean = false,
     /** Notifications on that lock screen: those the session lets through, as private as Android's own. Needs notification access. */
     val lockNotifications: Boolean = false,
     /** The apps whose notifications that lock screen may show; none until you pick them. */
@@ -191,6 +196,9 @@ data class HomeStyle(
     val quickReplies: List<String> = DEFAULT_QUICK_REPLIES,
     /** The weather after the date, as Breezy Weather sends it. */
     val showWeather: Boolean = false,
+    /** The row of today's 24 hours on the minimal screen, and on the lock screen. */
+    val hoursOnHome: Boolean = false,
+    val hoursOnLock: Boolean = false,
     /** How much of it: now, today's range too, or three days with their skies. */
     val weatherStyle: WeatherStyle = WeatherStyle.TODAY,
     /** Celsius, Fahrenheit, or the usual one where the phone is set. */
@@ -202,10 +210,13 @@ data class HomeStyle(
     /** The name of the font file you added, if any; the file itself lives in the app's own storage. */
     val customFontName: String? = null,
     val clockSize: ClockSize = ClockSize.MEDIUM,
+    val topSpace: TopSpace = TopSpace.MEDIUM,
     /** The text colour; null picks for you: cream on a dark background, ink on a light one. */
     val textColor: Long? = null,
     /** What a swipe from the middle of the lock screen opens: a package name, or [GESTURE_CAMERA]. */
     val lockGestures: Map<Swipe, String> = emptyMap(),
+    /** What a gesture on the home screen does: one of [HomeActions], or a package name to open. */
+    val homeGestures: Map<HomeGesture, String> = mapOf(HomeGesture.SWIPE_DOWN to HomeActions.NOTIFICATIONS),
     /** Today's next event under the date, read from the calendar already on the phone. */
     val showCalendar: Boolean = false,
     /** Whether the lock screen names the event, or only says when it is. */
@@ -218,6 +229,38 @@ enum class Swipe { UP, DOWN, LEFT, RIGHT }
 
 /** The camera, which unlike any other app can open over the lock screen without unlocking. */
 const val GESTURE_CAMERA = "camera"
+
+/** One thing the search can offer, by [SearchOrder] key, and whether it does. */
+@Serializable
+data class SearchChoice(val key: String, val on: Boolean)
+
+/** The home screen's gestures; a swipe up always opens every app. */
+@Serializable
+enum class HomeGesture { SWIPE_DOWN, SWIPE_LEFT, SWIPE_RIGHT, DOUBLE_TAP }
+
+/** What a home-screen gesture can do besides opening an app. None has a dot in it, so none is a package. */
+object HomeActions {
+    const val NOTIFICATIONS = "notifications"
+    const val LOCK = "lock"
+    const val NOTE = "note"
+    const val SEARCH = "search"
+    const val NOTES = "notes"
+    const val WEEK = "week"
+    const val CAMERA = GESTURE_CAMERA
+
+    /** In the order they're offered, with how each reads. */
+    val all: List<Pair<String, String>> = listOf(
+        NOTIFICATIONS to "Show notifications",
+        LOCK to "Lock the phone",
+        NOTE to "Write a quick note",
+        SEARCH to "Search",
+        NOTES to "Your notes",
+        WEEK to "The week ahead",
+        CAMERA to "Camera",
+    )
+
+    fun label(action: String?): String? = all.firstOrNull { it.first == action }?.second
+}
 
 /** The fonts the minimal home can use: four that ship with the app, and one you add. */
 @Serializable
@@ -242,6 +285,12 @@ data class AppSettings(
     val hiddenApps: Set<String> = emptySet(),
     /** Your own names for apps, by package, used on the home screen and in its lists. */
     val appNames: Map<String, String> = emptyMap(),
+    /** Apps whose time counts toward the row of 24 hours. */
+    val distractingApps: Set<String> = emptySet(),
+    /** Minutes in those apps that make an hour a distracted one. */
+    val distractionMinutes: Int = 5,
+    /** What the search offers after apps, in your order, each on or off; empty until you change it. */
+    val searchChoices: List<SearchChoice> = emptyList(),
     /** Which block each home-screen widget starts, by widget id; missing means the tile's block, then the first. */
     val widgetBlocks: Map<String, String> = emptyMap(),
     // Both of these used to live here and now belong to each schedule, since how firmly a session
@@ -352,6 +401,8 @@ data class UsageDay(
     val day: Long,
     /** Seconds in front, by package. Only apps that belong to a limit are counted. */
     val seconds: Map<String, Long> = emptyMap(),
+    /** Seconds in your distracting apps, by hour of the day (0–23). */
+    val hourly: Map<Int, Long> = emptyMap(),
     /** Times the pause before opening was shown, by package. */
     val opens: Map<String, Int> = emptyMap(),
     /** When more time was taken, by limit id; lifting for the rest of the day counts here too. */

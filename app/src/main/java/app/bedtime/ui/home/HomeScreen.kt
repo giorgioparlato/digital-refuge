@@ -1,5 +1,9 @@
 package app.bedtime.ui.home
 
+import app.bedtime.ui.components.rememberTodayHours
+import app.bedtime.ui.components.HourDetailDialog
+import app.bedtime.ui.components.HourDots
+import app.bedtime.data.HourlyUse
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
@@ -123,6 +127,11 @@ internal data class HomeUiState(
     val quoteFont: AppFont = AppFont.INTER,
     /** Whether the quote is one of your favourites, for its long-press menu. */
     val quoteFavourite: Boolean = false,
+    /** How many notes you have, for the line at the foot. */
+    val noteCount: Int = 0,
+    /** Today's seconds in distracting apps by hour; null until you've chosen those apps. */
+    val hourly: Map<Int, Long>? = null,
+    val distractionMinutes: Int = 5,
 )
 
 /** The home tab: what's running now, how the week has gone, and the blocks you can start. */
@@ -134,9 +143,13 @@ fun HomeScreen(
     onSetup: () -> Unit,
     onUnlock: (String) -> Unit,
     onStats: () -> Unit = {},
+    onNotes: () -> Unit = {},
+    onDistraction: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val repo = remember { Repository.get(context) }
+    val notes by repo.notes.collectAsStateWithLifecycle(initialValue = emptyList())
+    val hourly = rememberTodayHours()
     val scope = rememberCoroutineScope()
     val schedules: List<Schedule>? by repo.schedules.collectAsStateWithLifecycle(initialValue = null)
     val runtime by repo.runtime.collectAsStateWithLifecycle(initialValue = RuntimeState())
@@ -188,6 +201,9 @@ fun HomeScreen(
         ui = HomeUiState(
             loaded, active, runtime, history, serviceOn, greyscaleOk, dndOk, now, quote, undoBlockId, whatsNew, style.quoteFont,
             quoteFavourite = quote != null && quote.text in settings.quotes.favourites,
+            noteCount = notes.size,
+            hourly = hourly.takeIf { settings.distractingApps.isNotEmpty() },
+            distractionMinutes = settings.distractionMinutes,
         ),
         onQuoteFavourite = { quote?.let(quoteActions.favourite) },
         onQuoteHide = { quote?.let(quoteActions.hide) },
@@ -202,6 +218,8 @@ fun HomeScreen(
         onUndo = { id -> scope.launch { repo.undoStart(id) } },
         onDismissWhatsNew = { scope.launch { repo.updateSettings { it.copy(lastSeenVersion = installed) } } },
         onStats = onStats,
+        onNotes = onNotes,
+        onDistraction = onDistraction,
         isInstalled = { AppCatalog.isLaunchable(context, it) },
     )
 }
@@ -219,6 +237,8 @@ internal fun HomeContent(
     onUndo: (String) -> Unit = {},
     onDismissWhatsNew: () -> Unit = {},
     onStats: () -> Unit = {},
+    onNotes: () -> Unit = {},
+    onDistraction: () -> Unit = {},
     onQuoteFavourite: () -> Unit = {},
     onQuoteHide: () -> Unit = {},
     onQuoteAnother: () -> Unit = {},
@@ -298,9 +318,21 @@ internal fun HomeContent(
                     QuoteFooter(ui.quote, ui.quoteFont, ui.quoteFavourite, onQuoteFavourite, onQuoteHide, onQuoteAnother)
                 }
             }
+            item(key = "hours") { HoursSection(ui.hourly, ui.distractionMinutes, Instant.ofEpochMilli(ui.now).atZone(ZoneId.systemDefault()).hour, onDistraction) }
             // The week in one quiet line at the very foot; the full figures are a tap away.
             homeSummary(Stats.week(ui.history, ui.now), Stats.streak(ui.history, ui.now))?.let { summary ->
                 item(key = "stats") { StatsLine(summary, onStats) }
+            }
+            item(key = "notes") {
+                StatsLine(
+                    when (ui.noteCount) {
+                        0 -> "your notes · write one"
+                        1 -> "your notes · 1"
+                        else -> "your notes · ${ui.noteCount}"
+                    },
+                    onNotes,
+                    label = "open your notes",
+                )
             }
         }
     }
@@ -547,13 +579,13 @@ private fun QuoteFooter(
 }
 
 @Composable
-private fun StatsLine(summary: String, onClick: () -> Unit) {
+private fun StatsLine(summary: String, onClick: () -> Unit, label: String = "Open your refuge") {
     val c = Obsidian.colors
     Column(Modifier.padding(horizontal = PageGutter).padding(top = 26.dp)) {
         Box(Modifier.fillMaxWidth().height(1.dp).background(c.border.copy(alpha = 0.6f)))
         Row(
             Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
-                .clickable(onClickLabel = "Open your refuge", onClick = onClick)
+                .clickable(onClickLabel = label, onClick = onClick)
                 .padding(vertical = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -633,5 +665,32 @@ private fun EmptyState(onCreate: () -> Unit, onTemplate: (String) -> Unit, isIns
             modifier = Modifier.fillMaxWidth().padding(top = 12.dp, start = 4.dp),
         )
         TemplateGallery(onPick = onTemplate, isInstalled = isInstalled)
+    }
+}
+
+/**
+ * Today by the hour: a dot for each, the distracted ones lit, and a tap for the minutes. Before any
+ * distracting apps are chosen, a line inviting you to choose them.
+ */
+@Composable
+private fun HoursSection(hourly: Map<Int, Long>?, thresholdMinutes: Int, nowHour: Int, onChoose: () -> Unit) {
+    val c = Obsidian.colors
+    var detail by remember { mutableStateOf(false) }
+    Column(Modifier.padding(horizontal = PageGutter).padding(top = 26.dp)) {
+        Box(Modifier.fillMaxWidth().height(1.dp).background(c.border.copy(alpha = 0.6f)))
+        if (hourly == null) {
+            Row(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable(onClickLabel = "choose distracting apps", onClick = onChoose).padding(vertical = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("choose your distracting apps to see today by the hour", style = MaterialTheme.typography.bodyMedium, color = c.textMuted, modifier = Modifier.weight(1f))
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = c.textFaint, modifier = Modifier.size(20.dp))
+            }
+            return@Column
+        }
+        val states = HourlyUse.states(hourly, nowHour, thresholdMinutes)
+        Text(HourlyUse.summary(states, thresholdMinutes), style = MaterialTheme.typography.bodyMedium, color = c.textMuted, modifier = Modifier.padding(top = 16.dp))
+        HourDots(states, text = c.textNormal, accent = c.accent, modifier = Modifier.padding(top = 6.dp), onClick = { detail = true })
+        if (detail) HourDetailDialog(hourly, thresholdMinutes, c.bgSecondary, c.textNormal, c.textFaint, c.accent, onDismiss = { detail = false })
     }
 }

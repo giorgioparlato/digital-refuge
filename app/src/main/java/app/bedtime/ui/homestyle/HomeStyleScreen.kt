@@ -1,5 +1,9 @@
 package app.bedtime.ui.homestyle
 
+import app.bedtime.data.TopSpace
+import androidx.compose.material.icons.filled.Refresh
+import app.bedtime.data.HomeGesture
+import app.bedtime.data.HomeActions
 import app.bedtime.data.TempUnit
 import app.bedtime.data.WeatherView
 import app.bedtime.data.WeatherStyle
@@ -257,6 +261,18 @@ internal fun HomeStyleContent(
     val context = LocalContext.current
     val c = Obsidian.colors
     var pickingSwipe by rememberSaveable { mutableStateOf<Swipe?>(null) }
+    var pickingGesture by rememberSaveable { mutableStateOf<HomeGesture?>(null) }
+    pickingGesture?.let { gesture ->
+        HomeGestureDialog(
+            gesture = gesture,
+            apps = allApps,
+            onDismiss = { pickingGesture = null },
+            onPick = { action ->
+                onChange(style.copy(homeGestures = if (action == null) style.homeGestures - gesture else style.homeGestures + (gesture to action)))
+                pickingGesture = null
+            },
+        )
+    }
     var editingReplies by rememberSaveable { mutableStateOf(false) }
     if (editingReplies) {
         QuickRepliesDialog(style.quickReplies, onChange = { onChange(style.copy(quickReplies = it)) }, onDismiss = { editingReplies = false })
@@ -320,7 +336,13 @@ internal fun HomeStyleContent(
                     HexField(style.textColor ?: style.palette().text.toArgb().toLong() and 0xFFFFFFFFL) { onChange(style.copy(textColor = it)) }
                 }
                 SectionCard(title = "Sizes") {
-                    SizeLabel("Clock", Modifier.padding(bottom = 8.dp))
+                    SizeLabel("Space at the top", Modifier.padding(bottom = 8.dp))
+                SegmentedChoice(
+                    options = listOf("None", "Small", "Medium", "Large"),
+                    selected = style.topSpace.ordinal,
+                    onSelect = { onChange(style.copy(topSpace = TopSpace.entries[it])) },
+                )
+                SizeLabel("Clock", Modifier.padding(top = 16.dp, bottom = 8.dp))
                     SegmentedChoice(
                         options = listOf("Very small", "Small", "Medium", "Large"),
                         selected = style.clockSize.ordinal,
@@ -470,6 +492,20 @@ internal fun HomeStyleContent(
                     }
                 }
             }
+            if (page == StylePage.GESTURES) {
+                SectionCard {
+                    OptionRow(Icons.Default.KeyboardArrowUp, "Swipe up", description = "All apps and search")
+                    HomeGesture.entries.forEach { gesture ->
+                        val action = style.homeGestures[gesture]
+                        OptionRow(
+                            gesture.icon(),
+                            gesture.label(),
+                            description = HomeActions.label(action) ?: action?.let { pkg -> allApps.firstOrNull { it.packageName == pkg }?.label?.let { "Open $it" } ?: pkg } ?: "Nothing",
+                            onClick = { pickingGesture = gesture },
+                        ) { Chevron() }
+                    }
+                }
+            }
             if (page == StylePage.SWIPES) {
                 SectionCard {
                     Swipe.entries.forEach { swipe ->
@@ -499,7 +535,46 @@ enum class StylePage(val title: String, val intro: String) {
         "Lock-screen swipes",
         "Start around the clock: each can open an app once you've unlocked, or the camera straight away. The middle is for swiping notifications away. From the bottom, any swipe just unlocks.",
     ),
+    GESTURES(
+        "Gestures",
+        "On your home screen, and the minimal one during sessions. Swipes start anywhere but the very top edge, which stays Android's; a double tap is on an empty spot.",
+    ),
     NOTIFICATIONS("Lock-screen notifications", "Those the session lets through, from the apps you choose, as private as Android's own lock screen."),
+}
+
+private fun HomeGesture.icon(): ImageVector = when (this) {
+    HomeGesture.SWIPE_DOWN -> Icons.Default.KeyboardArrowDown
+    HomeGesture.SWIPE_LEFT -> Icons.AutoMirrored.Filled.KeyboardArrowLeft
+    HomeGesture.SWIPE_RIGHT -> Icons.AutoMirrored.Filled.KeyboardArrowRight
+    HomeGesture.DOUBLE_TAP -> Icons.Default.Refresh
+}
+
+private fun HomeGesture.label(): String = when (this) {
+    HomeGesture.SWIPE_DOWN -> "Swipe down"
+    HomeGesture.SWIPE_LEFT -> "Swipe left"
+    HomeGesture.SWIPE_RIGHT -> "Swipe right"
+    HomeGesture.DOUBLE_TAP -> "Double tap"
+}
+
+/** What a home-screen gesture does: nothing, one of the app's own actions, or opening any app. */
+@Composable
+private fun HomeGestureDialog(gesture: HomeGesture, apps: List<AppEntry>, onDismiss: () -> Unit, onPick: (String?) -> Unit) {
+    val c = Obsidian.colors
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = c.bgSecondary,
+        title = { Text("${gesture.label()} does") },
+        text = {
+            LazyColumn(Modifier.heightIn(max = 460.dp)) {
+                item { DialogChoice("Nothing") { onPick(null) } }
+                HomeActions.all.forEach { (action, label) -> item { DialogChoice(label) { onPick(action) } } }
+                item { Text("Or open an app", style = MaterialTheme.typography.labelLarge, color = c.accentText, modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)) }
+                items(apps.size) { i -> DialogChoice(apps[i].label) { onPick(apps[i].packageName) } }
+            }
+        },
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = c.textMuted) } },
+    )
 }
 
 private fun Swipe.icon(): ImageVector = when (this) {

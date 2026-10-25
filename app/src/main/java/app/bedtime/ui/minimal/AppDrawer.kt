@@ -1,5 +1,8 @@
 package app.bedtime.ui.minimal
 
+import app.bedtime.data.key
+import app.bedtime.data.SearchOrder
+import app.bedtime.data.SearchChoice
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -103,18 +106,24 @@ object AppDrawer {
         targets: List<SearchTarget>,
         noteTargets: List<NoteTarget>,
         event: ParsedEvent?,
+        /** Your choices, in your order; the defaults when null. */
+        choices: List<SearchChoice>? = null,
     ): List<DrawerResult> {
         val q = query.trim()
         if (q.isEmpty()) return emptyList()
         val matching = apps.filter { it.label.contains(q, ignoreCase = true) }
             .sortedWith(compareBy({ !it.label.startsWith(q, ignoreCase = true) }, { it.label.lowercase() }))
+        // Everything else that could be offered now, by key; your choices say what shows and in what order.
+        val offers = buildMap<String, DrawerResult> {
+            targets.forEach { put(it.key, DrawerResult.Search(it)) }
+            noteTargets.forEach { put(SearchOrder.noteKey(it), DrawerResult.AddNote(it)) }
+            put(SearchOrder.REFUGE_NOTES, DrawerResult.AddNote(null))
+            event?.let { put(SearchOrder.CALENDAR, DrawerResult.AddEvent(it)) }
+        }
         return buildList {
             matching.forEach { add(DrawerResult.App(it)) }
             if (q.length >= 2 && "notes".startsWith(q.lowercase())) add(DrawerResult.OpenNotes)
-            targets.forEach { add(DrawerResult.Search(it)) }
-            noteTargets.forEach { add(DrawerResult.AddNote(it)) }
-            add(DrawerResult.AddNote(null))
-            event?.let { add(DrawerResult.AddEvent(it)) }
+            (choices ?: SearchOrder.defaults(targets, noteTargets)).filter { it.on }.forEach { choice -> offers[choice.key]?.let(::add) }
         }
     }
 

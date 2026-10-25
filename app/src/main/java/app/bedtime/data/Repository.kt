@@ -191,6 +191,11 @@ class Repository private constructor(context: Context) {
         usage.copy(seconds = usage.seconds + seconds.map { (pkg, s) -> pkg to (usage.seconds[pkg] ?: 0L) + s })
     }
 
+    /** Adds time in distracting apps to [day], by hour. */
+    suspend fun addHourly(day: Long, seconds: Map<Int, Long>) = updateUsage(day) { usage ->
+        usage.copy(hourly = usage.hourly + seconds.map { (hour, s) -> hour to (usage.hourly[hour] ?: 0L) + s })
+    }
+
     /** Counts one more time the pause before opening [pkg] was shown. */
     suspend fun recordOpen(day: Long, pkg: String) = updateUsage(day) { it.copy(opens = it.opens + (pkg to (it.opens[pkg] ?: 0) + 1)) }
 

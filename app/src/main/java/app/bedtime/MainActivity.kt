@@ -1,5 +1,7 @@
 package app.bedtime
 
+import app.bedtime.ui.settings.DistractionScreen
+import app.bedtime.ui.settings.SearchSettingsScreen
 import app.bedtime.ui.homestyle.StylePage
 import android.content.Context
 import android.content.Intent
@@ -103,6 +105,9 @@ object Routes {
     const val STYLE_SHOWN = "homestyle/shown"
     const val STYLE_SWIPES = "homestyle/swipes"
     const val STYLE_NOTIFICATIONS = "homestyle/notifications"
+    const val STYLE_GESTURES = "homestyle/gestures"
+    const val SEARCH = "search"
+    const val DISTRACTION = "distraction"
     const val GROUPS = "groups"
     const val ALWAYS_AVAILABLE = "alwaysavailable"
     const val ONBOARDING = "onboarding"
@@ -246,6 +251,9 @@ private fun BedtimeNavigation(pendingRoute: String?, onRouteConsumed: () -> Unit
                         onQuotes = { push(Routes.QUOTES) },
                         onSwipes = { push(Routes.STYLE_SWIPES) },
                         onLockNotifications = { push(Routes.STYLE_NOTIFICATIONS) },
+                        onGestures = { push(Routes.STYLE_GESTURES) },
+                        onSearch = { push(Routes.SEARCH) },
+                        onDistraction = { push(Routes.DISTRACTION) },
                     )
                     else -> HomeScreen(
                         onEdit = { id -> push(Routes.EDIT + id) },
@@ -254,6 +262,8 @@ private fun BedtimeNavigation(pendingRoute: String?, onRouteConsumed: () -> Unit
                         onSetup = { push(Routes.SETUP) },
                         onUnlock = { id -> push(Routes.unlock(id)) },
                         onStats = { push(Routes.STATS) },
+                        onNotes = { push(Routes.NOTES) },
+                        onDistraction = { push(Routes.DISTRACTION) },
                     )
                 }
             }
@@ -269,6 +279,9 @@ private fun BedtimeNavigation(pendingRoute: String?, onRouteConsumed: () -> Unit
             top == Routes.STYLE_SHOWN -> HomeStyleScreen(onBack = ::pop, onQuotes = { push(Routes.QUOTES) }, page = StylePage.SHOWN)
             top == Routes.STYLE_SWIPES -> HomeStyleScreen(onBack = ::pop, page = StylePage.SWIPES)
             top == Routes.STYLE_NOTIFICATIONS -> HomeStyleScreen(onBack = ::pop, page = StylePage.NOTIFICATIONS)
+            top == Routes.STYLE_GESTURES -> HomeStyleScreen(onBack = ::pop, page = StylePage.GESTURES)
+            top == Routes.SEARCH -> SearchSettingsScreen(onBack = ::pop)
+            top == Routes.DISTRACTION -> DistractionScreen(onBack = ::pop)
             top == Routes.GROUPS -> GroupsScreen(onBack = ::pop)
             top == Routes.ALWAYS_AVAILABLE -> AlwaysAvailableScreen(onBack = ::pop)
             top == Routes.ONBOARDING -> OnboardingScreen(onDone = ::pop)

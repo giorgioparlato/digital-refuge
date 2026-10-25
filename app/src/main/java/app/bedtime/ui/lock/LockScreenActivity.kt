@@ -1,5 +1,9 @@
 package app.bedtime.ui.lock
 
+import app.bedtime.ui.components.rememberTodayHours
+import app.bedtime.data.HourlyUse
+import app.bedtime.ui.components.HourDots
+import app.bedtime.data.HourState
 import app.bedtime.data.Weather
 import app.bedtime.data.WeatherView
 import app.bedtime.ui.minimal.rememberWeather
@@ -302,11 +306,13 @@ private fun LockScreen(
     val context = LocalContext.current
     val repo = remember { Repository.get(context) }
     val state by Engine.state(context).collectAsStateWithLifecycle()
-    val settings by repo.settings.collectAsStateWithLifecycle(initialValue = AppSettings())
+    val loadedSettings by repo.settings.collectAsStateWithLifecycle(initialValue = null)
+    val settings = loadedSettings ?: AppSettings()
     val notifications by LockNotifications.current.collectAsStateWithLifecycle()
     val quiet by repo.lockQuiet.collectAsStateWithLifecycle(initialValue = emptyMap())
     val scope = rememberCoroutineScope()
     val breezy = remember { Weather.APPS.firstOrNull { AppCatalog.isLaunchable(context, it) } }
+    val todayHours = rememberTodayHours()
     // The list folds back to its summary line whenever the screen goes off.
     var listOpen by remember { mutableStateOf(false) }
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { listOpen = false }
@@ -314,9 +320,11 @@ private fun LockScreen(
     val occurrence = state?.active?.maxByOrNull { it.end }
     val style = settings.homeStyle
     val light = style.palette().isLight
+    // With digital refuge as your launcher, it can be your lock screen outside sessions too.
+    val always = settings.homeScreen && style.lockAlways
 
-    LaunchedEffect(state) {
-        if (state != null && occurrence == null) onFinish()
+    LaunchedEffect(state, loadedSettings) {
+        if (state != null && loadedSettings != null && occurrence == null && !always) onFinish()
     }
     LaunchedEffect(light) { onLightBackground(light) }
     var now by remember { mutableStateOf(LocalDateTime.now()) }
@@ -327,14 +335,17 @@ private fun LockScreen(
         }
     }
 
-    if (occurrence == null) {
+    if (loadedSettings == null || (occurrence == null && !always)) {
         Box(Modifier.fillMaxSize().background(style.palette().background))
         return
     }
+    // "Later" and "quiet" last until the session ends; outside one, an hour, and the morning.
+    val laterUntil = occurrence?.end ?: (System.currentTimeMillis() + 60 * 60_000L)
+    val quietUntil = occurrence?.end ?: nextMorning(now)
     LockScreenContent(
         now = now,
-        scheduleName = occurrence.schedule.name,
-        until = formatTime(context, occurrence.end),
+        scheduleName = occurrence?.schedule?.name,
+        until = occurrence?.let { formatTime(context, it.end) },
         style = style,
         onOpen = onOpen,
         // A swipe from the middle opens its app, if one is set; every other swipe just unlocks.
@@ -343,6 +354,8 @@ private fun LockScreen(
         calendar = rememberCalendarLine(style, now, onLockScreen = true),
         weather = rememberWeather(style, now),
         onWeather = breezy?.let { app -> { onOpenApp(app) } },
+        hours = todayHours.takeIf { style.hoursOnLock && settings.distractingApps.isNotEmpty() }
+            ?.let { HourlyUse.states(it, now.hour, settings.distractionMinutes) },
         notifications = if (style.lockNotifications) {
             val nowMs = System.currentTimeMillis()
             notifications.filter { it.packageName in style.lockNotificationApps && !LockNotifications.isQuiet(it, quiet, nowMs) }
@@ -355,13 +368,13 @@ private fun LockScreen(
         handlers = NoteHandlers(
             open = onOpenNotification,
             dismiss = LockNotifications::dismiss,
-            later = { LockNotifications.later(it, System.currentTimeMillis(), occurrence.end) },
+            later = { LockNotifications.later(it, System.currentTimeMillis(), laterUntil) },
             quiet = { note ->
                 val key = LockNotifications.quietKey(note)
-                scope.launch { repo.quiet(key, occurrence.end) }
-                // What's already here comes back when the session ends, like "later".
+                scope.launch { repo.quiet(key, quietUntil) }
+                // What's already here comes back when the quiet ends, like "later".
                 notifications.filter { LockNotifications.quietKey(it) == key }
-                    .forEach { LockNotifications.later(it, System.currentTimeMillis(), occurrence.end) }
+                    .forEach { LockNotifications.later(it, System.currentTimeMillis(), quietUntil) }
             },
             act = onAct,
         ),
@@ -371,8 +384,9 @@ private fun LockScreen(
 @Composable
 internal fun LockScreenContent(
     now: LocalDateTime,
-    scheduleName: String,
-    until: String,
+    /** The session in the pill; null outside sessions, and there's no pill. */
+    scheduleName: String?,
+    until: String?,
     style: HomeStyle,
     onOpen: () -> Unit = {},
     onSwipe: (Swipe) -> Unit = {},
@@ -381,6 +395,9 @@ internal fun LockScreenContent(
     weather: WeatherView? = null,
     /** Opens the weather app after the usual unlock. */
     onWeather: (() -> Unit)? = null,
+    /** Today by the hour, when it's shown here. */
+    hours: List<HourState>? = null,
+    onHours: (() -> Unit)? = null,
     preview: Boolean = false,
     notifications: List<LockNotification> = emptyList(),
     listOpen: Boolean = false,
@@ -429,10 +446,14 @@ internal fun LockScreenContent(
                     )
                 }
                 .then(if (preview) Modifier else Modifier.safeDrawingPadding())
-                .padding(horizontal = 28.dp, vertical = 24.dp),
+                .padding(horizontal = 28.dp)
+                .padding(bottom = 24.dp),
         ) {
-            Spacer(Modifier.height(if (preview) 12.dp else 32.dp))
+            Spacer(Modifier.height(if (preview) 12.dp else style.topSpace.dp.dp))
             SessionHeader(now, scheduleName, until, style, calendar, weather = weather, onWeather = onWeather)
+            if (hours != null) {
+                HourDots(hours, text = style.palette().text, accent = style.palette().accent, modifier = Modifier.padding(top = 12.dp), onClick = onHours)
+            }
             if (notifications.isNotEmpty()) {
                 Spacer(Modifier.height(28.dp))
                 NotificationArea(
@@ -467,4 +488,11 @@ internal fun LockScreenContent(
             }
         }
     }
+}
+
+/** The next 7:00, as epoch millis: when "quiet until morning" ends outside a session. */
+private fun nextMorning(now: LocalDateTime): Long {
+    val today = now.toLocalDate().atTime(7, 0)
+    val morning = if (now.isBefore(today)) today else today.plusDays(1)
+    return morning.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
 }

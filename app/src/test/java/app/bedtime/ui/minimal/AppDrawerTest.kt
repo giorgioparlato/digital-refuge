@@ -4,6 +4,8 @@ import app.bedtime.apps.AppEntry
 import app.bedtime.data.NoteTarget
 import app.bedtime.data.ParsedEvent
 import app.bedtime.data.SearchTarget
+import app.bedtime.data.SearchChoice
+import app.bedtime.data.SearchOrder
 import app.bedtime.data.SearchTargets
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -50,9 +52,49 @@ class AppDrawerTest {
             SearchTarget(SearchTarget.Kind.LOOKUP, "pkg.translate", "Translate", "pkg.translate.Do"),
         )
         val offered = SearchTargets.offered(found, setOf("pkg.browser", "pkg.dict", "pkg.translate"))
+        // Every one whose app could open now; which show, and in what order, is the choices' to say.
         assertEquals(
             listOf("pkg.browser" to SearchTarget.Kind.WEB, "pkg.browser" to SearchTarget.Kind.WIKIPEDIA, "pkg.dict" to SearchTarget.Kind.LOOKUP, "pkg.translate" to SearchTarget.Kind.LOOKUP),
             offered.map { it.packageName to it.kind },
         )
+    }
+
+    @Test
+    fun withNothingChosenOneOfEachThenNotesAndCalendar() {
+        val targets = listOf(
+            SearchTarget(SearchTarget.Kind.WEB, "pkg.chrome", "Chrome"),
+            SearchTarget(SearchTarget.Kind.WEB, "pkg.firefox", "Firefox"),
+            SearchTarget(SearchTarget.Kind.LOOKUP, "pkg.dict", "Dictionary", "x"),
+            SearchTarget(SearchTarget.Kind.WIKIPEDIA, "pkg.wiki", "Wikipedia"),
+        )
+        val scratch = NoteTarget("scratchpad", "content://s")
+        assertEquals(
+            listOf(
+                SearchChoice("web:pkg.chrome", true),
+                SearchChoice("web:pkg.firefox", false),
+                // Wikipedia is offered, but off until you want it.
+                SearchChoice("wikipedia:pkg.wiki", false),
+                SearchChoice("lookup:pkg.dict", true),
+                SearchChoice("note:content://s", true),
+                SearchChoice(SearchOrder.REFUGE_NOTES, true),
+                SearchChoice(SearchOrder.CALENDAR, true),
+            ),
+            SearchOrder.defaults(targets, listOf(scratch)),
+        )
+    }
+
+    @Test
+    fun yourOrderAndSwitchesShapeTheResults() {
+        val web = SearchTarget(SearchTarget.Kind.WEB, "pkg.browser", "Browser")
+        val wiki = SearchTarget(SearchTarget.Kind.WIKIPEDIA, "pkg.wiki", "Wikipedia")
+        val defaults = SearchOrder.defaults(listOf(web, wiki), emptyList())
+        // Refuge notes first, Wikipedia off; the calendar wasn't in your list yet, so it joins at the end.
+        val saved = listOf(SearchChoice(SearchOrder.REFUGE_NOTES, true), SearchChoice("wikipedia:pkg.wiki", false), SearchChoice("web:pkg.browser", true))
+        val choices = SearchOrder.arrange(defaults, saved)
+        assertEquals(saved + SearchChoice(SearchOrder.CALENDAR, true), choices)
+        val results = AppDrawer.results("tea", emptyList(), listOf(web, wiki), emptyList(), null, choices)
+        assertEquals(listOf(DrawerResult.AddNote(null), DrawerResult.Search(web)), results)
+        // Moving one up.
+        assertEquals("web:pkg.browser", SearchOrder.moved(choices, "web:pkg.browser", up = true)[1].key)
     }
 }

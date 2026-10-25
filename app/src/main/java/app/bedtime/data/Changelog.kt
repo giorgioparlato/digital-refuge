@@ -13,6 +13,17 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            50,
+            "0.9.4",
+            listOf(
+                "Today by the hour: 24 dots on home, lit when you spent more than a few minutes in apps you call distracting. Choose them in settings.",
+                "Gestures on the minimal screen: swipe down, left, right or double tap to open an app, write a quick note, see notifications, lock the phone, and more.",
+                "Choose what the search offers, and in what order. Wikipedia only through its own app.",
+                "Your notes from the home tab; more or less space above the clock; the lock screen outside sessions too, if digital refuge is your launcher.",
+                "The launcher choice now lives in setup, and uninstalling from a long press works.",
+            ),
+        ),
+        ChangelogEntry(
             49,
             "0.9.3",
             listOf(

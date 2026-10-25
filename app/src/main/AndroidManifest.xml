@@ -55,6 +55,11 @@
     <uses-permission android:name="android.permission.READ_CALENDAR" />
     <!-- Events typed into the minimal home's search, saved straight into the calendar; asked the first time. -->
     <uses-permission android:name="android.permission.WRITE_CALENDAR" />
+    <!--
+      Uninstall from a long press on an app, when digital refuge is your launcher. It only opens Android's
+      own "uninstall?" question, which you confirm there; never during a session.
+    -->
+    <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
 
     <!-- The status-bar lotus while a session runs; asked for in Setup (Android 13+). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />

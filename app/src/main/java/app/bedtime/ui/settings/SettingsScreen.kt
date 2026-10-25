@@ -1,5 +1,7 @@
 package app.bedtime.ui.settings
 
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.FavoriteBorder
@@ -7,7 +9,6 @@ import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Clear
 import app.bedtime.ui.apps.PickerMode
 import app.bedtime.ui.apps.AppPickerScreen
-import app.bedtime.service.HomeRole
 import androidx.compose.material.icons.filled.Edit
 import android.content.Intent
 import android.net.Uri
@@ -114,6 +115,9 @@ fun SettingsScreen(
     onQuotes: () -> Unit = {},
     onSwipes: () -> Unit = {},
     onLockNotifications: () -> Unit = {},
+    onGestures: () -> Unit = {},
+    onSearch: () -> Unit = {},
+    onDistraction: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val repo = remember { Repository.get(context) }
@@ -124,7 +128,6 @@ fun SettingsScreen(
     val version = remember { runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull().orEmpty() }
     val canPinWidget = remember { BlockWidget.canPin(context) }
     var pendingImport by remember { mutableStateOf<Uri?>(null) }
-    var isDefaultHome by remember { mutableStateOf(HomeRole.isDefault(context)) }
     var pickingHidden by rememberSaveable { mutableStateOf(false) }
 
     fun say(message: String) = Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
@@ -183,7 +186,6 @@ fun SettingsScreen(
             GreyscaleController.isAvailable(context),
             DndController.hasAccess(context),
         ).count { !it }
-        isDefaultHome = HomeRole.isDefault(context)
         onPauseOrDispose { }
     }
     if (pickingHidden) {
@@ -199,7 +201,6 @@ fun SettingsScreen(
         )
         return
     }
-    val askHome = { runCatching { context.startActivity(HomeRole.askIntent(context)) } }
     SettingsContent(
         blocks = schedules.filter { it.isBlock },
         tileBlockId = settings.tileBlockId,
@@ -209,22 +210,19 @@ fun SettingsScreen(
         onHomeStyle = onHomeStyle,
         onQuickNotes = onQuickNotes,
         homeScreen = settings.homeScreen,
-        isDefaultHome = isDefaultHome,
-        onHomeScreen = { on ->
-            HomeRole.setOffered(context, on)
-            scope.launch { repo.updateSettings { it.copy(homeScreen = on) } }
-            // Switched on, Android asks; switched off, it falls back to your other home app by itself.
-            if (on) askHome()
-        },
-        onAskHome = { askHome() },
         hiddenCount = settings.hiddenApps.size,
         onHiddenApps = { pickingHidden = true },
         onShown = onShown,
         onQuotes = onQuotes,
         lockScreen = settings.homeStyle.lockScreen,
         onLockScreen = { on -> scope.launch { repo.updateSettings { it.copy(homeStyle = it.homeStyle.copy(lockScreen = on)) } } },
+        lockAlways = settings.homeStyle.lockAlways,
+        onLockAlways = { on -> scope.launch { repo.updateSettings { it.copy(homeStyle = it.homeStyle.copy(lockAlways = on)) } } },
         onSwipes = onSwipes,
         onLockNotifications = onLockNotifications,
+        onGestures = onGestures,
+        onSearch = onSearch,
+        onDistraction = onDistraction,
         onTileBlock = { id -> scope.launch { repo.updateSettings { it.copy(tileBlockId = id) } } },
         groupCount = settings.groups.size,
         onGroups = onGroups,
@@ -262,17 +260,19 @@ internal fun SettingsContent(
     onWalkthrough: () -> Unit = {},
     onQuickNotes: () -> Unit = {},
     homeScreen: Boolean = false,
-    isDefaultHome: Boolean = false,
-    onHomeScreen: (Boolean) -> Unit = {},
-    onAskHome: () -> Unit = {},
     hiddenCount: Int = 0,
     onHiddenApps: () -> Unit = {},
     onShown: () -> Unit = {},
     onQuotes: () -> Unit = {},
     lockScreen: Boolean = true,
     onLockScreen: (Boolean) -> Unit = {},
+    lockAlways: Boolean = false,
+    onLockAlways: (Boolean) -> Unit = {},
     onSwipes: () -> Unit = {},
     onLockNotifications: () -> Unit = {},
+    onGestures: () -> Unit = {},
+    onSearch: () -> Unit = {},
+    onDistraction: () -> Unit = {},
 ) {
     val c = Obsidian.colors
     var otherOpen by rememberSaveable { mutableStateOf(false) }
@@ -294,20 +294,11 @@ internal fun SettingsContent(
                     last = true,
                 )
 
-                SectionLabel("your home screen")
-                SettingsRow(
-                    BedtimeIcons.Refuge,
-                    "Use as your home screen",
-                    when {
-                        !homeScreen -> "All the time, with your favourite apps; otherwise only during minimal sessions"
-                        isDefaultHome -> "Pressing Home brings you here"
-                        else -> "Not your home app yet: tap to choose it"
-                    },
-                    onClick = if (homeScreen && !isDefaultHome) onAskHome else null,
-                    trailing = { ObsidianToggle(homeScreen, onHomeScreen) },
-                )
+                SectionLabel("minimal screen")
                 SettingsRow(Icons.Default.Home, "Look", "Colours, sizes and fonts", onClick = onHomeStyle)
                 SettingsRow(Icons.Default.DateRange, "What's shown", "Greeting, date, weather, your next event, a quote", onClick = onShown)
+                SettingsRow(Icons.Default.Refresh, "Gestures", "Swipes and a double tap: an app, a quick note, notifications…", onClick = onGestures)
+                SettingsRow(Icons.Default.Search, "Search", "What it offers after apps, and in what order", onClick = onSearch)
                 SettingsRow(Icons.Default.FavoriteBorder, "Quotes", "Your own, favourites, hidden ones", onClick = onQuotes)
                 if (homeScreen) {
                     SettingsRow(
@@ -335,9 +326,18 @@ internal fun SettingsContent(
                     "Show during sessions",
                     "The clock and the session over the lock screen, without the apps",
                     trailing = { ObsidianToggle(lockScreen, onLockScreen) },
-                    last = !lockScreen,
+                    last = !lockScreen && !homeScreen,
                 )
-                if (lockScreen) {
+                if (homeScreen) {
+                    SettingsRow(
+                        Icons.Default.Lock,
+                        "Also outside sessions",
+                        "Your lock screen all the time, while digital refuge is your launcher",
+                        trailing = { ObsidianToggle(lockAlways, onLockAlways) },
+                        last = !lockScreen && !lockAlways,
+                    )
+                }
+                if (lockScreen || (homeScreen && lockAlways)) {
                     SettingsRow(Icons.Default.KeyboardArrowUp, "Swipes", "Open an app or the camera from around the clock", onClick = onSwipes)
                     SettingsRow(Icons.Default.Notifications, "Notifications", "From the apps you choose; read, reply or keep for later", onClick = onLockNotifications, last = true)
                 }
@@ -362,6 +362,12 @@ internal fun SettingsContent(
                         else -> "$alwaysAvailableCount apps, never blocked, whichever session is on"
                     },
                     onClick = onAlwaysAvailable,
+                )
+                SettingsRow(
+                    Icons.Default.DateRange,
+                    "Distracting apps",
+                    "Today by the hour, on the home tab",
+                    onClick = onDistraction,
                     last = true,
                 )
 

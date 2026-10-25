@@ -1,5 +1,7 @@
 package app.bedtime.ui.setup
 
+import androidx.compose.runtime.mutableLongStateOf
+import app.bedtime.service.HomeRole
 import android.Manifest
 import android.content.Context
 import android.content.Intent
@@ -72,6 +74,19 @@ fun SetupScreen(onBack: () -> Unit, onAlwaysAvailable: () -> Unit) {
     var notificationsOk by remember { mutableStateOf(true) }
     var askedNotifications by rememberSaveable { mutableStateOf(false) }
     var previewing by remember { mutableStateOf(false) }
+    var isDefaultHome by remember { mutableStateOf(HomeRole.isDefault(context)) }
+    // Android only shows its "use as your home app?" when asked for an answer back. If it comes back at
+    // once without asking (declined before, or held elsewhere for good), its own home-app page is where
+    // to choose instead.
+    var askedHomeAt by remember { mutableLongStateOf(0L) }
+    val chooseHome = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        isDefaultHome = HomeRole.isDefault(context)
+        if (!isDefaultHome && System.currentTimeMillis() - askedHomeAt < 800) context.tryStart(Intent(Settings.ACTION_HOME_SETTINGS))
+    }
+    val askHome = {
+        askedHomeAt = System.currentTimeMillis()
+        runCatching { chooseHome.launch(HomeRole.askIntent(context)) }
+    }
     val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         notificationsOk = granted
     }
@@ -81,6 +96,7 @@ fun SetupScreen(onBack: () -> Unit, onAlwaysAvailable: () -> Unit) {
         dndOk = DndController.hasAccess(context)
         overlayOk = Settings.canDrawOverlays(context)
         notificationsOk = NotificationManagerCompat.from(context).areNotificationsEnabled()
+        isDefaultHome = HomeRole.isDefault(context)
         onPauseOrDispose { }
     }
 
@@ -114,6 +130,15 @@ fun SetupScreen(onBack: () -> Unit, onAlwaysAvailable: () -> Unit) {
         onAlwaysAvailable = onAlwaysAvailable,
         notificationsOk = notificationsOk,
         greyscaleViaModes = Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM,
+        launcherOn = settings.homeScreen,
+        isDefaultHome = isDefaultHome,
+        onLauncher = { on ->
+            HomeRole.setOffered(context, on)
+            scope.launch { repo.updateSettings { it.copy(homeScreen = on) } }
+            // Switched on, Android asks; switched off, it falls back to your other home app by itself.
+            if (on) askHome()
+        },
+        onChooseHome = { askHome() },
         onAllowNotifications = {
             // Ask once; after that (or before Android 13) the switch lives in the app's notification settings.
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !askedNotifications) {
@@ -146,6 +171,10 @@ internal fun SetupContent(
     notificationsOk: Boolean = true,
     onAllowNotifications: () -> Unit = {},
     greyscaleViaModes: Boolean = false,
+    launcherOn: Boolean = false,
+    isDefaultHome: Boolean = false,
+    onLauncher: (Boolean) -> Unit = {},
+    onChooseHome: () -> Unit = {},
 ) {
     val c = Obsidian.colors
     Scaffold(containerColor = c.bgPrimary, topBar = { ObsidianTopBar("Setup", onBack = onBack) }) { padding ->
@@ -236,6 +265,25 @@ internal fun SetupContent(
             StepCard(7, "Keep digital refuge running", done = false, badge = "Recommended") {
                 Body("Some phones (Samsung, Xiaomi, OnePlus…) put background apps to sleep. If blocking ever stops working, set digital refuge's battery usage to Unrestricted.")
                 PlainButton("Open battery settings", onClick = onOpenBattery, modifier = Modifier.fillMaxWidth())
+            }
+
+            StepCard(8, "Use as your default launcher", done = launcherOn && isDefaultHome, badge = "Optional") {
+                Body(
+                    "The minimal screen all the time, with your favourite apps; otherwise it's only there during the refuge " +
+                        "sessions you choose. Switch it off any time and your previous launcher is back.",
+                )
+                when {
+                    !launcherOn -> PlainButton("Use as default launcher", onClick = { onLauncher(true) }, modifier = Modifier.fillMaxWidth())
+                    !isDefaultHome -> {
+                        Body("Not your home app yet.")
+                        PlainButton("Choose it as your home app", onClick = onChooseHome, modifier = Modifier.fillMaxWidth())
+                        PlainButton("Stop using it", onClick = { onLauncher(false) }, modifier = Modifier.fillMaxWidth())
+                    }
+                    else -> {
+                        Body("Pressing Home brings you to the minimal screen.")
+                        PlainButton("Stop using it as launcher", onClick = { onLauncher(false) }, modifier = Modifier.fillMaxWidth())
+                    }
+                }
             }
             Spacer(Modifier.height(8.dp))
         }

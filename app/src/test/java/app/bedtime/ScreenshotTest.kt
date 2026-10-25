@@ -143,6 +143,74 @@ class ScreenshotTest {
     fun homeIdle() = shot(tall = true) { Home(Samples.home()) }
 
     @Test
+    fun homeHours() = shot(tall = true) {
+        Home(Samples.home().copy(hourly = mapOf(7 to 120L, 8 to 600L, 9 to 1500L, 12 to 200L, 13 to 900L), noteCount = 4))
+    }
+
+    @Test
+    fun homeGestures() = shot {
+        HomeStyleContent(
+            style = HomeStyle(homeGestures = mapOf(app.bedtime.data.HomeGesture.SWIPE_DOWN to app.bedtime.data.HomeActions.NOTIFICATIONS, app.bedtime.data.HomeGesture.DOUBLE_TAP to app.bedtime.data.HomeActions.LOCK, app.bedtime.data.HomeGesture.SWIPE_RIGHT to app.bedtime.data.HomeActions.NOTE)),
+            onChange = {},
+            previewApps = Samples.minimalApps,
+            now = Samples.lateEvening,
+            onBack = {},
+            page = app.bedtime.ui.homestyle.StylePage.GESTURES,
+        )
+    }
+
+    @Test
+    fun quickNote() = shot {
+        Screen {
+            app.bedtime.ui.minimal.QuickNoteContent(
+                HomeStyle(),
+                listOf(app.bedtime.data.NoteTarget("today", "z", daily = true), app.bedtime.data.NoteTarget("scratchpad", "x")),
+                onSave = { _, _ -> },
+                initial = "Call the plumber about the kitchen tap",
+                focus = false,
+            )
+        }
+    }
+
+    @Test
+    fun searchSettings() = shot {
+        val choice = { k: String, on: Boolean -> app.bedtime.data.SearchChoice(k, on) }
+        app.bedtime.ui.settings.SearchSettingsContent(
+            choices = listOf(
+                choice("web:a", true) to "Search the web · Chrome",
+                choice("note:refuge", true) to "Save in refuge notes",
+                choice("note:x", true) to "Add to today",
+                choice("calendar", true) to "Add to calendar, when the words say when",
+                choice("web:b", false) to "Search the web · Firefox",
+                choice("maps:c", true) to "Maps · Google Maps",
+                choice("lookup:d", false) to "Look up in Translate",
+            ),
+            onChange = {},
+            onBack = {},
+        )
+    }
+
+    @Test
+    fun distraction() = shot {
+        app.bedtime.ui.settings.DistractionContent(appCount = 4, minutes = 5, onHome = true, onLock = false, onPick = {}, onMinutes = {}, onShowHome = {}, onShowLock = {}, onBack = {})
+    }
+
+    @Test
+    fun everydayHomeHours() = shot {
+        MinimalHomeContent(
+            now = Samples.lateEvening,
+            scheduleName = null,
+            until = null,
+            apps = Samples.minimalApps,
+            style = HomeStyle(topSpace = app.bedtime.data.TopSpace.NONE),
+            onLaunch = {},
+            onUnlock = null,
+            quote = Samples.shortQuote,
+            hours = app.bedtime.data.HourlyUse.states(mapOf(8 to 600L, 9 to 1500L, 13 to 900L, 20 to 400L), 22, 5),
+        )
+    }
+
+    @Test
     fun homeActive() = shot { Home(Samples.home(hour = 15, runningFocus = true)) }
 
     @Test
@@ -538,7 +606,6 @@ class ScreenshotTest {
             onHomeStyle = {},
             onTileBlock = {},
             homeScreen = true,
-            isDefaultHome = false,
             hiddenCount = 3,
         )
     }
@@ -554,7 +621,6 @@ class ScreenshotTest {
             onHomeStyle = {},
             onTileBlock = {},
             homeScreen = true,
-            isDefaultHome = true,
             groupCount = 2,
             alwaysAvailableCount = 3,
         )
