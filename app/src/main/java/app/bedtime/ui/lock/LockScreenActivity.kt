@@ -354,8 +354,8 @@ private fun LockScreen(
         calendar = rememberCalendarLine(style, now, onLockScreen = true),
         weather = rememberWeather(style, now),
         onWeather = breezy?.let { app -> { onOpenApp(app) } },
-        hours = todayHours.takeIf { style.hoursOnLock && settings.distractingApps.isNotEmpty() }
-            ?.let { HourlyUse.states(it, now.hour, settings.distractionMinutes) },
+        hours = todayHours.takeIf { style.hoursOnLock && HourlyUse.counting(settings) }
+            ?.let { HourlyUse.states(it, now.hour, HourlyUse.rule(settings)) },
         notifications = if (style.lockNotifications) {
             val nowMs = System.currentTimeMillis()
             notifications.filter { it.packageName in style.lockNotificationApps && !LockNotifications.isQuiet(it, quiet, nowMs) }
@@ -452,7 +452,15 @@ internal fun LockScreenContent(
             Spacer(Modifier.height(if (preview) 12.dp else style.topSpace.dp.dp))
             SessionHeader(now, scheduleName, until, style, calendar, weather = weather, onWeather = onWeather)
             if (hours != null) {
-                HourDots(hours, text = style.palette().text, accent = style.palette().accent, modifier = Modifier.padding(top = 12.dp), onClick = onHours)
+                HourDots(
+                    hours,
+                    text = style.palette().text,
+                    accent = style.palette().accent,
+                    modifier = Modifier.padding(top = 12.dp),
+                    calmColor = style.hourCalmColor,
+                    distractedColor = style.hourDistractedColor,
+                    onClick = onHours,
+                )
             }
             if (notifications.isNotEmpty()) {
                 Spacer(Modifier.height(28.dp))

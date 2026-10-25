@@ -1,5 +1,7 @@
 package app.bedtime.ui.home
 
+import app.bedtime.data.HourRule
+import app.bedtime.data.DayHours
 import app.bedtime.ui.components.rememberTodayHours
 import app.bedtime.ui.components.HourDetailDialog
 import app.bedtime.ui.components.HourDots
@@ -129,9 +131,11 @@ internal data class HomeUiState(
     val quoteFavourite: Boolean = false,
     /** How many notes you have, for the line at the foot. */
     val noteCount: Int = 0,
-    /** Today's seconds in distracting apps by hour; null until you've chosen those apps. */
-    val hourly: Map<Int, Long>? = null,
-    val distractionMinutes: Int = 5,
+    /** Today's seconds by hour; null until there's something to count by. */
+    val hourly: DayHours? = null,
+    val hourRule: HourRule = HourRule(5),
+    val hourCalmColor: Long? = null,
+    val hourDistractedColor: Long? = null,
 )
 
 /** The home tab: what's running now, how the week has gone, and the blocks you can start. */
@@ -202,8 +206,10 @@ fun HomeScreen(
             loaded, active, runtime, history, serviceOn, greyscaleOk, dndOk, now, quote, undoBlockId, whatsNew, style.quoteFont,
             quoteFavourite = quote != null && quote.text in settings.quotes.favourites,
             noteCount = notes.size,
-            hourly = hourly.takeIf { settings.distractingApps.isNotEmpty() },
-            distractionMinutes = settings.distractionMinutes,
+            hourly = hourly.takeIf { HourlyUse.counting(settings) },
+            hourRule = HourlyUse.rule(settings),
+            hourCalmColor = settings.homeStyle.hourCalmColor,
+            hourDistractedColor = settings.homeStyle.hourDistractedColor,
         ),
         onQuoteFavourite = { quote?.let(quoteActions.favourite) },
         onQuoteHide = { quote?.let(quoteActions.hide) },
@@ -318,7 +324,9 @@ internal fun HomeContent(
                     QuoteFooter(ui.quote, ui.quoteFont, ui.quoteFavourite, onQuoteFavourite, onQuoteHide, onQuoteAnother)
                 }
             }
-            item(key = "hours") { HoursSection(ui.hourly, ui.distractionMinutes, Instant.ofEpochMilli(ui.now).atZone(ZoneId.systemDefault()).hour, onDistraction) }
+            item(key = "hours") {
+                HoursSection(ui.hourly, ui.hourRule, Instant.ofEpochMilli(ui.now).atZone(ZoneId.systemDefault()).hour, ui.hourCalmColor, ui.hourDistractedColor, onDistraction)
+            }
             // The week in one quiet line at the very foot; the full figures are a tap away.
             homeSummary(Stats.week(ui.history, ui.now), Stats.streak(ui.history, ui.now))?.let { summary ->
                 item(key = "stats") { StatsLine(summary, onStats) }
@@ -673,7 +681,7 @@ private fun EmptyState(onCreate: () -> Unit, onTemplate: (String) -> Unit, isIns
  * distracting apps are chosen, a line inviting you to choose them.
  */
 @Composable
-private fun HoursSection(hourly: Map<Int, Long>?, thresholdMinutes: Int, nowHour: Int, onChoose: () -> Unit) {
+private fun HoursSection(hourly: DayHours?, rule: HourRule, nowHour: Int, calmColor: Long?, distractedColor: Long?, onChoose: () -> Unit) {
     val c = Obsidian.colors
     var detail by remember { mutableStateOf(false) }
     Column(Modifier.padding(horizontal = PageGutter).padding(top = 26.dp)) {
@@ -688,9 +696,17 @@ private fun HoursSection(hourly: Map<Int, Long>?, thresholdMinutes: Int, nowHour
             }
             return@Column
         }
-        val states = HourlyUse.states(hourly, nowHour, thresholdMinutes)
-        Text(HourlyUse.summary(states, thresholdMinutes), style = MaterialTheme.typography.bodyMedium, color = c.textMuted, modifier = Modifier.padding(top = 16.dp))
-        HourDots(states, text = c.textNormal, accent = c.accent, modifier = Modifier.padding(top = 6.dp), onClick = { detail = true })
-        if (detail) HourDetailDialog(hourly, thresholdMinutes, c.bgSecondary, c.textNormal, c.textFaint, c.accent, onDismiss = { detail = false })
+        val states = HourlyUse.states(hourly, nowHour, rule)
+        Text(HourlyUse.summary(states, rule), style = MaterialTheme.typography.bodyMedium, color = c.textMuted, modifier = Modifier.padding(top = 16.dp))
+        HourDots(
+            states,
+            text = c.textNormal,
+            accent = c.accent,
+            modifier = Modifier.padding(top = 6.dp),
+            calmColor = calmColor,
+            distractedColor = distractedColor,
+            onClick = { detail = true },
+        )
+        if (detail) HourDetailDialog(hourly, rule, c.bgSecondary, c.textNormal, c.textFaint, c.accent, onDismiss = { detail = false })
     }
 }

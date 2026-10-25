@@ -88,30 +88,54 @@ object SearchTargets {
 val SearchTarget.key: String get() = "${kind.name.lowercase()}:$packageName"
 
 /**
- * What the search offers after apps, and in what order. With nothing chosen: one web search and one
- * maps (the first found of each), every dictionary, your files, refuge notes and the calendar, in that
- * order; Wikipedia is listed, but off until you switch it on. Your choices, once made, keep their order; anything new joins at the end.
+ * What the search offers after apps, and in what order. With nothing chosen, only one web search (the
+ * first found), your files, refuge notes and the calendar are on; Wikipedia, maps, dictionaries and
+ * contacts are listed, off until you switch them on. Your choices, once made, keep their order; anything new joins at the end.
  */
 object SearchOrder {
     const val REFUGE_NOTES = "note:refuge"
     const val CALENDAR = "calendar"
+    const val CONTACTS = "contacts"
 
     fun noteKey(target: NoteTarget) = "note:${target.uri}"
 
     fun defaults(targets: List<SearchTarget>, notes: List<NoteTarget>): List<SearchChoice> {
         val ordered = SearchTarget.Kind.entries.flatMap { kind -> targets.filter { it.kind == kind }.distinctBy { it.packageName } }
         val firsts = ordered.groupBy { it.kind }.mapValues { (_, same) -> same.first().key }
-        val on = { t: SearchTarget -> t.kind == SearchTarget.Kind.LOOKUP || (t.kind != SearchTarget.Kind.WIKIPEDIA && firsts[t.kind] == t.key) }
-        return ordered.map { SearchChoice(it.key, on(it)) } +
-            notes.map { SearchChoice(noteKey(it), true) } +
-            SearchChoice(REFUGE_NOTES, true) +
-            SearchChoice(CALENDAR, true)
+        val on = { t: SearchTarget -> t.kind == SearchTarget.Kind.WEB && firsts[t.kind] == t.key }
+        return onFirst(
+            ordered.map { SearchChoice(it.key, on(it)) } +
+                notes.map { SearchChoice(noteKey(it), true) } +
+                SearchChoice(REFUGE_NOTES, true) +
+                SearchChoice(CALENDAR, true) +
+                SearchChoice(CONTACTS, false),
+        )
     }
 
     fun arrange(defaults: List<SearchChoice>, saved: List<SearchChoice>): List<SearchChoice> {
         val present = defaults.map { it.key }.toSet()
         val known = saved.map { it.key }.toSet()
-        return saved.filter { it.key in present } + defaults.filter { it.key !in known }
+        return onFirst(saved.filter { it.key in present } + defaults.filter { it.key !in known })
+    }
+
+    /** Those switched on first, in their order, then those switched off. */
+    fun onFirst(choices: List<SearchChoice>): List<SearchChoice> = choices.filter { it.on } + choices.filterNot { it.on }
+
+    /**
+     * [key] switched [on], and moved to where that belongs: switched on, to the end of those on;
+     * switched off, to the top of those off. Both are the same place, just past the last one on.
+     */
+    fun switched(choices: List<SearchChoice>, key: String, on: Boolean): List<SearchChoice> {
+        val item = choices.firstOrNull { it.key == key }?.copy(on = on) ?: return choices
+        val rest = onFirst(choices.filterNot { it.key == key })
+        val at = rest.count { it.on }
+        return rest.take(at) + item + rest.drop(at)
+    }
+
+    /** The one at [from] put at [to], the rest closing up around it. */
+    fun move(choices: List<SearchChoice>, from: Int, to: Int): List<SearchChoice> {
+        if (from !in choices.indices || to !in choices.indices) return choices
+        return choices.toMutableList().apply { add(to, removeAt(from)) }
     }
 
     /** [choices] with [key] moved one place up (or down), staying put at either end. */

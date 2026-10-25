@@ -1,5 +1,7 @@
 package app.bedtime.ui.minimal
 
+import app.bedtime.data.ContactSearch
+import app.bedtime.data.ContactHit
 import app.bedtime.ui.components.rememberTodayHours
 import app.bedtime.ui.components.HourDetailDialog
 import app.bedtime.data.HourlyUse
@@ -348,6 +350,13 @@ private fun MinimalHomeScreen(
             else -> AppCatalog.launch(context, action)
         }
     }
+    val searchChoices = SearchOrder.arrange(SearchOrder.defaults(searchTargets, settings.noteTargets), settings.searchChoices)
+    // Contacts are looked up as you type, only when you've switched them on in the search.
+    val contactsOn = searchChoices.any { it.key == SearchOrder.CONTACTS && it.on }
+    val contacts by produceState(emptyList<ContactHit>(), query, contactsOn) {
+        value = if (contactsOn && query.trim().length >= 2) withContext(Dispatchers.IO) { ContactSearch.find(context, query) } else emptyList()
+    }
+    val whatsApp = remember { ContactSearch.hasWhatsApp(context) }
     val onResult: (DrawerResult) -> Unit = { result ->
         val words = query.trim()
         when (result) {
@@ -369,6 +378,22 @@ private fun MinimalHomeScreen(
             } else {
                 pendingEvent = result.event
                 askCalendar.launch(arrayOf(Manifest.permission.READ_CALENDAR, Manifest.permission.WRITE_CALENDAR))
+            }
+            is DrawerResult.Contact -> {
+                runCatching { context.startActivity(ContactSearch.call(result.hit)) }
+                closeDrawer()
+            }
+            is DrawerResult.Message -> {
+                runCatching { context.startActivity(ContactSearch.message(result.hit)) }
+                closeDrawer()
+            }
+            is DrawerResult.WhatsApp -> {
+                val chat = ContactSearch.whatsapp(result.hit)
+                if (chat == null || runCatching { context.startActivity(chat) }.isFailure) {
+                    Toast.makeText(context, "whatsapp needs their number with its country code", Toast.LENGTH_SHORT).show()
+                } else {
+                    closeDrawer()
+                }
             }
             DrawerResult.OpenNotes -> {
                 notesOpen = true
@@ -394,8 +419,10 @@ private fun MinimalHomeScreen(
                     SearchTargets.offered(searchTargets, openable.map { it.packageName }.toSet()),
                     settings.noteTargets,
                     EventParser.parse(query, LocalDateTime.now()),
-                    SearchOrder.arrange(SearchOrder.defaults(searchTargets, settings.noteTargets), settings.searchChoices),
+                    searchChoices,
+                    contacts,
                 ),
+                whatsApp = whatsApp,
                 onLaunch = { pkg ->
                     AppCatalog.launch(context, pkg)
                     closeDrawer()
@@ -459,8 +486,8 @@ private fun MinimalHomeScreen(
             onCalendar = { scope.launch { week = loadCalendarWeek(context, LocalDateTime.now()) } },
             onOpenDrawer = { drawer = true },
             onGesture = onGesture,
-            hours = todayHours.takeIf { style.hoursOnHome && settings.distractingApps.isNotEmpty() }
-                ?.let { HourlyUse.states(it, now.hour, settings.distractionMinutes) },
+            hours = todayHours.takeIf { style.hoursOnHome && HourlyUse.counting(settings) }
+                ?.let { HourlyUse.states(it, now.hour, HourlyUse.rule(settings)) },
             onHours = { hoursDetail = true },
             weather = rememberWeather(style, now),
             onWeather = breezy?.let { app -> { AppCatalog.launch(context, app) } },
@@ -471,7 +498,7 @@ private fun MinimalHomeScreen(
     if (quickNote) QuickNoteDialog(style, settings.noteTargets, onSave = saveNote, onDismiss = { quickNote = false })
     if (hoursDetail) {
         val p = style.palette()
-        HourDetailDialog(todayHours, settings.distractionMinutes, p.background, p.text, p.faint, p.accent, onDismiss = { hoursDetail = false })
+        HourDetailDialog(todayHours, HourlyUse.rule(settings), p.background, p.text, p.faint, p.accent, onDismiss = { hoursDetail = false })
     }
     actionsFor?.let { app ->
         val shortcuts by produceState(emptyList<ShortcutInfo>(), app.packageName) {
@@ -614,7 +641,15 @@ internal fun MinimalHomeContent(
             Spacer(Modifier.height(if (preview) 12.dp else style.topSpace.dp.dp))
             SessionHeader(now, scheduleName, until, style, calendar, onCalendar, weather, onWeather)
             if (hours != null) {
-                HourDots(hours, text = style.palette().text, accent = style.palette().accent, modifier = Modifier.padding(top = 12.dp), onClick = onHours)
+                HourDots(
+                    hours,
+                    text = style.palette().text,
+                    accent = style.palette().accent,
+                    modifier = Modifier.padding(top = 12.dp),
+                    calmColor = style.hourCalmColor,
+                    distractedColor = style.hourDistractedColor,
+                    onClick = onHours,
+                )
             }
             if (quote != null && style.showQuote) {
                 Spacer(Modifier.height(if (preview) 20.dp else 28.dp))

@@ -199,6 +199,9 @@ data class HomeStyle(
     /** The row of today's 24 hours on the minimal screen, and on the lock screen. */
     val hoursOnHome: Boolean = false,
     val hoursOnLock: Boolean = false,
+    /** The dots' colours: calm hours, and distracted ones; null follows the text and the accent. */
+    val hourCalmColor: Long? = null,
+    val hourDistractedColor: Long? = null,
     /** How much of it: now, today's range too, or three days with their skies. */
     val weatherStyle: WeatherStyle = WeatherStyle.TODAY,
     /** Celsius, Fahrenheit, or the usual one where the phone is set. */
@@ -289,6 +292,8 @@ data class AppSettings(
     val distractingApps: Set<String> = emptySet(),
     /** Minutes in those apps that make an hour a distracted one. */
     val distractionMinutes: Int = 5,
+    /** Minutes in any app that make an hour a distracted one too; null leaves it to the distracting apps. */
+    val distractionTotalMinutes: Int? = null,
     /** What the search offers after apps, in your order, each on or off; empty until you change it. */
     val searchChoices: List<SearchChoice> = emptyList(),
     /** Which block each home-screen widget starts, by widget id; missing means the tile's block, then the first. */
@@ -403,6 +408,8 @@ data class UsageDay(
     val seconds: Map<String, Long> = emptyMap(),
     /** Seconds in your distracting apps, by hour of the day (0–23). */
     val hourly: Map<Int, Long> = emptyMap(),
+    /** Seconds in any app but digital refuge itself, by hour of the day. */
+    val hourlyAll: Map<Int, Long> = emptyMap(),
     /** Times the pause before opening was shown, by package. */
     val opens: Map<String, Int> = emptyMap(),
     /** When more time was taken, by limit id; lifting for the rest of the day counts here too. */

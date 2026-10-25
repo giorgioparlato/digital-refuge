@@ -1,5 +1,11 @@
 package app.bedtime.ui.settings
 
+import app.bedtime.ui.homestyle.TextPresets
+import app.bedtime.ui.homestyle.SwatchRow
+import app.bedtime.ui.homestyle.AccentPresets
+import app.bedtime.ui.components.QuickChip
+import app.bedtime.ui.components.HourDots
+import app.bedtime.data.HourState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -70,8 +76,14 @@ fun DistractionScreen(onBack: () -> Unit) {
         onLock = current.homeStyle.hoursOnLock,
         onPick = { picking = true },
         onMinutes = { m -> scope.launch { repo.updateSettings { it.copy(distractionMinutes = m) } } },
+        totalMinutes = current.distractionTotalMinutes,
+        onTotalMinutes = { m -> scope.launch { repo.updateSettings { it.copy(distractionTotalMinutes = m) } } },
         onShowHome = { on -> scope.launch { repo.updateSettings { it.copy(homeStyle = it.homeStyle.copy(hoursOnHome = on)) } } },
         onShowLock = { on -> scope.launch { repo.updateSettings { it.copy(homeStyle = it.homeStyle.copy(hoursOnLock = on)) } } },
+        calmColor = current.homeStyle.hourCalmColor,
+        distractedColor = current.homeStyle.hourDistractedColor,
+        onCalmColor = { v -> scope.launch { repo.updateSettings { it.copy(homeStyle = it.homeStyle.copy(hourCalmColor = v)) } } },
+        onDistractedColor = { v -> scope.launch { repo.updateSettings { it.copy(homeStyle = it.homeStyle.copy(hourDistractedColor = v)) } } },
         onBack = onBack,
     )
 }
@@ -87,6 +99,12 @@ internal fun DistractionContent(
     onShowHome: (Boolean) -> Unit,
     onShowLock: (Boolean) -> Unit,
     onBack: () -> Unit,
+    calmColor: Long? = null,
+    distractedColor: Long? = null,
+    totalMinutes: Int? = null,
+    onTotalMinutes: (Int?) -> Unit = {},
+    onCalmColor: (Long?) -> Unit = {},
+    onDistractedColor: (Long?) -> Unit = {},
 ) {
     val c = Obsidian.colors
     Scaffold(containerColor = c.bgPrimary, topBar = { ObsidianTopBar("Distracting apps", onBack = onBack) }) { padding ->
@@ -95,7 +113,7 @@ internal fun DistractionContent(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(
-                "Today as 24 dots on the home tab: an hour lights up when you spent more than its minutes in these apps. Only which app was open is counted, never what was in it.",
+                "Today as 24 dots on the home tab: an hour lights up when you spent more than its minutes in these apps, or, if you like, on the phone at all. Only which app was open is counted, never what was in it.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = c.textMuted,
             )
@@ -103,11 +121,42 @@ internal fun DistractionContent(
                 OptionRow(BedtimeIcons.Grid, "The apps", description = if (appCount == 0) "None yet" else pluralApps(appCount), onClick = onPick) { Chevron() }
             }
             SectionCard(title = "An hour counts after") {
+                Text("In these apps", style = MaterialTheme.typography.labelMedium, color = c.textMuted, modifier = Modifier.padding(bottom = 8.dp))
                 SegmentedChoice(
                     options = HourlyUse.THRESHOLDS.map { "$it min" },
                     selected = HourlyUse.THRESHOLDS.indexOf(minutes).coerceAtLeast(0),
                     onSelect = { onMinutes(HourlyUse.THRESHOLDS[it]) },
                 )
+                Text(
+                    "Or on the phone at all, in any app",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = c.textMuted,
+                    modifier = Modifier.padding(top = 16.dp, bottom = 8.dp),
+                )
+                val totals = listOf<Int?>(null) + HourlyUse.TOTAL_THRESHOLDS
+                SegmentedChoice(
+                    options = totals.map { it?.let { m -> "$m min" } ?: "Off" },
+                    selected = totals.indexOf(totalMinutes).coerceAtLeast(0),
+                    onSelect = { onTotalMinutes(totals[it]) },
+                )
+            }
+            SectionCard(title = "Colours") {
+                // How they'll look: a few calm hours, two distracted ones, this one, and some to come.
+                HourDots(
+                    List(9) { HourState.CALM } + HourState.DISTRACTED + HourState.CALM + HourState.DISTRACTED + HourState.NOW + List(11) { HourState.AHEAD },
+                    text = c.textNormal,
+                    accent = c.accent,
+                    calmColor = calmColor,
+                    distractedColor = distractedColor,
+                )
+                Text("Calm hours", style = MaterialTheme.typography.labelMedium, color = c.textMuted, modifier = Modifier.padding(top = 8.dp, bottom = 8.dp))
+                QuickChip("Automatic", calmColor == null) { onCalmColor(null) }
+                Spacer(Modifier.height(10.dp))
+                SwatchRow(TextPresets, calmColor ?: -1L) { onCalmColor(it) }
+                Text("Distracted hours", style = MaterialTheme.typography.labelMedium, color = c.textMuted, modifier = Modifier.padding(top = 16.dp, bottom = 8.dp))
+                QuickChip("Accent", distractedColor == null) { onDistractedColor(null) }
+                Spacer(Modifier.height(10.dp))
+                SwatchRow(AccentPresets + DistractedPresets, distractedColor ?: -1L) { onDistractedColor(it) }
             }
             SectionCard(title = "Also show it") {
                 OptionRow(Icons.Default.Home, "On the minimal screen", description = "A row under the date") { ObsidianToggle(onHome, onShowHome) }
@@ -117,3 +166,6 @@ internal fun DistractionContent(
         }
     }
 }
+
+/** A warmer colour for distracted hours, besides the accents (amber is already among them). */
+private val DistractedPresets: List<Pair<String, Long>> = listOf("Ember" to 0xFFD9604AL)

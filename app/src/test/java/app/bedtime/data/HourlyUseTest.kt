@@ -25,13 +25,24 @@ class HourlyUseTest {
 
     @Test
     fun hoursReadAsCalmDistractedNowOrAhead() {
-        val states = HourlyUse.states(mapOf(8 to 200L, 9 to 400L, 14 to 900L), nowHour = 14, thresholdMinutes = 5)
+        val states = HourlyUse.states(DayHours(mapOf(8 to 200L, 9 to 400L, 14 to 900L)), nowHour = 14, rule = HourRule(5))
         assertEquals(HourState.CALM, states[8])
         assertEquals(HourState.DISTRACTED, states[9])
         assertEquals(HourState.NOW_DISTRACTED, states[14])
         assertEquals(HourState.AHEAD, states[15])
         assertEquals(24, states.size)
-        assertEquals("2 hours over 5 min in distracting apps today", HourlyUse.summary(states, 5))
+        assertEquals("2 hours over 5 min in distracting apps today", HourlyUse.summary(states, HourRule(5)))
+    }
+
+    @Test
+    fun orOnThePhoneAtAllIfYouSaySo() {
+        // Only 3 min in distracting apps, but 40 in all: distracted with the any-app rule at 30, not without it.
+        val hours = DayHours(apps = mapOf(10 to 180L), all = mapOf(10 to 2400L))
+        assertEquals(false, HourlyUse.distracted(hours, 10, HourRule(5)))
+        assertEquals(true, HourlyUse.distracted(hours, 10, HourRule(5, totalMinutes = 30)))
+        assertEquals(false, HourlyUse.distracted(hours, 10, HourRule(5, totalMinutes = 45)))
+        val states = HourlyUse.states(hours, nowHour = 12, rule = HourRule(5, 30))
+        assertEquals("1 distracted hour today", HourlyUse.summary(states, HourRule(5, 30)))
     }
 
     @Test
@@ -42,5 +53,7 @@ class HourlyUseTest {
         assertEquals(false, s.homeStyle.hoursOnHome)
         assertEquals(TopSpace.MEDIUM, s.homeStyle.topSpace)
         assertEquals(false, s.homeStyle.lockAlways)
+        assertEquals(null, s.distractionTotalMinutes)
+        assertEquals(false, HourlyUse.counting(s))
     }
 }

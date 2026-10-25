@@ -144,7 +144,7 @@ class ScreenshotTest {
 
     @Test
     fun homeHours() = shot(tall = true) {
-        Home(Samples.home().copy(hourly = mapOf(7 to 120L, 8 to 600L, 9 to 1500L, 12 to 200L, 13 to 900L), noteCount = 4))
+        Home(Samples.home().copy(hourly = app.bedtime.data.DayHours(mapOf(7 to 120L, 8 to 600L, 9 to 1500L, 12 to 200L, 13 to 900L)), noteCount = 4))
     }
 
     @Test
@@ -192,7 +192,10 @@ class ScreenshotTest {
 
     @Test
     fun distraction() = shot {
-        app.bedtime.ui.settings.DistractionContent(appCount = 4, minutes = 5, onHome = true, onLock = false, onPick = {}, onMinutes = {}, onShowHome = {}, onShowLock = {}, onBack = {})
+        app.bedtime.ui.settings.DistractionContent(
+            appCount = 4, minutes = 5, onHome = true, onLock = false, onPick = {}, onMinutes = {}, onShowHome = {}, onShowLock = {}, onBack = {},
+            totalMinutes = 30, distractedColor = 0xFFD9604AL,
+        )
     }
 
     @Test
@@ -206,7 +209,7 @@ class ScreenshotTest {
             onLaunch = {},
             onUnlock = null,
             quote = Samples.shortQuote,
-            hours = app.bedtime.data.HourlyUse.states(mapOf(8 to 600L, 9 to 1500L, 13 to 900L, 20 to 400L), 22, 5),
+            hours = app.bedtime.data.HourlyUse.states(app.bedtime.data.DayHours(mapOf(8 to 600L, 9 to 1500L, 13 to 900L, 20 to 400L)), 22, app.bedtime.data.HourRule(5)),
         )
     }
 

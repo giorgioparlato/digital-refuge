@@ -1,5 +1,7 @@
 package app.bedtime.ui.components
 
+import app.bedtime.data.HourRule
+import app.bedtime.data.DayHours
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -36,7 +38,18 @@ import app.bedtime.ui.formatMinuteOfDay
  * still to come faint. A tap opens the minutes behind them.
  */
 @Composable
-fun HourDots(states: List<HourState>, text: Color, accent: Color, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
+fun HourDots(
+    states: List<HourState>,
+    text: Color,
+    accent: Color,
+    modifier: Modifier = Modifier,
+    /** Your colours for calm and distracted hours, where you've chosen them. */
+    calmColor: Long? = null,
+    distractedColor: Long? = null,
+    onClick: (() -> Unit)? = null,
+) {
+    val calm = calmColor?.let { Color(it) } ?: text.copy(alpha = 0.55f)
+    val distracted = distractedColor?.let { Color(it) } ?: accent
     Row(
         modifier
             .fillMaxWidth()
@@ -48,8 +61,8 @@ fun HourDots(states: List<HourState>, text: Color, accent: Color, modifier: Modi
     ) {
         states.forEach { state ->
             val fill = when (state) {
-                HourState.DISTRACTED, HourState.NOW_DISTRACTED -> accent
-                HourState.CALM, HourState.NOW -> text.copy(alpha = 0.55f)
+                HourState.DISTRACTED, HourState.NOW_DISTRACTED -> distracted
+                HourState.CALM, HourState.NOW -> calm
                 HourState.AHEAD -> text.copy(alpha = 0.16f)
             }
             val now = state == HourState.NOW || state == HourState.NOW_DISTRACTED
@@ -61,19 +74,20 @@ fun HourDots(states: List<HourState>, text: Color, accent: Color, modifier: Modi
     }
 }
 
-/** Today's hours (0–23) and seconds in distracting apps, refreshed as they're counted. */
+/** Today's seconds by hour, in distracting apps and in any, refreshed as they're counted. */
 @Composable
-fun rememberTodayHours(): Map<Int, Long> {
+fun rememberTodayHours(): DayHours {
     val context = LocalContext.current
     val repo = remember { Repository.get(context.applicationContext) }
     val usage by repo.usage.collectAsStateWithLifecycle(initialValue = emptyList())
     val today = HourlyUse.today()
-    return usage.lastOrNull { it.day == today }?.hourly.orEmpty()
+    val day = usage.lastOrNull { it.day == today }
+    return DayHours(day?.hourly.orEmpty(), day?.hourlyAll.orEmpty())
 }
 
 /** The minutes behind the dots: each hour of today with any time in distracting apps. */
 @Composable
-fun HourDetailDialog(hourly: Map<Int, Long>, thresholdMinutes: Int, background: Color, text: Color, faint: Color, accent: Color, onDismiss: () -> Unit) {
+fun HourDetailDialog(hours: DayHours, rule: HourRule, background: Color, text: Color, faint: Color, accent: Color, onDismiss: () -> Unit) {
     val context = LocalContext.current
     Dialog(onDismissRequest = onDismiss) {
         Column(
@@ -81,22 +95,31 @@ fun HourDetailDialog(hourly: Map<Int, Long>, thresholdMinutes: Int, background: 
         ) {
             Text("Today by the hour", style = MaterialTheme.typography.titleMedium, color = text)
             Text(
-                "Minutes in your distracting apps; over $thresholdMinutes counts as a distracted hour.",
+                if (rule.totalMinutes == null) {
+                    "Minutes in your distracting apps; over ${rule.appMinutes} counts as a distracted hour."
+                } else {
+                    "Minutes in your distracting apps, then in any app; over ${rule.appMinutes} or over ${rule.totalMinutes} counts as a distracted hour."
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = faint,
                 modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
             )
-            val used = hourly.filterValues { it >= 60 }.toSortedMap()
+            val used = (0 until 24).filter { (hours.apps[it] ?: 0L) >= 60 || (rule.totalMinutes != null && (hours.all[it] ?: 0L) >= 60) }
             if (used.isEmpty()) {
                 Text("Nothing yet today.", style = MaterialTheme.typography.bodyMedium, color = faint)
             } else {
                 LazyColumn(Modifier.heightIn(max = 420.dp)) {
-                    used.forEach { (hour, seconds) ->
+                    used.forEach { hour ->
                         item(key = hour) {
-                            val minutes = (seconds / 60).toInt()
+                            val inApps = ((hours.apps[hour] ?: 0L) / 60).toInt()
+                            val inAll = ((hours.all[hour] ?: 0L) / 60).toInt()
                             Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Text(formatMinuteOfDay(context, hour * 60), style = MaterialTheme.typography.bodyMedium, color = faint, modifier = Modifier.weight(1f))
-                                Text("$minutes min", style = MaterialTheme.typography.bodyMedium, color = if (minutes > thresholdMinutes) accent else text)
+                                Text(
+                                    if (rule.totalMinutes == null) "$inApps min" else "$inApps min · $inAll in all",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = if (HourlyUse.distracted(hours, hour, rule)) accent else text,
+                                )
                             }
                         }
                     }

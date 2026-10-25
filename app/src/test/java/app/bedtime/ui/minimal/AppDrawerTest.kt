@@ -68,16 +68,17 @@ class AppDrawerTest {
             SearchTarget(SearchTarget.Kind.WIKIPEDIA, "pkg.wiki", "Wikipedia"),
         )
         val scratch = NoteTarget("scratchpad", "content://s")
+        // For someone new, only one web search, notes and the calendar are on; the rest wait below, off.
         assertEquals(
             listOf(
                 SearchChoice("web:pkg.chrome", true),
-                SearchChoice("web:pkg.firefox", false),
-                // Wikipedia is offered, but off until you want it.
-                SearchChoice("wikipedia:pkg.wiki", false),
-                SearchChoice("lookup:pkg.dict", true),
                 SearchChoice("note:content://s", true),
                 SearchChoice(SearchOrder.REFUGE_NOTES, true),
                 SearchChoice(SearchOrder.CALENDAR, true),
+                SearchChoice("web:pkg.firefox", false),
+                SearchChoice("wikipedia:pkg.wiki", false),
+                SearchChoice("lookup:pkg.dict", false),
+                SearchChoice(SearchOrder.CONTACTS, false),
             ),
             SearchOrder.defaults(targets, listOf(scratch)),
         )
@@ -88,13 +89,51 @@ class AppDrawerTest {
         val web = SearchTarget(SearchTarget.Kind.WEB, "pkg.browser", "Browser")
         val wiki = SearchTarget(SearchTarget.Kind.WIKIPEDIA, "pkg.wiki", "Wikipedia")
         val defaults = SearchOrder.defaults(listOf(web, wiki), emptyList())
-        // Refuge notes first, Wikipedia off; the calendar wasn't in your list yet, so it joins at the end.
+        // Refuge notes first, Wikipedia off; the calendar wasn't in your list yet, so it joins the ones on,
+        // and those switched off sit below them all.
         val saved = listOf(SearchChoice(SearchOrder.REFUGE_NOTES, true), SearchChoice("wikipedia:pkg.wiki", false), SearchChoice("web:pkg.browser", true))
         val choices = SearchOrder.arrange(defaults, saved)
-        assertEquals(saved + SearchChoice(SearchOrder.CALENDAR, true), choices)
+        assertEquals(
+            listOf(
+                SearchChoice(SearchOrder.REFUGE_NOTES, true),
+                SearchChoice("web:pkg.browser", true),
+                SearchChoice(SearchOrder.CALENDAR, true),
+                SearchChoice("wikipedia:pkg.wiki", false),
+                SearchChoice(SearchOrder.CONTACTS, false),
+            ),
+            choices,
+        )
         val results = AppDrawer.results("tea", emptyList(), listOf(web, wiki), emptyList(), null, choices)
         assertEquals(listOf(DrawerResult.AddNote(null), DrawerResult.Search(web)), results)
         // Moving one up.
-        assertEquals("web:pkg.browser", SearchOrder.moved(choices, "web:pkg.browser", up = true)[1].key)
+        assertEquals("web:pkg.browser", SearchOrder.moved(choices, "web:pkg.browser", up = true)[0].key)
+    }
+
+    @Test
+    fun switchingMovesItBelowTheOnesStillOn() {
+        val a = SearchChoice("a", true); val b = SearchChoice("b", true); val c = SearchChoice("c", true); val d = SearchChoice("d", false)
+        // Off: just past the last one on.
+        assertEquals(listOf(a, c, b.copy(on = false), d), SearchOrder.switched(listOf(a, b, c, d), "b", on = false))
+        // On again: at the end of those on.
+        assertEquals(listOf(a, b, c, d.copy(on = true)), SearchOrder.switched(listOf(a, b, c, d), "d", on = true))
+        // Saved in a mixed order, they still show on first.
+        assertEquals(listOf(a, c, d), SearchOrder.onFirst(listOf(d, a, c)))
+        // Dragging the first to the third place.
+        assertEquals(listOf(b, c, a, d), SearchOrder.move(listOf(a, b, c, d), 0, 2))
+    }
+
+    @Test
+    fun contactsShowWhereYouPutThem() {
+        val anna = app.bedtime.data.ContactHit("Anna", "+46 70 123", "+4670123")
+        val choices = listOf(SearchChoice(SearchOrder.CONTACTS, true), SearchChoice(SearchOrder.REFUGE_NOTES, true))
+        assertEquals(
+            listOf(DrawerResult.Contact(anna), DrawerResult.AddNote(null)),
+            AppDrawer.results("ann", emptyList(), emptyList(), emptyList(), null, choices, contacts = listOf(anna)),
+        )
+        // Switched off, none show even if found.
+        assertEquals(
+            listOf(DrawerResult.AddNote(null)),
+            AppDrawer.results("ann", emptyList(), emptyList(), emptyList(), null, choices.map { if (it.key == SearchOrder.CONTACTS) it.copy(on = false) else it }, contacts = listOf(anna)),
+        )
     }
 }

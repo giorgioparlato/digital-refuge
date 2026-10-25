@@ -1,5 +1,8 @@
 package app.bedtime.ui.minimal
 
+import androidx.compose.foundation.border
+import androidx.compose.material.icons.filled.Call
+import app.bedtime.data.ContactHit
 import app.bedtime.data.key
 import app.bedtime.data.SearchOrder
 import app.bedtime.data.SearchChoice
@@ -85,6 +88,10 @@ sealed interface DrawerResult {
     data class AddNote(val target: NoteTarget?) : DrawerResult
     data class AddEvent(val event: ParsedEvent) : DrawerResult
     data object OpenNotes : DrawerResult
+    /** A contact: tapped, the phone app with their number; [Message] and [WhatsApp] are its two buttons. */
+    data class Contact(val hit: ContactHit) : DrawerResult
+    data class Message(val hit: ContactHit) : DrawerResult
+    data class WhatsApp(val hit: ContactHit) : DrawerResult
 }
 
 object AppDrawer {
@@ -108,6 +115,8 @@ object AppDrawer {
         event: ParsedEvent?,
         /** Your choices, in your order; the defaults when null. */
         choices: List<SearchChoice>? = null,
+        /** Contacts matching the words, looked up only when contacts are switched on. */
+        contacts: List<ContactHit> = emptyList(),
     ): List<DrawerResult> {
         val q = query.trim()
         if (q.isEmpty()) return emptyList()
@@ -123,7 +132,9 @@ object AppDrawer {
         return buildList {
             matching.forEach { add(DrawerResult.App(it)) }
             if (q.length >= 2 && "notes".startsWith(q.lowercase())) add(DrawerResult.OpenNotes)
-            (choices ?: SearchOrder.defaults(targets, noteTargets)).filter { it.on }.forEach { choice -> offers[choice.key]?.let(::add) }
+            (choices ?: SearchOrder.defaults(targets, noteTargets)).filter { it.on }.forEach { choice ->
+                if (choice.key == SearchOrder.CONTACTS) contacts.forEach { add(DrawerResult.Contact(it)) } else offers[choice.key]?.let(::add)
+            }
         }
     }
 
@@ -151,6 +162,8 @@ internal fun AppDrawerContent(
     preview: Boolean = false,
     /** A long press on an app: its actions. */
     onLongPress: ((AppEntry) -> Unit)? = null,
+    /** Whether contacts get a WhatsApp button. */
+    whatsApp: Boolean = false,
 ) {
     val p = style.palette()
     val focus = remember { FocusRequester() }
@@ -170,7 +183,15 @@ internal fun AppDrawerContent(
             } else {
                 LazyColumn(Modifier.fillMaxSize()) {
                     items(results) { result ->
-                        ResultRow(result, query.trim(), style, p, onLongPress = (result as? DrawerResult.App)?.let { r -> onLongPress?.let { { it(r.app) } } }) { onResult(result) }
+                        ResultRow(
+                            result,
+                            query.trim(),
+                            style,
+                            p,
+                            onLongPress = (result as? DrawerResult.App)?.let { r -> onLongPress?.let { { it(r.app) } } },
+                            whatsApp = whatsApp,
+                            onAction = onResult,
+                        ) { onResult(result) }
                     }
                 }
             }
@@ -306,7 +327,16 @@ private fun AppList(apps: List<AppEntry>, style: HomeStyle, p: HomePalette, onLa
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ResultRow(result: DrawerResult, query: String, style: HomeStyle, p: HomePalette, onLongPress: (() -> Unit)? = null, onClick: () -> Unit) {
+private fun ResultRow(
+    result: DrawerResult,
+    query: String,
+    style: HomeStyle,
+    p: HomePalette,
+    onLongPress: (() -> Unit)? = null,
+    whatsApp: Boolean = false,
+    onAction: (DrawerResult) -> Unit = {},
+    onClick: () -> Unit,
+) {
     val context = LocalContext.current
     val names = style.textSize.scale * style.listSize.scale
     Row(
@@ -319,6 +349,8 @@ private fun ResultRow(result: DrawerResult, query: String, style: HomeStyle, p: 
             is DrawerResult.AddNote -> result.target?.let { "add “$query” to ${it.name.lowercase()}" } ?: "save “$query” in refuge notes"
             is DrawerResult.AddEvent -> AppDrawer.eventLabel(result.event) { formatTime(context, it.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()) }
             DrawerResult.OpenNotes -> "open refuge notes"
+            is DrawerResult.Contact -> result.hit.name
+            is DrawerResult.Message, is DrawerResult.WhatsApp -> ""
         }
         val icon: ImageVector? = when (result) {
             is DrawerResult.App -> null
@@ -328,6 +360,7 @@ private fun ResultRow(result: DrawerResult, query: String, style: HomeStyle, p: 
                 else -> Icons.Default.Search
             }
             is DrawerResult.AddEvent -> Icons.Default.DateRange
+            is DrawerResult.Contact -> Icons.Default.Call
             else -> Icons.Default.Edit
         }
         Box(Modifier.size((30 * names).dp), contentAlignment = Alignment.Center) {
@@ -343,7 +376,27 @@ private fun ResultRow(result: DrawerResult, query: String, style: HomeStyle, p: 
             Text(label, fontSize = (26 * names).sp, lineHeight = (32 * names).sp, color = p.text, maxLines = 2, overflow = TextOverflow.Ellipsis)
         } else {
             // The suggestions a little smaller than the apps, with room between them.
-            VerbatimText(label, color = p.text, fontSize = (22 * names).sp, lineHeight = (30 * names).sp)
+            VerbatimText(label, color = p.text, fontSize = (22 * names).sp, lineHeight = (30 * names).sp, modifier = Modifier.weight(1f, fill = false))
+        }
+        if (result is DrawerResult.Contact) {
+            Spacer(Modifier.weight(1f))
+            ContactButton("message", p) { onAction(DrawerResult.Message(result.hit)) }
+            if (whatsApp) ContactButton("whatsapp", p) { onAction(DrawerResult.WhatsApp(result.hit)) }
         }
     }
+}
+
+@Composable
+private fun ContactButton(label: String, p: HomePalette, onClick: () -> Unit) {
+    Text(
+        label,
+        style = MaterialTheme.typography.labelMedium,
+        color = p.text,
+        modifier = Modifier
+            .padding(start = 8.dp)
+            .clip(RoundedCornerShape(50))
+            .border(1.dp, p.faint.copy(alpha = 0.5f), RoundedCornerShape(50))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 7.dp),
+    )
 }

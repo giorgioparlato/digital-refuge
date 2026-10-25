@@ -106,7 +106,7 @@ class BlockerService : AccessibilityService() {
 
     /** Time in limited apps, the pause before opening them, and the cover once their minutes are gone. */
     private val limitTracker by lazy { LimitTracker(this, scope, releaseScope) }
-    private val distractionClock by lazy { DistractionClock(Repository.get(this), releaseScope) }
+    private val distractionClock by lazy { DistractionClock(Repository.get(this), releaseScope, packageName) }
 
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {

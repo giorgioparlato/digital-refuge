@@ -631,7 +631,7 @@ private fun SizeLabel(text: String, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun SwatchRow(presets: List<Pair<String, Long>>, selected: Long, onPick: (Long) -> Unit) {
+internal fun SwatchRow(presets: List<Pair<String, Long>>, selected: Long, onPick: (Long) -> Unit) {
     val c = Obsidian.colors
     Row(
         Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
