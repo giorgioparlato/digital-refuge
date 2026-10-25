@@ -46,8 +46,9 @@ import java.util.Locale
 @Composable
 internal fun SessionHeader(
     now: LocalDateTime,
-    scheduleName: String,
-    until: String,
+    /** The session in the pill; null outside sessions, and there's no pill. */
+    scheduleName: String?,
+    until: String?,
     style: HomeStyle,
     calendar: String? = null,
     /** Opens the week ahead from the calendar line; null where a tap means something else (the lock screen). */
@@ -106,17 +107,19 @@ internal fun SessionHeader(
                     .then(if (onCalendar != null) Modifier.clip(RoundedCornerShape(6.dp)).clickable(onClickLabel = "see the week ahead", onClick = onCalendar) else Modifier),
             )
         }
-        Spacer(Modifier.height(16.dp))
-        Row(
-            Modifier
-                .clip(RoundedCornerShape(50))
-                .background(p.chip)
-                .padding(horizontal = 12.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(BedtimeIcons.Moon, contentDescription = null, tint = p.accent, modifier = Modifier.size(14.dp))
-            Spacer(Modifier.width(6.dp))
-            Text("$scheduleName · until $until", style = MaterialTheme.typography.labelLarge, color = p.muted)
+        if (scheduleName != null && until != null) {
+            Spacer(Modifier.height(16.dp))
+            Row(
+                Modifier
+                    .clip(RoundedCornerShape(50))
+                    .background(p.chip)
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(BedtimeIcons.Moon, contentDescription = null, tint = p.accent, modifier = Modifier.size(14.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("$scheduleName · until $until", style = MaterialTheme.typography.labelLarge, color = p.muted)
+            }
         }
     }
 }

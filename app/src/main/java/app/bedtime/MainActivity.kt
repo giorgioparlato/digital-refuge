@@ -1,5 +1,6 @@
 package app.bedtime
 
+import app.bedtime.ui.homestyle.StylePage
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
@@ -99,6 +100,9 @@ object Routes {
     const val SETTINGS = "settings"
     const val SETUP = "setup"
     const val HOME_STYLE = "homestyle"
+    const val STYLE_SHOWN = "homestyle/shown"
+    const val STYLE_SWIPES = "homestyle/swipes"
+    const val STYLE_NOTIFICATIONS = "homestyle/notifications"
     const val GROUPS = "groups"
     const val ALWAYS_AVAILABLE = "alwaysavailable"
     const val ONBOARDING = "onboarding"
@@ -238,6 +242,10 @@ private fun BedtimeNavigation(pendingRoute: String?, onRouteConsumed: () -> Unit
                         onHowItWorks = { push(Routes.ONBOARDING) },
                         onWalkthrough = { push(Routes.WALKTHROUGH) },
                         onQuickNotes = { push(Routes.QUICK_NOTES) },
+                        onShown = { push(Routes.STYLE_SHOWN) },
+                        onQuotes = { push(Routes.QUOTES) },
+                        onSwipes = { push(Routes.STYLE_SWIPES) },
+                        onLockNotifications = { push(Routes.STYLE_NOTIFICATIONS) },
                     )
                     else -> HomeScreen(
                         onEdit = { id -> push(Routes.EDIT + id) },
@@ -258,6 +266,9 @@ private fun BedtimeNavigation(pendingRoute: String?, onRouteConsumed: () -> Unit
             top == Routes.CREATE -> CreateScreen(onBack = ::pop, onPick = { key -> push(Routes.TEMPLATE + key) })
             top == Routes.SETUP -> SetupScreen(onBack = ::pop, onAlwaysAvailable = { push(Routes.ALWAYS_AVAILABLE) })
             top == Routes.HOME_STYLE -> HomeStyleScreen(onBack = ::pop, onQuotes = { push(Routes.QUOTES) })
+            top == Routes.STYLE_SHOWN -> HomeStyleScreen(onBack = ::pop, onQuotes = { push(Routes.QUOTES) }, page = StylePage.SHOWN)
+            top == Routes.STYLE_SWIPES -> HomeStyleScreen(onBack = ::pop, page = StylePage.SWIPES)
+            top == Routes.STYLE_NOTIFICATIONS -> HomeStyleScreen(onBack = ::pop, page = StylePage.NOTIFICATIONS)
             top == Routes.GROUPS -> GroupsScreen(onBack = ::pop)
             top == Routes.ALWAYS_AVAILABLE -> AlwaysAvailableScreen(onBack = ::pop)
             top == Routes.ONBOARDING -> OnboardingScreen(onDone = ::pop)

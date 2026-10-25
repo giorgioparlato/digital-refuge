@@ -1,5 +1,9 @@
 package app.bedtime.ui.minimal
 
+import app.bedtime.data.HomeApps
+import android.content.pm.ShortcutInfo
+import android.os.UserHandle
+import android.content.pm.LauncherApps
 import app.bedtime.data.Weather
 import app.bedtime.data.WeatherView
 import app.bedtime.ui.notes.NotesScreen
@@ -107,17 +111,57 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.time.LocalDateTime
 
-/** The minimal launcher: a clock and a plain list of allowed apps, styled by the user's [HomeStyle]. */
+/**
+ * The minimal launcher: a clock and a plain list of allowed apps, styled by the user's [HomeStyle].
+ * Made your home screen in settings, it's also there outside sessions, with your favourite apps.
+ */
 class MinimalHomeActivity : ComponentActivity() {
+    /** Presses of Home while this is already the home screen, which bring it back to its start. */
+    private val homePresses = mutableIntStateOf(0)
+
+    /** Installs, removals and updates, which refresh the lists. */
+    private val appsChanged = mutableIntStateOf(0)
+
+    private val appsCallback = object : LauncherApps.Callback() {
+        override fun onPackageRemoved(packageName: String?, user: UserHandle?) = changed()
+        override fun onPackageAdded(packageName: String?, user: UserHandle?) = changed()
+        override fun onPackageChanged(packageName: String?, user: UserHandle?) = changed()
+        override fun onPackagesAvailable(packageNames: Array<out String>?, user: UserHandle?, replacing: Boolean) = changed()
+        override fun onPackagesUnavailable(packageNames: Array<out String>?, user: UserHandle?, replacing: Boolean) = changed()
+        private fun changed() {
+            appsChanged.intValue++
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         onBackPressedDispatcher.addCallback(this) { /* Stay here; there is nowhere to go back to. */ }
+        runCatching { getSystemService(LauncherApps::class.java)?.registerCallback(appsCallback) }
+        val asHome = intent?.hasCategory(Intent.CATEGORY_HOME) == true
         setContent {
             BedtimeTheme {
-                ProvideAppIcons { MinimalHomeScreen(onFinish = ::finish, onLightBackground = ::useLightSystemBars) }
+                ProvideAppIcons {
+                    MinimalHomeScreen(
+                        onFinish = ::finish,
+                        onLightBackground = ::useLightSystemBars,
+                        launchedAsHome = asHome,
+                        homePresses = homePresses.intValue,
+                        appsChanged = appsChanged.intValue,
+                    )
+                }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        if (intent.hasCategory(Intent.CATEGORY_HOME)) homePresses.intValue++
+    }
+
+    override fun onDestroy() {
+        runCatching { getSystemService(LauncherApps::class.java)?.unregisterCallback(appsCallback) }
+        super.onDestroy()
     }
 
     /** Dark status-bar icons on light home backgrounds, light icons on dark ones. */
@@ -134,14 +178,24 @@ class MinimalHomeActivity : ComponentActivity() {
 }
 
 @Composable
-private fun MinimalHomeScreen(onFinish: () -> Unit, onLightBackground: (Boolean) -> Unit) {
+private fun MinimalHomeScreen(
+    onFinish: () -> Unit,
+    onLightBackground: (Boolean) -> Unit,
+    launchedAsHome: Boolean = false,
+    homePresses: Int = 0,
+    appsChanged: Int = 0,
+) {
     val context = LocalContext.current
     val c = Obsidian.colors
     val repo = remember { Repository.get(context) }
     val scope = rememberCoroutineScope()
     val state by Engine.state(context).collectAsStateWithLifecycle()
-    val settings by repo.settings.collectAsStateWithLifecycle(initialValue = AppSettings())
+    val loadedSettings by repo.settings.collectAsStateWithLifecycle(initialValue = null)
+    val settings = loadedSettings ?: AppSettings()
     val occurrence = state?.minimalOccurrence
+    // Your home screen all the time, or only the minimal one during sessions.
+    val asHome = launchedAsHome || settings.homeScreen
+    var actionsFor by remember { mutableStateOf<AppEntry?>(null) }
     var unlocking by rememberSaveable { mutableStateOf(false) }
     var emergency by rememberSaveable { mutableStateOf(false) }
     var quoteOffset by rememberSaveable { mutableIntStateOf(0) }
@@ -150,7 +204,10 @@ private fun MinimalHomeScreen(onFinish: () -> Unit, onLightBackground: (Boolean)
     val breezy = remember { Weather.APPS.firstOrNull { AppCatalog.isLaunchable(context, it) } }
     var query by rememberSaveable { mutableStateOf("") }
     var notesOpen by rememberSaveable { mutableStateOf(false) }
-    val searchTargets by produceState(emptyList<SearchTarget>()) { value = withContext(Dispatchers.IO) { SearchTargets.find(context) } }
+    // Looked for when the drawer first opens, so Home itself comes up at once.
+    val searchTargets by produceState(emptyList<SearchTarget>(), drawer) {
+        if (drawer && value.isEmpty()) value = withContext(Dispatchers.IO) { SearchTargets.find(context) }
+    }
     // An event waiting for calendar access, saved once it's given.
     var pendingEvent by remember { mutableStateOf<ParsedEvent?>(null) }
     val saveEvent: (ParsedEvent) -> Unit = { event ->
@@ -170,14 +227,41 @@ private fun MinimalHomeScreen(onFinish: () -> Unit, onLightBackground: (Boolean)
     val style = settings.homeStyle
     val light = style.palette().isLight
 
-    LaunchedEffect(state) {
-        if (state != null && occurrence == null) onFinish()
+    LaunchedEffect(state, loadedSettings) {
+        // Not your home screen, it's only for minimal sessions: once none runs, it goes.
+        if (state != null && loadedSettings != null && occurrence == null && !asHome) onFinish()
+    }
+    // Home pressed while already here: back to the start, as home screens do.
+    LaunchedEffect(homePresses) {
+        if (homePresses == 0) return@LaunchedEffect
+        drawer = false
+        query = ""
+        notesOpen = false
+        week = null
+        actionsFor = null
+        emergency = false
+        unlocking = false
     }
     LaunchedEffect(light, unlocking, emergency) { onLightBackground(if (unlocking || emergency) !c.isDark else light) }
 
-    val allowed = state?.minimalAllowlist.orEmpty()
-    var apps by remember { mutableStateOf(emptyList<AppEntry>()) }
-    LaunchedEffect(allowed) { apps = withContext(Dispatchers.IO) { entries(context, allowed + listOfNotNull(SystemApps.dialerPackage(context))) } }
+    var installed by remember { mutableStateOf(emptyList<AppEntry>()) }
+    // digital refuge itself among them, so your everyday home has a way into it; minimal mode leaves it to emergency.
+    LaunchedEffect(appsChanged) {
+        installed = withContext(Dispatchers.IO) { AppCatalog.launchableApps(context) + AppEntry(context.packageName, "digital refuge") }
+    }
+    val dialer = remember { SystemApps.dialerPackage(context) }
+    // Apps under your own names, where you've given them one.
+    val byPackage = installed.associate { app -> app.packageName to (settings.appNames[app.packageName]?.let { app.copy(label = it) } ?: app) }
+    val lists = HomeApps.lists(
+        installed = installed.map { it.packageName },
+        favourites = settings.homeFavourites,
+        hidden = settings.hiddenApps,
+        minimal = if (occurrence != null) state?.minimalAllowlist.orEmpty() else null,
+        blocked = if (state?.isActive == true) state?.blocked.orEmpty() else emptySet(),
+        alwaysAvailable = settings.alwaysAvailable,
+        dialer = dialer,
+    )
+    val apps = lists.home.mapNotNull(byPackage::get).let { home -> if (occurrence != null) home.sortedBy { it.label.lowercase() } else home }
     var alwaysAvailableApps by remember { mutableStateOf(emptyList<AppEntry>()) }
     LaunchedEffect(settings.alwaysAvailable) {
         alwaysAvailableApps = withContext(Dispatchers.IO) { entries(context, settings.alwaysAvailable) }
@@ -190,13 +274,16 @@ private fun MinimalHomeScreen(onFinish: () -> Unit, onLightBackground: (Boolean)
         }
     }
 
-    if (occurrence == null) {
+    if (loadedSettings == null || (occurrence == null && !asHome)) {
         Surface(Modifier.fillMaxSize(), color = style.palette().background) { }
         return
     }
+    // The session shown in the pill: the minimal one, or any other that's on.
+    val session = occurrence ?: state?.active?.maxByOrNull { it.end }
     val shownQuote = Quotes.forPeriod(now, style.quoteRefresh, quoteOffset, settings.quotes)
-    // What the drawer and its search can open: the session's apps and the always-available ones.
-    val openable = (apps + alwaysAvailableApps).distinctBy { it.packageName }
+    // What the drawer and its search can open: in a session, its apps and the always-available ones;
+    // otherwise everything you haven't hidden.
+    val openable = lists.all.mapNotNull(byPackage::get)
     val closeDrawer = {
         drawer = false
         query = ""
@@ -276,9 +363,10 @@ private fun MinimalHomeScreen(onFinish: () -> Unit, onLightBackground: (Boolean)
                     closeDrawer()
                 },
                 onResult = onResult,
+                onLongPress = { actionsFor = it },
             )
         }
-        emergency -> {
+        emergency && occurrence != null -> {
             BackHandler { emergency = false }
             EmergencyContent(
                 onBack = { emergency = false },
@@ -294,7 +382,7 @@ private fun MinimalHomeScreen(onFinish: () -> Unit, onLightBackground: (Boolean)
                 pauseEnabled = occurrence.schedule.pauseEnabled,
             )
         }
-        unlocking -> Surface(Modifier.fillMaxSize(), color = c.bgPrimary) {
+        unlocking && occurrence != null -> Surface(Modifier.fillMaxSize(), color = c.bgPrimary) {
             key(occurrence.schedule.id) {
                 UnlockFlow(
                     occurrence,
@@ -309,15 +397,18 @@ private fun MinimalHomeScreen(onFinish: () -> Unit, onLightBackground: (Boolean)
         }
         else -> MinimalHomeContent(
             now = now,
-            scheduleName = occurrence.schedule.name,
-            until = formatTime(context, occurrence.end),
+            scheduleName = session?.schedule?.name,
+            until = session?.let { formatTime(context, it.end) },
             apps = apps,
             style = style,
             onLaunch = { AppCatalog.launch(context, it) },
-            onUnlock = { unlocking = true },
+            // Unlocking and emergencies belong to minimal sessions; your everyday home has a way into the app.
+            onUnlock = if (occurrence != null) ({ unlocking = true }) else null,
             onEmergency = { emergency = true },
+            onAppLongPress = { actionsFor = it },
+            emptyHint = if (occurrence == null) "Hold an app in the full list to add it here." else null,
             // Re-read every second with the clock, so it goes back to "unlock" once the moment passes.
-            onUndo = if (occurrence.schedule.isBlock && Repository.canUndo(occurrence.start, System.currentTimeMillis())) {
+            onUndo = if (occurrence != null && occurrence.schedule.isBlock && Repository.canUndo(occurrence.start, System.currentTimeMillis())) {
                 { scope.launch { repo.undoStart(occurrence.schedule.id) } }
             } else {
                 null
@@ -335,6 +426,39 @@ private fun MinimalHomeScreen(onFinish: () -> Unit, onLightBackground: (Boolean)
         )
     }
     week?.let { CalendarWeekDialog(it, style, onDismiss = { week = null }) }
+    actionsFor?.let { app ->
+        val shortcuts by produceState(emptyList<ShortcutInfo>(), app.packageName) {
+            value = withContext(Dispatchers.IO) { AppShortcuts.of(context, app.packageName) }
+        }
+        fun save(transform: (AppSettings) -> AppSettings) = scope.launch { repo.updateSettings(transform) }
+        val favourite = app.packageName in settings.homeFavourites
+        AppActionsDialog(
+            app = app,
+            style = style,
+            favourite = favourite,
+            hidden = app.packageName in settings.hiddenApps,
+            canUninstall = state?.isActive != true,
+            shortcuts = shortcuts.map { AppShortcut(it.id, (it.shortLabel ?: it.longLabel ?: "").toString()) },
+            handlers = AppActionHandlers(
+                toggleFavourite = {
+                    save { s -> s.copy(homeFavourites = if (favourite) s.homeFavourites - app.packageName else s.homeFavourites + app.packageName) }
+                },
+                move = { up -> save { s -> s.copy(homeFavourites = HomeApps.moved(s.homeFavourites, app.packageName, up)) } },
+                rename = { name ->
+                    // An empty name, or the app's own, goes back to the app's own.
+                    val own = installed.firstOrNull { it.packageName == app.packageName }?.label
+                    save { s -> s.copy(appNames = if (name.isBlank() || name == own) s.appNames - app.packageName else s.appNames + (app.packageName to name)) }
+                },
+                toggleHidden = {
+                    save { s -> s.copy(hiddenApps = if (app.packageName in s.hiddenApps) s.hiddenApps - app.packageName else s.hiddenApps + app.packageName) }
+                },
+                info = { runCatching { context.startActivity(AppShortcuts.infoIntent(app.packageName)) } },
+                uninstall = { runCatching { context.startActivity(AppShortcuts.uninstallIntent(app.packageName)) } },
+                shortcut = { chosen -> shortcuts.firstOrNull { it.id == chosen.id }?.let { AppShortcuts.start(context, it) } },
+            ),
+            onDismiss = { actionsFor = null },
+        )
+    }
 }
 
 /** Launchable apps among [packages], with labels, sorted by name. */
@@ -348,13 +472,19 @@ private fun entries(context: Context, packages: Set<String>): List<AppEntry> =
 @Composable
 internal fun MinimalHomeContent(
     now: LocalDateTime,
-    scheduleName: String,
-    until: String,
+    /** The session in the pill; both null outside sessions, when there's no pill. */
+    scheduleName: String?,
+    until: String?,
     apps: List<AppEntry>,
     style: HomeStyle,
     onLaunch: (String) -> Unit,
-    onUnlock: () -> Unit,
+    /** Unlocking, in a minimal session; null outside one, when the foot has only the way to all apps. */
+    onUnlock: (() -> Unit)?,
     onEmergency: () -> Unit = {},
+    /** A long press on an app: its actions. */
+    onAppLongPress: ((AppEntry) -> Unit)? = null,
+    /** What an empty list says; the session's words when null. */
+    emptyHint: String? = null,
     /** Set for the first seconds of a block, when starting it can still be taken back. */
     onUndo: (() -> Unit)? = null,
     /** Today's next event, when the calendar line is on. */
@@ -447,7 +577,12 @@ internal fun MinimalHomeContent(
                         Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(8.dp))
-                            .clickable(onClickLabel = "open ${app.label}") { onLaunch(app.packageName) }
+                            .combinedClickable(
+                                onClickLabel = "open ${app.label}",
+                                onLongClickLabel = "more for ${app.label}",
+                                onLongClick = onAppLongPress?.let { { it(app) } },
+                                onClick = { onLaunch(app.packageName) },
+                            )
                             .padding(vertical = (12 * names).dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
@@ -459,10 +594,17 @@ internal fun MinimalHomeContent(
                     }
                 }
                 if (apps.isEmpty()) {
-                    item { Text("nothing to open right now. enjoy the quiet.", fontSize = (18 * scale).sp, color = p.faint) }
+                    item { Text(emptyHint ?: "nothing to open right now. enjoy the quiet.", fontSize = (18 * scale).sp, color = p.faint) }
                 }
             }
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            if (onUnlock == null) {
+                // Your everyday home: just the way to all apps (digital refuge itself is among them).
+                Box(Modifier.fillMaxWidth()) {
+                    IconButton(onClick = onOpenDrawer, modifier = Modifier.align(Alignment.Center)) {
+                        Icon(Icons.Default.KeyboardArrowUp, contentDescription = "all apps and search", tint = p.faint)
+                    }
+                }
+            } else Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 if (onUndo != null) {
                     TextButton(onClick = onUndo) { Text("undo", color = p.accent, fontWeight = FontWeight.SemiBold) }
                 } else {

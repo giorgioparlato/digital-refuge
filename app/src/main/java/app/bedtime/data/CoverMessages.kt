@@ -18,19 +18,18 @@ object CoverMessages {
     fun pool(custom: List<CustomMessage>): List<String> = presets + custom.filter { it.inRandom }.map { it.text }
 
     /**
-     * The words for [choice], or null for the cover's usual ones. A chosen message that has since been
-     * deleted, or a mix that is somehow empty, falls back to the usual words rather than to nothing.
+     * The words for [choice]: one from the mix, or the one you chose. A chosen message that has since
+     * been deleted falls back to the mix; null only if there's somehow nothing to say, and the cover
+     * keeps its own words.
      */
-    fun pick(choice: CoverMessage, custom: List<CustomMessage>, random: Random = Random.Default): String? = when (choice.mode) {
-        MessageMode.USUAL -> null
-        MessageMode.CHOSEN -> choice.text?.takeIf { text -> text in presets || custom.any { it.text == text } }
-        MessageMode.RANDOM -> pool(custom).takeIf { it.isNotEmpty() }?.random(random)
+    fun pick(choice: CoverMessage, custom: List<CustomMessage>, random: Random = Random.Default): String? {
+        val chosen = choice.text?.takeIf { choice.mode == MessageMode.CHOSEN }?.takeIf { text -> text in presets || custom.any { it.text == text } }
+        return chosen ?: pool(custom).takeIf { it.isNotEmpty() }?.random(random)
     }
 
     /** The choice in a few words, for the row that opens it. */
     fun summary(choice: CoverMessage): String = when (choice.mode) {
-        MessageMode.USUAL -> "The usual words"
-        MessageMode.RANDOM -> "A different one each time"
         MessageMode.CHOSEN -> "“${choice.text.orEmpty()}”"
+        else -> "A different one each time"
     }
 }

@@ -1,5 +1,7 @@
 package app.bedtime.ui.minimal
 
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -138,6 +140,8 @@ internal fun AppDrawerContent(
     onLaunch: (String) -> Unit,
     onResult: (DrawerResult) -> Unit,
     preview: Boolean = false,
+    /** A long press on an app: its actions. */
+    onLongPress: ((AppEntry) -> Unit)? = null,
 ) {
     val p = style.palette()
     val focus = remember { FocusRequester() }
@@ -153,10 +157,12 @@ internal fun AppDrawerContent(
             SearchField(query, onQuery, p, focus, onGo = { results.firstOrNull()?.let(onResult) })
             Spacer(Modifier.height(20.dp))
             if (query.isBlank()) {
-                AppList(apps, style, p, onLaunch)
+                AppList(apps, style, p, onLaunch, onLongPress)
             } else {
                 LazyColumn(Modifier.fillMaxSize()) {
-                    items(results) { result -> ResultRow(result, query.trim(), style, p) { onResult(result) } }
+                    items(results) { result ->
+                        ResultRow(result, query.trim(), style, p, onLongPress = (result as? DrawerResult.App)?.let { r -> onLongPress?.let { { it(r.app) } } }) { onResult(result) }
+                    }
                 }
             }
         }
@@ -199,10 +205,11 @@ private fun SearchField(query: String, onQuery: (String) -> Unit, p: HomePalette
 }
 
 /** The apps under their letters, and the strip on the right edge that jumps through them. */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun AppList(apps: List<AppEntry>, style: HomeStyle, p: HomePalette, onLaunch: (String) -> Unit) {
-    // The same size as the app names on the minimal home.
-    val names = style.textSize.scale * style.appNameSize.scale
+private fun AppList(apps: List<AppEntry>, style: HomeStyle, p: HomePalette, onLaunch: (String) -> Unit, onLongPress: ((AppEntry) -> Unit)?) {
+    // The full list's own size, chosen apart from the home screen's app names.
+    val names = style.textSize.scale * style.listSize.scale
     val sections = remember(apps) { AppDrawer.sections(apps) }
     // Where each letter's heading sits in the list.
     val starts = remember(sections) {
@@ -223,7 +230,11 @@ private fun AppList(apps: List<AppEntry>, style: HomeStyle, p: HomePalette, onLa
                         Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(8.dp))
-                            .clickable(onClickLabel = "open ${app.label}") { onLaunch(app.packageName) }
+                            .combinedClickable(
+                                onClickLabel = "open ${app.label}",
+                                onLongClick = onLongPress?.let { { it(app) } },
+                                onClick = { onLaunch(app.packageName) },
+                            )
                             .padding(vertical = (12 * names).dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
@@ -284,12 +295,13 @@ private fun AppList(apps: List<AppEntry>, style: HomeStyle, p: HomePalette, onLa
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ResultRow(result: DrawerResult, query: String, style: HomeStyle, p: HomePalette, onClick: () -> Unit) {
+private fun ResultRow(result: DrawerResult, query: String, style: HomeStyle, p: HomePalette, onLongPress: (() -> Unit)? = null, onClick: () -> Unit) {
     val context = LocalContext.current
-    val names = style.textSize.scale * style.appNameSize.scale
+    val names = style.textSize.scale * style.listSize.scale
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable(onClick = onClick).padding(vertical = (10 * names).dp),
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).combinedClickable(onLongClick = onLongPress, onClick = onClick).padding(vertical = (16 * names).dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         val label = when (result) {
@@ -321,7 +333,8 @@ private fun ResultRow(result: DrawerResult, query: String, style: HomeStyle, p: 
         if (result is DrawerResult.App || result == DrawerResult.OpenNotes) {
             Text(label, fontSize = (26 * names).sp, lineHeight = (32 * names).sp, color = p.text, maxLines = 2, overflow = TextOverflow.Ellipsis)
         } else {
-            VerbatimText(label, color = p.text, fontSize = (26 * names).sp, lineHeight = (32 * names).sp)
+            // The suggestions a little smaller than the apps, with room between them.
+            VerbatimText(label, color = p.text, fontSize = (22 * names).sp, lineHeight = (30 * names).sp)
         }
     }
 }

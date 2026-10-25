@@ -1,7 +1,6 @@
 package app.bedtime.data
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.random.Random
@@ -11,16 +10,21 @@ class CoverMessagesTest {
     private val notInMix = CustomMessage("Only when I choose it.", inRandom = false)
 
     @Test
-    fun theUsualWordsMeanNoMessage() {
-        assertNull(CoverMessages.pick(CoverMessage(), listOf(mine)))
+    fun byDefaultADifferentOneEachTime() {
+        assertEquals(MessageMode.RANDOM, CoverMessage().mode)
+        val pool = CoverMessages.pool(listOf(mine))
+        assertTrue(CoverMessages.pick(CoverMessage(), listOf(mine)) in pool)
+        // "The usual words", no longer offered, reads as a different one each time.
+        assertTrue(CoverMessages.pick(CoverMessage(MessageMode.USUAL), listOf(mine)) in pool)
+        assertEquals("A different one each time", CoverMessages.summary(CoverMessage(MessageMode.USUAL)))
     }
 
     @Test
     fun aChosenMessageIsUsedWhileItStillExists() {
         assertEquals(mine.text, CoverMessages.pick(CoverMessage(MessageMode.CHOSEN, mine.text), listOf(mine)))
         assertEquals(CoverMessages.presets[2], CoverMessages.pick(CoverMessage(MessageMode.CHOSEN, CoverMessages.presets[2]), emptyList()))
-        // Deleted since: back to the usual words, never a blank cover.
-        assertNull(CoverMessages.pick(CoverMessage(MessageMode.CHOSEN, mine.text), emptyList()))
+        // Deleted since: back to the mix, never a blank cover.
+        assertTrue(CoverMessages.pick(CoverMessage(MessageMode.CHOSEN, mine.text), emptyList()) in CoverMessages.presets)
     }
 
     @Test

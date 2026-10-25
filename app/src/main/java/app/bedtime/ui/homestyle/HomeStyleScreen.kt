@@ -110,7 +110,7 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 
 @Composable
-fun HomeStyleScreen(onBack: () -> Unit, onQuotes: () -> Unit = {}) {
+fun HomeStyleScreen(onBack: () -> Unit, onQuotes: () -> Unit = {}, page: StylePage = StylePage.LOOK) {
     val context = LocalContext.current
     val repo = remember { Repository.get(context) }
     val scope = rememberCoroutineScope()
@@ -210,6 +210,7 @@ fun HomeStyleScreen(onBack: () -> Unit, onQuotes: () -> Unit = {}) {
         notificationAccess = notificationAccess,
         onPickNotificationApps = { pickingNotificationApps = true },
         weatherHeardAt = weather?.at,
+        page = page,
         // The preview shows the real weather if there is some, otherwise an example.
         weatherPreview = current.homeStyle.takeIf { it.showWeather }?.let { style ->
             Weather.view(weather ?: Weather.SAMPLE, (weather?.at ?: Weather.SAMPLE.at) + 1, Weather.fahrenheit(style.weatherUnit), style.weatherStyle)
@@ -250,6 +251,8 @@ internal fun HomeStyleContent(
     weatherHeardAt: Long? = null,
     /** The weather as the preview shows it. */
     weatherPreview: WeatherView? = null,
+    /** Which of the home and lock screen's pages this is. */
+    page: StylePage = StylePage.LOOK,
 ) {
     val context = LocalContext.current
     val c = Obsidian.colors
@@ -269,7 +272,7 @@ internal fun HomeStyleContent(
             },
         )
     }
-    Scaffold(containerColor = c.bgPrimary, topBar = { ObsidianTopBar("Minimal home screen", onBack = onBack) }) { padding ->
+    Scaffold(containerColor = c.bgPrimary, topBar = { ObsidianTopBar(page.title, onBack = onBack) }) { padding ->
         Column(
             Modifier
                 .fillMaxSize()
@@ -278,13 +281,9 @@ internal fun HomeStyleContent(
                 .padding(horizontal = PageGutter, vertical = 4.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Text(
-                "What you see when a schedule or block uses minimal mode. Changes save as you go.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = c.textMuted,
-            )
+            Text(page.intro, style = MaterialTheme.typography.bodyMedium, color = c.textMuted)
             val previewShape = RoundedCornerShape(24.dp)
-            Box(
+            if (page == StylePage.LOOK || page == StylePage.SHOWN) Box(
                 Modifier
                     .fillMaxWidth()
                     .height(460.dp)
@@ -305,140 +304,149 @@ internal fun HomeStyleContent(
                 )
             }
 
-            SectionCard(title = "Background") {
-                SwatchRow(BackgroundPresets, style.background) { onChange(style.copy(background = it)) }
-                HexField(style.background) { onChange(style.copy(background = it)) }
-            }
-            SectionCard(title = "Accent") {
-                SwatchRow(AccentPresets, style.accent) { onChange(style.copy(accent = it)) }
-                HexField(style.accent) { onChange(style.copy(accent = it)) }
-            }
-            SectionCard(title = "Text", subtitle = "Automatic is cream on a dark background, ink on a light one") {
-                QuickChip("Automatic", style.textColor == null) { onChange(style.copy(textColor = null)) }
-                Spacer(Modifier.height(12.dp))
-                SwatchRow(TextPresets, style.textColor ?: -1L) { onChange(style.copy(textColor = it)) }
-                HexField(style.textColor ?: style.palette().text.toArgb().toLong() and 0xFFFFFFFFL) { onChange(style.copy(textColor = it)) }
-            }
-            SectionCard(title = "Sizes") {
-                SizeLabel("Clock", Modifier.padding(bottom = 8.dp))
-                SegmentedChoice(
-                    options = listOf("Very small", "Small", "Medium", "Large"),
-                    selected = style.clockSize.ordinal,
-                    onSelect = { onChange(style.copy(clockSize = ClockSize.entries[it])) },
-                )
-                SizeLabel("Text", Modifier.padding(top = 16.dp, bottom = 8.dp))
-                SegmentedChoice(
-                    options = listOf("Small", "Medium", "Large"),
-                    selected = style.textSize.ordinal,
-                    onSelect = { onChange(style.copy(textSize = TextSize.entries[it])) },
-                )
-                SizeLabel("App names", Modifier.padding(top = 16.dp, bottom = 8.dp))
-                SegmentedChoice(
-                    options = listOf("Very small", "Small", "Medium", "Large"),
-                    selected = style.appNameSize.ordinal,
-                    onSelect = { onChange(style.copy(appNameSize = AppNameSize.entries[it])) },
-                )
-            }
-            SectionCard(title = "Fonts", subtitle = "Two choices: one for the clock, date and apps, one for the quote") {
-                SizeLabel("Clock, date and apps", Modifier.padding(bottom = 8.dp))
-                FontChoices(style.font, style.customFontName, onPick = { onChange(style.copy(font = it)) }, onAdd = { onAddFont(false) })
-                SizeLabel("Quote", Modifier.padding(top = 16.dp, bottom = 8.dp))
-                FontChoices(style.quoteFont, style.customFontName, onPick = { onChange(style.copy(quoteFont = it)) }, onAdd = { onAddFont(true) })
-                Text(
-                    "Serifs set the quote in italics. Your own font is a .ttf or .otf file; it stays on this phone and isn't part of a backup.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = c.textFaint,
-                    modifier = Modifier.padding(top = 12.dp),
-                )
-            }
-            SectionCard(title = "Show") {
-                OptionRow(Icons.Default.Face, "Greeting", description = "“Good evening”, “Good morning”…") {
-                    ObsidianToggle(style.showGreeting, { onChange(style.copy(showGreeting = it)) })
+            if (page == StylePage.LOOK) {
+                SectionCard(title = "Background") {
+                    SwatchRow(BackgroundPresets, style.background) { onChange(style.copy(background = it)) }
+                    HexField(style.background) { onChange(style.copy(background = it)) }
                 }
-                OptionRow(Icons.Default.DateRange, "Date") {
-                    ObsidianToggle(style.showDate, { onChange(style.copy(showDate = it)) })
+                SectionCard(title = "Accent") {
+                    SwatchRow(AccentPresets, style.accent) { onChange(style.copy(accent = it)) }
+                    HexField(style.accent) { onChange(style.copy(accent = it)) }
                 }
-                OptionRow(BedtimeIcons.Grid, "App icons", description = "Small icons next to app names") {
-                    ObsidianToggle(style.showIcons, { onChange(style.copy(showIcons = it)) })
+                SectionCard(title = "Text", subtitle = "Automatic is cream on a dark background, ink on a light one") {
+                    QuickChip("Automatic", style.textColor == null) { onChange(style.copy(textColor = null)) }
+                    Spacer(Modifier.height(12.dp))
+                    SwatchRow(TextPresets, style.textColor ?: -1L) { onChange(style.copy(textColor = it)) }
+                    HexField(style.textColor ?: style.palette().text.toArgb().toLong() and 0xFFFFFFFFL) { onChange(style.copy(textColor = it)) }
                 }
-                OptionRow(BedtimeIcons.Leaf, "Quote", description = "Here and on the lock screen. Tap it for another, hold it to favourite or hide it") {
-                    ObsidianToggle(style.showQuote, { onChange(style.copy(showQuote = it)) })
-                }
-                if (style.showQuote) {
-                    SizeLabel("A new one every", Modifier.padding(top = 12.dp, bottom = 8.dp))
+                SectionCard(title = "Sizes") {
+                    SizeLabel("Clock", Modifier.padding(bottom = 8.dp))
                     SegmentedChoice(
-                        options = listOf("Hour", "6 hours", "Day", "Week"),
-                        selected = style.quoteRefresh.ordinal,
-                        onSelect = { onChange(style.copy(quoteRefresh = QuoteRefresh.entries[it])) },
+                        options = listOf("Very small", "Small", "Medium", "Large"),
+                        selected = style.clockSize.ordinal,
+                        onSelect = { onChange(style.copy(clockSize = ClockSize.entries[it])) },
                     )
-                    OptionRow(
-                        Icons.Default.FavoriteBorder,
-                        "Quotes",
-                        description = "Add your own, pick favourites, hide some",
-                        onClick = onQuotes,
-                    ) { Chevron() }
+                    SizeLabel("Text", Modifier.padding(top = 16.dp, bottom = 8.dp))
+                    SegmentedChoice(
+                        options = listOf("Small", "Medium", "Large"),
+                        selected = style.textSize.ordinal,
+                        onSelect = { onChange(style.copy(textSize = TextSize.entries[it])) },
+                    )
+                    SizeLabel("App names", Modifier.padding(top = 16.dp, bottom = 8.dp))
+                    SegmentedChoice(
+                        options = listOf("Very small", "Small", "Medium", "Large"),
+                        selected = style.appNameSize.ordinal,
+                        onSelect = { onChange(style.copy(appNameSize = AppNameSize.entries[it])) },
+                    )
+                    SizeLabel("Full app list and search", Modifier.padding(top = 16.dp, bottom = 8.dp))
+                    SegmentedChoice(
+                        options = listOf("Very small", "Small", "Medium", "Large"),
+                        selected = style.listSize.ordinal,
+                        onSelect = { onChange(style.copy(listSize = AppNameSize.entries[it])) },
+                    )
                 }
-            }
-            SectionCard(title = "Weather", subtitle = "From Breezy Weather, a free app that does the fetching; this one never goes online") {
-                OptionRow(
-                    Icons.Default.Info,
-                    "Weather after the date",
-                    description = when {
-                        !style.showWeather -> "Like “12° · light rain”, here and on the lock screen"
-                        weatherHeardAt == null -> "Nothing from Breezy Weather yet"
-                        else -> "Last heard ${formatRelativePast(System.currentTimeMillis() - weatherHeardAt)}. Hidden when over 3 hours old"
-                    },
-                ) { ObsidianToggle(style.showWeather, { onChange(style.copy(showWeather = it)) }) }
-                if (style.showWeather) {
-                    SizeLabel("Show", Modifier.padding(top = 12.dp, bottom = 8.dp))
-                    val styles = listOf(WeatherStyle.TODAY, WeatherStyle.DAYS, WeatherStyle.WEEK)
-                    SegmentedChoice(
-                        options = listOf("Today", "3 days", "5 days"),
-                        selected = styles.indexOf(style.weatherStyle).coerceAtLeast(0),
-                        onSelect = { onChange(style.copy(weatherStyle = styles[it])) },
-                    )
-                    SizeLabel("In", Modifier.padding(top = 12.dp, bottom = 8.dp))
-                    SegmentedChoice(
-                        options = listOf("Automatic", "°C", "°F"),
-                        selected = style.weatherUnit.ordinal,
-                        onSelect = { onChange(style.copy(weatherUnit = TempUnit.entries[it])) },
-                    )
+                SectionCard(title = "Fonts", subtitle = "Two choices: one for the clock, date and apps, one for the quote") {
+                    SizeLabel("Clock, date and apps", Modifier.padding(bottom = 8.dp))
+                    FontChoices(style.font, style.customFontName, onPick = { onChange(style.copy(font = it)) }, onAdd = { onAddFont(false) })
+                    SizeLabel("Quote", Modifier.padding(top = 16.dp, bottom = 8.dp))
+                    FontChoices(style.quoteFont, style.customFontName, onPick = { onChange(style.copy(quoteFont = it)) }, onAdd = { onAddFont(true) })
                     Text(
-                        "Install Breezy Weather (it's on F-Droid). In its settings, under widgets, open “Send Gadgetbridge data” and tick digital refuge. It sends the weather each time it updates.",
+                        "Serifs set the quote in italics. Your own font is a .ttf or .otf file; it stays on this phone and isn't part of a backup.",
                         style = MaterialTheme.typography.bodySmall,
                         color = c.textFaint,
-                        modifier = Modifier.padding(top = 4.dp),
+                        modifier = Modifier.padding(top = 12.dp),
                     )
                 }
-            }
-            SectionCard(title = "Calendar") {
-                OptionRow(
-                    Icons.Default.DateRange,
-                    "Today's next event",
-                    description = "Under the date, read from the calendar already on this phone. Nothing is fetched",
-                ) { ObsidianToggle(style.showCalendar, onShowCalendar) }
-                if (style.showCalendar) {
-                    OptionRow(
-                        Icons.Default.Lock,
-                        "Event names on the lock screen",
-                        description = "Off, the lock screen only says when the next one is",
-                    ) { ObsidianToggle(style.calendarNamesOnLock, { onChange(style.copy(calendarNamesOnLock = it)) }) }
+                // Your own font's file stays, so resetting keeps it on offer.
+                TextButton(onClick = { onChange(HomeStyle(customFontName = style.customFontName)) }, modifier = Modifier.align(Alignment.CenterHorizontally)) {
+                    Text("Reset to default", color = c.textMuted)
                 }
             }
-            SectionCard {
-                OptionRow(
-                    BedtimeIcons.Refuge,
-                    "Show on the lock screen",
-                    description = "During any session, the lock screen shows this clock and the session, without the apps",
-                ) { ObsidianToggle(style.lockScreen, { onChange(style.copy(lockScreen = it)) }) }
-                if (style.lockScreen) {
+            if (page == StylePage.SHOWN) {
+                SectionCard(title = "Show") {
+                    OptionRow(Icons.Default.Face, "Greeting", description = "“Good evening”, “Good morning”…") {
+                        ObsidianToggle(style.showGreeting, { onChange(style.copy(showGreeting = it)) })
+                    }
+                    OptionRow(Icons.Default.DateRange, "Date") {
+                        ObsidianToggle(style.showDate, { onChange(style.copy(showDate = it)) })
+                    }
+                    OptionRow(BedtimeIcons.Grid, "App icons", description = "Small icons next to app names") {
+                        ObsidianToggle(style.showIcons, { onChange(style.copy(showIcons = it)) })
+                    }
+                    OptionRow(BedtimeIcons.Leaf, "Quote", description = "Here and on the lock screen. Tap it for another, hold it to favourite or hide it") {
+                        ObsidianToggle(style.showQuote, { onChange(style.copy(showQuote = it)) })
+                    }
+                    if (style.showQuote) {
+                        SizeLabel("A new one every", Modifier.padding(top = 12.dp, bottom = 8.dp))
+                        SegmentedChoice(
+                            options = listOf("Hour", "6 hours", "Day", "Week"),
+                            selected = style.quoteRefresh.ordinal,
+                            onSelect = { onChange(style.copy(quoteRefresh = QuoteRefresh.entries[it])) },
+                        )
+                        OptionRow(
+                            Icons.Default.FavoriteBorder,
+                            "Quotes",
+                            description = "Add your own, pick favourites, hide some",
+                            onClick = onQuotes,
+                        ) { Chevron() }
+                    }
+                }
+                SectionCard(title = "Weather", subtitle = "From Breezy Weather, a free app that does the fetching; this one never goes online") {
+                    OptionRow(
+                        Icons.Default.Info,
+                        "Weather after the date",
+                        description = when {
+                            !style.showWeather -> "Like “12° · light rain”, here and on the lock screen"
+                            weatherHeardAt == null -> "Nothing from Breezy Weather yet"
+                            else -> "Last heard ${formatRelativePast(System.currentTimeMillis() - weatherHeardAt)}. Hidden when over 3 hours old"
+                        },
+                    ) { ObsidianToggle(style.showWeather, { onChange(style.copy(showWeather = it)) }) }
+                    if (style.showWeather) {
+                        SizeLabel("Show", Modifier.padding(top = 12.dp, bottom = 8.dp))
+                        val styles = listOf(WeatherStyle.TODAY, WeatherStyle.DAYS, WeatherStyle.WEEK)
+                        SegmentedChoice(
+                            options = listOf("Today", "3 days", "5 days"),
+                            selected = styles.indexOf(style.weatherStyle).coerceAtLeast(0),
+                            onSelect = { onChange(style.copy(weatherStyle = styles[it])) },
+                        )
+                        SizeLabel("In", Modifier.padding(top = 12.dp, bottom = 8.dp))
+                        SegmentedChoice(
+                            options = listOf("Automatic", "°C", "°F"),
+                            selected = style.weatherUnit.ordinal,
+                            onSelect = { onChange(style.copy(weatherUnit = TempUnit.entries[it])) },
+                        )
+                        Text(
+                            "Install Breezy Weather (it's on F-Droid). In its settings, under widgets, open “Send Gadgetbridge data” and tick digital refuge. It sends the weather each time it updates.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = c.textFaint,
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
+                    }
+                }
+                SectionCard(title = "Calendar") {
+                    OptionRow(
+                        Icons.Default.DateRange,
+                        "Today's next event",
+                        description = "Under the date, read from the calendar already on this phone. Nothing is fetched",
+                    ) { ObsidianToggle(style.showCalendar, onShowCalendar) }
+                    if (style.showCalendar) {
+                        OptionRow(
+                            Icons.Default.Lock,
+                            "Event names on the lock screen",
+                            description = "Off, the lock screen only says when the next one is",
+                        ) { ObsidianToggle(style.calendarNamesOnLock, { onChange(style.copy(calendarNamesOnLock = it)) }) }
+                    }
+                }
+            }
+            if (page == StylePage.NOTIFICATIONS) {
+                SectionCard {
                     OptionRow(
                         Icons.Default.Notifications,
                         "Notifications",
                         description = if (style.lockNotifications && !notificationAccess) {
                             "Notification access is off, so none can show. Switch this on again to allow it"
                         } else {
-                            "Those the session lets through, as private as Android's own lock screen. Tap one to unlock and open it, or swipe it aside to clear it"
+                            "Drag one down to read it; tap to unlock and open it, or swipe it aside to clear it"
                         },
                     ) { ObsidianToggle(style.lockNotifications && notificationAccess, onLockNotifications) }
                     if (style.lockNotifications && notificationAccess) {
@@ -460,13 +468,10 @@ internal fun HomeStyleContent(
                             onClick = { editingReplies = true },
                         ) { Chevron() }
                     }
-                    SizeLabel("Swipes from the top of the lock screen", Modifier.padding(top = 12.dp, bottom = 4.dp))
-                    Text(
-                        "Start around the clock: each can open an app once you've unlocked, or the camera straight away. The middle is for swiping notifications away. From the bottom, any swipe just unlocks.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = c.textFaint,
-                        modifier = Modifier.padding(bottom = 4.dp),
-                    )
+                }
+            }
+            if (page == StylePage.SWIPES) {
+                SectionCard {
                     Swipe.entries.forEach { swipe ->
                         val target = style.lockGestures[swipe]
                         OptionRow(
@@ -482,12 +487,19 @@ internal fun HomeStyleContent(
                     }
                 }
             }
-            // Your own font's file stays, so resetting keeps it on offer.
-            TextButton(onClick = { onChange(HomeStyle(customFontName = style.customFontName)) }, modifier = Modifier.align(Alignment.CenterHorizontally)) {
-                Text("Reset to default", color = c.textMuted)
-            }
         }
     }
+}
+
+/** The pages the home and lock screen's choices are split into, each reached from settings. */
+enum class StylePage(val title: String, val intro: String) {
+    LOOK("Look", "Colours, sizes and fonts, for your home screen, the minimal one in sessions, and the lock screen. Changes save as you go."),
+    SHOWN("What's shown", "What sits around the clock: greeting, date, weather, your next event and a quote. Changes save as you go."),
+    SWIPES(
+        "Lock-screen swipes",
+        "Start around the clock: each can open an app once you've unlocked, or the camera straight away. The middle is for swiping notifications away. From the bottom, any swipe just unlocks.",
+    ),
+    NOTIFICATIONS("Lock-screen notifications", "Those the session lets through, from the apps you choose, as private as Android's own lock screen."),
 }
 
 private fun Swipe.icon(): ImageVector = when (this) {

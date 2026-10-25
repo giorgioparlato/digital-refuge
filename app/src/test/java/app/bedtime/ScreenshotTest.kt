@@ -420,7 +420,7 @@ class ScreenshotTest {
     }
 
     @Test
-    fun homeStyleNotifications() = shot(tall = true, height = 9000) {
+    fun homeStyleNotifications() = shot {
         HomeStyleContent(
             style = HomeStyle(lockNotifications = true, lockNotificationApps = setOf("com.android.dialer", "org.thoughtcrime.securesms")),
             onChange = {},
@@ -428,6 +428,32 @@ class ScreenshotTest {
             now = Samples.lateEvening,
             onBack = {},
             notificationAccess = true,
+            page = app.bedtime.ui.homestyle.StylePage.NOTIFICATIONS,
+        )
+    }
+
+    @Test
+    fun homeStyleShown() = shot(tall = true, height = 6000) {
+        HomeStyleContent(
+            style = HomeStyle(showCalendar = true, showWeather = true),
+            onChange = {},
+            previewApps = Samples.minimalApps,
+            now = Samples.lateEvening,
+            onBack = {},
+            quote = Samples.shortQuote,
+            page = app.bedtime.ui.homestyle.StylePage.SHOWN,
+        )
+    }
+
+    @Test
+    fun homeStyleSwipes() = shot {
+        HomeStyleContent(
+            style = HomeStyle(lockGestures = mapOf(app.bedtime.data.Swipe.UP to app.bedtime.data.GESTURE_CAMERA)),
+            onChange = {},
+            previewApps = Samples.minimalApps,
+            now = Samples.lateEvening,
+            onBack = {},
+            page = app.bedtime.ui.homestyle.StylePage.SWIPES,
         )
     }
 
@@ -454,6 +480,83 @@ class ScreenshotTest {
             onLaunch = {},
             onUnlock = {},
             quote = Samples.shortQuote,
+        )
+    }
+
+    @Test
+    fun everydayHome() = shot {
+        MinimalHomeContent(
+            now = Samples.lateEvening,
+            scheduleName = null,
+            until = null,
+            apps = Samples.minimalApps,
+            style = HomeStyle(),
+            onLaunch = {},
+            onUnlock = null,
+            quote = Samples.shortQuote,
+        )
+    }
+
+    @Test
+    fun everydayHomeEmpty() = shot {
+        MinimalHomeContent(
+            now = Samples.lateEvening,
+            scheduleName = null,
+            until = null,
+            apps = emptyList(),
+            style = HomeStyle(),
+            onLaunch = {},
+            onUnlock = null,
+            emptyHint = "Hold an app in the full list to add it here.",
+            quote = Samples.shortQuote,
+        )
+    }
+
+    @Test
+    fun appActions() = shot {
+        Screen {
+            app.bedtime.ui.minimal.AppActionsContent(
+                app = app.bedtime.apps.AppEntry("pkg.signal", "Signal"),
+                style = HomeStyle(),
+                favourite = true,
+                hidden = false,
+                canUninstall = true,
+                shortcuts = listOf(app.bedtime.ui.minimal.AppShortcut("a", "New message"), app.bedtime.ui.minimal.AppShortcut("b", "Anna")),
+                handlers = app.bedtime.ui.minimal.AppActionHandlers(),
+            )
+        }
+    }
+
+    @Test
+    fun settingsAsHome() = shot {
+        SettingsContent(
+            blocks = listOf(Samples.focus),
+            tileBlockId = null,
+            setupStepsLeft = 0,
+            onBack = {},
+            onSetup = {},
+            onHomeStyle = {},
+            onTileBlock = {},
+            homeScreen = true,
+            isDefaultHome = false,
+            hiddenCount = 3,
+        )
+    }
+
+    @Test
+    fun settingsTall() = shot(tall = true, height = 4600) {
+        SettingsContent(
+            blocks = listOf(Samples.focus),
+            tileBlockId = null,
+            setupStepsLeft = 0,
+            onBack = {},
+            onSetup = {},
+            onHomeStyle = {},
+            onTileBlock = {},
+            homeScreen = true,
+            isDefaultHome = true,
+            groupCount = 2,
+            alwaysAvailableCount = 3,
         )
     }
 

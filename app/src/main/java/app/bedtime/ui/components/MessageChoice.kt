@@ -92,9 +92,8 @@ private fun MessageChoiceDialog(current: CoverMessage, onPick: (CoverMessage) ->
         title = { Text("What the cover says") },
         text = {
             LazyColumn(Modifier.heightIn(max = 480.dp)) {
-                item { Choice("The usual words", current.mode == MessageMode.USUAL) { onPick(CoverMessage()) } }
                 item {
-                    Choice("A different one each time", current.mode == MessageMode.RANDOM, note = "From the app's and yours that are in the mix") {
+                    Choice("A different one each time", current.mode != MessageMode.CHOSEN, note = "From the app's and yours that are in the mix") {
                         onPick(CoverMessage(MessageMode.RANDOM))
                     }
                 }

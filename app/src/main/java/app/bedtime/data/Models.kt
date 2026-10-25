@@ -172,6 +172,8 @@ data class HomeStyle(
     val accent: Long = DEFAULT_HOME_ACCENT,
     val textSize: TextSize = TextSize.MEDIUM,
     val appNameSize: AppNameSize = AppNameSize.MEDIUM,
+    /** The full app list behind a swipe up: its app names, and the search's suggestions a little smaller. */
+    val listSize: AppNameSize = AppNameSize.MEDIUM,
     val showGreeting: Boolean = true,
     val showDate: Boolean = true,
     val showIcons: Boolean = false,
@@ -232,6 +234,14 @@ data class AppSettings(
     /** Apps no session blocks, reached from the Emergency screen (maps, rides, an authenticator…). */
     val alwaysAvailable: Set<String> = emptySet(),
     val alwaysAvailableSeeded: Boolean = false,
+    /** digital refuge is your home screen, not only the minimal one during sessions. */
+    val homeScreen: Boolean = false,
+    /** The apps on the home screen outside sessions, in your order. */
+    val homeFavourites: List<String> = emptyList(),
+    /** Apps left out of the home screen's lists and search (they still open, and still follow sessions). */
+    val hiddenApps: Set<String> = emptySet(),
+    /** Your own names for apps, by package, used on the home screen and in its lists. */
+    val appNames: Map<String, String> = emptyMap(),
     /** Which block each home-screen widget starts, by widget id; missing means the tile's block, then the first. */
     val widgetBlocks: Map<String, String> = emptyMap(),
     // Both of these used to live here and now belong to each schedule, since how firmly a session
@@ -271,13 +281,16 @@ data class QuotePrefs(
     val hidden: Set<String> = emptySet(),
 )
 
-/** How a cover picks its words: the usual ones, one you chose, or a different one each time. */
+/**
+ * How a cover picks its words: a different one each time, or one you chose. [USUAL] is no longer
+ * offered; saved, it reads as a different one each time.
+ */
 @Serializable
 enum class MessageMode { USUAL, CHOSEN, RANDOM }
 
 /** A cover's words. [text] is the chosen message when [mode] is [MessageMode.CHOSEN]. */
 @Serializable
-data class CoverMessage(val mode: MessageMode = MessageMode.USUAL, val text: String? = null)
+data class CoverMessage(val mode: MessageMode = MessageMode.RANDOM, val text: String? = null)
 
 /** A message you wrote. [inRandom] puts it in the mix for covers set to a different one each time. */
 @Serializable

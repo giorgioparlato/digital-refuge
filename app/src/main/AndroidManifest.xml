@@ -111,6 +111,23 @@
             android:windowSoftInputMode="adjustResize"
             tools:ignore="DiscouragedApi,LockedOrientationActivity" />
 
+        <!--
+          The minimal home as your everyday home screen. Off until you switch it on in settings, so an
+          update never makes Android ask which home app to use; switched off, Android goes back to yours.
+        -->
+        <activity-alias
+            android:name=".Home"
+            android:enabled="false"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:targetActivity=".ui.minimal.MinimalHomeActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.HOME" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity-alias>
+
         <activity
             android:name=".ui.lock.LockScreenActivity"
             android:excludeFromRecents="true"

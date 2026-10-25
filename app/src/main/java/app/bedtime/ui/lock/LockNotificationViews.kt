@@ -1,5 +1,10 @@
 package app.bedtime.ui.lock
 
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -269,6 +274,9 @@ private fun ReplyBox(p: HomePalette, quickReplies: List<String>, onSend: (String
             onValueChange = { text = it },
             textStyle = MaterialTheme.typography.bodyMedium.copy(color = p.text),
             cursorBrush = SolidColor(p.accent),
+            // A message: sentences start with a capital, and the keyboard's own key sends it.
+            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, keyboardType = KeyboardType.Text, imeAction = ImeAction.Send),
+            keyboardActions = KeyboardActions(onSend = { if (text.isNotBlank()) onSend(text.trim()) }),
             modifier = Modifier
                 .fillMaxWidth()
                 .focusRequester(focus)

@@ -13,6 +13,16 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            49,
+            "0.9.3",
+            listOf(
+                "digital refuge can be your home screen, if you want: settings › use as your home screen. The same calm screen all day, with your favourite apps, narrowed during sessions.",
+                "Hold an app for its shortcuts, to add it to your home screen, rename it, hide it, or see its info.",
+                "Settings are grouped by place: your home screen, your lock screen, your sessions.",
+                "Covers now show a different message each time by default.",
+            ),
+        ),
+        ChangelogEntry(
             48,
             "0.9.2",
             listOf(
