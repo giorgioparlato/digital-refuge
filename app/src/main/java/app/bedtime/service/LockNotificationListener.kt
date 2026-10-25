@@ -92,10 +92,30 @@ class LockNotificationListener : NotificationListenerService(), LockNotification
                 who = if (full && style != null) style.conversationTitle?.toString() ?: lines.lastOrNull()?.sender ?: title else null,
                 count = lines.size.coerceAtLeast(1),
                 missedCall = n.category == CATEGORY_MISSED_CALL,
+                people = peopleIn(n),
             )
         }
         held.keys.retainAll(active.map { it.key }.toSet())
         LockNotifications.publish(list.sortedByDescending { it.postedAt })
+    }
+
+    /**
+     * The names a notification is about, read only to choose which show: the people it lists, a
+     * conversation's name and writers, its title, and a missed call's caller.
+     */
+    private fun peopleIn(n: Notification): List<String> {
+        val extras = n.extras ?: return emptyList()
+        val listed = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            @Suppress("DEPRECATION")
+            extras.getParcelableArrayList<android.app.Person>(Notification.EXTRA_PEOPLE_LIST).orEmpty().mapNotNull { it.name?.toString() }
+        } else {
+            emptyList()
+        }
+        val style = NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(n)
+        val writers = style?.messages.orEmpty().mapNotNull { it.person?.name?.toString() }
+        val call = if (n.category == CATEGORY_MISSED_CALL) listOfNotNull(extras.getCharSequence(Notification.EXTRA_TEXT)?.toString()) else emptyList()
+        return (listed + writers + listOfNotNull(style?.conversationTitle?.toString(), extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()) + call)
+            .map { it.trim() }.filter { it.isNotEmpty() }.distinct()
     }
 
     /** The reply, if any, and up to three other buttons; contextual ones (Android's own suggestions) left out. */

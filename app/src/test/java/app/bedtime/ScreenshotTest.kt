@@ -205,6 +205,25 @@ class ScreenshotTest {
             ),
             onChange = {},
             onBack = {},
+            keywords = mapOf("web:a" to "w", "note:refuge" to "n", "note:x" to "to", "calendar" to "c", "maps:c" to "m"),
+        )
+    }
+
+    @Test
+    fun searchSettingsFolders() = shot {
+        val choice = { k: String, on: Boolean -> app.bedtime.data.SearchChoice(k, on) }
+        app.bedtime.ui.settings.SearchSettingsContent(
+            choices = listOf(
+                choice("clock", true) to "Alarms and timers: \"alarm 7:30\", \"timer 10 min\"",
+                choice("settings", true) to "Settings pages",
+                choice("files", true) to "Files in a folder, by name",
+                choice("spotify:s", false) to "Search in Spotify",
+                choice("obsidian", false) to "Obsidian notes, by title",
+            ),
+            onChange = {},
+            onBack = {},
+            keywords = mapOf("files" to "f", "spotify:s" to "s", "obsidian" to "o"),
+            folders = listOf(Triple("obsidian", "Obsidian vault", null), Triple("files", "Folder of files", "Documents")),
         )
     }
 
@@ -828,6 +847,23 @@ class ScreenshotTest {
                 query, drawerApps, targets,
                 listOf(app.bedtime.data.NoteTarget("scratchpad", "x"), app.bedtime.data.NoteTarget("movies list", "y")),
                 app.bedtime.data.EventParser.parse(query, now),
+            ),
+            onLaunch = {}, onResult = {}, preview = true,
+        )
+    }
+
+    @Test
+    fun drawerSearchMore() = shot {
+        val file = { name: String -> app.bedtime.data.IndexedFile(name, name, "content://$name", "") }
+        app.bedtime.ui.minimal.AppDrawerContent(
+            apps = drawerApps, style = HomeStyle(), query = "review", onQuery = {},
+            results = listOf(
+                app.bedtime.ui.minimal.DrawerResult.Clock(app.bedtime.data.ClockAction.Alarm(7, 30, "")),
+                app.bedtime.ui.minimal.DrawerResult.Clock(app.bedtime.data.ClockAction.Timer(600, "tea")),
+                app.bedtime.ui.minimal.DrawerResult.Setting(app.bedtime.data.SettingsPages.match("wifi").first()),
+                app.bedtime.ui.minimal.DrawerResult.VaultNote(file("Weekly review.md")),
+                app.bedtime.ui.minimal.DrawerResult.File(file("Review 2026.pdf")),
+                app.bedtime.ui.minimal.DrawerResult.Search(app.bedtime.data.SearchTarget(app.bedtime.data.SearchTarget.Kind.SPOTIFY, "s", "Spotify")),
             ),
             onLaunch = {}, onResult = {}, preview = true,
         )

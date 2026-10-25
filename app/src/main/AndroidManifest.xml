@@ -62,6 +62,8 @@
       own "uninstall?" question, which you confirm there; never during a session.
     -->
     <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
+    <!-- Alarms and timers typed into the minimal screen's search ("alarm 7:30", "timer 10 min"), handed to your clock app. -->
+    <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
     <!-- Contacts in the minimal screen's search, read only to match what you type; asked when you switch them on. -->
     <uses-permission android:name="android.permission.READ_CONTACTS" />
 

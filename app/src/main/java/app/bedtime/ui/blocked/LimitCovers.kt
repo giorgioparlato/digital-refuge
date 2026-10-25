@@ -1,5 +1,7 @@
 package app.bedtime.ui.blocked
 
+import app.bedtime.unlock.TypingChallenge
+import app.bedtime.data.TextSource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -53,7 +55,16 @@ import java.time.LocalDate
 
 /** The pause before opening an app with a limit: a few breaths, then open it or let it be. */
 @Composable
-internal fun PauseScreen(pkg: String, seconds: Int, opens: Int, passKey: String, onHome: () -> Unit, onFinish: () -> Unit) {
+internal fun PauseScreen(
+    pkg: String,
+    seconds: Int,
+    opens: Int,
+    passKey: String,
+    onHome: () -> Unit,
+    onFinish: () -> Unit,
+    typing: Int = 0,
+    source: TextSource = TextSource.WORDS,
+) {
     val context = LocalContext.current
     val label = remember(pkg) { AppCatalog.label(context, pkg) }
     val settings by Repository.get(context).settings.collectAsStateWithLifecycle(initialValue = null)
@@ -65,12 +76,31 @@ internal fun PauseScreen(pkg: String, seconds: Int, opens: Int, passKey: String,
             .maxByOrNull { it.rules.pauseSeconds ?: 0 }
             ?.let { CoverMessages.pick(it.message, loaded.customMessages) }
     }
-    var left by rememberSaveable(pkg, opens) { mutableIntStateOf(seconds) }
+    var left by rememberSaveable(pkg, opens) { mutableIntStateOf(if (typing > 0) 0 else seconds) }
+    var typed by rememberSaveable(pkg, opens) { mutableStateOf(typing <= 0) }
     LaunchedEffect(pkg, opens) {
         while (left > 0) {
             delay(1_000)
             left--
         }
+    }
+    // Typing first, when the limit asks for it; the way to open appears once it's done.
+    if (!typed) {
+        Column(
+            Modifier.fillMaxSize().background(Obsidian.colors.bgPrimary).safeDrawingPadding().imePadding().padding(horizontal = 24.dp, vertical = 16.dp),
+        ) {
+            Text("About to open $label", style = MaterialTheme.typography.titleLarge, color = Obsidian.colors.textNormal)
+            Text(
+                if (opens > 1) "type this first · the ${ordinal(opens)} time today" else "type this first",
+                style = MaterialTheme.typography.bodyMedium,
+                color = Obsidian.colors.textMuted,
+                modifier = Modifier.padding(top = 4.dp, bottom = 16.dp),
+            )
+            TypingChallenge(length = typing, source = source, onPassed = { typed = true })
+            Spacer(Modifier.weight(1f))
+            TextButton(onClick = onHome, modifier = Modifier.align(Alignment.CenterHorizontally)) { Text("Never mind", color = Obsidian.colors.textMuted) }
+        }
+        return
     }
     PauseContent(
         appLabel = label,

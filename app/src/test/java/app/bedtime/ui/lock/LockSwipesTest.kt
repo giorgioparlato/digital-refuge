@@ -33,9 +33,12 @@ class LockSwipesTest {
     }
 
     @Test
-    fun edgesUnlockToo() {
+    fun theSidesUnlockAndTheTopPullsTheShade() {
         assertEquals(LockSwipe.Unlock, read(30f, 1000f, 400f, 0f))
-        assertEquals(LockSwipe.Unlock, read(500f, 50f, 0f, 400f))
+        // A pull down from the very top is Android's notification shade, as on any lock screen.
+        assertEquals(LockSwipe.Shade, read(500f, 50f, 0f, 400f))
+        // Sideways along the top edge still just unlocks.
+        assertEquals(LockSwipe.Unlock, read(500f, 50f, 400f, 30f))
     }
 
     @Test

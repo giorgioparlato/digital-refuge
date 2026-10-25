@@ -1,5 +1,7 @@
 package app.bedtime.ui.limits
 
+import app.bedtime.data.TextSource
+import app.bedtime.data.PauseKind
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
@@ -334,6 +336,7 @@ internal fun LimitEditContent(
                 Text(
                     when {
                         rules.dailyMinutes != null -> "${formatMinutes(rules.dailyMinutes.toLong())} a day"
+                        (rules.pauseSeconds ?: 0) > 0 && rules.pauseKind == PauseKind.TYPING -> "${rules.pauseTextLength} characters to type"
                         (rules.pauseSeconds ?: 0) > 0 -> "${formatWaitSeconds(rules.pauseSeconds ?: 0)} pause"
                         else -> "not set yet"
                     },
@@ -410,15 +413,72 @@ internal fun LimitEditContent(
                 }
                 AnimatedVisibility((rules.pauseSeconds ?: 0) > 0) {
                     Column {
-                        SubOptionRow("How long") {
-                            NumberStepper(
-                                rules.pauseSeconds ?: 10,
-                                { v -> setRules { it.copy(pauseSeconds = v) } },
-                                3..120,
-                                presets = listOf(5, 10, 15, 20, 30, 60),
-                                title = "pause",
+                        Column(Modifier.padding(start = 52.dp, bottom = 12.dp)) {
+                            SegmentedChoice(
+                                options = listOf("A wait", "Typing"),
+                                selected = rules.pauseKind.ordinal,
+                                onSelect = { i -> setRules { it.copy(pauseKind = PauseKind.entries[i]) } },
                                 enabled = editable,
-                                format = { formatWaitSeconds(it) },
+                            )
+                        }
+                        if (rules.pauseKind == PauseKind.WAIT) {
+                            SubOptionRow("How long") {
+                                NumberStepper(
+                                    rules.pauseSeconds ?: 10,
+                                    { v -> setRules { it.copy(pauseSeconds = v) } },
+                                    3..120,
+                                    presets = listOf(5, 10, 15, 20, 30, 60),
+                                    title = "pause",
+                                    enabled = editable,
+                                    format = { formatWaitSeconds(it) },
+                                )
+                            }
+                        } else {
+                            SubOptionRow("How much to type") {
+                                NumberStepper(
+                                    rules.pauseTextLength,
+                                    { v -> setRules { it.copy(pauseTextLength = v) } },
+                                    10..300,
+                                    presets = listOf(20, 40, 60, 100, 150),
+                                    title = "characters",
+                                    enabled = editable,
+                                    format = { "$it characters" },
+                                )
+                            }
+                            Column(Modifier.padding(start = 52.dp, bottom = 12.dp)) {
+                                SegmentedChoice(
+                                    options = listOf("Letters", "Words", "Passages"),
+                                    selected = rules.pauseTextSource.ordinal,
+                                    onSelect = { i -> setRules { it.copy(pauseTextSource = TextSource.entries[i]) } },
+                                    enabled = editable,
+                                )
+                            }
+                        }
+                        Text(
+                            "Longer with each open today",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = c.textMuted,
+                            modifier = Modifier.padding(start = 52.dp, bottom = 8.dp),
+                        )
+                        Column(Modifier.padding(start = 52.dp, bottom = 4.dp)) {
+                            val growths = listOf(0, 25, 50, 100)
+                            SegmentedChoice(
+                                options = listOf("No", "+25%", "+50%", "+100%"),
+                                selected = growths.indexOf(rules.pauseGrowth).coerceAtLeast(0),
+                                onSelect = { i -> setRules { it.copy(pauseGrowth = growths[i]) } },
+                                enabled = editable,
+                            )
+                            Text(
+                                if (rules.pauseGrowth == 0) {
+                                    "The same every time."
+                                } else if (rules.pauseKind == PauseKind.WAIT) {
+                                    "Each open today makes the wait ${rules.pauseGrowth}% longer than the last, up to 8 times as long. A new day starts it over."
+                                } else {
+                                    "Each open today adds ${rules.pauseGrowth}% more to type, up to 3 times as much. A new day starts it over."
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = c.textFaint,
+                                modifier = Modifier.padding(top = 6.dp, bottom = 12.dp),
                             )
                         }
                         SubOptionRow("Back within") {

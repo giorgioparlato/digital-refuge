@@ -377,6 +377,7 @@ private fun LockScreen(
         // A swipe from around the clock does what you set; every other swipe just unlocks.
         onSwipe = { swipe -> style.lockGestures[swipe]?.let(runAction) ?: onOpen() },
         onDoubleTap = style.lockGestures[Swipe.DOUBLE_TAP]?.let { action -> { runAction(action) } },
+        onShade = { BlockingState.globalAction(context, AccessibilityService.GLOBAL_ACTION_NOTIFICATIONS) },
         quote = Quotes.forPeriod(now, style.quoteRefresh, prefs = settings.quotes),
         calendar = rememberCalendarLine(style, now, onLockScreen = true),
         weather = rememberWeather(style, now),
@@ -385,7 +386,9 @@ private fun LockScreen(
             ?.let { HourlyUse.states(it, now.hour, HourlyUse.rule(settings)) },
         notifications = if (style.lockNotifications) {
             val nowMs = System.currentTimeMillis()
-            notifications.filter { it.packageName in style.lockNotificationApps && !LockNotifications.isQuiet(it, quiet, nowMs) }
+            notifications.filter {
+                LockNotifications.wanted(it, style.lockNotificationApps, style.lockNotificationPeople) && !LockNotifications.isQuiet(it, quiet, nowMs)
+            }
         } else {
             emptyList()
         },
@@ -426,6 +429,8 @@ internal fun LockScreenContent(
     hours: List<HourState>? = null,
     /** A double tap anywhere, when you've set one; a single tap then waits a moment to be sure. */
     onDoubleTap: (() -> Unit)? = null,
+    /** A pull down from the very top: the notification shade. */
+    onShade: () -> Unit = {},
     onHours: (() -> Unit)? = null,
     preview: Boolean = false,
     notifications: List<LockNotification> = emptyList(),
@@ -467,6 +472,7 @@ internal fun LockScreenContent(
                             when (val read = readLockSwipe(start.x, start.y, w, h, travel.x, travel.y, minDistance)) {
                                 LockSwipe.None -> Unit
                                 LockSwipe.Unlock -> onOpen()
+                                LockSwipe.Shade -> onShade()
                                 is LockSwipe.From -> onSwipe(read.swipe)
                             }
                         },

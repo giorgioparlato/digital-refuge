@@ -1,5 +1,6 @@
 package app.bedtime.ui.blocked
 
+import app.bedtime.data.TextSource
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
@@ -68,6 +69,9 @@ class BlockedActivity : ComponentActivity() {
     private var pauseSeconds by mutableIntStateOf(0)
     private var opens by mutableIntStateOf(0)
     private var passKey by mutableStateOf<String?>(null)
+    /** Characters to type before opening, when the pause asks for typing; 0 for a wait. */
+    private var typing by mutableIntStateOf(0)
+    private var typingSource by mutableStateOf(TextSource.WORDS)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -80,7 +84,7 @@ class BlockedActivity : ComponentActivity() {
                 val pkg = blockedPackage
                 when {
                     mode == MODE_PAUSE && pkg != null -> key(pkg, opens) {
-                        PauseScreen(pkg, pauseSeconds, opens, passKey ?: pkg, onHome = ::goHome, onFinish = ::finish)
+                        PauseScreen(pkg, pauseSeconds, opens, passKey ?: pkg, onHome = ::goHome, onFinish = ::finish, typing = typing, source = typingSource)
                     }
                     mode == MODE_LIMIT && pkg != null -> key(pkg, limitId) {
                         LimitScreen(pkg, limitId.orEmpty(), onHome = ::goHome, onFinish = ::finish)
@@ -104,6 +108,8 @@ class BlockedActivity : ComponentActivity() {
         pauseSeconds = intent.getIntExtra(EXTRA_SECONDS, 0)
         opens = intent.getIntExtra(EXTRA_OPENS, 0)
         passKey = intent.getStringExtra(EXTRA_PASS)
+        typing = intent.getIntExtra(EXTRA_TYPING, 0)
+        typingSource = intent.getStringExtra(EXTRA_SOURCE)?.let { runCatching { TextSource.valueOf(it) }.getOrNull() } ?: TextSource.WORDS
     }
 
     private fun goHome() {
@@ -119,6 +125,8 @@ class BlockedActivity : ComponentActivity() {
         private const val EXTRA_SECONDS = "seconds"
         private const val EXTRA_OPENS = "opens"
         private const val EXTRA_PASS = "pass"
+        private const val EXTRA_TYPING = "typing"
+        private const val EXTRA_SOURCE = "source"
         private const val MODE_PAUSE = "pause"
         private const val MODE_LIMIT = "limit"
 
@@ -127,10 +135,14 @@ class BlockedActivity : ComponentActivity() {
                 .putExtra(EXTRA_PACKAGE, pkg)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
-        /** The pause before opening [pkg]: [seconds] to breathe, then "open" (granting [passKey]) or "never mind". */
-        fun pauseIntent(context: Context, pkg: String, seconds: Int, opens: Int, passKey: String): Intent =
+        /**
+         * The pause before opening [pkg]: [seconds] to breathe, or [typing] characters to type, then
+         * "open" (granting [passKey]) or "never mind".
+         */
+        fun pauseIntent(context: Context, pkg: String, seconds: Int, opens: Int, passKey: String, typing: Int = 0, source: TextSource = TextSource.WORDS): Intent =
             intent(context, pkg).putExtra(EXTRA_MODE, MODE_PAUSE).putExtra(EXTRA_SECONDS, seconds)
                 .putExtra(EXTRA_OPENS, opens).putExtra(EXTRA_PASS, passKey)
+                .putExtra(EXTRA_TYPING, typing).putExtra(EXTRA_SOURCE, source.name)
 
         /** [pkg]'s minutes for today are gone under limit [limitId]. */
         fun limitIntent(context: Context, pkg: String, limitId: String): Intent =

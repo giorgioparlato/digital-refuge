@@ -99,6 +99,10 @@ data class UnlockConfig(
 @Serializable
 enum class TextSource { LETTERS, WORDS, PASSAGES }
 
+/** What a limit's pause before opening asks: a wait, or typing a little. */
+@Serializable
+enum class PauseKind { WAIT, TYPING }
+
 /** What a completed unlock gives: the rest of the session, a set break, or a length chosen there and then. */
 @Serializable
 enum class UnlockMode { END_SESSION, PAUSE, CHOOSE }
@@ -194,6 +198,8 @@ data class HomeStyle(
     val lockNotifications: Boolean = false,
     /** The apps whose notifications that lock screen may show; none until you pick them. */
     val lockNotificationApps: Set<String> = emptySet(),
+    /** People whose notifications show too, from any app, by their name in your contacts. */
+    val lockNotificationPeople: Set<String> = emptySet(),
     /** Ready-made replies to a message from the lock screen; typing your own works too. */
     val quickReplies: List<String> = DEFAULT_QUICK_REPLIES,
     /** The weather after the date, as Breezy Weather sends it. */
@@ -299,6 +305,13 @@ data class AppSettings(
     val distractionMinutes: Int = 5,
     /** Minutes in any app that make an hour a distracted one too; null leaves it to the distracting apps. */
     val distractionTotalMinutes: Int? = null,
+    /** Keywords for the search's choices and for apps ("app:" + package); the suggested ones until [keywordsCustom]. */
+    val keywords: Map<String, String> = emptyMap(),
+    val keywordsCustom: Boolean = false,
+    /** Your Obsidian vault's folder (a tree URI), whose notes' titles the search finds; null until chosen. */
+    val obsidianVault: String? = null,
+    /** A folder (a tree URI) whose files the search finds by name; null until chosen. */
+    val filesFolder: String? = null,
     /** What the search offers after apps, in your order, each on or off; empty until you change it. */
     val searchChoices: List<SearchChoice> = emptyList(),
     /** Which block each home-screen widget starts, by widget id; missing means the tile's block, then the first. */
@@ -371,6 +384,12 @@ data class LimitRules(
     val apps: Set<String> = emptySet(),
     /** Seconds of quiet before one of these apps opens; null means it opens straight away. */
     val pauseSeconds: Int? = 10,
+    /** What that pause asks: a wait of [pauseSeconds], or typing [pauseTextLength] characters of [pauseTextSource]. */
+    val pauseKind: PauseKind = PauseKind.WAIT,
+    val pauseTextLength: Int = 40,
+    val pauseTextSource: TextSource = TextSource.WORDS,
+    /** Each open today makes the pause this much longer than the one before, in percent; 0 keeps it the same. */
+    val pauseGrowth: Int = 0,
     /** After "open anyway", how long you can be away and come back without the pause; 0 = every open. */
     val graceMinutes: Int = 2,
     /** Whether "open anyway" on one of the apps lets you into all of them, rather than only that one. */

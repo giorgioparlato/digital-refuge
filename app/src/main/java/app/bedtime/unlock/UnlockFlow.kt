@@ -471,7 +471,11 @@ internal fun WaitChallengeContent(remaining: Long?, total: Long) {
 }
 
 @Composable
-private fun TextChallengeInput(length: Int, source: TextSource, onPassed: () -> Unit) {
+private fun TextChallengeInput(length: Int, source: TextSource, onPassed: () -> Unit) = TypingChallenge(length, source, onPassed)
+
+/** Copy a short text to go on: the unlock steps' typing, also asked by a limit's pause before opening. */
+@Composable
+internal fun TypingChallenge(length: Int, source: TextSource, onPassed: () -> Unit) {
     val scope = rememberCoroutineScope()
     // Passages follow your quote choices, so wait for them before choosing what to copy.
     val settings by Repository.get(LocalContext.current).settings.collectAsStateWithLifecycle(initialValue = null)

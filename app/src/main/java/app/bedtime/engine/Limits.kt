@@ -1,5 +1,8 @@
 package app.bedtime.engine
 
+import app.bedtime.unlock.Escalation
+import app.bedtime.data.TextSource
+import app.bedtime.data.PauseKind
 import app.bedtime.data.AppLimit
 import app.bedtime.data.LimitRules
 import app.bedtime.data.OutOfTime
@@ -10,7 +13,22 @@ import app.bedtime.data.UsageDay
  * The pause before opening an app: how long, how long "open anyway" lasts once you leave, and the key
  * that pass is kept under — the app itself, or a whole limit — with the apps it covers.
  */
-data class PauseRule(val seconds: Int, val graceMinutes: Int, val passKey: String, val group: Set<String>)
+data class PauseRule(
+    val seconds: Int,
+    val graceMinutes: Int,
+    val passKey: String,
+    val group: Set<String>,
+    val kind: PauseKind = PauseKind.WAIT,
+    val textLength: Int = 40,
+    val textSource: TextSource = TextSource.WORDS,
+    val growth: Int = 0,
+) {
+    /** The wait for the [opens]th open today (1 = the first), grown by [growth] per open before it, at most 8×. */
+    fun secondsFor(opens: Int): Int = if (growth <= 0) seconds else Escalation.waitSeconds(seconds, (opens - 1).coerceAtLeast(0), 1 + growth / 100f)
+
+    /** The typing for the [opens]th open today, grown the same way, at most 3×. */
+    fun textLengthFor(opens: Int): Int = if (growth <= 0) textLength else Escalation.textLength(textLength, (opens - 1).coerceAtLeast(0), 1 + growth / 100f)
+}
 
 /** Pure rules for limits: what holds today, how much time is left, and what counts as loosening. */
 object Limits {
@@ -81,6 +99,10 @@ object Limits {
             graceMinutes = pausing.minOf { it.rules.graceMinutes },
             passKey = if (strictest.rules.pauseForGroup) "limit:${strictest.id}" else pkg,
             group = if (strictest.rules.pauseForGroup) strictest.rules.apps else setOf(pkg),
+            kind = strictest.rules.pauseKind,
+            textLength = strictest.rules.pauseTextLength,
+            textSource = strictest.rules.pauseTextSource,
+            growth = strictest.rules.pauseGrowth,
         )
     }
 
@@ -110,8 +132,15 @@ object Limits {
             (new.pauseSeconds ?: 0) < (old.pauseSeconds ?: 0) ||
             ((old.pauseSeconds ?: 0) > 0 && new.graceMinutes > old.graceMinutes) ||
             ((old.pauseSeconds ?: 0) > 0 && !old.pauseForGroup && new.pauseForGroup) ||
+            ((old.pauseSeconds ?: 0) > 0 && pauseLooser(old, new)) ||
             budgetLooser(old, new) ||
             isLooser(old.unlock, new.unlock)
+
+    /** Typing swapped for a wait, less to type, or a pause that grows less with each open. */
+    private fun pauseLooser(old: LimitRules, new: LimitRules): Boolean =
+        (old.pauseKind == PauseKind.TYPING && new.pauseKind == PauseKind.WAIT) ||
+            (old.pauseKind == PauseKind.TYPING && new.pauseKind == PauseKind.TYPING && new.pauseTextLength < old.pauseTextLength) ||
+            new.pauseGrowth < old.pauseGrowth
 
     private fun budgetLooser(old: LimitRules, new: LimitRules): Boolean {
         val oldMinutes = old.dailyMinutes ?: return false

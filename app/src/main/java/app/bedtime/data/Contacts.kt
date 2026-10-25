@@ -39,6 +39,20 @@ object ContactSearch {
         }.getOrDefault(emptyList()).filter { it.name.isNotBlank() && it.number.isNotBlank() }.distinctBy { it.name }.take(limit)
     }
 
+    /** Everyone in your contacts, by name, A–Z. */
+    fun names(context: Context): List<String> {
+        if (!canRead(context)) return emptyList()
+        return runCatching {
+            context.contentResolver.query(
+                ContactsContract.Contacts.CONTENT_URI,
+                arrayOf(ContactsContract.Contacts.DISPLAY_NAME_PRIMARY),
+                null,
+                null,
+                "${ContactsContract.Contacts.DISPLAY_NAME_PRIMARY} COLLATE NOCASE ASC",
+            )?.use { c -> buildList { while (c.moveToNext()) c.getString(0)?.takeIf { it.isNotBlank() }?.let(::add) } }.orEmpty()
+        }.getOrDefault(emptyList()).distinct()
+    }
+
     fun hasWhatsApp(context: Context): Boolean =
         runCatching { context.packageManager.getApplicationInfo(WHATSAPP, 0) }.isSuccess
 

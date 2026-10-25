@@ -1,5 +1,6 @@
 package app.bedtime.ui.minimal
 
+import androidx.compose.material.icons.filled.Search
 import android.content.Context
 import android.content.Intent
 import android.content.pm.LauncherApps
@@ -59,6 +60,7 @@ class AppActionHandlers(
     val toggleFavourite: () -> Unit = {},
     val move: (up: Boolean) -> Unit = {},
     val rename: (String) -> Unit = {},
+    val setKeyword: (String) -> Unit = {},
     val toggleHidden: () -> Unit = {},
     val info: () -> Unit = {},
     val uninstall: () -> Unit = {},
@@ -76,9 +78,10 @@ internal fun AppActionsDialog(
     shortcuts: List<AppShortcut>,
     handlers: AppActionHandlers,
     onDismiss: () -> Unit,
+    keyword: String = "",
 ) {
     Dialog(onDismissRequest = onDismiss) {
-        AppActionsContent(app, style, favourite, hidden, canUninstall, shortcuts, handlers, onDone = onDismiss)
+        AppActionsContent(app, style, favourite, hidden, canUninstall, shortcuts, handlers, onDone = onDismiss, keyword = keyword)
     }
 }
 
@@ -97,10 +100,14 @@ internal fun AppActionsContent(
     handlers: AppActionHandlers,
     onDone: () -> Unit = {},
     initialRenaming: Boolean = false,
+    /** Its keyword in the search, typed alone to open it; empty if none. */
+    keyword: String = "",
 ) {
     val p = style.palette()
     var renaming by remember { mutableStateOf(initialRenaming) }
+    var keying by remember { mutableStateOf(false) }
     var name by remember { mutableStateOf(app.label) }
+    var typed by remember { mutableStateOf(keyword) }
     Column(
         Modifier
             .fillMaxWidth()
@@ -113,6 +120,34 @@ internal fun AppActionsContent(
             AppIcon(app.packageName, app.label, 28.dp)
             Spacer(Modifier.width(12.dp))
             Text(app.label, style = MaterialTheme.typography.titleMedium, color = p.text)
+        }
+        if (keying) {
+            Column(Modifier.padding(horizontal = 22.dp, vertical = 6.dp)) {
+                Text("Type it in the search, then Enter, to open ${app.label}.", style = MaterialTheme.typography.bodySmall, color = p.faint)
+                Spacer(Modifier.height(8.dp))
+                BasicTextField(
+                    value = typed,
+                    onValueChange = { typed = it.filterNot { c -> c.isWhitespace() }.lowercase().take(4) },
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.bodyLarge.copy(color = p.text),
+                    cursorBrush = SolidColor(p.accent),
+                    modifier = Modifier.fillMaxWidth().border(1.dp, p.faint.copy(alpha = 0.5f), RoundedCornerShape(12.dp)).padding(12.dp),
+                )
+                Spacer(Modifier.height(8.dp))
+                Row {
+                    Spacer(Modifier.weight(1f))
+                    Text(
+                        "Save",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = p.accent,
+                        modifier = Modifier.clip(RoundedCornerShape(50)).clickable {
+                            handlers.setKeyword(typed)
+                            onDone()
+                        }.padding(horizontal = 14.dp, vertical = 8.dp),
+                    )
+                }
+            }
+            return@Column
         }
         if (renaming) {
             Column(Modifier.padding(horizontal = 22.dp, vertical = 6.dp)) {
@@ -151,6 +186,7 @@ internal fun AppActionsContent(
             ActionRow(Icons.Default.KeyboardArrowDown, "Move down", p) { handlers.move(false) }
         }
         ActionRow(Icons.Default.Edit, "Rename", p) { renaming = true }
+        ActionRow(Icons.Default.Search, if (keyword.isEmpty()) "Give it a keyword" else "Keyword: $keyword", p) { keying = true }
         ActionRow(Icons.Default.Clear, if (hidden) "Show in the lists again" else "Hide from the lists", p) {
             handlers.toggleHidden()
             onDone()

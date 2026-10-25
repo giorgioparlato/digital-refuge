@@ -1,5 +1,10 @@
 package app.bedtime.ui.minimal
 
+import app.bedtime.data.Keywords
+import app.bedtime.data.ClockActions
+import app.bedtime.data.FolderIndex
+import app.bedtime.data.IndexedFile
+import app.bedtime.data.SettingsPages
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.BoxWithConstraints
 import app.bedtime.ui.components.StatusBarVisibility
@@ -230,6 +235,22 @@ private fun MinimalHomeScreen(
     val searchTargets by produceState(emptyList<SearchTarget>(), drawer) {
         if (drawer && value.isEmpty()) value = withContext(Dispatchers.IO) { SearchTargets.find(context) }
     }
+    val obsidian = remember { AppCatalog.isLaunchable(context, FolderIndex.OBSIDIAN) }
+    val settingsApp = remember {
+        context.packageManager.resolveActivity(Intent(android.provider.Settings.ACTION_SETTINGS), 0)?.activityInfo?.packageName
+    }
+    // Your vault's notes (with its name, for Obsidian's links) and your folder's files, read when the drawer opens.
+    val vault by produceState("" to emptyList<IndexedFile>(), drawer, settings.obsidianVault) {
+        val tree = settings.obsidianVault
+        if (drawer && tree != null && obsidian) value = withContext(Dispatchers.IO) {
+            val uri = Uri.parse(tree)
+            FolderIndex.folderName(context, uri) to FolderIndex.list(context, uri) { it.endsWith(".md") }
+        }
+    }
+    val folderFiles by produceState(emptyList<IndexedFile>(), drawer, settings.filesFolder) {
+        val tree = settings.filesFolder
+        if (drawer && tree != null) value = withContext(Dispatchers.IO) { FolderIndex.list(context, Uri.parse(tree)) }
+    }
     // An event waiting for calendar access, saved once it's given.
     var pendingEvent by remember { mutableStateOf<ParsedEvent?>(null) }
     val saveEvent: (ParsedEvent) -> Unit = { event ->
@@ -332,15 +353,31 @@ private fun MinimalHomeScreen(
             else -> AppCatalog.launch(context, action)
         }
     }
-    val searchChoices = SearchOrder.arrange(SearchOrder.defaults(searchTargets, settings.noteTargets), settings.searchChoices)
-    // Contacts are looked up as you type, only when you've switched them on in the search.
-    val contactsOn = searchChoices.any { it.key == SearchOrder.CONTACTS && it.on }
-    val contacts by produceState(emptyList<ContactHit>(), query, contactsOn) {
-        value = if (contactsOn && query.trim().length >= 2) withContext(Dispatchers.IO) { ContactSearch.find(context, query) } else emptyList()
+    val searchChoices = SearchOrder.arrange(SearchOrder.defaults(searchTargets, settings.noteTargets, obsidian), settings.searchChoices)
+    // A keyword first ("m cafe") sends the words after it straight to one place.
+    val keywords = Keywords.effective(settings.keywords, settings.keywordsCustom, Keywords.defaults(searchChoices, settings.noteTargets))
+    val keyword = Keywords.match(query, keywords)
+    val words = keyword?.words ?: query.trim()
+    // Contacts are looked up as you type, only when you've switched them on in the search or used their keyword.
+    val contactsOn = searchChoices.any { it.key == SearchOrder.CONTACTS && it.on } || keyword?.key == SearchOrder.CONTACTS
+    val contacts by produceState(emptyList<ContactHit>(), words, contactsOn) {
+        value = if (contactsOn && words.length >= 2) withContext(Dispatchers.IO) { ContactSearch.find(context, words) } else emptyList()
     }
     val whatsApp = remember { ContactSearch.hasWhatsApp(context) }
+    val openablePackages = openable.map { it.packageName }.toSet()
+    // An alarm or timer, settings pages (when Settings could be opened now), and notes and files by name.
+    val found = buildMap {
+        ClockActions.parse(words)?.let { put(SearchOrder.CLOCK, listOf(DrawerResult.Clock(it))) }
+        if (settingsApp == null || settingsApp in openablePackages) put(SearchOrder.SETTINGS, SettingsPages.match(words).map { DrawerResult.Setting(it) })
+        if (FolderIndex.OBSIDIAN in openablePackages) put(SearchOrder.OBSIDIAN, FolderIndex.match(vault.second, words, name = FolderIndex::title).map { DrawerResult.VaultNote(it) })
+        put(SearchOrder.FILES, FolderIndex.match(folderFiles, words).map { DrawerResult.File(it) })
+    }
+    val open: (Intent) -> Unit = { intent ->
+        runCatching { context.startActivity(intent) }
+            .onSuccess { closeDrawer() }
+            .onFailure { Toast.makeText(context, "couldn't open that", Toast.LENGTH_SHORT).show() }
+    }
     val onResult: (DrawerResult) -> Unit = { result ->
-        val words = query.trim()
         when (result) {
             is DrawerResult.App -> {
                 AppCatalog.launch(context, result.app.packageName)
@@ -381,6 +418,15 @@ private fun MinimalHomeScreen(
                 notesOpen = true
                 closeDrawer()
             }
+            is DrawerResult.Clock -> runCatching { context.startActivity(ClockActions.intent(result.action)) }
+                .onSuccess {
+                    Toast.makeText(context, if (result.action is app.bedtime.data.ClockAction.Alarm) "alarm set" else "timer started", Toast.LENGTH_SHORT).show()
+                    query = ""
+                }
+                .onFailure { Toast.makeText(context, "no clock app took it", Toast.LENGTH_SHORT).show() }
+            is DrawerResult.Setting -> open(SettingsPages.intent(result.page))
+            is DrawerResult.VaultNote -> open(FolderIndex.obsidianIntent(vault.first, result.file))
+            is DrawerResult.File -> open(FolderIndex.openIntent(result.file))
         }
     }
     when {
@@ -398,13 +444,17 @@ private fun MinimalHomeScreen(
                 results = AppDrawer.results(
                     query,
                     openable,
-                    SearchTargets.offered(searchTargets, openable.map { it.packageName }.toSet()),
+                    SearchTargets.offered(searchTargets, openablePackages),
                     settings.noteTargets,
-                    EventParser.parse(query, LocalDateTime.now()),
+                    EventParser.parse(words, LocalDateTime.now()),
                     searchChoices,
                     contacts,
+                    keyword,
+                    found,
                 ),
                 whatsApp = whatsApp,
+                words = words,
+                keyworded = keyword != null,
                 onLaunch = { pkg ->
                     AppCatalog.launch(context, pkg)
                     closeDrawer()
@@ -511,7 +561,14 @@ private fun MinimalHomeScreen(
                 info = { runCatching { context.startActivity(AppShortcuts.infoIntent(app.packageName)) } },
                 uninstall = { runCatching { context.startActivity(AppShortcuts.uninstallIntent(app.packageName)) } },
                 shortcut = { chosen -> shortcuts.firstOrNull { it.id == chosen.id }?.let { AppShortcuts.start(context, it) } },
+                setKeyword = { typed ->
+                    val key = Keywords.appKey(app.packageName)
+                    val clean = Keywords.clean(typed)
+                    val now = Keywords.effective(settings.keywords, settings.keywordsCustom, Keywords.defaults(searchChoices, settings.noteTargets))
+                    save { s -> s.copy(keywords = if (clean.isEmpty()) now - key else now + (key to clean), keywordsCustom = true) }
+                },
             ),
+            keyword = keywords[Keywords.appKey(app.packageName)].orEmpty(),
             onDismiss = { actionsFor = null },
         )
     }

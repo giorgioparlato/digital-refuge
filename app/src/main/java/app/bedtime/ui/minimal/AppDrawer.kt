@@ -1,5 +1,17 @@
 package app.bedtime.ui.minimal
 
+import androidx.compose.foundation.lazy.itemsIndexed
+import app.bedtime.data.Keywords
+import app.bedtime.data.ClockAction
+import app.bedtime.data.ClockActions
+import app.bedtime.data.FolderIndex
+import app.bedtime.data.IndexedFile
+import app.bedtime.data.SettingsPage
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.Create
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.foundation.border
 import androidx.compose.material.icons.filled.Call
 import app.bedtime.data.ContactHit
@@ -92,6 +104,12 @@ sealed interface DrawerResult {
     data class Contact(val hit: ContactHit) : DrawerResult
     data class Message(val hit: ContactHit) : DrawerResult
     data class WhatsApp(val hit: ContactHit) : DrawerResult
+    data class Clock(val action: ClockAction) : DrawerResult
+    data class Setting(val page: SettingsPage) : DrawerResult
+    /** A note in your Obsidian vault, found by its title. */
+    data class VaultNote(val file: IndexedFile) : DrawerResult
+    /** A file in the folder you chose, found by its name. */
+    data class File(val file: IndexedFile) : DrawerResult
 }
 
 object AppDrawer {
@@ -117,24 +135,32 @@ object AppDrawer {
         choices: List<SearchChoice>? = null,
         /** Contacts matching the words, looked up only when contacts are switched on. */
         contacts: List<ContactHit> = emptyList(),
+        /** A keyword typed first: then only its one destination is offered, with the words after it. */
+        keyword: Keywords.Hit? = null,
+        /** What else the words found, by choice key: an alarm, settings pages, notes and files by name. */
+        found: Map<String, List<DrawerResult>> = emptyMap(),
     ): List<DrawerResult> {
         val q = query.trim()
         if (q.isEmpty()) return emptyList()
+        if (keyword != null && keyword.key.startsWith(Keywords.APP)) {
+            return listOfNotNull(apps.firstOrNull { Keywords.appKey(it.packageName) == keyword.key }?.let { DrawerResult.App(it) })
+        }
         val matching = apps.filter { it.label.contains(q, ignoreCase = true) }
             .sortedWith(compareBy({ !it.label.startsWith(q, ignoreCase = true) }, { it.label.lowercase() }))
         // Everything else that could be offered now, by key; your choices say what shows and in what order.
-        val offers = buildMap<String, DrawerResult> {
-            targets.forEach { put(it.key, DrawerResult.Search(it)) }
-            noteTargets.forEach { put(SearchOrder.noteKey(it), DrawerResult.AddNote(it)) }
-            put(SearchOrder.REFUGE_NOTES, DrawerResult.AddNote(null))
-            event?.let { put(SearchOrder.CALENDAR, DrawerResult.AddEvent(it)) }
+        val offers = buildMap<String, List<DrawerResult>> {
+            putAll(found)
+            targets.forEach { put(it.key, listOf(DrawerResult.Search(it))) }
+            noteTargets.forEach { put(SearchOrder.noteKey(it), listOf(DrawerResult.AddNote(it))) }
+            put(SearchOrder.REFUGE_NOTES, listOf(DrawerResult.AddNote(null)))
+            event?.let { put(SearchOrder.CALENDAR, listOf(DrawerResult.AddEvent(it))) }
+            put(SearchOrder.CONTACTS, contacts.map { DrawerResult.Contact(it) })
         }
+        if (keyword != null) return offers[keyword.key].orEmpty()
         return buildList {
             matching.forEach { add(DrawerResult.App(it)) }
             if (q.length >= 2 && "notes".startsWith(q.lowercase())) add(DrawerResult.OpenNotes)
-            (choices ?: SearchOrder.defaults(targets, noteTargets)).filter { it.on }.forEach { choice ->
-                if (choice.key == SearchOrder.CONTACTS) contacts.forEach { add(DrawerResult.Contact(it)) } else offers[choice.key]?.let(::add)
-            }
+            (choices ?: SearchOrder.defaults(targets, noteTargets)).filter { it.on }.forEach { choice -> addAll(offers[choice.key].orEmpty()) }
         }
     }
 
@@ -164,6 +190,10 @@ internal fun AppDrawerContent(
     onLongPress: ((AppEntry) -> Unit)? = null,
     /** Whether contacts get a WhatsApp button. */
     whatsApp: Boolean = false,
+    /** The words the results are about: what was typed, or what follows a keyword. */
+    words: String = query,
+    /** A keyword was typed: its one result is marked, and Enter runs it. */
+    keyworded: Boolean = false,
 ) {
     val p = style.palette()
     val focus = remember { FocusRequester() }
@@ -182,12 +212,13 @@ internal fun AppDrawerContent(
                 AppList(apps, style, p, onLaunch, onLongPress)
             } else {
                 LazyColumn(Modifier.fillMaxSize()) {
-                    items(results) { result ->
+                    itemsIndexed(results) { i, result ->
                         ResultRow(
                             result,
-                            query.trim(),
+                            words.trim(),
                             style,
                             p,
+                            marked = keyworded && i == 0,
                             onLongPress = (result as? DrawerResult.App)?.let { r -> onLongPress?.let { { it(r.app) } } },
                             whatsApp = whatsApp,
                             onAction = onResult,
@@ -335,12 +366,18 @@ private fun ResultRow(
     onLongPress: (() -> Unit)? = null,
     whatsApp: Boolean = false,
     onAction: (DrawerResult) -> Unit = {},
+    marked: Boolean = false,
     onClick: () -> Unit,
 ) {
     val context = LocalContext.current
     val names = style.textSize.scale * style.listSize.scale
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).combinedClickable(onLongClick = onLongPress, onClick = onClick).padding(vertical = (16 * names).dp),
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (marked) p.accent.copy(alpha = 0.14f) else androidx.compose.ui.graphics.Color.Transparent)
+            .combinedClickable(onLongClick = onLongPress, onClick = onClick)
+            .padding(vertical = (16 * names).dp, horizontal = if (marked) 8.dp else 0.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         val label = when (result) {
@@ -351,16 +388,27 @@ private fun ResultRow(
             DrawerResult.OpenNotes -> "open refuge notes"
             is DrawerResult.Contact -> result.hit.name
             is DrawerResult.Message, is DrawerResult.WhatsApp -> ""
+            is DrawerResult.Clock -> ClockActions.label(result.action) { h, m ->
+                formatTime(context, java.time.LocalDate.now().atTime(h, m).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()).lowercase()
+            }
+            is DrawerResult.Setting -> "settings: ${result.page.name.lowercase()}"
+            is DrawerResult.VaultNote -> "${FolderIndex.title(result.file)} · obsidian"
+            is DrawerResult.File -> result.file.name
         }
         val icon: ImageVector? = when (result) {
             is DrawerResult.App -> null
             is DrawerResult.Search -> when (result.target.kind) {
                 SearchTarget.Kind.MAPS -> Icons.Default.LocationOn
                 SearchTarget.Kind.LOOKUP -> Icons.Default.Info
+                SearchTarget.Kind.SPOTIFY -> Icons.Default.PlayArrow
                 else -> Icons.Default.Search
             }
             is DrawerResult.AddEvent -> Icons.Default.DateRange
             is DrawerResult.Contact -> Icons.Default.Call
+            is DrawerResult.Clock -> Icons.Default.Notifications
+            is DrawerResult.Setting -> Icons.Default.Settings
+            is DrawerResult.VaultNote -> Icons.Default.Create
+            is DrawerResult.File -> Icons.AutoMirrored.Filled.List
             else -> Icons.Default.Edit
         }
         Box(Modifier.size((30 * names).dp), contentAlignment = Alignment.Center) {

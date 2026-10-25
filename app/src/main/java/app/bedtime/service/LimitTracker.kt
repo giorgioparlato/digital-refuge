@@ -1,5 +1,6 @@
 package app.bedtime.service
 
+import app.bedtime.data.PauseKind
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
@@ -158,7 +159,13 @@ internal class LimitTracker(
                     writeScope.launch { repo.recordOpen(day.day, pkg) }
                     // A pass for the whole limit counts its apps' openings together, too.
                     val opens = pause.group.sumOf { day.opens[it] ?: 0 } + 1
-                    cover(BlockedActivity.pauseIntent(context, pkg, pause.seconds, opens, pause.passKey))
+                    cover(
+                        BlockedActivity.pauseIntent(
+                            context, pkg, pause.secondsFor(opens), opens, pause.passKey,
+                            typing = if (pause.kind == PauseKind.TYPING) pause.textLengthFor(opens) else 0,
+                            source = pause.textSource,
+                        ),
+                    )
                     return true
                 }
             }

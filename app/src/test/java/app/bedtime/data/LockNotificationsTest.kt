@@ -97,4 +97,15 @@ class LockNotificationsTest {
         assertEquals(3_600_000L, LockNotifications.snoozeFor(now = 0L, until = 3_600_000L))
         assertEquals(60_000L, LockNotifications.snoozeFor(now = 10_000L, until = 20_000L))
     }
+
+    @Test
+    fun fromYourAppsOrFromYourPeople() {
+        val fromAnna = LockNotification("k", "com.whatsapp", "WhatsApp", "Anna", null, 0L, NoteDetail.FULL, people = listOf("Anna", "Family"))
+        val fromBo = fromAnna.copy(key = "b", people = listOf("Bo"))
+        // Not a chosen app, but a chosen person: shows.
+        assertTrue(LockNotifications.wanted(fromAnna, apps = setOf("com.signal"), people = setOf("anna")))
+        assertFalse(LockNotifications.wanted(fromBo, apps = setOf("com.signal"), people = setOf("Anna")))
+        // A chosen app shows whoever it's from.
+        assertTrue(LockNotifications.wanted(fromBo, apps = setOf("com.whatsapp"), people = emptySet()))
+    }
 }

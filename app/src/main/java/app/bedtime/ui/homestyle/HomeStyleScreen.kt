@@ -1,5 +1,8 @@
 package app.bedtime.ui.homestyle
 
+import androidx.compose.material.icons.filled.Person
+import app.bedtime.ui.settings.PeoplePickerScreen
+import app.bedtime.data.ContactSearch
 import app.bedtime.data.TopSpace
 import androidx.compose.material.icons.filled.Refresh
 import app.bedtime.data.HomeGesture
@@ -137,6 +140,11 @@ fun HomeStyleScreen(onBack: () -> Unit, onQuotes: () -> Unit = {}, page: StylePa
     var notificationAccess by remember { mutableStateOf(LockNotificationListener.hasAccess(context)) }
     var askedForNotifications by rememberSaveable { mutableStateOf(false) }
     var pickingNotificationApps by rememberSaveable { mutableStateOf(false) }
+    var pickingPeople by rememberSaveable { mutableStateOf(false) }
+    // Choosing people reads your contacts: asked for the first time here.
+    val askContacts = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) pickingPeople = true else Toast.makeText(context, "contacts access wasn't allowed", Toast.LENGTH_SHORT).show()
+    }
     val switchOnNotifications = {
         scope.launch { repo.updateSettings { it.copy(homeStyle = it.homeStyle.copy(lockNotifications = true)) } }
         // Nothing shows until you choose whose notifications to see, so the choice comes straight away.
@@ -167,6 +175,18 @@ fun HomeStyleScreen(onBack: () -> Unit, onQuotes: () -> Unit = {}, page: StylePa
         }
     }
     val current = settings ?: return
+    if (pickingPeople) {
+        PeoplePickerScreen(
+            "Notifications from",
+            current.homeStyle.lockNotificationPeople,
+            onDone = { people ->
+                scope.launch { repo.updateSettings { it.copy(homeStyle = it.homeStyle.copy(lockNotificationPeople = people)) } }
+                pickingPeople = false
+            },
+            onBack = { pickingPeople = false },
+        )
+        return
+    }
     if (pickingNotificationApps) {
         AppPickerScreen(
             "Notifications from",
@@ -213,6 +233,7 @@ fun HomeStyleScreen(onBack: () -> Unit, onQuotes: () -> Unit = {}, page: StylePa
         },
         notificationAccess = notificationAccess,
         onPickNotificationApps = { pickingNotificationApps = true },
+        onPickPeople = { if (ContactSearch.canRead(context)) pickingPeople = true else askContacts.launch(Manifest.permission.READ_CONTACTS) },
         weatherHeardAt = weather?.at,
         page = page,
         // The preview shows the real weather if there is some, otherwise an example.
@@ -251,6 +272,8 @@ internal fun HomeStyleContent(
     notificationAccess: Boolean = false,
     /** Opens the choice of apps whose notifications the lock screen shows. */
     onPickNotificationApps: () -> Unit = {},
+    /** And of people, from any app. */
+    onPickPeople: () -> Unit = {},
     /** When Breezy Weather last sent the weather, if ever. */
     weatherHeardAt: Long? = null,
     /** The weather as the preview shows it. */
@@ -480,11 +503,22 @@ internal fun HomeStyleContent(
                             BedtimeIcons.Grid,
                             "From these apps",
                             description = when (labels.size) {
-                                0 -> "None yet, so none show. Pick the apps you want to hear from"
+                                0 -> "None yet. Pick the apps you want to hear from"
                                 in 1..3 -> labels.joinToString(", ")
                                 else -> labels.take(2).joinToString(", ") + " and ${labels.size - 2} more"
                             },
                             onClick = onPickNotificationApps,
+                        ) { Chevron() }
+                        val people = style.lockNotificationPeople.sorted()
+                        OptionRow(
+                            Icons.Default.Person,
+                            "And from these people",
+                            description = when (people.size) {
+                                0 -> "From any app: messages, calls, mail from them"
+                                in 1..3 -> people.joinToString(", ")
+                                else -> people.take(2).joinToString(", ") + " and ${people.size - 2} more"
+                            },
+                            onClick = onPickPeople,
                         ) { Chevron() }
                         OptionRow(
                             Icons.Default.Edit,

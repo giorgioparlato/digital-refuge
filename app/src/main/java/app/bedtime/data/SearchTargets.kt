@@ -16,7 +16,7 @@ data class SearchTarget(
     /** The exact screen, where an app offers several (dictionaries' "look up"). */
     val activity: String? = null,
 ) {
-    enum class Kind { WEB, WIKIPEDIA, MAPS, LOOKUP }
+    enum class Kind { WEB, WIKIPEDIA, MAPS, LOOKUP, SPOTIFY }
 
     /** How the result reads, in the app's lowercase, with [query] in it as typed. */
     fun label(query: String): String = when (kind) {
@@ -24,6 +24,7 @@ data class SearchTarget(
         Kind.WIKIPEDIA -> "wikipedia: “$query”"
         Kind.MAPS -> "maps: “$query”"
         Kind.LOOKUP -> "look up “$query” in ${appLabel.lowercase()}"
+        Kind.SPOTIFY -> "search spotify for “$query”"
     }
 }
 
@@ -33,6 +34,7 @@ data class SearchTarget(
  */
 object SearchTargets {
     private const val WIKIPEDIA_APP = "org.wikipedia"
+    private const val SPOTIFY_APP = "com.spotify.music"
 
     /** The ones whose app is in [openable] right now; which of them show, and in what order, is [SearchOrder]'s. */
     fun offered(found: List<SearchTarget>, openable: Set<String>): List<SearchTarget> =
@@ -44,7 +46,8 @@ object SearchTargets {
         fun handlers(intent: Intent) = runCatching { pm.queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY) }.getOrDefault(emptyList())
         fun label(pkg: String) = runCatching { pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString() }.getOrDefault(pkg)
         val browsers = handlers(Intent(Intent.ACTION_VIEW, Uri.parse("https://wikipedia.org"))).map { it.activityInfo.packageName }
-        val wikipedia = listOfNotNull(WIKIPEDIA_APP.takeIf { runCatching { pm.getApplicationInfo(it, 0) }.isSuccess })
+        fun installed(pkg: String) = runCatching { pm.getApplicationInfo(pkg, 0) }.isSuccess
+        val wikipedia = listOfNotNull(WIKIPEDIA_APP.takeIf(::installed))
         return buildList {
             handlers(Intent(Intent.ACTION_WEB_SEARCH)).forEach {
                 add(SearchTarget(SearchTarget.Kind.WEB, it.activityInfo.packageName, label(it.activityInfo.packageName), it.activityInfo.name))
@@ -56,6 +59,7 @@ object SearchTargets {
             handlers(Intent(Intent.ACTION_PROCESS_TEXT).setType("text/plain")).forEach {
                 add(SearchTarget(SearchTarget.Kind.LOOKUP, it.activityInfo.packageName, it.loadLabel(pm).toString(), it.activityInfo.name))
             }
+            if (installed(SPOTIFY_APP)) add(SearchTarget(SearchTarget.Kind.SPOTIFY, SPOTIFY_APP, label(SPOTIFY_APP)))
         }
     }
 
@@ -77,6 +81,7 @@ object SearchTargets {
                 .setType("text/plain")
                 .putExtra(Intent.EXTRA_PROCESS_TEXT, query)
                 .putExtra(Intent.EXTRA_PROCESS_TEXT_READONLY, true)
+            SearchTarget.Kind.SPOTIFY -> Intent(Intent.ACTION_VIEW, Uri.parse("spotify:search:$q"))
         }
         return intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).also {
             if (target.activity != null) it.setClassName(target.packageName, target.activity) else it.setPackage(target.packageName)
@@ -89,17 +94,23 @@ val SearchTarget.key: String get() = "${kind.name.lowercase()}:$packageName"
 
 /**
  * What the search offers after apps, and in what order. With nothing chosen, only one web search (the
- * first found), your files, refuge notes and the calendar are on; Wikipedia, maps, dictionaries and
- * contacts are listed, off until you switch them on. Your choices, once made, keep their order; anything new joins at the end.
+ * first found), your files, refuge notes, the calendar, alarms and timers, and settings pages are on;
+ * Wikipedia, maps, dictionaries, Spotify, contacts, Obsidian notes and a folder of files are listed, off
+ * until you switch them on. Your choices, once made, keep their order; anything new joins at the end.
  */
 object SearchOrder {
     const val REFUGE_NOTES = "note:refuge"
     const val CALENDAR = "calendar"
     const val CONTACTS = "contacts"
+    const val CLOCK = "clock"
+    const val SETTINGS = "settings"
+    const val OBSIDIAN = "obsidian"
+    const val FILES = "files"
 
     fun noteKey(target: NoteTarget) = "note:${target.uri}"
 
-    fun defaults(targets: List<SearchTarget>, notes: List<NoteTarget>): List<SearchChoice> {
+    /** [obsidian]: whether Obsidian is on the phone, so its notes can be offered. */
+    fun defaults(targets: List<SearchTarget>, notes: List<NoteTarget>, obsidian: Boolean = false): List<SearchChoice> {
         val ordered = SearchTarget.Kind.entries.flatMap { kind -> targets.filter { it.kind == kind }.distinctBy { it.packageName } }
         val firsts = ordered.groupBy { it.kind }.mapValues { (_, same) -> same.first().key }
         val on = { t: SearchTarget -> t.kind == SearchTarget.Kind.WEB && firsts[t.kind] == t.key }
@@ -108,7 +119,11 @@ object SearchOrder {
                 notes.map { SearchChoice(noteKey(it), true) } +
                 SearchChoice(REFUGE_NOTES, true) +
                 SearchChoice(CALENDAR, true) +
-                SearchChoice(CONTACTS, false),
+                SearchChoice(CONTACTS, false) +
+                SearchChoice(CLOCK, true) +
+                SearchChoice(SETTINGS, true) +
+                listOfNotNull(SearchChoice(OBSIDIAN, false).takeIf { obsidian }) +
+                SearchChoice(FILES, false),
         )
     }
 

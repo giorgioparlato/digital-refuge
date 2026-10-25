@@ -42,6 +42,8 @@ data class LockNotification(
     /** How many messages it holds, for the summary. */
     val count: Int = 1,
     val missedCall: Boolean = false,
+    /** The names it's about (sender, conversation, people it lists), only for choosing which show. */
+    val people: List<String> = emptyList(),
 )
 
 /**
@@ -127,6 +129,10 @@ object LockNotifications {
         }
         return parts.take(3).joinToString(" · ") + if (parts.size > 3) " · and more" else ""
     }
+
+    /** Whether [note] is one you asked for: from one of [apps], or from one of [people] in any app. */
+    fun wanted(note: LockNotification, apps: Set<String>, people: Set<String>): Boolean =
+        note.packageName in apps || note.people.any { name -> people.any { it.equals(name.trim(), ignoreCase = true) } }
 
     /** Worth a line at all: not ours, not ongoing (music, navigation), not a group's summary, not minimal. */
     fun worthShowing(packageName: String, ownPackage: String, clearable: Boolean, groupSummary: Boolean, importance: Int): Boolean =

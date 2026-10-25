@@ -75,13 +75,19 @@ class AppDrawerTest {
                 SearchChoice("note:content://s", true),
                 SearchChoice(SearchOrder.REFUGE_NOTES, true),
                 SearchChoice(SearchOrder.CALENDAR, true),
+                SearchChoice(SearchOrder.CLOCK, true),
+                SearchChoice(SearchOrder.SETTINGS, true),
                 SearchChoice("web:pkg.firefox", false),
                 SearchChoice("wikipedia:pkg.wiki", false),
                 SearchChoice("lookup:pkg.dict", false),
                 SearchChoice(SearchOrder.CONTACTS, false),
+                SearchChoice(SearchOrder.FILES, false),
             ),
             SearchOrder.defaults(targets, listOf(scratch)),
         )
+        // Obsidian's notes are offered only with Obsidian on the phone, off until you choose your vault.
+        assertTrue(SearchChoice(SearchOrder.OBSIDIAN, false) in SearchOrder.defaults(targets, emptyList(), obsidian = true))
+        assertTrue(SearchOrder.defaults(targets, emptyList()).none { it.key == SearchOrder.OBSIDIAN })
     }
 
     @Test
@@ -98,8 +104,11 @@ class AppDrawerTest {
                 SearchChoice(SearchOrder.REFUGE_NOTES, true),
                 SearchChoice("web:pkg.browser", true),
                 SearchChoice(SearchOrder.CALENDAR, true),
+                SearchChoice(SearchOrder.CLOCK, true),
+                SearchChoice(SearchOrder.SETTINGS, true),
                 SearchChoice("wikipedia:pkg.wiki", false),
                 SearchChoice(SearchOrder.CONTACTS, false),
+                SearchChoice(SearchOrder.FILES, false),
             ),
             choices,
         )
@@ -134,6 +143,23 @@ class AppDrawerTest {
         assertEquals(
             listOf(DrawerResult.AddNote(null)),
             AppDrawer.results("ann", emptyList(), emptyList(), emptyList(), null, choices.map { if (it.key == SearchOrder.CONTACTS) it.copy(on = false) else it }, contacts = listOf(anna)),
+        )
+    }
+
+    @Test
+    fun whatElseTheWordsFoundShowsWhereYouPutIt() {
+        val note = app.bedtime.data.IndexedFile("Trip.md", "travel/Trip.md", "content://v/trip", "text/markdown")
+        val pdf = app.bedtime.data.IndexedFile("trip tickets.pdf", "trip tickets.pdf", "content://f/t", "application/pdf")
+        val found = mapOf(SearchOrder.OBSIDIAN to listOf(DrawerResult.VaultNote(note)), SearchOrder.FILES to listOf(DrawerResult.File(pdf)))
+        val choices = listOf(SearchChoice(SearchOrder.FILES, true), SearchChoice(SearchOrder.REFUGE_NOTES, true), SearchChoice(SearchOrder.OBSIDIAN, false))
+        assertEquals(
+            listOf(DrawerResult.File(pdf), DrawerResult.AddNote(null)),
+            AppDrawer.results("trip", emptyList(), emptyList(), emptyList(), null, choices, found = found),
+        )
+        // A keyword reaches it even switched off.
+        assertEquals(
+            listOf(DrawerResult.VaultNote(note)),
+            AppDrawer.results("o trip", emptyList(), emptyList(), emptyList(), null, choices, keyword = app.bedtime.data.Keywords.Hit(SearchOrder.OBSIDIAN, "trip"), found = found),
         )
     }
 }

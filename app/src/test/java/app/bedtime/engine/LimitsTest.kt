@@ -143,4 +143,32 @@ class LimitsTest {
         val old = UsageDay(today - 7, seconds = mapOf("a" to 10_000L))
         assertEquals(900L to 2, Limits.week(social, listOf(old, usage), today))
     }
+
+    @Test
+    fun thePauseGrowsWithEachOpenToday() {
+        val wait = PauseRule(seconds = 10, graceMinutes = 2, passKey = "x", group = setOf("x"), growth = 50)
+        assertEquals(10, wait.secondsFor(1))
+        assertEquals(15, wait.secondsFor(2))
+        assertEquals(23, wait.secondsFor(3))
+        // Never more than eight times the start.
+        assertEquals(80, wait.secondsFor(20))
+        val typing = PauseRule(seconds = 10, graceMinutes = 2, passKey = "x", group = setOf("x"), kind = app.bedtime.data.PauseKind.TYPING, textLength = 40, growth = 100)
+        assertEquals(40, typing.textLengthFor(1))
+        assertEquals(80, typing.textLengthFor(2))
+        // Never more than three times as much to type.
+        assertEquals(120, typing.textLengthFor(5))
+        // No growth: the same each time.
+        assertEquals(10, wait.copy(growth = 0).secondsFor(7))
+    }
+
+    @Test
+    fun easingThePauseWaitsForMidnight() {
+        val typing = app.bedtime.data.LimitRules(apps = setOf("x"), pauseSeconds = 10, pauseKind = app.bedtime.data.PauseKind.TYPING, pauseTextLength = 60, pauseGrowth = 50)
+        assertTrue(Limits.isLooser(typing, typing.copy(pauseKind = app.bedtime.data.PauseKind.WAIT)))
+        assertTrue(Limits.isLooser(typing, typing.copy(pauseTextLength = 40)))
+        assertTrue(Limits.isLooser(typing, typing.copy(pauseGrowth = 25)))
+        // Harder is fine at once.
+        assertFalse(Limits.isLooser(typing, typing.copy(pauseTextLength = 100, pauseGrowth = 100)))
+        assertFalse(Limits.isLooser(typing.copy(pauseKind = app.bedtime.data.PauseKind.WAIT), typing))
+    }
 }
