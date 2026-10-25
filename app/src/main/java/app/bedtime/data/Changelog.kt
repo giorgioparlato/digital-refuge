@@ -13,6 +13,17 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            54,
+            "0.9.8",
+            listOf(
+                "Keywords in the search: \"m cafe\" goes straight to maps, \"@anna\" to contacts, and an app's keyword opens it on its own. Change them in Search settings.",
+                "The search can set alarms and timers (\"alarm 7:30\", \"timer 10 min\"), open settings pages, search in Spotify, and find Obsidian notes and files by name in a folder you choose.",
+                "Limits: the pause before opening can be a typing challenge, and it can grow with each open today.",
+                "Lock-screen notifications can come from people you choose, not only apps.",
+                "Pulling down from the very top of the lock screen opens the notification shade.",
+            ),
+        ),
+        ChangelogEntry(
             53,
             "0.9.7",
             listOf(
