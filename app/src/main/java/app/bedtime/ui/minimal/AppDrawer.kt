@@ -375,8 +375,8 @@ private fun ResultRow(
         if (result is DrawerResult.App || result == DrawerResult.OpenNotes) {
             Text(label, fontSize = (26 * names).sp, lineHeight = (32 * names).sp, color = p.text, maxLines = 2, overflow = TextOverflow.Ellipsis)
         } else {
-            // The suggestions a little smaller than the apps, with room between them.
-            VerbatimText(label, color = p.text, fontSize = (22 * names).sp, lineHeight = (30 * names).sp, modifier = Modifier.weight(1f, fill = false))
+            // The suggestions as large as the apps in the list.
+            VerbatimText(label, color = p.text, fontSize = (26 * names).sp, lineHeight = (32 * names).sp, modifier = Modifier.weight(1f, fill = false))
         }
         if (result is DrawerResult.Contact) {
             Spacer(Modifier.weight(1f))

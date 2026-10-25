@@ -515,11 +515,13 @@ internal fun HomeStyleContent(
                         val target = style.lockGestures[swipe]
                         OptionRow(
                             swipe.icon(),
-                            "Swipe ${swipe.name.lowercase()}",
+                            swipe.label(),
                             description = when (target) {
-                                null -> "Just unlocks"
+                                null -> if (swipe == Swipe.DOUBLE_TAP) "Nothing" else "Just unlocks"
                                 GESTURE_CAMERA -> "Camera"
-                                else -> allApps.firstOrNull { it.packageName == target }?.label ?: target
+                                HomeActions.NOTE -> "Write a quick note"
+                                HomeActions.NOTIFICATIONS -> "Show notifications"
+                                else -> allApps.firstOrNull { it.packageName == target }?.label?.let { "Open $it" } ?: target
                             },
                             onClick = { pickingSwipe = swipe },
                         ) { Chevron() }
@@ -535,8 +537,8 @@ enum class StylePage(val title: String, val intro: String) {
     LOOK("Look", "Colours, sizes and fonts, for your home screen, the minimal one in sessions, and the lock screen. Changes save as you go."),
     SHOWN("What's shown", "What sits around the clock: greeting, date, weather, your next event and a quote. Changes save as you go."),
     SWIPES(
-        "Lock-screen swipes",
-        "Start around the clock: each can open an app once you've unlocked, or the camera straight away. The middle is for swiping notifications away. From the bottom, any swipe just unlocks.",
+        "Lock-screen gestures",
+        "Swipes start around the clock; a double tap is anywhere. Each can open an app once you've unlocked, or straight away the camera, a quick note or your notifications. The middle is for swiping notifications away; from the bottom, any swipe just unlocks.",
     ),
     GESTURES(
         "Gestures",
@@ -580,7 +582,10 @@ private fun HomeGestureDialog(gesture: HomeGesture, apps: List<AppEntry>, onDism
     )
 }
 
+private fun Swipe.label(): String = if (this == Swipe.DOUBLE_TAP) "Double tap" else "Swipe ${name.lowercase()}"
+
 private fun Swipe.icon(): ImageVector = when (this) {
+    Swipe.DOUBLE_TAP -> Icons.Default.Refresh
     Swipe.UP -> Icons.Default.KeyboardArrowUp
     Swipe.DOWN -> Icons.Default.KeyboardArrowDown
     Swipe.LEFT -> Icons.AutoMirrored.Filled.KeyboardArrowLeft
@@ -594,11 +599,14 @@ private fun SwipeTargetDialog(swipe: Swipe, apps: List<AppEntry>, onDismiss: () 
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = c.bgSecondary,
-        title = { Text("Swipe ${swipe.name.lowercase()} opens") },
+        title = { Text("${swipe.label()} does") },
         text = {
-            LazyColumn(Modifier.heightIn(max = 420.dp)) {
-                item { DialogChoice("Nothing, it just unlocks") { onPick(null) } }
+            LazyColumn(Modifier.heightIn(max = 460.dp)) {
+                item { DialogChoice(if (swipe == Swipe.DOUBLE_TAP) "Nothing" else "Nothing, it just unlocks") { onPick(null) } }
                 item { DialogChoice("Camera, without unlocking") { onPick(GESTURE_CAMERA) } }
+                item { DialogChoice("Write a quick note, without unlocking") { onPick(HomeActions.NOTE) } }
+                item { DialogChoice("Show notifications") { onPick(HomeActions.NOTIFICATIONS) } }
+                item { Text("Or open an app, once unlocked", style = MaterialTheme.typography.labelLarge, color = c.accentText, modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)) }
                 items(apps.size) { i -> DialogChoice(apps[i].label) { onPick(apps[i].packageName) } }
             }
         },

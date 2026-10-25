@@ -1,5 +1,7 @@
 package app.bedtime.ui.minimal
 
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.BoxWithConstraints
 import app.bedtime.ui.components.StatusBarVisibility
 import app.bedtime.data.ContactSearch
 import app.bedtime.data.ContactHit
@@ -312,36 +314,14 @@ private fun MinimalHomeScreen(
     }
     // A quick note, from the search or a gesture: to the app's own notes, or one of your files.
     val saveNote: (String, NoteTarget?) -> Unit = { words, target ->
-        scope.launch {
-            if (target == null) {
-                repo.addNote(words)
-                Toast.makeText(context, "saved in refuge notes", Toast.LENGTH_SHORT).show()
-            } else {
-                val at = LocalDateTime.now()
-                val line = Notes.line(words, at, target.style, target.withDate)
-                val added = withContext(Dispatchers.IO) {
-                    if (target.daily) {
-                        Notes.appendDaily(context, Uri.parse(target.uri), target.dailyFormat, at.toLocalDate(), line)
-                    } else {
-                        Notes.append(context, Uri.parse(target.uri), line)
-                    }
-                }
-                // Never lost: if the file can't be reached, it waits in the app's notes.
-                if (!added) repo.addNote(words)
-                Toast.makeText(
-                    context,
-                    if (added) "added to ${target.name.lowercase()}" else "couldn't reach ${target.name.lowercase()}, so it's in refuge notes",
-                    Toast.LENGTH_SHORT,
-                ).show()
-            }
-        }
+        scope.launch { Toast.makeText(context, Notes.save(context, repo, words, target), Toast.LENGTH_SHORT).show() }
     }
     // What a gesture on the home screen does, as you set it.
     val onGesture: (HomeGesture) -> Unit = { gesture ->
         when (val action = style.homeGestures[gesture]) {
             null -> Unit
-            HomeActions.NOTIFICATIONS -> globalAction(context, AccessibilityService.GLOBAL_ACTION_NOTIFICATIONS)
-            HomeActions.LOCK -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) globalAction(context, AccessibilityService.GLOBAL_ACTION_LOCK_SCREEN)
+            HomeActions.NOTIFICATIONS -> BlockingState.globalAction(context, AccessibilityService.GLOBAL_ACTION_NOTIFICATIONS)
+            HomeActions.LOCK -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) BlockingState.globalAction(context, AccessibilityService.GLOBAL_ACTION_LOCK_SCREEN)
             HomeActions.NOTE -> quickNote = true
             HomeActions.SEARCH -> drawer = true
             HomeActions.NOTES -> notesOpen = true
@@ -681,24 +661,28 @@ internal fun MinimalHomeContent(
             Spacer(Modifier.height(if (preview) 28.dp else 44.dp))
             LazyColumn(Modifier.weight(1f).fillMaxWidth().nestedScroll(overscroll)) {
                 items(apps, key = { it.packageName }) { app ->
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .combinedClickable(
-                                onClickLabel = "open ${app.label}",
-                                onLongClickLabel = "more for ${app.label}",
-                                onLongClick = onAppLongPress?.let { { it(app) } },
-                                onClick = { onLaunch(app.packageName) },
-                            )
-                            .padding(vertical = (12 * names).dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        if (style.showIcons) {
-                            AppIcon(app.packageName, app.label, (30 * names).dp)
-                            Spacer(Modifier.width(16.dp))
+                    // An app's tap reaches half the width (or its whole name), leaving the right side free
+                    // for a double tap.
+                    BoxWithConstraints(Modifier.fillMaxWidth()) {
+                        Row(
+                            Modifier
+                                .widthIn(min = maxWidth / 2)
+                                .clip(RoundedCornerShape(8.dp))
+                                .combinedClickable(
+                                    onClickLabel = "open ${app.label}",
+                                    onLongClickLabel = "more for ${app.label}",
+                                    onLongClick = onAppLongPress?.let { { it(app) } },
+                                    onClick = { onLaunch(app.packageName) },
+                                )
+                                .padding(vertical = (12 * names).dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            if (style.showIcons) {
+                                AppIcon(app.packageName, app.label, (30 * names).dp)
+                                Spacer(Modifier.width(16.dp))
+                            }
+                            Text(app.label, fontSize = (26 * names).sp, color = p.text)
                         }
-                        Text(app.label, fontSize = (26 * names).sp, color = p.text)
                     }
                 }
                 if (apps.isEmpty()) {
@@ -734,12 +718,5 @@ internal fun MinimalHomeContent(
                 }
             }
         }
-    }
-}
-
-/** Android's own actions (the notification shade, locking), through the blocking service you switched on. */
-private fun globalAction(context: Context, action: Int) {
-    if (BlockingState.service?.performGlobalAction(action) != true) {
-        Toast.makeText(context, "this needs digital refuge's blocking switched on", Toast.LENGTH_SHORT).show()
     }
 }

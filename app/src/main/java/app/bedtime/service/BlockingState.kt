@@ -26,6 +26,13 @@ object BlockingState {
 
     fun isOn(context: Context): Boolean = SystemApps.isAccessibilityServiceEnabled(context)
 
+    /** Android's own actions (the notification shade, locking), through the blocking service you switched on. */
+    fun globalAction(context: Context, action: Int) {
+        if (service?.performGlobalAction(action) != true) {
+            android.widget.Toast.makeText(context, "this needs digital refuge's blocking switched on", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
+
     fun isOnBreak(): Boolean = SystemClock.elapsedRealtime() < breakUntil
 
     /** When the current break ends (elapsed-realtime millis), so a longer one can be noticed; 0 if none. */

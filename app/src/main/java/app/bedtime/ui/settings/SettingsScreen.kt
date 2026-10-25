@@ -338,7 +338,7 @@ internal fun SettingsContent(
                     )
                 }
                 if (lockScreen || (homeScreen && lockAlways)) {
-                    SettingsRow(Icons.Default.KeyboardArrowUp, "Swipes", "Open an app or the camera from around the clock", onClick = onSwipes)
+                    SettingsRow(Icons.Default.KeyboardArrowUp, "Gestures", "Swipes and a double tap: an app, the camera, a note…", onClick = onSwipes)
                     SettingsRow(Icons.Default.Notifications, "Notifications", "From the apps you choose; read, reply or keep for later", onClick = onLockNotifications, last = true)
                 }
 

@@ -1,5 +1,11 @@
 package app.bedtime.ui.lock
 
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.foundation.gestures.detectTapGestures
+import app.bedtime.ui.minimal.QuickNoteDialog
+import app.bedtime.data.Notes
+import app.bedtime.data.HomeActions
 import app.bedtime.ui.components.StatusBarVisibility
 import app.bedtime.ui.components.rememberTodayHours
 import app.bedtime.data.HourlyUse
@@ -314,6 +320,24 @@ private fun LockScreen(
     val scope = rememberCoroutineScope()
     val breezy = remember { Weather.APPS.firstOrNull { AppCatalog.isLaunchable(context, it) } }
     val todayHours = rememberTodayHours()
+    var quickNote by remember { mutableStateOf(false) }
+    // A gesture's action: a quick note or the notification shade right here, otherwise an app (the camera
+    // straight away, any other once unlocked).
+    val runAction: (String) -> Unit = { action ->
+        when (action) {
+            HomeActions.NOTE -> quickNote = true
+            HomeActions.NOTIFICATIONS -> BlockingState.globalAction(context, AccessibilityService.GLOBAL_ACTION_NOTIFICATIONS)
+            else -> onOpenApp(action)
+        }
+    }
+    if (quickNote) {
+        QuickNoteDialog(
+            settings.homeStyle,
+            settings.noteTargets,
+            onSave = { words, target -> scope.launch { Toast.makeText(context, Notes.save(context, repo, words, target), Toast.LENGTH_SHORT).show() } },
+            onDismiss = { quickNote = false },
+        )
+    }
     // The list folds back to its summary line whenever the screen goes off.
     var listOpen by remember { mutableStateOf(false) }
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { listOpen = false }
@@ -350,8 +374,9 @@ private fun LockScreen(
         until = occurrence?.let { formatTime(context, it.end) },
         style = style,
         onOpen = onOpen,
-        // A swipe from the middle opens its app, if one is set; every other swipe just unlocks.
-        onSwipe = { swipe -> style.lockGestures[swipe]?.let(onOpenApp) ?: onOpen() },
+        // A swipe from around the clock does what you set; every other swipe just unlocks.
+        onSwipe = { swipe -> style.lockGestures[swipe]?.let(runAction) ?: onOpen() },
+        onDoubleTap = style.lockGestures[Swipe.DOUBLE_TAP]?.let { action -> { runAction(action) } },
         quote = Quotes.forPeriod(now, style.quoteRefresh, prefs = settings.quotes),
         calendar = rememberCalendarLine(style, now, onLockScreen = true),
         weather = rememberWeather(style, now),
@@ -399,6 +424,8 @@ internal fun LockScreenContent(
     onWeather: (() -> Unit)? = null,
     /** Today by the hour, when it's shown here. */
     hours: List<HourState>? = null,
+    /** A double tap anywhere, when you've set one; a single tap then waits a moment to be sure. */
+    onDoubleTap: (() -> Unit)? = null,
     onHours: (() -> Unit)? = null,
     preview: Boolean = false,
     notifications: List<LockNotification> = emptyList(),
@@ -418,12 +445,10 @@ internal fun LockScreenContent(
             Modifier
                 .fillMaxSize()
                 .background(p.background)
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClickLabel = "unlock the phone",
-                    onClick = onOpen,
-                )
+                .semantics { onClick(label = "unlock the phone") { onOpen(); true } }
+                .pointerInput(onOpen, onDoubleTap) {
+                    detectTapGestures(onTap = { onOpen() }, onDoubleTap = onDoubleTap?.let { { _: Offset -> it() } })
+                }
                 .pointerInput(onSwipe, onOpen) {
                     var start = Offset.Zero
                     var travel = Offset.Zero

@@ -175,7 +175,7 @@ data class HomeStyle(
     val accent: Long = DEFAULT_HOME_ACCENT,
     val textSize: TextSize = TextSize.MEDIUM,
     val appNameSize: AppNameSize = AppNameSize.MEDIUM,
-    /** The full app list behind a swipe up: its app names, and the search's suggestions a little smaller. */
+    /** The full app list behind a swipe up: its app names, and the search's suggestions at the same size. */
     val listSize: AppNameSize = AppNameSize.MEDIUM,
     val showGreeting: Boolean = true,
     val showDate: Boolean = true,
@@ -218,7 +218,10 @@ data class HomeStyle(
     val topSpace: TopSpace = TopSpace.MEDIUM,
     /** The text colour; null picks for you: cream on a dark background, ink on a light one. */
     val textColor: Long? = null,
-    /** What a swipe from the middle of the lock screen opens: a package name, or [GESTURE_CAMERA]. */
+    /**
+     * What a lock-screen gesture does: a swipe from around the clock, or a double tap anywhere. A package
+     * name (opened after unlocking), [GESTURE_CAMERA], or [HomeActions.NOTE] / [HomeActions.NOTIFICATIONS].
+     */
     val lockGestures: Map<Swipe, String> = emptyMap(),
     /** What a gesture on the home screen does: one of [HomeActions], or a package name to open. */
     val homeGestures: Map<HomeGesture, String> = mapOf(HomeGesture.SWIPE_DOWN to HomeActions.NOTIFICATIONS),
@@ -228,9 +231,9 @@ data class HomeStyle(
     val calendarNamesOnLock: Boolean = false,
 )
 
-/** The four swipes the lock screen knows, each starting in the middle of the screen. */
+/** The lock screen's gestures: four swipes starting around the clock, and a double tap anywhere. */
 @Serializable
-enum class Swipe { UP, DOWN, LEFT, RIGHT }
+enum class Swipe { UP, DOWN, LEFT, RIGHT, DOUBLE_TAP }
 
 /** The camera, which unlike any other app can open over the lock screen without unlocking. */
 const val GESTURE_CAMERA = "camera"

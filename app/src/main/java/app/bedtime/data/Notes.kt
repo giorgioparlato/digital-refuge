@@ -3,6 +3,8 @@ package app.bedtime.data
 import android.content.Context
 import android.net.Uri
 import android.provider.DocumentsContract
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -138,5 +140,25 @@ object Notes {
         return runCatching {
             resolver.openOutputStream(uri, "wt")?.use { it.write(appended(existing, line).toByteArray()) } != null
         }.getOrDefault(false)
+    }
+
+    /**
+     * Saves a quick note: in the app's own notes when [target] is null, otherwise at the end of that file
+     * (or today's daily note). If the file can't be reached it waits in the app's notes, so nothing is
+     * lost. Returns what to tell you.
+     */
+    suspend fun save(context: Context, repo: Repository, words: String, target: NoteTarget?): String {
+        if (target == null) {
+            repo.addNote(words)
+            return "saved in refuge notes"
+        }
+        val at = LocalDateTime.now()
+        val line = line(words, at, target.style, target.withDate)
+        val added = withContext(Dispatchers.IO) {
+            if (target.daily) appendDaily(context, Uri.parse(target.uri), target.dailyFormat, at.toLocalDate(), line) else append(context, Uri.parse(target.uri), line)
+        }
+        if (!added) repo.addNote(words)
+        val name = target.name.lowercase()
+        return if (added) "added to $name" else "couldn't reach $name, so it's in refuge notes"
     }
 }
