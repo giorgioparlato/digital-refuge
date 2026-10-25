@@ -13,6 +13,15 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            52,
+            "0.9.6",
+            listOf(
+                "A double tap on the lock screen, and every lock-screen gesture can now write a quick note or show notifications too.",
+                "On the minimal screen, the right side beside your apps is free for a double tap.",
+                "Search suggestions are as large as the apps in the full list.",
+            ),
+        ),
+        ChangelogEntry(
             51,
             "0.9.5",
             listOf(
