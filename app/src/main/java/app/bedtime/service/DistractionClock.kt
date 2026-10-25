@@ -41,7 +41,7 @@ class DistractionClock(private val repo: Repository, private val scope: Coroutin
         if (pkg == ownPackage) return
         val isDistracting = pkg in distracting
         HourlyUse.split(since, now, ZoneId.systemDefault()).forEach { (day, hours) ->
-            scope.launch { repo.addHourly(day, if (isDistracting) hours else emptyMap(), hours) }
+            scope.launch { repo.addHourly(day, if (isDistracting) hours else emptyMap(), hours, pkg.takeIf { isDistracting }) }
         }
     }
 }

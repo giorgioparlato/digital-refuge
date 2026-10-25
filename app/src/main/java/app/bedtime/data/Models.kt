@@ -415,6 +415,8 @@ data class UsageDay(
     val hourly: Map<Int, Long> = emptyMap(),
     /** Seconds in any app but digital refuge itself, by hour of the day. */
     val hourlyAll: Map<Int, Long> = emptyMap(),
+    /** Seconds in each of your distracting apps, by package. */
+    val distractingSeconds: Map<String, Long> = emptyMap(),
     /** Times the pause before opening was shown, by package. */
     val opens: Map<String, Int> = emptyMap(),
     /** When more time was taken, by limit id; lifting for the rest of the day counts here too. */

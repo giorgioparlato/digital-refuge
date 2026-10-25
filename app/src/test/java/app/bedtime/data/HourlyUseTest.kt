@@ -56,4 +56,34 @@ class HourlyUseTest {
         assertEquals(null, s.distractionTotalMinutes)
         assertEquals(false, HourlyUse.counting(s))
     }
+
+    @Test
+    fun theDayToldAgainstYesterday() {
+        val today = DayHours(
+            apps = mapOf(9 to 600L, 21 to 2040L),
+            all = mapOf(9 to 1800L, 12 to 900L, 21 to 2400L),
+            byApp = mapOf("insta" to 1800L, "tube" to 840L, "chess" to 30L),
+        )
+        val yesterday = DayHours(apps = mapOf(20 to 4200L), all = mapOf(20 to 6000L))
+        val r = HourlyUse.report(today, yesterday, HourRule(5), nowHour = 22)
+        assertEquals(2640L, r.inApps)
+        assertEquals(5100L, r.overall)
+        assertEquals(-1560L, r.inAppsVsYesterday)
+        assertEquals(-900L, r.overallVsYesterday)
+        assertEquals(2, r.distracted)
+        assertEquals(23, r.hoursSoFar)
+        assertEquals(21, r.peakHour)
+        // Under a minute isn't worth a line.
+        assertEquals(listOf("insta" to 1800L, "tube" to 840L), r.topApps)
+        // No yesterday: nothing to compare.
+        assertEquals(null, HourlyUse.report(today, DayHours(), HourRule(5), 22).inAppsVsYesterday)
+    }
+
+    @Test
+    fun comparedInWords() {
+        val f = { m: Long -> "$m min" }
+        assertEquals("26 min less than yesterday", HourlyUse.versus(-1560L, f))
+        assertEquals("15 min more than yesterday", HourlyUse.versus(900L, f))
+        assertEquals("the same as yesterday", HourlyUse.versus(30L, f))
+    }
 }

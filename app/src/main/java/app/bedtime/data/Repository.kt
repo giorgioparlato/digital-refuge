@@ -191,11 +191,13 @@ class Repository private constructor(context: Context) {
         usage.copy(seconds = usage.seconds + seconds.map { (pkg, s) -> pkg to (usage.seconds[pkg] ?: 0L) + s })
     }
 
-    /** Adds time to [day], by hour: in distracting apps, and in any app. */
-    suspend fun addHourly(day: Long, distracting: Map<Int, Long>, all: Map<Int, Long>) = updateUsage(day) { usage ->
+    /** Adds time to [day], by hour: in distracting apps, and in any app; and to [app] if it's a distracting one. */
+    suspend fun addHourly(day: Long, distracting: Map<Int, Long>, all: Map<Int, Long>, app: String? = null) = updateUsage(day) { usage ->
+        val spent = distracting.values.sum()
         usage.copy(
             hourly = usage.hourly + distracting.map { (hour, s) -> hour to (usage.hourly[hour] ?: 0L) + s },
             hourlyAll = usage.hourlyAll + all.map { (hour, s) -> hour to (usage.hourlyAll[hour] ?: 0L) + s },
+            distractingSeconds = if (app == null || spent == 0L) usage.distractingSeconds else usage.distractingSeconds + (app to (usage.distractingSeconds[app] ?: 0L) + spent),
         )
     }
 

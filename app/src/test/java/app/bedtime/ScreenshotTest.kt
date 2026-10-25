@@ -148,6 +148,24 @@ class ScreenshotTest {
     }
 
     @Test
+    fun hourDetail() = shot(tall = true, height = 3400) {
+        Screen {
+            val today = app.bedtime.data.DayHours(
+                apps = mapOf(8 to 300L, 9 to 1500L, 13 to 900L, 21 to 2040L),
+                all = mapOf(8 to 1200L, 9 to 2400L, 12 to 900L, 13 to 1500L, 21 to 2700L),
+                byApp = mapOf("pkg.insta" to 2400L, "pkg.tube" to 1500L, "pkg.reddit" to 840L),
+            )
+            val rule = app.bedtime.data.HourRule(5)
+            val report = app.bedtime.data.HourlyUse.report(today, app.bedtime.data.DayHours(apps = mapOf(20 to 6000L), all = mapOf(20 to 9000L)), rule, 22)
+            val c = Obsidian.colors
+            app.bedtime.ui.components.HourDetailContent(
+                report, today, rule, mapOf("pkg.insta" to "Instagram", "pkg.tube" to "YouTube", "pkg.reddit" to "Reddit"),
+                c.bgSecondary, c.textNormal, c.textFaint, c.accent,
+            )
+        }
+    }
+
+    @Test
     fun homeGestures() = shot {
         HomeStyleContent(
             style = HomeStyle(homeGestures = mapOf(app.bedtime.data.HomeGesture.SWIPE_DOWN to app.bedtime.data.HomeActions.NOTIFICATIONS, app.bedtime.data.HomeGesture.DOUBLE_TAP to app.bedtime.data.HomeActions.LOCK, app.bedtime.data.HomeGesture.SWIPE_RIGHT to app.bedtime.data.HomeActions.NOTE)),

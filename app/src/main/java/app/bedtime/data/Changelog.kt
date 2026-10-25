@@ -13,6 +13,13 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            53,
+            "0.9.7",
+            listOf(
+                "Tap the hour dots for your day so far: time in distracting apps and on the phone at all, against yesterday; the heaviest hour; the distracting apps you used most; and every hour as a bar.",
+            ),
+        ),
+        ChangelogEntry(
             52,
             "0.9.6",
             listOf(
