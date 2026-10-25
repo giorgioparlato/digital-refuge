@@ -201,6 +201,8 @@ private fun SearchField(query: String, onQuery: (String) -> Unit, p: HomePalette
 /** The apps under their letters, and the strip on the right edge that jumps through them. */
 @Composable
 private fun AppList(apps: List<AppEntry>, style: HomeStyle, p: HomePalette, onLaunch: (String) -> Unit) {
+    // The same size as the app names on the minimal home.
+    val names = style.textSize.scale * style.appNameSize.scale
     val sections = remember(apps) { AppDrawer.sections(apps) }
     // Where each letter's heading sits in the list.
     val starts = remember(sections) {
@@ -222,14 +224,14 @@ private fun AppList(apps: List<AppEntry>, style: HomeStyle, p: HomePalette, onLa
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(8.dp))
                             .clickable(onClickLabel = "open ${app.label}") { onLaunch(app.packageName) }
-                            .padding(vertical = 10.dp),
+                            .padding(vertical = (12 * names).dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         if (style.showIcons) {
-                            AppIcon(app.packageName, app.label, 28.dp)
-                            Spacer(Modifier.width(14.dp))
+                            AppIcon(app.packageName, app.label, (30 * names).dp)
+                            Spacer(Modifier.width(16.dp))
                         }
-                        Text(app.label, fontSize = 22.sp, color = p.text)
+                        Text(app.label, fontSize = (26 * names).sp, color = p.text)
                     }
                 }
             }
@@ -285,8 +287,9 @@ private fun AppList(apps: List<AppEntry>, style: HomeStyle, p: HomePalette, onLa
 @Composable
 private fun ResultRow(result: DrawerResult, query: String, style: HomeStyle, p: HomePalette, onClick: () -> Unit) {
     val context = LocalContext.current
+    val names = style.textSize.scale * style.appNameSize.scale
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable(onClick = onClick).padding(vertical = 10.dp),
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable(onClick = onClick).padding(vertical = (10 * names).dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         val label = when (result) {
@@ -306,9 +309,9 @@ private fun ResultRow(result: DrawerResult, query: String, style: HomeStyle, p: 
             is DrawerResult.AddEvent -> Icons.Default.DateRange
             else -> Icons.Default.Edit
         }
-        Box(Modifier.size(28.dp), contentAlignment = Alignment.Center) {
+        Box(Modifier.size((30 * names).dp), contentAlignment = Alignment.Center) {
             if (result is DrawerResult.App) {
-                AppIcon(result.app.packageName, result.app.label, 28.dp)
+                AppIcon(result.app.packageName, result.app.label, (30 * names).dp)
             } else if (icon != null) {
                 Icon(icon, contentDescription = null, tint = p.accent, modifier = Modifier.size(24.dp))
             }
@@ -316,9 +319,9 @@ private fun ResultRow(result: DrawerResult, query: String, style: HomeStyle, p: 
         Spacer(Modifier.width(14.dp))
         // App names are lowercased like the rest; what you typed keeps its case.
         if (result is DrawerResult.App || result == DrawerResult.OpenNotes) {
-            Text(label, fontSize = 20.sp, color = p.text, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(label, fontSize = (26 * names).sp, color = p.text, maxLines = 2, overflow = TextOverflow.Ellipsis)
         } else {
-            VerbatimText(label, color = p.text, fontSize = 17.sp)
+            VerbatimText(label, color = p.text, fontSize = (19 * names).sp)
         }
     }
 }

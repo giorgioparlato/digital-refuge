@@ -1,5 +1,13 @@
 package app.bedtime.ui.notes
 
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.TextRange
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.horizontalScroll
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -148,37 +156,75 @@ internal fun NotesContent(
     }
 }
 
-/** One note as plain Markdown, saved when you go back. */
+/** One note, styled as Markdown as you type, with a few marks a tap away; saved when you go back. */
 @Composable
 private fun NoteEditor(initial: String, onDone: (String) -> Unit, onDelete: (() -> Unit)?) {
     val c = Obsidian.colors
-    var text by rememberSaveable { mutableStateOf(initial) }
-    BackHandler { onDone(text) }
+    var value by remember { mutableStateOf(TextFieldValue(initial, TextRange(initial.length))) }
+    BackHandler { onDone(value.text) }
     Scaffold(
         containerColor = c.bgPrimary,
         topBar = {
-            ObsidianTopBar(if (onDelete == null) "New note" else "Note", onBack = { onDone(text) }) {
+            ObsidianTopBar(if (onDelete == null) "New note" else "Note", onBack = { onDone(value.text) }) {
                 if (onDelete != null) {
                     IconButton(onClick = onDelete) { Icon(Icons.Default.Delete, contentDescription = "delete", tint = c.textMuted) }
                 }
             }
         },
     ) { padding ->
-        Box(Modifier.fillMaxSize().padding(padding).imePadding().padding(horizontal = PageGutter)) {
+        Column(Modifier.fillMaxSize().padding(padding).imePadding()) {
             BasicTextField(
-                value = text,
-                onValueChange = { text = it },
+                value = value,
+                onValueChange = { value = it },
                 textStyle = MaterialTheme.typography.bodyLarge.copy(color = c.textNormal),
                 cursorBrush = SolidColor(c.accent),
-                modifier = Modifier.fillMaxSize(),
+                visualTransformation = remember(c.textFaint, c.accent) { MarkdownTransformation(c.textFaint, c.accent) },
+                modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = PageGutter),
                 decorationBox = { field ->
                     Box(contentAlignment = Alignment.TopStart) {
-                        if (text.isEmpty()) Text("# A title\n\n- a list\n- [ ] a to-do", style = MaterialTheme.typography.bodyLarge, color = c.textFaint)
+                        if (value.text.isEmpty()) VerbatimText("# A title\n\n- a list\n- [ ] a to-do", style = MaterialTheme.typography.bodyLarge, color = c.textFaint)
                         field()
                     }
                 },
             )
+            MarkdownBar { change -> value = change(value) }
         }
+    }
+}
+
+/** The marks Obsidian keeps above its keyboard: brackets, bold, italic, a heading, a list, a to-do. */
+@Composable
+private fun MarkdownBar(onEdit: ((TextFieldValue) -> TextFieldValue) -> Unit) {
+    val c = Obsidian.colors
+    Row(
+        Modifier.fillMaxWidth().background(c.bgSecondary).horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        BarKey("[", "bracket") { onEdit { Markdown.insert(it, "[") } }
+        BarKey("]", "closing bracket") { onEdit { Markdown.insert(it, "]") } }
+        BarKey("B", "bold", bold = true) { onEdit { Markdown.wrap(it, "**") } }
+        BarKey("I", "italic", italic = true) { onEdit { Markdown.wrap(it, "*") } }
+        BarKey("H", "heading") { onEdit { Markdown.toggleLine(it, "# ") } }
+        BarKey("•", "list") { onEdit { Markdown.toggleLine(it, "- ") } }
+        BarKey("☐", "to-do") { onEdit { Markdown.toggleLine(it, "- [ ] ") } }
+    }
+}
+
+@Composable
+private fun BarKey(label: String, description: String, bold: Boolean = false, italic: Boolean = false, onClick: () -> Unit) {
+    val c = Obsidian.colors
+    Box(
+        Modifier.size(44.dp).clip(RoundedCornerShape(10.dp)).clickable(onClickLabel = description, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        VerbatimText(
+            label,
+            color = c.textNormal,
+            style = MaterialTheme.typography.titleMedium.copy(
+                fontWeight = if (bold) FontWeight.Bold else FontWeight.Normal,
+                fontStyle = if (italic) FontStyle.Italic else FontStyle.Normal,
+            ),
+        )
     }
 }
 

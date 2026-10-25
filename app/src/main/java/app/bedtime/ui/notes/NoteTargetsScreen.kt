@@ -1,5 +1,11 @@
 package app.bedtime.ui.notes
 
+import java.time.LocalDateTime
+import androidx.compose.ui.text.font.FontFamily
+import app.bedtime.ui.components.VerbatimText
+import app.bedtime.ui.components.SegmentedChoice
+import app.bedtime.ui.components.ObsidianToggle
+import app.bedtime.data.NoteStyle
 import android.Manifest
 import android.content.Intent
 import android.net.Uri
@@ -68,9 +74,9 @@ fun NoteTargetsScreen(onBack: () -> Unit, onOpenNotes: () -> Unit) {
     val askCalendar = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
         calendarAccess = granted.values.all { it }
     }
-    // A file just picked, waiting for its name.
-    var picked by rememberSaveable { mutableStateOf<String?>(null) }
-    var pickedName by rememberSaveable { mutableStateOf("") }
+    // A file being named and set up: just picked (new) or tapped to change. The original, to replace.
+    var draft by remember { mutableStateOf<NoteTarget?>(null) }
+    var original by remember { mutableStateOf<NoteTarget?>(null) }
     val pickFile = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
         val kept = runCatching {
@@ -80,19 +86,40 @@ fun NoteTargetsScreen(onBack: () -> Unit, onOpenNotes: () -> Unit) {
             Toast.makeText(context, "that file can't be written to from here", Toast.LENGTH_LONG).show()
             return@rememberLauncherForActivityResult
         }
-        picked = uri.toString()
-        pickedName = displayName(context, uri)?.substringBeforeLast('.').orEmpty()
+        original = null
+        draft = NoteTarget(displayName(context, uri)?.substringBeforeLast('.').orEmpty(), uri.toString())
+    }
+    // Today's note lives in a folder: the folder is what's picked, once.
+    val pickFolder = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        val kept = runCatching {
+            context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+        }.isSuccess
+        if (!kept) {
+            Toast.makeText(context, "that folder can't be written to from here", Toast.LENGTH_LONG).show()
+            return@rememberLauncherForActivityResult
+        }
+        original = null
+        draft = NoteTarget("today", uri.toString(), daily = true)
     }
     val current = settings ?: return
-    picked?.let { uri ->
-        NameDialog(
-            name = pickedName,
-            onName = { pickedName = it },
+    draft?.let { target ->
+        TargetDialog(
+            target = target,
+            isNew = original == null,
+            onChange = { draft = it },
             onDone = {
-                scope.launch { repo.updateSettings { it.copy(noteTargets = (it.noteTargets + NoteTarget(pickedName.trim(), uri)).take(Notes.MAX_TARGETS)) } }
-                picked = null
+                val done = target.copy(name = target.name.trim())
+                val was = original
+                scope.launch {
+                    repo.updateSettings { s ->
+                        val list = if (was == null) s.noteTargets + done else s.noteTargets.map { if (it == was) done else it }
+                        s.copy(noteTargets = list.take(Notes.MAX_TARGETS))
+                    }
+                }
+                draft = null
             },
-            onCancel = { picked = null },
+            onCancel = { draft = null },
         )
     }
     NoteTargetsContent(
@@ -101,6 +128,11 @@ fun NoteTargetsScreen(onBack: () -> Unit, onOpenNotes: () -> Unit) {
         calendarId = current.eventCalendarId,
         calendarAccess = calendarAccess,
         onAdd = { pickFile.launch(arrayOf("text/*", "application/octet-stream")) },
+        onAddDaily = { pickFolder.launch(null) },
+        onEdit = { target ->
+            original = target
+            draft = target
+        },
         onRemove = { target ->
             runCatching { context.contentResolver.releasePersistableUriPermission(Uri.parse(target.uri), Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION) }
             scope.launch { repo.updateSettings { it.copy(noteTargets = it.noteTargets - target) } }
@@ -119,6 +151,8 @@ internal fun NoteTargetsContent(
     calendarId: Long?,
     calendarAccess: Boolean,
     onAdd: () -> Unit,
+    onAddDaily: () -> Unit,
+    onEdit: (NoteTarget) -> Unit,
     onRemove: (NoteTarget) -> Unit,
     onCalendar: (Long) -> Unit,
     onAllowCalendar: () -> Unit,
@@ -142,15 +176,22 @@ internal fun NoteTargetsContent(
             Spacer(Modifier.height(16.dp))
             SectionCard(
                 title = "Your files",
-                subtitle = "Up to ${Notes.MAX_TARGETS}. Each note is added at the end, as “- date time your words”",
+                subtitle = "Up to ${Notes.MAX_TARGETS}. Each note is added at the end; tap one to change how",
             ) {
                 targets.forEach { target ->
-                    OptionRow(Icons.Default.List, target.name, description = "Add to ${target.name}") {
+                    val example = Notes.line("your words", SAMPLE_TIME, target.style, target.withDate)
+                    OptionRow(
+                        if (target.daily) Icons.Default.DateRange else Icons.Default.List,
+                        target.name,
+                        description = if (target.daily) "Today's note, e.g. ${Notes.dailyPath(target.dailyFormat, SAMPLE_TIME.toLocalDate())} · adds “$example”" else "Adds “$example”",
+                        onClick = { onEdit(target) },
+                    ) {
                         IconButton(onClick = { onRemove(target) }) { Icon(Icons.Default.Close, contentDescription = "remove", tint = c.textFaint) }
                     }
                 }
                 if (targets.size < Notes.MAX_TARGETS) {
                     OptionRow(Icons.Default.Add, "Add a file", description = "Pick a note, then name it, e.g. scratchpad or movies list", onClick = onAdd) { Chevron() }
+                    OptionRow(Icons.Default.DateRange, "Add today's daily note", description = "Pick your daily-notes folder; today's note is made if it isn't there", onClick = onAddDaily) { Chevron() }
                 }
                 Text(
                     "For Obsidian, pick the note inside your vault. Vaults in Documents work; one kept in Obsidian's own app folder can't be reached by other apps.",
@@ -179,23 +220,61 @@ internal fun NoteTargetsContent(
     }
 }
 
+/** An example moment for the previews of how a note will be written. */
+private val SAMPLE_TIME: LocalDateTime = LocalDateTime.of(2026, 10, 25, 22, 41)
+
+/** A file's name, and how each quick note is written into it, with a preview line. */
 @Composable
-private fun NameDialog(name: String, onName: (String) -> Unit, onDone: () -> Unit, onCancel: () -> Unit) {
+private fun TargetDialog(target: NoteTarget, isNew: Boolean, onChange: (NoteTarget) -> Unit, onDone: () -> Unit, onCancel: () -> Unit) {
     val c = Obsidian.colors
     AlertDialog(
         onDismissRequest = onCancel,
         containerColor = c.bgSecondary,
-        title = { Text("Name it") },
+        title = { Text(if (!isNew) target.name else if (target.daily) "Add today's daily note" else "Add a file") },
         text = {
             Column {
                 Text("How it reads in the search: “add to …”", style = MaterialTheme.typography.bodySmall, color = c.textFaint)
                 Spacer(Modifier.height(8.dp))
-                ObsidianTextField(value = name, onValueChange = onName, label = "e.g. scratchpad")
+                ObsidianTextField(value = target.name, onValueChange = { onChange(target.copy(name = it)) }, label = if (target.daily) "e.g. today" else "e.g. scratchpad")
+                if (target.daily) {
+                    Spacer(Modifier.height(16.dp))
+                    Text("The daily note's name", style = MaterialTheme.typography.labelLarge, color = c.accentText)
+                    Text(
+                        "As in Obsidian's daily notes settings; folders work too, like YYYY/MM/YYYY-MM-DD",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = c.textFaint,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    ObsidianTextField(value = target.dailyFormat, onValueChange = { onChange(target.copy(dailyFormat = it)) }, label = "YYYY-MM-DD")
+                    VerbatimText(
+                        "Today: " + Notes.dailyPath(target.dailyFormat, java.time.LocalDate.now()),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = c.textMuted,
+                        modifier = Modifier.padding(top = 6.dp),
+                    )
+                }
+                Spacer(Modifier.height(16.dp))
+                Text("Each note is written as", style = MaterialTheme.typography.labelLarge, color = c.accentText)
+                Spacer(Modifier.height(8.dp))
+                SegmentedChoice(
+                    options = listOf("A list item", "A to-do", "Plain"),
+                    selected = target.style.ordinal,
+                    onSelect = { onChange(target.copy(style = NoteStyle.entries[it])) },
+                )
+                OptionRow(Icons.Default.DateRange, "Date and time first") {
+                    ObsidianToggle(target.withDate, { onChange(target.copy(withDate = it)) })
+                }
+                VerbatimText(
+                    Notes.line("Watch Paterson", SAMPLE_TIME, target.style, target.withDate),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = c.textMuted,
+                    fontFamily = FontFamily.Monospace,
+                )
             }
         },
         confirmButton = {
-            TextButton(onClick = onDone, enabled = name.isNotBlank()) {
-                Text("Add", color = if (name.isNotBlank()) c.accentText else c.textFaint, fontWeight = FontWeight.SemiBold)
+            TextButton(onClick = onDone, enabled = target.name.isNotBlank()) {
+                Text(if (isNew) "Add" else "Save", color = if (target.name.isNotBlank()) c.accentText else c.textFaint, fontWeight = FontWeight.SemiBold)
             }
         },
         dismissButton = { TextButton(onClick = onCancel) { Text("Cancel", color = c.textMuted) } },

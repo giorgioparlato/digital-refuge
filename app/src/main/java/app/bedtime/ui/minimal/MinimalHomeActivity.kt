@@ -1,5 +1,6 @@
 package app.bedtime.ui.minimal
 
+import app.bedtime.data.WeatherView
 import app.bedtime.ui.notes.NotesScreen
 import app.bedtime.data.SearchTargets
 import app.bedtime.data.SearchTarget
@@ -217,7 +218,15 @@ private fun MinimalHomeScreen(onFinish: () -> Unit, onLightBackground: (Boolean)
                         repo.addNote(words)
                         Toast.makeText(context, "saved in refuge notes", Toast.LENGTH_SHORT).show()
                     } else {
-                        val added = withContext(Dispatchers.IO) { Notes.append(context, Uri.parse(target.uri), Notes.line(words, LocalDateTime.now())) }
+                        val at = LocalDateTime.now()
+                        val line = Notes.line(words, at, target.style, target.withDate)
+                        val added = withContext(Dispatchers.IO) {
+                            if (target.daily) {
+                                Notes.appendDaily(context, Uri.parse(target.uri), target.dailyFormat, at.toLocalDate(), line)
+                            } else {
+                                Notes.append(context, Uri.parse(target.uri), line)
+                            }
+                        }
                         // Never lost: if the file can't be reached, it waits in the app's notes.
                         if (!added) repo.addNote(words)
                         Toast.makeText(
@@ -318,7 +327,7 @@ private fun MinimalHomeScreen(onFinish: () -> Unit, onLightBackground: (Boolean)
             calendar = rememberCalendarLine(style, now, onLockScreen = false),
             onCalendar = { scope.launch { week = loadCalendarWeek(context, LocalDateTime.now()) } },
             onOpenDrawer = { drawer = true },
-            weather = rememberWeatherLine(style, now),
+            weather = rememberWeather(style, now),
             onNextQuote = { quoteOffset++ },
         )
     }
@@ -350,7 +359,7 @@ internal fun MinimalHomeContent(
     /** Opens the week ahead, from a tap on the calendar line. */
     onCalendar: (() -> Unit)? = null,
     /** The weather after the date, when it's on. */
-    weather: String? = null,
+    weather: WeatherView? = null,
     /** Opens every available app with search, from a swipe up or the handle at the foot. */
     onOpenDrawer: () -> Unit = {},
     quote: Quote? = null,

@@ -8,15 +8,16 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.bedtime.data.HomeStyle
 import app.bedtime.data.Repository
 import app.bedtime.data.Weather
+import app.bedtime.data.WeatherView
 import java.time.LocalDateTime
 import java.time.ZoneId
 
-/** "12° · light rain" for the line after the date, or null when it's off or Breezy hasn't sent anything lately. */
+/** The weather as [style] asks for it, or null when it's off or Breezy hasn't sent anything lately. */
 @Composable
-fun rememberWeatherLine(style: HomeStyle, now: LocalDateTime): String? {
+fun rememberWeather(style: HomeStyle, now: LocalDateTime): WeatherView? {
     val context = LocalContext.current
     val repo = remember { Repository.get(context.applicationContext) }
     val weather by repo.weather.collectAsStateWithLifecycle(initialValue = null)
     if (!style.showWeather) return null
-    return Weather.line(weather, now.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(), Weather.usesFahrenheit())
+    return Weather.view(weather, now.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(), Weather.usesFahrenheit(), style.weatherStyle)
 }

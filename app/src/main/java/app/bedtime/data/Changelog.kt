@@ -13,6 +13,17 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            47,
+            "0.9.1",
+            listOf(
+                "Quick notes can go to today's daily note in Obsidian, made if it isn't there yet. Each file chooses how notes land: a list item, a to-do or a plain line, dated or not.",
+                "Notes show their Markdown as you type, with brackets, bold, italic, headings, lists and to-dos a tap away.",
+                "Weather can show today's range, or three days with their skies.",
+                "On the lock screen, the arrow or a drag down each open a notification fully.",
+                "The full app list's text follows your minimal home's size.",
+            ),
+        ),
+        ChangelogEntry(
             46,
             "0.9.0",
             listOf(

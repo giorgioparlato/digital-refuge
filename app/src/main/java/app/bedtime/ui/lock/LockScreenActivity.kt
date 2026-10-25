@@ -1,6 +1,7 @@
 package app.bedtime.ui.lock
 
-import app.bedtime.ui.minimal.rememberWeatherLine
+import app.bedtime.data.WeatherView
+import app.bedtime.ui.minimal.rememberWeather
 import app.bedtime.service.BlockingState
 import app.bedtime.data.NoteAction
 import androidx.lifecycle.compose.LifecycleEventEffect
@@ -338,7 +339,7 @@ private fun LockScreen(
         onSwipe = { swipe -> style.lockGestures[swipe]?.let(onOpenApp) ?: onOpen() },
         quote = Quotes.forPeriod(now, style.quoteRefresh, prefs = settings.quotes),
         calendar = rememberCalendarLine(style, now, onLockScreen = true),
-        weather = rememberWeatherLine(style, now),
+        weather = rememberWeather(style, now),
         notifications = if (style.lockNotifications) {
             val nowMs = System.currentTimeMillis()
             notifications.filter { it.packageName in style.lockNotificationApps && !LockNotifications.isQuiet(it, quiet, nowMs) }
@@ -374,7 +375,7 @@ internal fun LockScreenContent(
     onSwipe: (Swipe) -> Unit = {},
     quote: Quote? = null,
     calendar: String? = null,
-    weather: String? = null,
+    weather: WeatherView? = null,
     preview: Boolean = false,
     notifications: List<LockNotification> = emptyList(),
     listOpen: Boolean = false,

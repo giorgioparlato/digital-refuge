@@ -1,5 +1,9 @@
 package app.bedtime.ui.minimal
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
+import app.bedtime.ui.components.WeatherIcons
+import app.bedtime.data.WeatherView
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
@@ -45,8 +49,8 @@ internal fun SessionHeader(
     calendar: String? = null,
     /** Opens the week ahead from the calendar line; null where a tap means something else (the lock screen). */
     onCalendar: (() -> Unit)? = null,
-    /** "12° · light rain", after the date. */
-    weather: String? = null,
+    /** "12° · light rain" after the date, with its sky, and the next days if chosen. */
+    weather: WeatherView? = null,
 ) {
     val context = LocalContext.current
     val p = style.palette()
@@ -66,13 +70,45 @@ internal fun SessionHeader(
             maxLines = 1,
         )
         if (style.showDate || weather != null) {
-            Text(
-                listOfNotNull(DateTimeFormatter.ofPattern("EEEE, d MMMM", Locale.getDefault()).format(now).takeIf { style.showDate }, weather)
-                    .joinToString(" · "),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Normal,
-                color = p.muted,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (style.showDate) {
+                    Text(
+                        DateTimeFormatter.ofPattern("EEEE, d MMMM", Locale.getDefault()).format(now) + if (weather != null) " · " else "",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Normal,
+                        color = p.muted,
+                    )
+                }
+                if (weather != null) {
+                    weather.icon?.let { Icon(WeatherIcons.of(it), contentDescription = null, tint = p.muted, modifier = Modifier.padding(end = 6.dp).size(18.dp)) }
+                    Text(weather.text, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Normal, color = p.muted)
+                }
+            }
+        }
+        if (weather != null && weather.days.isNotEmpty()) {
+            Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(22.dp)) {
+                weather.days.forEach { day ->
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            when (day.offset) {
+                                0 -> "Today"
+                                1 -> "Tomorrow"
+                                else -> DateTimeFormatter.ofPattern("EEE", Locale.getDefault()).format(now.plusDays(day.offset.toLong()))
+                            },
+                            style = MaterialTheme.typography.labelMedium,
+                            color = p.faint,
+                        )
+                        Box(Modifier.padding(vertical = 4.dp).size(24.dp), contentAlignment = Alignment.Center) {
+                            day.icon?.let { Icon(WeatherIcons.of(it), contentDescription = null, tint = p.muted, modifier = Modifier.size(24.dp)) }
+                        }
+                        Text(
+                            listOfNotNull(day.high?.let { "$it°" }, day.low?.let { "$it°" }).joinToString(" · "),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = p.muted,
+                        )
+                    }
+                }
+            }
         }
         if (calendar != null) {
             Text(

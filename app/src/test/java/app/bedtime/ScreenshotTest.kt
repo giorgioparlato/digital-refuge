@@ -572,7 +572,8 @@ class ScreenshotTest {
     fun lockScreenWeather() = shot {
         app.bedtime.ui.lock.LockScreenContent(
             now = Samples.lateEvening, scheduleName = "Bedtime", until = "07:00", style = HomeStyle(), quote = Samples.shortQuote,
-            weather = "12° · light rain", calendar = "next · dentist at 9:00 am",
+            weather = app.bedtime.data.Weather.view(app.bedtime.data.Weather.SAMPLE, 2L, false, app.bedtime.data.WeatherStyle.NOW),
+            calendar = "next · dentist at 9:00 am",
         )
     }
 
@@ -655,13 +656,33 @@ class ScreenshotTest {
     }
 
     @Test
+    fun noteEditor() = shot {
+        app.bedtime.ui.notes.NotesContent(
+            notes = listOf(app.bedtime.data.Note("a", "# Films to see\n- [ ] Perfect Days\n- [x] **Paterson**, again\n\nsomething *quiet* for sunday", 0L, 0L)),
+            onSave = { _, _ -> }, onDelete = {}, onBack = {}, initialOpen = "a",
+        )
+    }
+
+    @Test
+    fun lockScreenWeatherDays() = shot {
+        app.bedtime.ui.lock.LockScreenContent(
+            now = Samples.lateEvening, scheduleName = "Bedtime", until = "07:00", style = HomeStyle(), quote = Samples.shortQuote,
+            weather = app.bedtime.data.Weather.view(app.bedtime.data.Weather.SAMPLE, 2L, false, app.bedtime.data.WeatherStyle.DAYS),
+        )
+    }
+
+    @Test
     fun quickNotes() = shot {
         app.bedtime.ui.notes.NoteTargetsContent(
-            targets = listOf(app.bedtime.data.NoteTarget("scratchpad", "x"), app.bedtime.data.NoteTarget("movies list", "y")),
+            targets = listOf(
+                app.bedtime.data.NoteTarget("today", "z", daily = true, withDate = false),
+                app.bedtime.data.NoteTarget("scratchpad", "x"),
+                app.bedtime.data.NoteTarget("movies list", "y", app.bedtime.data.NoteStyle.TASK, withDate = false),
+            ),
             calendars = listOf(1L to "Personal", 2L to "Work"),
             calendarId = null,
             calendarAccess = true,
-            onAdd = {}, onRemove = {}, onCalendar = {}, onAllowCalendar = {}, onOpenNotes = {}, onBack = {},
+            onAdd = {}, onAddDaily = {}, onEdit = {}, onRemove = {}, onCalendar = {}, onAllowCalendar = {}, onOpenNotes = {}, onBack = {},
         )
     }
 

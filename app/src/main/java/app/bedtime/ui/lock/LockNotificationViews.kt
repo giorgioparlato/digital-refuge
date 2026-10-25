@@ -1,9 +1,13 @@
 package app.bedtime.ui.lock
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -41,7 +45,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
+import kotlinx.coroutines.delay
+import kotlin.math.abs
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -157,7 +166,7 @@ private fun SummaryLine(summary: String, p: HomePalette, onOpen: () -> Unit) {
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
 @Composable
 private fun NotificationRow(
     note: LockNotification,
@@ -170,26 +179,50 @@ private fun NotificationRow(
     quickReplies: List<String>,
 ) {
     val more = note.messages.isNotEmpty() || note.body != null
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(p.text.copy(alpha = 0.06f))) {
+    // Opened, by the arrow or a drag, it scrolls itself fully into view.
+    val reveal = remember { BringIntoViewRequester() }
+    LaunchedEffect(expanded) {
+        if (expanded) {
+            delay(80)
+            reveal.bringIntoView()
+        }
+    }
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .bringIntoViewRequester(reveal)
+            .clip(RoundedCornerShape(14.dp))
+            .background(p.text.copy(alpha = 0.06f)),
+    ) {
         Row(
             Modifier
                 .fillMaxWidth()
                 .clickable(onClickLabel = "unlock and open") { handlers.open(note.key) }
-                // Drag down to read it in place, as in Android's own shade; drag up to fold it again.
+                // Drag down to read it in place, as in Android's own shade. Claimed before the list's own
+                // scrolling sees it; a drag up, or any drag on an open one, is left to scroll.
                 .pointerInput(expanded) {
-                    var travel = 0f
-                    detectVerticalDragGestures(
-                        onDragStart = { travel = 0f },
-                        onVerticalDrag = { change, amount ->
-                            change.consume()
-                            travel += amount
-                        },
-                        onDragEnd = {
-                            val threshold = 24.dp.toPx()
-                            if (travel > threshold && !expanded) onExpand(true)
-                            if (travel < -threshold && expanded) onExpand(false)
-                        },
-                    )
+                    if (expanded) return@pointerInput
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                        var travel = Offset.Zero
+                        while (true) {
+                            val change = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.id == down.id } ?: break
+                            if (!change.pressed) break
+                            travel += change.positionChange()
+                            val slop = viewConfiguration.touchSlop
+                            if (travel.y > slop && travel.y > abs(travel.x)) {
+                                change.consume()
+                                onExpand(true)
+                                // The rest of this drag is spent.
+                                do {
+                                    val rest = awaitPointerEvent(PointerEventPass.Initial)
+                                    rest.changes.forEach { it.consume() }
+                                } while (rest.changes.any { it.pressed })
+                                break
+                            }
+                            if (abs(travel.x) > slop || travel.y < -slop) break
+                        }
+                    }
                 }
                 .padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.Top,
@@ -200,12 +233,12 @@ private fun NotificationRow(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(note.app, style = MaterialTheme.typography.labelMedium, color = p.faint, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                     Text(formatTime(LocalContext.current, note.postedAt), style = MaterialTheme.typography.labelSmall, color = p.faint)
-                    Icon(
-                        if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                        contentDescription = if (expanded) "fold" else "read it here",
-                        tint = p.faint,
-                        modifier = Modifier.padding(start = 4.dp).size(18.dp).clip(RoundedCornerShape(50)).clickable { onExpand(!expanded) },
-                    )
+                    Box(
+                        Modifier.size(32.dp).clip(RoundedCornerShape(50)).clickable(onClickLabel = if (expanded) "fold" else "read it here") { onExpand(!expanded) },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown, contentDescription = null, tint = p.faint, modifier = Modifier.size(20.dp))
+                    }
                 }
                 val title = note.title ?: if (note.detail == NoteDetail.APP_ONLY) "New notification" else null
                 title?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = p.text, maxLines = 1, overflow = TextOverflow.Ellipsis) }

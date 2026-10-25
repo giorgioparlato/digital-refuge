@@ -189,6 +189,8 @@ data class HomeStyle(
     val quickReplies: List<String> = DEFAULT_QUICK_REPLIES,
     /** The weather after the date, as Breezy Weather sends it. */
     val showWeather: Boolean = false,
+    /** How much of it: now, today's range too, or three days with their skies. */
+    val weatherStyle: WeatherStyle = WeatherStyle.NOW,
     /** The clock, date and app names. */
     val font: AppFont = AppFont.INTER,
     /** The quote, chosen apart from the rest: Inter as it always was, or a serif in italics. */

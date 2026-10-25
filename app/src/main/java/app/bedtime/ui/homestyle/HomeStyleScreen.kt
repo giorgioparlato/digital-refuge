@@ -1,5 +1,8 @@
 package app.bedtime.ui.homestyle
 
+import app.bedtime.data.WeatherView
+import app.bedtime.data.WeatherStyle
+import app.bedtime.data.Weather
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Edit
 import app.bedtime.ui.apps.PickerMode
@@ -206,6 +209,10 @@ fun HomeStyleScreen(onBack: () -> Unit, onQuotes: () -> Unit = {}) {
         notificationAccess = notificationAccess,
         onPickNotificationApps = { pickingNotificationApps = true },
         weatherHeardAt = weather?.at,
+        // The preview shows the real weather if there is some, otherwise an example.
+        weatherPreview = current.homeStyle.takeIf { it.showWeather }?.let { style ->
+            Weather.view(weather ?: Weather.SAMPLE, (weather?.at ?: Weather.SAMPLE.at) + 1, Weather.usesFahrenheit(), style.weatherStyle)
+        },
         now = LocalDateTime.now(),
         onBack = onBack,
         quote = Quotes.forPeriod(LocalDateTime.now(), current.homeStyle.quoteRefresh, prefs = current.quotes),
@@ -240,6 +247,8 @@ internal fun HomeStyleContent(
     onPickNotificationApps: () -> Unit = {},
     /** When Breezy Weather last sent the weather, if ever. */
     weatherHeardAt: Long? = null,
+    /** The weather as the preview shows it. */
+    weatherPreview: WeatherView? = null,
 ) {
     val context = LocalContext.current
     val c = Obsidian.colors
@@ -290,6 +299,7 @@ internal fun HomeStyleContent(
                     onLaunch = {},
                     onUnlock = {},
                     quote = quote,
+                    weather = weatherPreview,
                     preview = true,
                 )
             }
@@ -379,6 +389,12 @@ internal fun HomeStyleContent(
                     },
                 ) { ObsidianToggle(style.showWeather, { onChange(style.copy(showWeather = it)) }) }
                 if (style.showWeather) {
+                    SizeLabel("Show", Modifier.padding(top = 12.dp, bottom = 8.dp))
+                    SegmentedChoice(
+                        options = listOf("Now", "With today", "Three days"),
+                        selected = style.weatherStyle.ordinal,
+                        onSelect = { onChange(style.copy(weatherStyle = WeatherStyle.entries[it])) },
+                    )
                     Text(
                         "Install Breezy Weather (it's on F-Droid). In its settings, under widgets, open “Send Gadgetbridge data” and tick digital refuge. It sends the weather each time it updates.",
                         style = MaterialTheme.typography.bodySmall,
