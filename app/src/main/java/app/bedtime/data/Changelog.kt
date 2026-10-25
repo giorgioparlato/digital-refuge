@@ -13,6 +13,16 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            51,
+            "0.9.5",
+            listOf(
+                "Drag the search's choices into your order; switched off, one moves below the rest.",
+                "Contacts in the search, if you switch them on: call, message or WhatsApp.",
+                "An hour can also count as distracted after a while on the phone at all, and the dots can take your colours.",
+                "Hide Android's status bar on the minimal and lock screens, under what's shown.",
+            ),
+        ),
+        ChangelogEntry(
             50,
             "0.9.4",
             listOf(

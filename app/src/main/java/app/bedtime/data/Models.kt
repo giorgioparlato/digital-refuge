@@ -188,6 +188,8 @@ data class HomeStyle(
     val lockScreen: Boolean = true,
     /** Outside sessions too, when digital refuge is your launcher. */
     val lockAlways: Boolean = false,
+    /** Android's status bar hidden on the minimal and lock screens; a swipe from the top edge still shows it. */
+    val hideStatusBar: Boolean = false,
     /** Notifications on that lock screen: those the session lets through, as private as Android's own. Needs notification access. */
     val lockNotifications: Boolean = false,
     /** The apps whose notifications that lock screen may show; none until you pick them. */

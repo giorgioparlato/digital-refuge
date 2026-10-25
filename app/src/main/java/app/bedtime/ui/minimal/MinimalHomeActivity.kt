@@ -1,5 +1,6 @@
 package app.bedtime.ui.minimal
 
+import app.bedtime.ui.components.StatusBarVisibility
 import app.bedtime.data.ContactSearch
 import app.bedtime.data.ContactHit
 import app.bedtime.ui.components.rememberTodayHours
@@ -263,6 +264,7 @@ private fun MinimalHomeScreen(
         unlocking = false
     }
     LaunchedEffect(light, unlocking, emergency) { onLightBackground(if (unlocking || emergency) !c.isDark else light) }
+    StatusBarVisibility(hidden = style.hideStatusBar)
 
     var installed by remember { mutableStateOf(emptyList<AppEntry>()) }
     // digital refuge itself among them, so your everyday home has a way into it; minimal mode leaves it to emergency.

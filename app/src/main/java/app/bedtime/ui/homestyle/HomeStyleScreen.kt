@@ -392,6 +392,9 @@ internal fun HomeStyleContent(
                     OptionRow(Icons.Default.DateRange, "Date") {
                         ObsidianToggle(style.showDate, { onChange(style.copy(showDate = it)) })
                     }
+                    OptionRow(Icons.Default.Notifications, "Android's status bar", description = "Off hides it here and on the lock screen; a swipe down from the top edge shows it") {
+                        ObsidianToggle(!style.hideStatusBar, { onChange(style.copy(hideStatusBar = !it)) })
+                    }
                     OptionRow(BedtimeIcons.Grid, "App icons", description = "Small icons next to app names") {
                         ObsidianToggle(style.showIcons, { onChange(style.copy(showIcons = it)) })
                     }

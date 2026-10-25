@@ -1,5 +1,6 @@
 package app.bedtime.ui.lock
 
+import app.bedtime.ui.components.StatusBarVisibility
 import app.bedtime.ui.components.rememberTodayHours
 import app.bedtime.data.HourlyUse
 import app.bedtime.ui.components.HourDots
@@ -327,6 +328,7 @@ private fun LockScreen(
         if (state != null && loadedSettings != null && occurrence == null && !always) onFinish()
     }
     LaunchedEffect(light) { onLightBackground(light) }
+    StatusBarVisibility(hidden = style.hideStatusBar)
     var now by remember { mutableStateOf(LocalDateTime.now()) }
     LaunchedEffect(Unit) {
         while (true) {
