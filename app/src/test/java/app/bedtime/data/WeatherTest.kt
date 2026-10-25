@@ -46,7 +46,20 @@ class WeatherTest {
 
     @Test
     fun weatherIsOffUntilSwitchedOn() {
-        assertFalse(AppJson.decodeFromString(HomeStyle.serializer(), """{"showQuote":true}""").showWeather)
+        val style = AppJson.decodeFromString(HomeStyle.serializer(), """{"showQuote":true}""")
+        assertFalse(style.showWeather)
+        assertEquals(WeatherStyle.TODAY, style.weatherStyle)
+        assertEquals(TempUnit.AUTO, style.weatherUnit)
+        // A saved "now" still loads.
+        assertEquals(WeatherStyle.NOW, AppJson.decodeFromString(HomeStyle.serializer(), """{"weatherStyle":"NOW"}""").weatherStyle)
+    }
+
+    @Test
+    fun theUnitYouChoose() {
+        assertTrue(Weather.fahrenheit(TempUnit.AUTO, Locale.US))
+        assertFalse(Weather.fahrenheit(TempUnit.CELSIUS, Locale.US))
+        assertTrue(Weather.fahrenheit(TempUnit.FAHRENHEIT, Locale("sv", "SE")))
+        assertFalse(Weather.fahrenheit(TempUnit.AUTO, Locale("sv", "SE")))
     }
 
     @Test
@@ -56,14 +69,20 @@ class WeatherTest {
             "forecasts":[{"conditionCode":802,"minTemp":280.2,"maxTemp":289.1},{"conditionCode":800,"minTemp":279.5,"maxTemp":290.8},{"conditionCode":600}]}"""
         val w = Weather.parse(json, 0L)!!
         assertEquals(500, w.code)
-        assertEquals(2, w.days.size)
+        // Up to four coming days are kept; this one sends three.
+        assertEquals(3, w.days.size)
         val now = w.at + 1
-        assertEquals(WeatherView("12° · light rain", WeatherIcon.RAIN), Weather.view(w, now, false, WeatherStyle.NOW))
-        assertEquals("12° · light rain · 8°–14°", Weather.view(w, now, false, WeatherStyle.TODAY)!!.text)
+        assertEquals(WeatherView(WeatherIcon.RAIN, "12°", range = "8°–14°"), Weather.view(w, now, false, WeatherStyle.TODAY))
+        // "Now" is no longer offered; saved, it shows as today.
+        assertEquals(Weather.view(w, now, false, WeatherStyle.TODAY), Weather.view(w, now, false, WeatherStyle.NOW))
         assertEquals(
-            listOf(WeatherDayView(0, WeatherIcon.RAIN, 14, 8), WeatherDayView(1, WeatherIcon.PARTLY, 16, 7), WeatherDayView(2, WeatherIcon.CLEAR, 18, 6)),
+            listOf(WeatherDayView(1, WeatherIcon.PARTLY, 16, 7), WeatherDayView(2, WeatherIcon.CLEAR, 18, 6)),
             Weather.view(w, now, false, WeatherStyle.DAYS)!!.days,
         )
+        assertNull(Weather.view(w, w.at + Weather.FRESH_MS + 1, false, WeatherStyle.TODAY))
+        // Five days: today, then the forecasts sent (here three).
+        assertEquals(listOf(0, 1, 2, 3), Weather.view(w, now, false, WeatherStyle.WEEK)!!.week.map { it.offset })
+        assertEquals(WeatherDayView(0, WeatherIcon.RAIN, 14, 8), Weather.view(w, now, false, WeatherStyle.WEEK)!!.week.first())
     }
 
     @Test
@@ -77,5 +96,11 @@ class WeatherTest {
         assertEquals(WeatherIcon.PARTLY, Weather.icon(802))
         assertEquals(WeatherIcon.CLOUDY, Weather.icon(804))
         assertNull(Weather.icon(null))
+        // Without a code, the sky's own words.
+        assertEquals(WeatherIcon.RAIN, Weather.icon(null, "Light rain"))
+        assertEquals(WeatherIcon.PARTLY, Weather.icon(null, "Partly cloudy"))
+        assertEquals(WeatherIcon.CLOUDY, Weather.icon(null, "Overcast"))
+        assertEquals(WeatherIcon.CLEAR, Weather.icon(null, "Sunny"))
+        assertNull(Weather.icon(null, "Windy"))
     }
 }

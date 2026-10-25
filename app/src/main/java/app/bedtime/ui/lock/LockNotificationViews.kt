@@ -48,7 +48,6 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.positionChange
 import kotlinx.coroutines.delay
 import kotlin.math.abs
 import androidx.compose.ui.platform.LocalContext
@@ -158,6 +157,7 @@ private fun SummaryLine(summary: String, p: HomePalette, onOpen: () -> Unit) {
             .clip(RoundedCornerShape(14.dp))
             .background(p.text.copy(alpha = 0.06f))
             .clickable(onClickLabel = "show the notifications", onClick = onOpen)
+            .pullDown(enabled = true, onPull = onOpen)
             .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -198,32 +198,8 @@ private fun NotificationRow(
             Modifier
                 .fillMaxWidth()
                 .clickable(onClickLabel = "unlock and open") { handlers.open(note.key) }
-                // Drag down to read it in place, as in Android's own shade. Claimed before the list's own
-                // scrolling sees it; a drag up, or any drag on an open one, is left to scroll.
-                .pointerInput(expanded) {
-                    if (expanded) return@pointerInput
-                    awaitEachGesture {
-                        val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-                        var travel = Offset.Zero
-                        while (true) {
-                            val change = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.id == down.id } ?: break
-                            if (!change.pressed) break
-                            travel += change.positionChange()
-                            val slop = viewConfiguration.touchSlop
-                            if (travel.y > slop && travel.y > abs(travel.x)) {
-                                change.consume()
-                                onExpand(true)
-                                // The rest of this drag is spent.
-                                do {
-                                    val rest = awaitPointerEvent(PointerEventPass.Initial)
-                                    rest.changes.forEach { it.consume() }
-                                } while (rest.changes.any { it.pressed })
-                                break
-                            }
-                            if (abs(travel.x) > slop || travel.y < -slop) break
-                        }
-                    }
-                }
+                // Drag down to read it in place, as in Android's own shade.
+                .pullDown(enabled = !expanded) { onExpand(true) }
                 .padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.Top,
         ) {
@@ -334,3 +310,34 @@ private fun NoteChip(text: String, p: HomePalette, enabled: Boolean = true, onCl
             .padding(horizontal = 12.dp, vertical = 7.dp),
     )
 }
+
+/**
+ * Runs [onPull] when a finger drags down over this, as pulling Android's shade does. It reads the
+ * finger itself, before the scrolling list around it can take the drag, so it works wherever the
+ * list is. A drag up or sideways is left alone: to scroll, or to swipe a notification away.
+ */
+private fun Modifier.pullDown(enabled: Boolean, onPull: () -> Unit): Modifier =
+    if (!enabled) this else pointerInput(onPull) {
+        awaitEachGesture {
+            val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+            var travel = Offset.Zero
+            while (true) {
+                val change = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.id == down.id } ?: break
+                if (!change.pressed) break
+                // Movement as the finger made it, even if something else has claimed it already.
+                travel += change.position - change.previousPosition
+                val slop = viewConfiguration.touchSlop
+                if (travel.y > slop && travel.y > abs(travel.x)) {
+                    change.consume()
+                    onPull()
+                    // The rest of this drag is spent.
+                    do {
+                        val rest = awaitPointerEvent(PointerEventPass.Initial)
+                        rest.changes.forEach { it.consume() }
+                    } while (rest.changes.any { it.pressed })
+                    break
+                }
+                if (abs(travel.x) > slop || travel.y < -slop) break
+            }
+        }
+    }

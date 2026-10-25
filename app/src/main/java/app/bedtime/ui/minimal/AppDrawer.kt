@@ -319,9 +319,9 @@ private fun ResultRow(result: DrawerResult, query: String, style: HomeStyle, p: 
         Spacer(Modifier.width(14.dp))
         // App names are lowercased like the rest; what you typed keeps its case.
         if (result is DrawerResult.App || result == DrawerResult.OpenNotes) {
-            Text(label, fontSize = (26 * names).sp, color = p.text, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(label, fontSize = (26 * names).sp, lineHeight = (32 * names).sp, color = p.text, maxLines = 2, overflow = TextOverflow.Ellipsis)
         } else {
-            VerbatimText(label, color = p.text, fontSize = (19 * names).sp)
+            VerbatimText(label, color = p.text, fontSize = (26 * names).sp, lineHeight = (32 * names).sp)
         }
     }
 }

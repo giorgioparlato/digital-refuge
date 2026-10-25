@@ -1,5 +1,6 @@
 package app.bedtime.ui.minimal
 
+import app.bedtime.data.Weather
 import app.bedtime.data.WeatherView
 import app.bedtime.ui.notes.NotesScreen
 import app.bedtime.data.SearchTargets
@@ -146,6 +147,7 @@ private fun MinimalHomeScreen(onFinish: () -> Unit, onLightBackground: (Boolean)
     var quoteOffset by rememberSaveable { mutableIntStateOf(0) }
     var week by remember { mutableStateOf<List<CalendarDay>?>(null) }
     var drawer by rememberSaveable { mutableStateOf(false) }
+    val breezy = remember { Weather.APPS.firstOrNull { AppCatalog.isLaunchable(context, it) } }
     var query by rememberSaveable { mutableStateOf("") }
     var notesOpen by rememberSaveable { mutableStateOf(false) }
     val searchTargets by produceState(emptyList<SearchTarget>()) { value = withContext(Dispatchers.IO) { SearchTargets.find(context) } }
@@ -328,6 +330,7 @@ private fun MinimalHomeScreen(onFinish: () -> Unit, onLightBackground: (Boolean)
             onCalendar = { scope.launch { week = loadCalendarWeek(context, LocalDateTime.now()) } },
             onOpenDrawer = { drawer = true },
             weather = rememberWeather(style, now),
+            onWeather = breezy?.let { app -> { AppCatalog.launch(context, app) } },
             onNextQuote = { quoteOffset++ },
         )
     }
@@ -358,8 +361,10 @@ internal fun MinimalHomeContent(
     calendar: String? = null,
     /** Opens the week ahead, from a tap on the calendar line. */
     onCalendar: (() -> Unit)? = null,
-    /** The weather after the date, when it's on. */
+    /** The weather beside the clock, when it's on. */
     weather: WeatherView? = null,
+    /** Opens the weather app, from a tap on the weather. */
+    onWeather: (() -> Unit)? = null,
     /** Opens every available app with search, from a swipe up or the handle at the foot. */
     onOpenDrawer: () -> Unit = {},
     quote: Quote? = null,
@@ -409,7 +414,7 @@ internal fun MinimalHomeContent(
                 .padding(horizontal = 28.dp, vertical = 24.dp),
         ) {
             Spacer(Modifier.height(if (preview) 12.dp else 32.dp))
-            SessionHeader(now, scheduleName, until, style, calendar, onCalendar, weather)
+            SessionHeader(now, scheduleName, until, style, calendar, onCalendar, weather, onWeather)
             if (quote != null && style.showQuote) {
                 Spacer(Modifier.height(if (preview) 20.dp else 28.dp))
                 // A tap moves on, as it always has; a long press offers to keep it or never see it again.

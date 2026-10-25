@@ -1,5 +1,6 @@
 package app.bedtime.ui.homestyle
 
+import app.bedtime.data.TempUnit
 import app.bedtime.data.WeatherView
 import app.bedtime.data.WeatherStyle
 import app.bedtime.data.Weather
@@ -211,7 +212,7 @@ fun HomeStyleScreen(onBack: () -> Unit, onQuotes: () -> Unit = {}) {
         weatherHeardAt = weather?.at,
         // The preview shows the real weather if there is some, otherwise an example.
         weatherPreview = current.homeStyle.takeIf { it.showWeather }?.let { style ->
-            Weather.view(weather ?: Weather.SAMPLE, (weather?.at ?: Weather.SAMPLE.at) + 1, Weather.usesFahrenheit(), style.weatherStyle)
+            Weather.view(weather ?: Weather.SAMPLE, (weather?.at ?: Weather.SAMPLE.at) + 1, Weather.fahrenheit(style.weatherUnit), style.weatherStyle)
         },
         now = LocalDateTime.now(),
         onBack = onBack,
@@ -390,10 +391,17 @@ internal fun HomeStyleContent(
                 ) { ObsidianToggle(style.showWeather, { onChange(style.copy(showWeather = it)) }) }
                 if (style.showWeather) {
                     SizeLabel("Show", Modifier.padding(top = 12.dp, bottom = 8.dp))
+                    val styles = listOf(WeatherStyle.TODAY, WeatherStyle.DAYS, WeatherStyle.WEEK)
                     SegmentedChoice(
-                        options = listOf("Now", "With today", "Three days"),
-                        selected = style.weatherStyle.ordinal,
-                        onSelect = { onChange(style.copy(weatherStyle = WeatherStyle.entries[it])) },
+                        options = listOf("Today", "3 days", "5 days"),
+                        selected = styles.indexOf(style.weatherStyle).coerceAtLeast(0),
+                        onSelect = { onChange(style.copy(weatherStyle = styles[it])) },
+                    )
+                    SizeLabel("In", Modifier.padding(top = 12.dp, bottom = 8.dp))
+                    SegmentedChoice(
+                        options = listOf("Automatic", "°C", "°F"),
+                        selected = style.weatherUnit.ordinal,
+                        onSelect = { onChange(style.copy(weatherUnit = TempUnit.entries[it])) },
                     )
                     Text(
                         "Install Breezy Weather (it's on F-Droid). In its settings, under widgets, open “Send Gadgetbridge data” and tick digital refuge. It sends the weather each time it updates.",

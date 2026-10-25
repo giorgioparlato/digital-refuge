@@ -572,7 +572,7 @@ class ScreenshotTest {
     fun lockScreenWeather() = shot {
         app.bedtime.ui.lock.LockScreenContent(
             now = Samples.lateEvening, scheduleName = "Bedtime", until = "07:00", style = HomeStyle(), quote = Samples.shortQuote,
-            weather = app.bedtime.data.Weather.view(app.bedtime.data.Weather.SAMPLE, 2L, false, app.bedtime.data.WeatherStyle.NOW),
+            weather = app.bedtime.data.Weather.view(app.bedtime.data.Weather.SAMPLE, 2L, false, app.bedtime.data.WeatherStyle.WEEK),
             calendar = "next · dentist at 9:00 am",
         )
     }
@@ -660,6 +660,25 @@ class ScreenshotTest {
         app.bedtime.ui.notes.NotesContent(
             notes = listOf(app.bedtime.data.Note("a", "# Films to see\n- [ ] Perfect Days\n- [x] **Paterson**, again\n\nsomething *quiet* for sunday", 0L, 0L)),
             onSave = { _, _ -> }, onDelete = {}, onBack = {}, initialOpen = "a",
+        )
+    }
+
+    @Test
+    fun weatherIcons() = shot {
+        Screen {
+            androidx.compose.foundation.layout.Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(18.dp)) {
+                app.bedtime.data.WeatherIcon.entries.forEach {
+                    androidx.compose.material3.Icon(app.bedtime.ui.components.WeatherIcons.of(it), contentDescription = null, tint = Obsidian.colors.accent, modifier = Modifier.size(32.dp))
+                }
+            }
+        }
+    }
+
+    @Test
+    fun lockScreenWeatherToday() = shot {
+        app.bedtime.ui.lock.LockScreenContent(
+            now = Samples.lateEvening, scheduleName = "Bedtime", until = "07:00", style = HomeStyle(), quote = Samples.shortQuote,
+            weather = app.bedtime.data.Weather.view(app.bedtime.data.Weather.SAMPLE, 2L, false, app.bedtime.data.WeatherStyle.TODAY),
         )
     }
 

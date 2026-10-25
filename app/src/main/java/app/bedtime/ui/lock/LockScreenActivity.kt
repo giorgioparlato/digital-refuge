@@ -1,5 +1,6 @@
 package app.bedtime.ui.lock
 
+import app.bedtime.data.Weather
 import app.bedtime.data.WeatherView
 import app.bedtime.ui.minimal.rememberWeather
 import app.bedtime.service.BlockingState
@@ -305,6 +306,7 @@ private fun LockScreen(
     val notifications by LockNotifications.current.collectAsStateWithLifecycle()
     val quiet by repo.lockQuiet.collectAsStateWithLifecycle(initialValue = emptyMap())
     val scope = rememberCoroutineScope()
+    val breezy = remember { Weather.APPS.firstOrNull { AppCatalog.isLaunchable(context, it) } }
     // The list folds back to its summary line whenever the screen goes off.
     var listOpen by remember { mutableStateOf(false) }
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { listOpen = false }
@@ -340,6 +342,7 @@ private fun LockScreen(
         quote = Quotes.forPeriod(now, style.quoteRefresh, prefs = settings.quotes),
         calendar = rememberCalendarLine(style, now, onLockScreen = true),
         weather = rememberWeather(style, now),
+        onWeather = breezy?.let { app -> { onOpenApp(app) } },
         notifications = if (style.lockNotifications) {
             val nowMs = System.currentTimeMillis()
             notifications.filter { it.packageName in style.lockNotificationApps && !LockNotifications.isQuiet(it, quiet, nowMs) }
@@ -376,6 +379,8 @@ internal fun LockScreenContent(
     quote: Quote? = null,
     calendar: String? = null,
     weather: WeatherView? = null,
+    /** Opens the weather app after the usual unlock. */
+    onWeather: (() -> Unit)? = null,
     preview: Boolean = false,
     notifications: List<LockNotification> = emptyList(),
     listOpen: Boolean = false,
@@ -427,7 +432,7 @@ internal fun LockScreenContent(
                 .padding(horizontal = 28.dp, vertical = 24.dp),
         ) {
             Spacer(Modifier.height(if (preview) 12.dp else 32.dp))
-            SessionHeader(now, scheduleName, until, style, calendar, weather = weather)
+            SessionHeader(now, scheduleName, until, style, calendar, weather = weather, onWeather = onWeather)
             if (notifications.isNotEmpty()) {
                 Spacer(Modifier.height(28.dp))
                 NotificationArea(
@@ -450,12 +455,16 @@ internal fun LockScreenContent(
                 QuoteBlock(quote, style)
                 Spacer(Modifier.height(40.dp))
             }
-            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(BedtimeIcons.Refuge, contentDescription = null, tint = p.accent, modifier = Modifier.size(28.dp))
-                Spacer(Modifier.height(10.dp))
-                Text("tap to open", style = MaterialTheme.typography.labelLarge, color = p.faint)
+            // While a reply is being written, the keyboard has the foot of the screen: the mark stays out
+            // of the way instead of riding up above it and taking the room the reply needs.
+            if (replying == null) {
+                Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(BedtimeIcons.Refuge, contentDescription = null, tint = p.accent, modifier = Modifier.size(28.dp))
+                    Spacer(Modifier.height(10.dp))
+                    Text("tap to open", style = MaterialTheme.typography.labelLarge, color = p.faint)
+                }
+                Spacer(Modifier.height(12.dp))
             }
-            Spacer(Modifier.height(12.dp))
         }
     }
 }

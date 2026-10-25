@@ -190,7 +190,9 @@ data class HomeStyle(
     /** The weather after the date, as Breezy Weather sends it. */
     val showWeather: Boolean = false,
     /** How much of it: now, today's range too, or three days with their skies. */
-    val weatherStyle: WeatherStyle = WeatherStyle.NOW,
+    val weatherStyle: WeatherStyle = WeatherStyle.TODAY,
+    /** Celsius, Fahrenheit, or the usual one where the phone is set. */
+    val weatherUnit: TempUnit = TempUnit.AUTO,
     /** The clock, date and app names. */
     val font: AppFont = AppFont.INTER,
     /** The quote, chosen apart from the rest: Inter as it always was, or a serif in italics. */

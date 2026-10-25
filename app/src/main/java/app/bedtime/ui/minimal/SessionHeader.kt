@@ -1,5 +1,8 @@
 package app.bedtime.ui.minimal
 
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import app.bedtime.ui.components.WeatherIcons
@@ -49,8 +52,10 @@ internal fun SessionHeader(
     calendar: String? = null,
     /** Opens the week ahead from the calendar line; null where a tap means something else (the lock screen). */
     onCalendar: (() -> Unit)? = null,
-    /** "12° · light rain" after the date, with its sky, and the next days if chosen. */
+    /** The sky and temperature beside the clock, and its words, today's range or the next days under them. */
     weather: WeatherView? = null,
+    /** Opens the weather app, from a tap on the weather. */
+    onWeather: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val p = style.palette()
@@ -59,57 +64,38 @@ internal fun SessionHeader(
         if (style.showGreeting) {
             Text(greeting(now.hour), style = MaterialTheme.typography.titleMedium, color = p.accent)
         }
-        Text(
-            styledTime(timeFormatter(context).format(now), suffixSize = (30 * clock).sp),
-            style = MaterialTheme.typography.displayLarge.copy(
-                fontSize = (76 * clock).sp,
-                lineHeight = (84 * clock).sp,
-                fontFeatureSettings = "tnum",
-            ),
-            color = p.text,
-            maxLines = 1,
-        )
-        if (style.showDate || weather != null) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                styledTime(timeFormatter(context).format(now), suffixSize = (30 * clock).sp),
+                style = MaterialTheme.typography.displayLarge.copy(
+                    fontSize = (76 * clock).sp,
+                    lineHeight = (84 * clock).sp,
+                    fontFeatureSettings = "tnum",
+                ),
+                color = p.text,
+                maxLines = 1,
+            )
+            if (weather != null) {
+                Spacer(Modifier.weight(1f))
+                WeatherBeside(weather, style, onWeather)
+            }
+        }
+        val detail = weather != null && (weather.condition != null || weather.range != null || weather.days.isNotEmpty())
+        if (style.showDate || detail) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                if (style.showDate) {
-                    Text(
-                        DateTimeFormatter.ofPattern("EEEE, d MMMM", Locale.getDefault()).format(now) + if (weather != null) " · " else "",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Normal,
-                        color = p.muted,
-                    )
-                }
-                if (weather != null) {
-                    weather.icon?.let { Icon(WeatherIcons.of(it), contentDescription = null, tint = p.muted, modifier = Modifier.padding(end = 6.dp).size(18.dp)) }
-                    Text(weather.text, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Normal, color = p.muted)
-                }
+                Text(
+                    if (style.showDate) DateTimeFormatter.ofPattern("EEEE, d MMMM", Locale.getDefault()).format(now) else "",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Normal,
+                    color = p.muted,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                if (weather != null && detail) WeatherDetail(weather, style, onWeather)
             }
         }
-        if (weather != null && weather.days.isNotEmpty()) {
-            Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(22.dp)) {
-                weather.days.forEach { day ->
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            when (day.offset) {
-                                0 -> "Today"
-                                1 -> "Tomorrow"
-                                else -> DateTimeFormatter.ofPattern("EEE", Locale.getDefault()).format(now.plusDays(day.offset.toLong()))
-                            },
-                            style = MaterialTheme.typography.labelMedium,
-                            color = p.faint,
-                        )
-                        Box(Modifier.padding(vertical = 4.dp).size(24.dp), contentAlignment = Alignment.Center) {
-                            day.icon?.let { Icon(WeatherIcons.of(it), contentDescription = null, tint = p.muted, modifier = Modifier.size(24.dp)) }
-                        }
-                        Text(
-                            listOfNotNull(day.high?.let { "$it°" }, day.low?.let { "$it°" }).joinToString(" · "),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = p.muted,
-                        )
-                    }
-                }
-            }
-        }
+        if (weather != null && weather.week.isNotEmpty()) WeatherWeek(weather, style, now, onWeather)
         if (calendar != null) {
             Text(
                 calendar,
@@ -156,6 +142,80 @@ internal fun QuoteBlock(quote: Quote, style: HomeStyle, modifier: Modifier = Mod
         quote.credit()?.let { credit ->
             Spacer(Modifier.height(8.dp))
             Text("— $credit", style = MaterialTheme.typography.labelMedium, color = p.faint)
+        }
+    }
+}
+
+/** The sky and temperature beside the clock, no taller than it; a tap opens the weather app. */
+@Composable
+private fun WeatherBeside(weather: WeatherView, style: HomeStyle, onWeather: (() -> Unit)?) {
+    val p = style.palette()
+    val clock = style.clockSize.scale
+    Column(
+        Modifier
+            .padding(start = 10.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .then(if (onWeather != null) Modifier.clickable(onClickLabel = "open the weather", onClick = onWeather) else Modifier)
+            .padding(horizontal = 4.dp, vertical = 2.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        weather.icon?.let { Icon(WeatherIcons.of(it), contentDescription = null, tint = p.text, modifier = Modifier.size((32 * clock).coerceAtLeast(20f).dp)) }
+        Text(weather.temperature, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Normal, color = p.text, maxLines = 1)
+    }
+}
+
+/**
+ * The rest of the weather, at the end of the date line: the sky's words, today's range, or the next
+ * two days as small skies with their highs.
+ */
+@Composable
+private fun WeatherDetail(weather: WeatherView, style: HomeStyle, onWeather: (() -> Unit)?) {
+    val p = style.palette()
+    Row(
+        Modifier
+            .padding(start = 12.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .then(if (onWeather != null) Modifier.clickable(onClickLabel = "open the weather", onClick = onWeather) else Modifier)
+            .padding(horizontal = 4.dp, vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        (weather.condition ?: weather.range)?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = p.faint, maxLines = 1) }
+        weather.days.forEach { day ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                day.icon?.let { Icon(WeatherIcons.of(it), contentDescription = null, tint = p.muted, modifier = Modifier.padding(end = 3.dp).size(16.dp)) }
+                Text(day.high?.let { "$it°" }.orEmpty(), style = MaterialTheme.typography.bodyMedium, color = p.faint)
+            }
+        }
+    }
+}
+
+/** Five days on a line of their own under the date: each day's name, its sky, and its high over its low. */
+@Composable
+private fun WeatherWeek(weather: WeatherView, style: HomeStyle, now: LocalDateTime, onWeather: (() -> Unit)?) {
+    val p = style.palette()
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(top = 10.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .then(if (onWeather != null) Modifier.clickable(onClickLabel = "open the weather", onClick = onWeather) else Modifier)
+            .padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        weather.week.forEach { day ->
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    if (day.offset == 0) "Today" else DateTimeFormatter.ofPattern("EEE", Locale.getDefault()).format(now.plusDays(day.offset.toLong())),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = p.faint,
+                )
+                Box(Modifier.padding(vertical = 5.dp).size(22.dp), contentAlignment = Alignment.Center) {
+                    day.icon?.let { Icon(WeatherIcons.of(it), contentDescription = null, tint = p.text, modifier = Modifier.size(22.dp)) }
+                }
+                Text(day.high?.let { "$it°" }.orEmpty(), style = MaterialTheme.typography.labelLarge, color = p.text)
+                Text(day.low?.let { "$it°" }.orEmpty(), style = MaterialTheme.typography.labelMedium, color = p.faint)
+            }
         }
     }
 }

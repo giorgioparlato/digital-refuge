@@ -19,5 +19,5 @@ fun rememberWeather(style: HomeStyle, now: LocalDateTime): WeatherView? {
     val repo = remember { Repository.get(context.applicationContext) }
     val weather by repo.weather.collectAsStateWithLifecycle(initialValue = null)
     if (!style.showWeather) return null
-    return Weather.view(weather, now.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(), Weather.usesFahrenheit(), style.weatherStyle)
+    return Weather.view(weather, now.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(), Weather.fahrenheit(style.weatherUnit), style.weatherStyle)
 }
