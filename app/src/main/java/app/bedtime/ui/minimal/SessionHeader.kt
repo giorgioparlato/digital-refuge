@@ -1,5 +1,6 @@
 package app.bedtime.ui.minimal
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -36,7 +37,17 @@ import java.util.Locale
 
 /** Greeting, clock, date and the session pill: the top of the minimal home and the lock screen. */
 @Composable
-internal fun SessionHeader(now: LocalDateTime, scheduleName: String, until: String, style: HomeStyle, calendar: String? = null) {
+internal fun SessionHeader(
+    now: LocalDateTime,
+    scheduleName: String,
+    until: String,
+    style: HomeStyle,
+    calendar: String? = null,
+    /** Opens the week ahead from the calendar line; null where a tap means something else (the lock screen). */
+    onCalendar: (() -> Unit)? = null,
+    /** "12° · light rain", after the date. */
+    weather: String? = null,
+) {
     val context = LocalContext.current
     val p = style.palette()
     val clock = style.clockSize.scale
@@ -54,16 +65,24 @@ internal fun SessionHeader(now: LocalDateTime, scheduleName: String, until: Stri
             color = p.text,
             maxLines = 1,
         )
-        if (style.showDate) {
+        if (style.showDate || weather != null) {
             Text(
-                DateTimeFormatter.ofPattern("EEEE, d MMMM", Locale.getDefault()).format(now),
+                listOfNotNull(DateTimeFormatter.ofPattern("EEEE, d MMMM", Locale.getDefault()).format(now).takeIf { style.showDate }, weather)
+                    .joinToString(" · "),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Normal,
                 color = p.muted,
             )
         }
         if (calendar != null) {
-            Text(calendar, style = MaterialTheme.typography.bodyMedium, color = p.muted, modifier = Modifier.padding(top = 4.dp))
+            Text(
+                calendar,
+                style = MaterialTheme.typography.bodyMedium,
+                color = p.muted,
+                modifier = Modifier
+                    .padding(top = 4.dp)
+                    .then(if (onCalendar != null) Modifier.clip(RoundedCornerShape(6.dp)).clickable(onClickLabel = "see the week ahead", onClick = onCalendar) else Modifier),
+            )
         }
         Spacer(Modifier.height(16.dp))
         Row(

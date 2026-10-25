@@ -70,6 +70,7 @@ class ModelsCompatTest {
         assertEquals(AppFont.INTER, style.quoteFont)
         assertEquals(false, style.lockNotifications)
         assertEquals(emptySet<String>(), style.lockNotificationApps)
+        assertEquals(DEFAULT_QUICK_REPLIES, style.quickReplies)
     }
 
     @Test

@@ -185,6 +185,10 @@ data class HomeStyle(
     val lockNotifications: Boolean = false,
     /** The apps whose notifications that lock screen may show; none until you pick them. */
     val lockNotificationApps: Set<String> = emptySet(),
+    /** Ready-made replies to a message from the lock screen; typing your own works too. */
+    val quickReplies: List<String> = DEFAULT_QUICK_REPLIES,
+    /** The weather after the date, as Breezy Weather sends it. */
+    val showWeather: Boolean = false,
     /** The clock, date and app names. */
     val font: AppFont = AppFont.INTER,
     /** The quote, chosen apart from the rest: Inter as it always was, or a serif in italics. */
@@ -241,6 +245,10 @@ data class AppSettings(
     val customMessages: List<CustomMessage> = emptyList(),
     /** Your own quotes, favourites, hidden ones, and which of them rotate. */
     val quotes: QuotePrefs = QuotePrefs(),
+    /** Files quick notes can be added to, besides the app's own notes; at most [Notes.MAX_TARGETS]. */
+    val noteTargets: List<NoteTarget> = emptyList(),
+    /** Which calendar the search adds events to; null for the first one that can take them. */
+    val eventCalendarId: Long? = null,
 )
 
 /** Which quotes rotate: the app's and yours, only yours, or only favourites. */
@@ -374,3 +382,10 @@ data class SessionLog(
     /** Every moment this session was escaped, of whichever kind. */
     val escapeTimes: List<Long> get() = unlockTimes + pausedAt + breakTimes
 }
+
+/** The quick replies to start with, all of them editable. */
+val DEFAULT_QUICK_REPLIES = listOf(
+    "i'm offline until morning, i'll write then",
+    "all fine, talk tomorrow",
+    "can't talk now",
+)

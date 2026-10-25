@@ -1,5 +1,6 @@
 package app.bedtime.ui.settings
 
+import androidx.compose.material.icons.filled.Edit
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
@@ -100,6 +101,7 @@ fun SettingsScreen(
     onAlwaysAvailable: () -> Unit,
     onHowItWorks: () -> Unit,
     onWalkthrough: () -> Unit = {},
+    onQuickNotes: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val repo = remember { Repository.get(context) }
@@ -176,6 +178,7 @@ fun SettingsScreen(
         onBack = onBack,
         onSetup = onSetup,
         onHomeStyle = onHomeStyle,
+        onQuickNotes = onQuickNotes,
         onTileBlock = { id -> scope.launch { repo.updateSettings { it.copy(tileBlockId = id) } } },
         groupCount = settings.groups.size,
         onGroups = onGroups,
@@ -211,6 +214,7 @@ internal fun SettingsContent(
     onImport: () -> Unit = {},
     onHowItWorks: () -> Unit = {},
     onWalkthrough: () -> Unit = {},
+    onQuickNotes: () -> Unit = {},
 ) {
     val c = Obsidian.colors
     var otherOpen by rememberSaveable { mutableStateOf(false) }
@@ -258,6 +262,12 @@ internal fun SettingsContent(
                         else -> "$alwaysAvailableCount apps, never blocked, whichever session is on"
                     },
                     onClick = onAlwaysAvailable,
+                )
+                SettingsRow(
+                    Icons.Default.Edit,
+                    "Notes & quick notes",
+                    "Your notes, and where the search sends notes and events",
+                    onClick = onQuickNotes,
                     last = true,
                 )
 

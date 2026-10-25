@@ -50,4 +50,51 @@ class LockNotificationsTest {
         assertFalse(LockNotifications.worthShowing("com.chat", "app.bedtime", clearable = true, groupSummary = true, importance = default))
         assertFalse(LockNotifications.worthShowing("com.chat", "app.bedtime", true, false, NotificationManager.IMPORTANCE_MIN))
     }
+
+    private fun note(key: String, app: String = "Messages", who: String? = null, count: Int = 1, missedCall: Boolean = false, conversation: String? = null) =
+        LockNotification(key, "pkg.$app", app, null, null, 0L, NoteDetail.FULL, who = who, count = count, missedCall = missedCall, conversation = conversation)
+
+    @Test
+    fun summaryReadsCalmly() {
+        assertEquals("", LockNotifications.summary(emptyList()))
+        assertEquals(
+            "a missed call · 3 from anna · 1 from mail",
+            LockNotifications.summary(listOf(note("a", who = "anna", count = 3), note("m", app = "mail"), note("c", app = "Phone", missedCall = true))),
+        )
+        assertEquals("2 missed calls", LockNotifications.summary(listOf(note("c1", missedCall = true), note("c2", missedCall = true))))
+        // Two notifications from the same person add up.
+        assertEquals("3 from anna", LockNotifications.summary(listOf(note("a1", who = "anna", count = 2), note("a2", who = "anna"))))
+        assertEquals(
+            "3 from anna · 2 from bo · 1 from cy · and more",
+            LockNotifications.summary(listOf(note("a", who = "anna", count = 3), note("b", who = "bo", count = 2), note("c", who = "cy"), note("d", who = "di"))),
+        )
+    }
+
+    @Test
+    fun repliesAlwaysAskForTheUnlockButtonsOnlyWhenTheirAppSays() {
+        assertTrue(LockNotifications.needsUnlock(authenticationRequired = false, isReply = true))
+        assertTrue(LockNotifications.needsUnlock(authenticationRequired = true, isReply = false))
+        assertFalse(LockNotifications.needsUnlock(authenticationRequired = false, isReply = false))
+    }
+
+    @Test
+    fun quietCoversTheConversationOrTheApp() {
+        val chat = note("a", app = "Signal", conversation = "anna")
+        val mail = note("m", app = "Mail")
+        assertEquals("pkg.Signal/anna", LockNotifications.quietKey(chat))
+        assertEquals("pkg.Mail", LockNotifications.quietKey(mail))
+        val quiet = mapOf("pkg.Signal/anna" to 2_000L, "pkg.Mail" to 500L)
+        assertTrue(LockNotifications.isQuiet(chat, quiet, now = 1_000L))
+        assertFalse(LockNotifications.isQuiet(note("b", app = "Signal", conversation = "bo"), quiet, now = 1_000L))
+        // Over once the session has ended.
+        assertFalse(LockNotifications.isQuiet(mail, quiet, now = 1_000L))
+        // Quieting a whole app covers its conversations too.
+        assertTrue(LockNotifications.isQuiet(chat, mapOf("pkg.Signal" to 2_000L), now = 1_000L))
+    }
+
+    @Test
+    fun laterLastsUntilTheSessionEndsAndAtLeastAMinute() {
+        assertEquals(3_600_000L, LockNotifications.snoozeFor(now = 0L, until = 3_600_000L))
+        assertEquals(60_000L, LockNotifications.snoozeFor(now = 10_000L, until = 20_000L))
+    }
 }

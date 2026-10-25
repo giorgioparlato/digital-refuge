@@ -3,7 +3,7 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <!--
-      Which other apps this one can see. Naming the four lookups it actually makes is enough, so it
+      Which other apps this one can see. Naming the lookups it actually makes is enough, so it
       does not ask for QUERY_ALL_PACKAGES — a permission that, next to an accessibility service and
       an overlay, makes a blocker look like the malware it is shaped like.
     -->
@@ -27,6 +27,22 @@
             <action android:name="android.intent.action.DELETE" />
             <data android:scheme="package" />
         </intent>
+        <!-- The minimal home's search: web search, a browser for Wikipedia, maps, and dictionaries. -->
+        <intent>
+            <action android:name="android.intent.action.WEB_SEARCH" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="geo" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.PROCESS_TEXT" />
+            <data android:mimeType="text/plain" />
+        </intent>
     </queries>
 
     <!-- Do Not Disturb and hidden notifications; granted by the user in "Do Not Disturb access". -->
@@ -37,6 +53,8 @@
       calendar already on the phone; with no internet permission, nothing it reads can leave.
     -->
     <uses-permission android:name="android.permission.READ_CALENDAR" />
+    <!-- Events typed into the minimal home's search, saved straight into the calendar; asked the first time. -->
+    <uses-permission android:name="android.permission.WRITE_CALENDAR" />
 
     <!-- The status-bar lotus while a session runs; asked for in Setup (Android 13+). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
@@ -100,6 +118,7 @@
             android:launchMode="singleTask"
             android:screenOrientation="portrait"
             android:taskAffinity="app.bedtime.lock"
+            android:windowSoftInputMode="adjustResize"
             tools:ignore="DiscouragedApi,LockedOrientationActivity" />
 
         <activity
@@ -173,6 +192,19 @@
                 <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
         </service>
+
+        <!--
+          The weather from Breezy Weather, which sends it to the apps you tick under "Send Gadgetbridge
+          data". Only read for the line after the date; the app itself never goes online.
+        -->
+        <receiver
+            android:name=".service.WeatherReceiver"
+            android:exported="true"
+            tools:ignore="ExportedReceiver">
+            <intent-filter>
+                <action android:name="nodomain.freeyourgadget.gadgetbridge.ACTION_GENERIC_WEATHER" />
+            </intent-filter>
+        </receiver>
 
         <service
             android:name=".service.FocusTileService"

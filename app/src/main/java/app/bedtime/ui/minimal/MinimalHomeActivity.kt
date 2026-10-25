@@ -1,5 +1,27 @@
 package app.bedtime.ui.minimal
 
+import app.bedtime.ui.notes.NotesScreen
+import app.bedtime.data.SearchTargets
+import app.bedtime.data.SearchTarget
+import app.bedtime.data.ParsedEvent
+import app.bedtime.data.Notes
+import app.bedtime.data.EventParser
+import androidx.compose.ui.unit.Velocity
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.runtime.produceState
+import androidx.compose.material3.IconButton
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.compose.rememberLauncherForActivityResult
+import android.widget.Toast
+import android.net.Uri
+import android.Manifest
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.combinedClickable
@@ -121,6 +143,26 @@ private fun MinimalHomeScreen(onFinish: () -> Unit, onLightBackground: (Boolean)
     var unlocking by rememberSaveable { mutableStateOf(false) }
     var emergency by rememberSaveable { mutableStateOf(false) }
     var quoteOffset by rememberSaveable { mutableIntStateOf(0) }
+    var week by remember { mutableStateOf<List<CalendarDay>?>(null) }
+    var drawer by rememberSaveable { mutableStateOf(false) }
+    var query by rememberSaveable { mutableStateOf("") }
+    var notesOpen by rememberSaveable { mutableStateOf(false) }
+    val searchTargets by produceState(emptyList<SearchTarget>()) { value = withContext(Dispatchers.IO) { SearchTargets.find(context) } }
+    // An event waiting for calendar access, saved once it's given.
+    var pendingEvent by remember { mutableStateOf<ParsedEvent?>(null) }
+    val saveEvent: (ParsedEvent) -> Unit = { event ->
+        scope.launch {
+            val saved = withContext(Dispatchers.IO) { CalendarSource.insert(context, event, settings.eventCalendarId) }
+            Toast.makeText(context, if (saved) "added to your calendar" else "couldn't add it to a calendar", Toast.LENGTH_SHORT).show()
+            if (saved) query = ""
+        }
+    }
+    val askCalendar = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
+        val event = pendingEvent
+        pendingEvent = null
+        if (event != null && granted.values.all { it }) saveEvent(event)
+        else Toast.makeText(context, "calendar access wasn't allowed", Toast.LENGTH_SHORT).show()
+    }
     val quoteActions = rememberQuoteActions()
     val style = settings.homeStyle
     val light = style.palette().isLight
@@ -150,7 +192,81 @@ private fun MinimalHomeScreen(onFinish: () -> Unit, onLightBackground: (Boolean)
         return
     }
     val shownQuote = Quotes.forPeriod(now, style.quoteRefresh, quoteOffset, settings.quotes)
+    // What the drawer and its search can open: the session's apps and the always-available ones.
+    val openable = (apps + alwaysAvailableApps).distinctBy { it.packageName }
+    val closeDrawer = {
+        drawer = false
+        query = ""
+    }
+    val onResult: (DrawerResult) -> Unit = { result ->
+        val words = query.trim()
+        when (result) {
+            is DrawerResult.App -> {
+                AppCatalog.launch(context, result.app.packageName)
+                closeDrawer()
+            }
+            is DrawerResult.Search -> {
+                runCatching { context.startActivity(SearchTargets.intent(result.target, words)) }
+                    .onFailure { Toast.makeText(context, "couldn't open that", Toast.LENGTH_SHORT).show() }
+                closeDrawer()
+            }
+            is DrawerResult.AddNote -> {
+                val target = result.target
+                scope.launch {
+                    if (target == null) {
+                        repo.addNote(words)
+                        Toast.makeText(context, "saved in refuge notes", Toast.LENGTH_SHORT).show()
+                    } else {
+                        val added = withContext(Dispatchers.IO) { Notes.append(context, Uri.parse(target.uri), Notes.line(words, LocalDateTime.now())) }
+                        // Never lost: if the file can't be reached, it waits in the app's notes.
+                        if (!added) repo.addNote(words)
+                        Toast.makeText(
+                            context,
+                            if (added) "added to ${target.name.lowercase()}" else "couldn't reach ${target.name.lowercase()}, so it's in refuge notes",
+                            Toast.LENGTH_SHORT,
+                        ).show()
+                    }
+                    query = ""
+                }
+            }
+            is DrawerResult.AddEvent -> if (CalendarSource.hasPermission(context) && CalendarSource.canWrite(context)) {
+                saveEvent(result.event)
+            } else {
+                pendingEvent = result.event
+                askCalendar.launch(arrayOf(Manifest.permission.READ_CALENDAR, Manifest.permission.WRITE_CALENDAR))
+            }
+            DrawerResult.OpenNotes -> {
+                notesOpen = true
+                closeDrawer()
+            }
+        }
+    }
     when {
+        notesOpen -> {
+            BackHandler { notesOpen = false }
+            NotesScreen(onBack = { notesOpen = false })
+        }
+        drawer -> {
+            BackHandler { closeDrawer() }
+            AppDrawerContent(
+                apps = openable,
+                style = style,
+                query = query,
+                onQuery = { query = it },
+                results = AppDrawer.results(
+                    query,
+                    openable,
+                    SearchTargets.offered(searchTargets, openable.map { it.packageName }.toSet()),
+                    settings.noteTargets,
+                    EventParser.parse(query, LocalDateTime.now()),
+                ),
+                onLaunch = { pkg ->
+                    AppCatalog.launch(context, pkg)
+                    closeDrawer()
+                },
+                onResult = onResult,
+            )
+        }
         emergency -> {
             BackHandler { emergency = false }
             EmergencyContent(
@@ -200,9 +316,13 @@ private fun MinimalHomeScreen(onFinish: () -> Unit, onLightBackground: (Boolean)
             onQuoteFavourite = { quoteActions.favourite(shownQuote) },
             onQuoteHide = { quoteActions.hide(shownQuote) },
             calendar = rememberCalendarLine(style, now, onLockScreen = false),
+            onCalendar = { scope.launch { week = loadCalendarWeek(context, LocalDateTime.now()) } },
+            onOpenDrawer = { drawer = true },
+            weather = rememberWeatherLine(style, now),
             onNextQuote = { quoteOffset++ },
         )
     }
+    week?.let { CalendarWeekDialog(it, style, onDismiss = { week = null }) }
 }
 
 /** Launchable apps among [packages], with labels, sorted by name. */
@@ -227,6 +347,12 @@ internal fun MinimalHomeContent(
     onUndo: (() -> Unit)? = null,
     /** Today's next event, when the calendar line is on. */
     calendar: String? = null,
+    /** Opens the week ahead, from a tap on the calendar line. */
+    onCalendar: (() -> Unit)? = null,
+    /** The weather after the date, when it's on. */
+    weather: String? = null,
+    /** Opens every available app with search, from a swipe up or the handle at the foot. */
+    onOpenDrawer: () -> Unit = {},
     quote: Quote? = null,
     /** Whether [quote] is one of your favourites, and the long-press menu's two choices for it. */
     quoteFavourite: Boolean = false,
@@ -238,16 +364,43 @@ internal fun MinimalHomeContent(
     val p = style.palette()
     val scale = style.textSize.scale
     val names = scale * style.appNameSize.scale
+    val pull = with(LocalDensity.current) { 72.dp.toPx() }
+    // Pulling on past the end of the app list opens the drawer, as a swipe up does anywhere else.
+    val overscroll = remember(onOpenDrawer) {
+        object : NestedScrollConnection {
+            var travel = 0f
+
+            override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+                if (source == NestedScrollSource.UserInput && available.y < 0) {
+                    travel -= available.y
+                    if (travel > pull) {
+                        travel = 0f
+                        onOpenDrawer()
+                    }
+                }
+                return Offset.Zero
+            }
+
+            override suspend fun onPreFling(available: Velocity): Velocity {
+                travel = 0f
+                return Velocity.Zero
+            }
+        }
+    }
     WithFontFamily(AppFonts.family(LocalContext.current, style.font)) {
         Column(
             Modifier
                 .fillMaxSize()
                 .background(p.background)
+                .pointerInput(onOpenDrawer) {
+                    var travel = 0f
+                    detectVerticalDragGestures(onDragStart = { travel = 0f }, onDragEnd = { if (travel < -pull) onOpenDrawer() }) { _, amount -> travel += amount }
+                }
                 .then(if (preview) Modifier else Modifier.safeDrawingPadding())
                 .padding(horizontal = 28.dp, vertical = 24.dp),
         ) {
             Spacer(Modifier.height(if (preview) 12.dp else 32.dp))
-            SessionHeader(now, scheduleName, until, style, calendar)
+            SessionHeader(now, scheduleName, until, style, calendar, onCalendar, weather)
             if (quote != null && style.showQuote) {
                 Spacer(Modifier.height(if (preview) 20.dp else 28.dp))
                 // A tap moves on, as it always has; a long press offers to keep it or never see it again.
@@ -274,7 +427,7 @@ internal fun MinimalHomeContent(
                 }
             }
             Spacer(Modifier.height(if (preview) 28.dp else 44.dp))
-            LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
+            LazyColumn(Modifier.weight(1f).fillMaxWidth().nestedScroll(overscroll)) {
                 items(apps, key = { it.packageName }) { app ->
                     Row(
                         Modifier
@@ -304,6 +457,10 @@ internal fun MinimalHomeContent(
                         Spacer(Modifier.width(8.dp))
                         Text("unlock", color = p.faint)
                     }
+                }
+                Spacer(Modifier.weight(1f))
+                IconButton(onClick = onOpenDrawer) {
+                    Icon(Icons.Default.KeyboardArrowUp, contentDescription = "all apps and search", tint = p.faint)
                 }
                 Spacer(Modifier.weight(1f))
                 TextButton(onClick = onEmergency) {

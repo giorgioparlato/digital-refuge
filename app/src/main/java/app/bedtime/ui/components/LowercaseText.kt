@@ -123,6 +123,19 @@ fun VerbatimText(
     )
 }
 
+/** Styled text whose case matters, like your own notes. Shown exactly as written. */
+@Composable
+fun VerbatimText(
+    text: AnnotatedString,
+    modifier: Modifier = Modifier,
+    color: Color = Color.Unspecified,
+    maxLines: Int = Int.MAX_VALUE,
+    overflow: TextOverflow = TextOverflow.Clip,
+    style: TextStyle = LocalTextStyle.current,
+) {
+    MaterialText(text = text, modifier = modifier, color = color, maxLines = maxLines, overflow = overflow, style = style)
+}
+
 /** Lowercases while keeping styled ranges, unless lowercasing changes the length (rare Unicode cases). */
 fun AnnotatedString.lowercased(): AnnotatedString {
     val lower = text.lowercase()

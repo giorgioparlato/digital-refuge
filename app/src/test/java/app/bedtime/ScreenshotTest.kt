@@ -533,25 +533,135 @@ class ScreenshotTest {
         app.bedtime.ui.lock.LockScreenContent(now = Samples.lateEvening, scheduleName = "Bedtime", until = "07:00", style = HomeStyle(), quote = Samples.mediumQuote)
     }
 
+    private fun sampleNotes(): List<app.bedtime.data.LockNotification> {
+        val at = Samples.lateEvening.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+        val full = app.bedtime.data.NoteDetail.FULL
+        fun note(i: Int, label: String, title: String?, text: String?, detail: app.bedtime.data.NoteDetail = full) =
+            app.bedtime.data.LockNotification("k$i", "com.example.$i", label, title, text, at - i * 7 * 60_000L, detail)
+        return listOf(
+            note(0, "Signal", "Anna", "call me tomorrow?").copy(
+                who = "Anna",
+                count = 3,
+                messages = listOf(
+                    app.bedtime.data.NoteLine("Anna", "are you up?"),
+                    app.bedtime.data.NoteLine("Anna", "no worries if not"),
+                    app.bedtime.data.NoteLine("Anna", "call me tomorrow?"),
+                ),
+                actions = listOf(
+                    app.bedtime.data.NoteAction("Reply", 0, isReply = true, needsUnlock = true),
+                    app.bedtime.data.NoteAction("Mark as read", 1, isReply = false, needsUnlock = false),
+                ),
+            ),
+            note(1, "Phone", "Missed call", "Mum").copy(missedCall = true),
+            note(2, "Messages", null, null, app.bedtime.data.NoteDetail.APP_ONLY),
+            note(3, "Mail", "Your order has shipped", "It's on its way").copy(body = "It's on its way, and should reach you on Tuesday."),
+            note(4, "Calendar", "Dentist", "Tomorrow 09:00"),
+            note(5, "Mail", null, null, app.bedtime.data.NoteDetail.APP_ONLY),
+        )
+    }
+
     @Test
     fun lockScreenNotifications() = shot {
-        val at = Samples.lateEvening.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
-        fun note(i: Int, label: String, title: String?, text: String?, detail: app.bedtime.data.NoteDetail) =
-            app.bedtime.data.LockNotification("k$i", "com.example.$i", label, title, text, at - i * 7 * 60_000L, detail)
         app.bedtime.ui.lock.LockScreenContent(
-            now = Samples.lateEvening,
-            scheduleName = "Bedtime",
-            until = "07:00",
-            style = HomeStyle(),
-            quote = Samples.shortQuote,
-            notifications = listOf(
-                note(0, "Phone", "Missed call", "Mum", app.bedtime.data.NoteDetail.FULL),
-                note(1, "Messages", null, null, app.bedtime.data.NoteDetail.APP_ONLY),
-                note(2, "Clock", "Alarm set for 06:45", null, app.bedtime.data.NoteDetail.FULL),
-                note(3, "Signal", "2 new messages", null, app.bedtime.data.NoteDetail.APP_ONLY),
-                note(4, "Calendar", "Dentist", "Tomorrow 09:00", app.bedtime.data.NoteDetail.FULL),
-                note(5, "Mail", null, null, app.bedtime.data.NoteDetail.APP_ONLY),
+            now = Samples.lateEvening, scheduleName = "Bedtime", until = "07:00", style = HomeStyle(), quote = Samples.shortQuote,
+            notifications = sampleNotes(),
+        )
+    }
+
+    @Test
+    fun lockScreenWeather() = shot {
+        app.bedtime.ui.lock.LockScreenContent(
+            now = Samples.lateEvening, scheduleName = "Bedtime", until = "07:00", style = HomeStyle(), quote = Samples.shortQuote,
+            weather = "12° · light rain", calendar = "next · dentist at 9:00 am",
+        )
+    }
+
+    @Test
+    fun lockScreenNotificationsOpen() = shot {
+        app.bedtime.ui.lock.LockScreenContent(
+            now = Samples.lateEvening, scheduleName = "Bedtime", until = "07:00", style = HomeStyle(), quote = Samples.shortQuote,
+            notifications = sampleNotes(), listOpen = true, initialExpanded = "k0",
+        )
+    }
+
+    @Test
+    fun lockScreenReply() = shot {
+        app.bedtime.ui.lock.LockScreenContent(
+            now = Samples.lateEvening, scheduleName = "Bedtime", until = "07:00", style = HomeStyle(), quote = Samples.shortQuote,
+            notifications = sampleNotes(), listOpen = true, initialExpanded = "k0", initialReplying = "k0",
+            quickReplies = app.bedtime.data.DEFAULT_QUICK_REPLIES,
+        )
+    }
+
+    @Test
+    fun calendarWeek() = shot {
+        Screen {
+            val zone = java.time.ZoneId.systemDefault()
+            val today = java.time.LocalDate.of(2026, 10, 25)
+            fun at(days: Long, h: Int, m: Int = 0) = today.plusDays(days).atTime(h, m).atZone(zone).toInstant().toEpochMilli()
+            val utc = { days: Long -> today.plusDays(days).atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli() }
+            val ev = { t: String, b: Long, e: Long, all: Boolean -> app.bedtime.ui.minimal.CalendarEvent(t, b, e, all) }
+            val events = listOf(
+                ev("Dinner with Sam", at(0, 19), at(0, 21), false),
+                ev("Dentist", at(1, 9), at(1, 10), false),
+                ev("Yoga", at(1, 7, 30), at(1, 8, 30), false),
+                ev("Stockholm trip", utc(3), utc(5), true),
+                ev("Team call", at(3, 14), at(3, 15), false),
+            )
+            app.bedtime.ui.minimal.CalendarWeekContent(app.bedtime.ui.minimal.calendarWeek(events, today, zone), HomeStyle())
+        }
+    }
+
+    private val drawerApps = listOf("Signal", "Maps", "Calendar", "Camera", "Clock", "Phone", "Messages", "Bank", "Authenticator", "Notes", "Weather", "Wikipedia")
+        .map { app.bedtime.apps.AppEntry("pkg.$it", it) }
+
+    @Test
+    fun drawer() = shot {
+        app.bedtime.ui.minimal.AppDrawerContent(
+            apps = drawerApps, style = HomeStyle(), query = "", onQuery = {}, results = emptyList(), onLaunch = {}, onResult = {}, preview = true,
+        )
+    }
+
+    @Test
+    fun drawerSearch() = shot {
+        val query = "dentist friday 9"
+        val now = java.time.LocalDateTime.of(2026, 10, 25, 21, 0)
+        val targets = listOf(
+            app.bedtime.data.SearchTarget(app.bedtime.data.SearchTarget.Kind.WEB, "pkg.browser", "Browser"),
+            app.bedtime.data.SearchTarget(app.bedtime.data.SearchTarget.Kind.WIKIPEDIA, "pkg.wiki", "Wikipedia"),
+            app.bedtime.data.SearchTarget(app.bedtime.data.SearchTarget.Kind.LOOKUP, "pkg.dict", "Dictionary", "x"),
+        )
+        app.bedtime.ui.minimal.AppDrawerContent(
+            apps = drawerApps, style = HomeStyle(), query = query, onQuery = {},
+            results = app.bedtime.ui.minimal.AppDrawer.results(
+                query, drawerApps, targets,
+                listOf(app.bedtime.data.NoteTarget("scratchpad", "x"), app.bedtime.data.NoteTarget("movies list", "y")),
+                app.bedtime.data.EventParser.parse(query, now),
             ),
+            onLaunch = {}, onResult = {}, preview = true,
+        )
+    }
+
+    @Test
+    fun notes() = shot {
+        val at = 1_761_420_000_000L
+        app.bedtime.ui.notes.NotesContent(
+            notes = listOf(
+                app.bedtime.data.Note("a", "# Films to see\n- [ ] Perfect Days\n- [x] **Paterson**", at, at),
+                app.bedtime.data.Note("b", "Call the plumber about the *kitchen* tap", at - 86_400_000L, at - 86_400_000L),
+            ),
+            onSave = { _, _ -> }, onDelete = {}, onBack = {},
+        )
+    }
+
+    @Test
+    fun quickNotes() = shot {
+        app.bedtime.ui.notes.NoteTargetsContent(
+            targets = listOf(app.bedtime.data.NoteTarget("scratchpad", "x"), app.bedtime.data.NoteTarget("movies list", "y")),
+            calendars = listOf(1L to "Personal", 2L to "Work"),
+            calendarId = null,
+            calendarAccess = true,
+            onAdd = {}, onRemove = {}, onCalendar = {}, onAllowCalendar = {}, onOpenNotes = {}, onBack = {},
         )
     }
 

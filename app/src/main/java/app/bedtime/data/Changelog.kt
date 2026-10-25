@@ -13,6 +13,16 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            46,
+            "0.9.0",
+            listOf(
+                "On the lock screen, notifications start as one calm line. Drag one down to read it, reply, mark it as read, keep it for later or quiet it until morning; replies unlock, send and lock again.",
+                "Swipe up on the minimal home for all your apps, A–Z, and a search that also looks things up, saves quick notes (to the app or your own files, like Obsidian) and adds events to your calendar.",
+                "Tap the calendar line for the week ahead.",
+                "Weather after the date, sent by Breezy Weather; this app still never goes online.",
+            ),
+        ),
+        ChangelogEntry(
             45,
             "0.8.8.1",
             listOf(

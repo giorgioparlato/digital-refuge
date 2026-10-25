@@ -10,9 +10,15 @@ import kotlinx.coroutines.flow.StateFlow
 /** How much of a notification the lock screen may show, as Android's own lock screen would. */
 enum class NoteDetail { HIDE, APP_ONLY, FULL }
 
+/** One line of a conversation, read in place: who wrote it (when the app says) and what. */
+data class NoteLine(val sender: String?, val text: String)
+
+/** One of the notification's own buttons. [index] is its place in the notification's actions. */
+data class NoteAction(val title: String, val index: Int, val isReply: Boolean, val needsUnlock: Boolean)
+
 /**
  * A notification as the session lock screen shows it. With [NoteDetail.APP_ONLY], [title] and [text]
- * are the app's own public version, if it gave one.
+ * are the app's own public version, if it gave one, and nothing more is read.
  */
 data class LockNotification(
     val key: String,
@@ -24,6 +30,18 @@ data class LockNotification(
     val detail: NoteDetail,
     val contentIntent: PendingIntent? = null,
     val autoCancel: Boolean = false,
+    /** The whole text, when longer than [text]. */
+    val body: String? = null,
+    /** A conversation's last few lines, oldest first. */
+    val messages: List<NoteLine> = emptyList(),
+    val actions: List<NoteAction> = emptyList(),
+    /** The conversation it belongs to, if the app says, for quieting just that one. */
+    val conversation: String? = null,
+    /** Who it's from, for the summary: the conversation or its last writer. */
+    val who: String? = null,
+    /** How many messages it holds, for the summary. */
+    val count: Int = 1,
+    val missedCall: Boolean = false,
 )
 
 /**
@@ -41,6 +59,8 @@ object LockNotifications {
     interface Listener {
         fun refresh()
         fun cancel(key: String)
+        fun snooze(key: String, millis: Long)
+        fun action(key: String, index: Int): Notification.Action?
     }
 
     /** Swiped away, by key and post time: gone at once, and an update to the same one can still show. */
@@ -65,6 +85,48 @@ object LockNotifications {
     fun refresh() = listener?.refresh()
 
     fun cancel(key: String) = listener?.cancel(key)
+
+    /** Out of the way until [until] (the session's end), when Android hands it back. */
+    fun later(note: LockNotification, now: Long, until: Long) {
+        synchronized(dismissed) {
+            dismissed += note.key to note.postedAt
+            _current.value = _current.value.filterNot { it.key == note.key }
+        }
+        listener?.snooze(note.key, snoozeFor(now, until))
+    }
+
+    fun action(key: String, index: Int): Notification.Action? = listener?.action(key, index)
+
+    /** At least a minute, so a session about to end doesn't bounce it straight back. */
+    fun snoozeFor(now: Long, until: Long): Long = (until - now).coerceAtLeast(60_000L)
+
+    /** Replies always ask for the unlock; other buttons only when their app says so, as on Android's lock screen. */
+    fun needsUnlock(authenticationRequired: Boolean, isReply: Boolean): Boolean = authenticationRequired || isReply
+
+    /** What "quiet until morning" quiets: just the conversation if there is one, otherwise the whole app. */
+    fun quietKey(note: LockNotification): String = note.conversation?.let { "${note.packageName}/$it" } ?: note.packageName
+
+    /** Whether [note] is quieted by any entry in [quiet] still running at [now]. */
+    fun isQuiet(note: LockNotification, quiet: Map<String, Long>, now: Long): Boolean =
+        listOf(note.packageName, quietKey(note)).any { (quiet[it] ?: 0L) > now }
+
+    /**
+     * One calm line for the whole list: "a missed call · 3 from anna · 1 from mail". Missed calls first,
+     * then whoever wrote most. At most three parts.
+     */
+    fun summary(notes: List<LockNotification>): String {
+        if (notes.isEmpty()) return ""
+        val calls = notes.count { it.missedCall }
+        val parts = buildList {
+            if (calls > 0) add(if (calls == 1) "a missed call" else "$calls missed calls")
+            notes.filterNot { it.missedCall }
+                .groupBy { it.who ?: it.app }
+                .map { (who, group) -> who to group.sumOf { it.count } }
+                .sortedByDescending { it.second }
+                .forEach { (who, n) -> add("$n from $who") }
+        }
+        return parts.take(3).joinToString(" · ") + if (parts.size > 3) " · and more" else ""
+    }
 
     /** Worth a line at all: not ours, not ongoing (music, navigation), not a group's summary, not minimal. */
     fun worthShowing(packageName: String, ownPackage: String, clearable: Boolean, groupSummary: Boolean, importance: Int): Boolean =

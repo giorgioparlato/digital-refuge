@@ -1,5 +1,13 @@
 package app.bedtime.ui.lock
 
+import app.bedtime.ui.minimal.rememberWeatherLine
+import app.bedtime.service.BlockingState
+import app.bedtime.data.NoteAction
+import androidx.lifecycle.compose.LifecycleEventEffect
+import androidx.compose.runtime.rememberCoroutineScope
+import android.widget.Toast
+import android.app.RemoteInput
+import android.accessibilityservice.AccessibilityService
 import androidx.compose.runtime.key
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.material3.SwipeToDismissBoxValue
@@ -126,6 +134,7 @@ class LockScreenActivity : ComponentActivity() {
                         onOpen = ::openPhone,
                         onOpenApp = ::openApp,
                         onOpenNotification = ::openNotification,
+                        onAct = ::act,
                         onFinish = ::finish,
                         onLightBackground = ::useLightSystemBars,
                     )
@@ -195,6 +204,46 @@ class LockScreenActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * One of a notification's buttons, or a reply. Those that need it ask for the unlock first and lock
+     * the phone again straight after, so no app opens and the phone isn't left unlocked.
+     */
+    private fun act(note: LockNotification, action: NoteAction, reply: String?) {
+        val send = {
+            val sent = LockNotifications.action(note.key, action.index)?.let { a ->
+                val fill = Intent()
+                val inputs = a.remoteInputs
+                if (reply != null && inputs != null) {
+                    RemoteInput.addResultsToIntent(inputs, fill, Bundle().apply { inputs.forEach { putCharSequence(it.resultKey, reply) } })
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) RemoteInput.setResultsSource(fill, RemoteInput.SOURCE_FREE_FORM_INPUT)
+                }
+                runCatching { a.actionIntent.send(this, 0, fill, null, null, null, sendOptions()) }.isSuccess
+            } == true
+            Toast.makeText(this, if (!sent) "that didn't go through" else if (reply != null) "sent" else "done", Toast.LENGTH_SHORT).show()
+        }
+        if (action.needsUnlock) unlockActLock(send) else send()
+    }
+
+    /** Asks for the usual unlock, does [action], then locks the phone again; the lock screen returns with the screen. */
+    private fun unlockActLock(action: () -> Unit) {
+        val keyguard = getSystemService(KeyguardManager::class.java)
+        if (!keyguard.isKeyguardLocked) {
+            action()
+            return
+        }
+        keyguard.requestDismissKeyguard(
+            this,
+            object : KeyguardManager.KeyguardDismissCallback() {
+                override fun onDismissSucceeded() {
+                    action()
+                    val locked = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P &&
+                        BlockingState.service?.performGlobalAction(AccessibilityService.GLOBAL_ACTION_LOCK_SCREEN) == true
+                    if (!locked) finish()
+                }
+            },
+        )
+    }
+
     /** Lets a notification open its app from here, which Android 14 otherwise counts as starting from the background. */
     private fun sendOptions(): Bundle? =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
@@ -244,6 +293,7 @@ private fun LockScreen(
     onOpen: () -> Unit,
     onOpenApp: (String) -> Unit,
     onOpenNotification: (String) -> Unit,
+    onAct: (LockNotification, NoteAction, String?) -> Unit,
     onFinish: () -> Unit,
     onLightBackground: (Boolean) -> Unit,
 ) {
@@ -252,6 +302,11 @@ private fun LockScreen(
     val state by Engine.state(context).collectAsStateWithLifecycle()
     val settings by repo.settings.collectAsStateWithLifecycle(initialValue = AppSettings())
     val notifications by LockNotifications.current.collectAsStateWithLifecycle()
+    val quiet by repo.lockQuiet.collectAsStateWithLifecycle(initialValue = emptyMap())
+    val scope = rememberCoroutineScope()
+    // The list folds back to its summary line whenever the screen goes off.
+    var listOpen by remember { mutableStateOf(false) }
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) { listOpen = false }
     // With several sessions at once, show the one that lasts longest.
     val occurrence = state?.active?.maxByOrNull { it.end }
     val style = settings.homeStyle
@@ -283,9 +338,29 @@ private fun LockScreen(
         onSwipe = { swipe -> style.lockGestures[swipe]?.let(onOpenApp) ?: onOpen() },
         quote = Quotes.forPeriod(now, style.quoteRefresh, prefs = settings.quotes),
         calendar = rememberCalendarLine(style, now, onLockScreen = true),
-        notifications = if (style.lockNotifications) notifications.filter { it.packageName in style.lockNotificationApps } else emptyList(),
-        onOpenNotification = onOpenNotification,
-        onDismissNotification = LockNotifications::dismiss,
+        weather = rememberWeatherLine(style, now),
+        notifications = if (style.lockNotifications) {
+            val nowMs = System.currentTimeMillis()
+            notifications.filter { it.packageName in style.lockNotificationApps && !LockNotifications.isQuiet(it, quiet, nowMs) }
+        } else {
+            emptyList()
+        },
+        listOpen = listOpen,
+        onListOpen = { listOpen = it },
+        quickReplies = style.quickReplies,
+        handlers = NoteHandlers(
+            open = onOpenNotification,
+            dismiss = LockNotifications::dismiss,
+            later = { LockNotifications.later(it, System.currentTimeMillis(), occurrence.end) },
+            quiet = { note ->
+                val key = LockNotifications.quietKey(note)
+                scope.launch { repo.quiet(key, occurrence.end) }
+                // What's already here comes back when the session ends, like "later".
+                notifications.filter { LockNotifications.quietKey(it) == key }
+                    .forEach { LockNotifications.later(it, System.currentTimeMillis(), occurrence.end) }
+            },
+            act = onAct,
+        ),
     )
 }
 
@@ -299,11 +374,18 @@ internal fun LockScreenContent(
     onSwipe: (Swipe) -> Unit = {},
     quote: Quote? = null,
     calendar: String? = null,
+    weather: String? = null,
     preview: Boolean = false,
     notifications: List<LockNotification> = emptyList(),
-    onOpenNotification: (String) -> Unit = {},
-    onDismissNotification: (LockNotification) -> Unit = {},
+    listOpen: Boolean = false,
+    onListOpen: (Boolean) -> Unit = {},
+    quickReplies: List<String> = emptyList(),
+    handlers: NoteHandlers = NoteHandlers(),
+    initialExpanded: String? = null,
+    initialReplying: String? = null,
 ) {
+    var expanded by remember { mutableStateOf(initialExpanded) }
+    var replying by remember { mutableStateOf(initialReplying) }
     val p = style.palette()
     val minDistance = with(LocalDensity.current) { 64.dp.toPx() }
     WithFontFamily(AppFonts.family(LocalContext.current, style.font)) {
@@ -344,13 +426,26 @@ internal fun LockScreenContent(
                 .padding(horizontal = 28.dp, vertical = 24.dp),
         ) {
             Spacer(Modifier.height(if (preview) 12.dp else 32.dp))
-            SessionHeader(now, scheduleName, until, style, calendar)
+            SessionHeader(now, scheduleName, until, style, calendar, weather = weather)
             if (notifications.isNotEmpty()) {
                 Spacer(Modifier.height(28.dp))
-                NotificationList(notifications, style, onOpenNotification, onDismissNotification)
+                NotificationArea(
+                    notes = notifications,
+                    style = style,
+                    listOpen = listOpen,
+                    onListOpen = onListOpen,
+                    handlers = handlers,
+                    quickReplies = quickReplies,
+                    expanded = expanded,
+                    onExpand = { expanded = it },
+                    replying = replying,
+                    onReply = { replying = it },
+                    // Open, the list takes the free space and scrolls in it; the quote and "tap to open" stay at the foot.
+                    modifier = if (listOpen) Modifier.weight(1f) else Modifier,
+                )
             }
-            Spacer(Modifier.weight(1f))
-            if (quote != null && style.showQuote) {
+            if (notifications.isEmpty() || !listOpen) Spacer(Modifier.weight(1f)) else Spacer(Modifier.height(24.dp))
+            if (quote != null && style.showQuote && replying == null) {
                 QuoteBlock(quote, style)
                 Spacer(Modifier.height(40.dp))
             }
@@ -360,65 +455,6 @@ internal fun LockScreenContent(
                 Text("tap to open", style = MaterialTheme.typography.labelLarge, color = p.faint)
             }
             Spacer(Modifier.height(12.dp))
-        }
-    }
-}
-
-/** How many notifications the lock screen lists before "and N more". */
-private const val MAX_NOTIFICATIONS = 4
-
-/**
- * The newest notifications, quietly: app, time, and as much as Android's own lock screen would show.
- * Swiped aside, one is cleared as in Android's own shade.
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun NotificationList(notes: List<LockNotification>, style: HomeStyle, onOpen: (String) -> Unit, onDismiss: (LockNotification) -> Unit) {
-    val p = style.palette()
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        notes.take(MAX_NOTIFICATIONS).forEach { note ->
-            key(note.key) {
-                val swipe = rememberSwipeToDismissBoxState(
-                    confirmValueChange = { value ->
-                        if (value != SwipeToDismissBoxValue.Settled) onDismiss(note)
-                        true
-                    },
-                )
-                SwipeToDismissBox(swipe, backgroundContent = {}) { NotificationRow(note, p, onOpen) }
-            }
-        }
-        if (notes.size > MAX_NOTIFICATIONS) {
-            Text(
-                "and ${notes.size - MAX_NOTIFICATIONS} more",
-                style = MaterialTheme.typography.labelMedium,
-                color = p.faint,
-                modifier = Modifier.padding(start = 14.dp, top = 2.dp),
-            )
-        }
-    }
-}
-
-@Composable
-private fun NotificationRow(note: LockNotification, p: HomePalette, onOpen: (String) -> Unit) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .background(p.text.copy(alpha = 0.06f))
-            .clickable(onClickLabel = "unlock and open") { onOpen(note.key) }
-            .padding(horizontal = 14.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.Top,
-    ) {
-        Box(Modifier.padding(top = 2.dp)) { AppIcon(note.packageName, note.app, 22.dp) }
-        Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(note.app, style = MaterialTheme.typography.labelMedium, color = p.faint, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                Text(formatTime(LocalContext.current, note.postedAt), style = MaterialTheme.typography.labelSmall, color = p.faint)
-            }
-            val title = note.title ?: if (note.detail == NoteDetail.APP_ONLY) "New notification" else null
-            title?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = p.text, maxLines = 1, overflow = TextOverflow.Ellipsis) }
-            note.text?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = p.muted, maxLines = 1, overflow = TextOverflow.Ellipsis) }
         }
     }
 }

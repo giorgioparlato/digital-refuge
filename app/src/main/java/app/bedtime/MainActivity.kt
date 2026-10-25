@@ -78,6 +78,8 @@ import app.bedtime.ui.stats.StatsScreen
 import app.bedtime.ui.onboarding.OnboardingScreen
 import app.bedtime.ui.onboarding.WalkthroughScreen
 import app.bedtime.ui.homestyle.HomeStyleScreen
+import app.bedtime.ui.notes.NoteTargetsScreen
+import app.bedtime.ui.notes.NotesScreen
 import app.bedtime.ui.quotes.QuotesScreen
 import app.bedtime.ui.schedules.SchedulesScreen
 import app.bedtime.ui.settings.SettingsScreen
@@ -108,6 +110,8 @@ object Routes {
     const val LIMIT = "limit/"
     const val STATS = "stats"
     const val QUOTES = "quotes"
+    const val NOTES = "notes"
+    const val QUICK_NOTES = "quicknotes"
 
     fun unlock(scheduleId: String) = UNLOCK + scheduleId
 }
@@ -233,6 +237,7 @@ private fun BedtimeNavigation(pendingRoute: String?, onRouteConsumed: () -> Unit
                         onAlwaysAvailable = { push(Routes.ALWAYS_AVAILABLE) },
                         onHowItWorks = { push(Routes.ONBOARDING) },
                         onWalkthrough = { push(Routes.WALKTHROUGH) },
+                        onQuickNotes = { push(Routes.QUICK_NOTES) },
                     )
                     else -> HomeScreen(
                         onEdit = { id -> push(Routes.EDIT + id) },
@@ -259,6 +264,8 @@ private fun BedtimeNavigation(pendingRoute: String?, onRouteConsumed: () -> Unit
             top == Routes.WALKTHROUGH -> WalkthroughScreen(onDone = ::pop)
             top == Routes.STATS -> StatsScreen(onBack = ::pop)
             top == Routes.QUOTES -> QuotesScreen(onBack = ::pop)
+            top == Routes.NOTES -> NotesScreen(onBack = ::pop)
+            top == Routes.QUICK_NOTES -> NoteTargetsScreen(onBack = ::pop, onOpenNotes = { push(Routes.NOTES) })
             top.startsWith(Routes.EDIT) -> ScheduleEditScreen(
                 scheduleId = top.removePrefix(Routes.EDIT).ifEmpty { null },
                 template = null,

@@ -14,6 +14,9 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.MapSerializer
+import kotlinx.serialization.builtins.nullable
+import kotlinx.serialization.builtins.serializer
 import java.util.UUID
 
 private val Context.store: DataStore<Preferences> by preferencesDataStore(name = "bedtime")
@@ -29,6 +32,26 @@ class Repository private constructor(context: Context) {
 
     /** Time in limited apps, a day per entry, newest last. Kept apart so counting never re-runs the engine. */
     val usage: Flow<List<UsageDay>> = observe(USAGE, usageSerializer, emptyList())
+
+    /** Your notes, newest first. Kept apart from the settings, which change far more often. */
+    val notes: Flow<List<Note>> = observe(NOTES, notesSerializer, emptyList())
+
+    suspend fun addNote(text: String, at: Long = System.currentTimeMillis()) =
+        update(NOTES, notesSerializer, emptyList()) { listOf(Note(text = text, createdAt = at)) + it }
+
+    suspend fun editNote(id: String, text: String) = update(NOTES, notesSerializer, emptyList()) { notes ->
+        notes.map { if (it.id == id) it.copy(text = text, editedAt = System.currentTimeMillis()) else it }
+    }
+
+    suspend fun deleteNote(id: String) = update(NOTES, notesSerializer, emptyList()) { notes -> notes.filterNot { it.id == id } }
+
+    /** The latest weather Breezy Weather sent, if any. */
+    val weather: Flow<WeatherNow?> = observe(WEATHER, WeatherNow.serializer().nullable, null)
+
+    suspend fun saveWeather(weather: WeatherNow) = update(WEATHER, WeatherNow.serializer().nullable, null) { weather }
+
+    /** Apps and conversations quieted on the lock screen, each until its session ends. */
+    val lockQuiet: Flow<Map<String, Long>> = observe(LOCK_QUIET, quietSerializer, emptyMap())
 
     suspend fun upsert(schedule: Schedule) = updateSchedules { list ->
         if (list.any { it.id == schedule.id }) list.map { if (it.id == schedule.id) schedule else it }
@@ -157,6 +180,12 @@ class Repository private constructor(context: Context) {
             (days.filterNot { it.day == day } + transform(today)).sortedBy { it.day }.takeLast(USAGE_DAYS)
         }
 
+    /** Quiets [key] on the lock screen until [until], dropping entries already over. */
+    suspend fun quiet(key: String, until: Long) = update(LOCK_QUIET, quietSerializer, emptyMap()) { quiet ->
+        val now = System.currentTimeMillis()
+        quiet.filterValues { it > now } + (key to until)
+    }
+
     /** Adds time spent in front, by package. */
     suspend fun addUsage(day: Long, seconds: Map<String, Long>) = updateUsage(day) { usage ->
         usage.copy(seconds = usage.seconds + seconds.map { (pkg, s) -> pkg to (usage.seconds[pkg] ?: 0L) + s })
@@ -221,14 +250,19 @@ class Repository private constructor(context: Context) {
         schedules = schedules.first(),
         settings = settings.first(),
         history = history.first(),
+        notes = notes.first(),
     )
 
-    /** Replaces schedules, settings and history with [backup]. Runtime state is left alone. */
+    /**
+     * Replaces schedules, settings and history with [backup], and the notes too when it has some (an
+     * older backup has none, and shouldn't wipe yours). Runtime state is left alone.
+     */
     suspend fun restore(backup: Backup) {
         store.edit { prefs ->
             prefs[SCHEDULES] = AppJson.encodeToString(schedulesSerializer, backup.schedules)
             prefs[SETTINGS] = AppJson.encodeToString(AppSettings.serializer(), backup.settings)
             prefs[HISTORY] = AppJson.encodeToString(historySerializer, backup.history)
+            if (backup.notes.isNotEmpty()) prefs[NOTES] = AppJson.encodeToString(notesSerializer, backup.notes)
         }
     }
 
@@ -250,6 +284,11 @@ class Repository private constructor(context: Context) {
         private val SETTINGS = stringPreferencesKey("settings")
         private val HISTORY = stringPreferencesKey("history")
         private val USAGE = stringPreferencesKey("usage")
+        private val LOCK_QUIET = stringPreferencesKey("lockQuiet")
+        private val NOTES = stringPreferencesKey("notes")
+        private val WEATHER = stringPreferencesKey("weather")
+        private val notesSerializer = ListSerializer(Note.serializer())
+        private val quietSerializer = MapSerializer(String.serializer(), Long.serializer())
         /** About three years of nightly sessions, or several months of a busy mix: still a small file. */
         private const val MAX_HISTORY = 1000
         /** Five weeks, enough for the week's figures and the strip of days on the limits tab. */

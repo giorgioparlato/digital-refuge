@@ -1,5 +1,7 @@
 package app.bedtime.ui.homestyle
 
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Edit
 import app.bedtime.ui.apps.PickerMode
 import app.bedtime.ui.apps.AppPickerScreen
 import app.bedtime.service.LockNotificationListener
@@ -109,6 +111,7 @@ fun HomeStyleScreen(onBack: () -> Unit, onQuotes: () -> Unit = {}) {
     val repo = remember { Repository.get(context) }
     val scope = rememberCoroutineScope()
     val settings: AppSettings? by repo.settings.collectAsStateWithLifecycle(initialValue = null)
+    val weather by repo.weather.collectAsStateWithLifecycle(initialValue = null)
     var allApps by remember { mutableStateOf(emptyList<AppEntry>()) }
     LaunchedEffect(Unit) {
         allApps = withContext(Dispatchers.IO) { AppCatalog.launchableApps(context).sortedBy { it.label.lowercase() } }
@@ -202,6 +205,7 @@ fun HomeStyleScreen(onBack: () -> Unit, onQuotes: () -> Unit = {}) {
         },
         notificationAccess = notificationAccess,
         onPickNotificationApps = { pickingNotificationApps = true },
+        weatherHeardAt = weather?.at,
         now = LocalDateTime.now(),
         onBack = onBack,
         quote = Quotes.forPeriod(LocalDateTime.now(), current.homeStyle.quoteRefresh, prefs = current.quotes),
@@ -234,10 +238,16 @@ internal fun HomeStyleContent(
     notificationAccess: Boolean = false,
     /** Opens the choice of apps whose notifications the lock screen shows. */
     onPickNotificationApps: () -> Unit = {},
+    /** When Breezy Weather last sent the weather, if ever. */
+    weatherHeardAt: Long? = null,
 ) {
     val context = LocalContext.current
     val c = Obsidian.colors
     var pickingSwipe by rememberSaveable { mutableStateOf<Swipe?>(null) }
+    var editingReplies by rememberSaveable { mutableStateOf(false) }
+    if (editingReplies) {
+        QuickRepliesDialog(style.quickReplies, onChange = { onChange(style.copy(quickReplies = it)) }, onDismiss = { editingReplies = false })
+    }
     pickingSwipe?.let { swipe ->
         SwipeTargetDialog(
             swipe = swipe,
@@ -358,6 +368,25 @@ internal fun HomeStyleContent(
                     ) { Chevron() }
                 }
             }
+            SectionCard(title = "Weather", subtitle = "From Breezy Weather, a free app that does the fetching; this one never goes online") {
+                OptionRow(
+                    Icons.Default.Info,
+                    "Weather after the date",
+                    description = when {
+                        !style.showWeather -> "Like “12° · light rain”, here and on the lock screen"
+                        weatherHeardAt == null -> "Nothing from Breezy Weather yet"
+                        else -> "Last heard ${formatRelativePast(System.currentTimeMillis() - weatherHeardAt)}. Hidden when over 3 hours old"
+                    },
+                ) { ObsidianToggle(style.showWeather, { onChange(style.copy(showWeather = it)) }) }
+                if (style.showWeather) {
+                    Text(
+                        "Install Breezy Weather (it's on F-Droid). In its settings, under widgets, open “Send Gadgetbridge data” and tick digital refuge. It sends the weather each time it updates.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = c.textFaint,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
+            }
             SectionCard(title = "Calendar") {
                 OptionRow(
                     Icons.Default.DateRange,
@@ -399,6 +428,12 @@ internal fun HomeStyleContent(
                                 else -> labels.take(2).joinToString(", ") + " and ${labels.size - 2} more"
                             },
                             onClick = onPickNotificationApps,
+                        ) { Chevron() }
+                        OptionRow(
+                            Icons.Default.Edit,
+                            "Quick replies",
+                            description = "${style.quickReplies.size} ready to send with a tap. Typing your own works too",
+                            onClick = { editingReplies = true },
                         ) { Chevron() }
                     }
                     SizeLabel("Swipes from the top of the lock screen", Modifier.padding(top = 12.dp, bottom = 4.dp))
@@ -531,4 +566,15 @@ private fun HexField(value: Long, onPick: (Long) -> Unit) {
         label = "Custom colour (#RRGGBB)",
         modifier = Modifier.padding(top = 12.dp),
     )
+}
+
+/** "just now", "12 min ago", "2 h ago": how long since the weather last came. */
+private fun formatRelativePast(millis: Long): String {
+    val minutes = millis / 60_000
+    return when {
+        minutes < 1 -> "just now"
+        minutes < 60 -> "$minutes min ago"
+        minutes < 48 * 60 -> "${minutes / 60} h ago"
+        else -> "${minutes / (24 * 60)} days ago"
+    }
 }

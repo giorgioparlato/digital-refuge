@@ -1,5 +1,9 @@
 package app.bedtime.service
 
+import java.util.concurrent.ConcurrentHashMap
+import app.bedtime.data.NoteLine
+import app.bedtime.data.NoteAction
+import androidx.core.app.NotificationCompat
 import android.app.Notification
 import android.content.ComponentName
 import android.content.Context
@@ -38,6 +42,15 @@ class LockNotificationListener : NotificationListenerService(), LockNotification
         runCatching { cancelNotification(key) }
     }
 
+    override fun snooze(key: String, millis: Long) {
+        runCatching { snoozeNotification(key, millis) }
+    }
+
+    override fun action(key: String, index: Int): Notification.Action? = held[key]?.actions?.getOrNull(index)
+
+    /** The notifications on show, by key, so their buttons and replies can be used from the lock screen. */
+    private val held = ConcurrentHashMap<String, Notification>()
+
     override fun refresh() {
         val active = runCatching { activeNotifications }.getOrNull() ?: return
         val ranking = currentRanking
@@ -54,21 +67,47 @@ class LockNotificationListener : NotificationListenerService(), LockNotification
             }
             val detail = LockNotifications.detail(n.visibility, rank.channel?.lockscreenVisibility ?: Ranking.VISIBILITY_NO_OVERRIDE, showOnLock, allowPrivate)
             if (detail == NoteDetail.HIDE) return@mapNotNull null
-            // Private ones show what the app chose to make public, if anything.
-            val shown = if (detail == NoteDetail.FULL) n else n.publicVersion
+            // Private ones show what the app chose to make public, if anything, and nothing more is read.
+            val full = detail == NoteDetail.FULL
+            val shown = if (full) n else n.publicVersion
+            val style = if (full) NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(n) else null
+            val lines = style?.messages.orEmpty()
+                .mapNotNull { m -> m.text?.toString()?.takeIf { it.isNotBlank() }?.let { NoteLine(m.person?.name?.toString(), it) } }
+            val title = shown?.extras?.getCharSequence(Notification.EXTRA_TITLE)?.toString()?.takeIf { it.isNotBlank() }
+            held[sbn.key] = n
             LockNotification(
                 key = sbn.key,
                 packageName = sbn.packageName,
                 app = appLabel(sbn.packageName),
-                title = shown?.extras?.getCharSequence(Notification.EXTRA_TITLE)?.toString()?.takeIf { it.isNotBlank() },
+                title = title,
                 text = shown?.extras?.getCharSequence(Notification.EXTRA_TEXT)?.toString()?.takeIf { it.isNotBlank() },
                 postedAt = sbn.postTime,
                 detail = detail,
                 contentIntent = n.contentIntent,
                 autoCancel = n.flags and Notification.FLAG_AUTO_CANCEL != 0,
+                body = if (full) n.extras?.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString()?.takeIf { it.isNotBlank() } else null,
+                messages = lines.takeLast(5),
+                actions = if (full) buttons(n) else emptyList(),
+                conversation = n.shortcutId,
+                who = if (full && style != null) style.conversationTitle?.toString() ?: lines.lastOrNull()?.sender ?: title else null,
+                count = lines.size.coerceAtLeast(1),
+                missedCall = n.category == CATEGORY_MISSED_CALL,
             )
         }
+        held.keys.retainAll(active.map { it.key }.toSet())
         LockNotifications.publish(list.sortedByDescending { it.postedAt })
+    }
+
+    /** The reply, if any, and up to three other buttons; contextual ones (Android's own suggestions) left out. */
+    private fun buttons(n: Notification): List<NoteAction> {
+        val all = n.actions.orEmpty().mapIndexedNotNull { i, a ->
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && a.isContextual) return@mapIndexedNotNull null
+            val title = a.title?.toString()?.takeIf { it.isNotBlank() } ?: return@mapIndexedNotNull null
+            val reply = a.remoteInputs?.any { it.allowFreeFormInput } == true
+            val auth = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && a.isAuthenticationRequired
+            NoteAction(title, i, reply, LockNotifications.needsUnlock(auth, reply))
+        }
+        return all.filter { it.isReply }.take(1) + all.filterNot { it.isReply }.take(3)
     }
 
     /** Android's own lock-screen settings: not public, so null when this phone won't say. */
@@ -79,6 +118,9 @@ class LockNotificationListener : NotificationListenerService(), LockNotification
         runCatching { packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString() }.getOrDefault(pkg)
 
     companion object {
+        /** `Notification.CATEGORY_MISSED_CALL`, only named from Android 12. */
+        private const val CATEGORY_MISSED_CALL = "missed_call"
+
         fun hasAccess(context: Context): Boolean =
             context.packageName in NotificationManagerCompat.getEnabledListenerPackages(context)
 
