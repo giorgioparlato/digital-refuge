@@ -81,18 +81,23 @@ fun HourDots(
     }
 }
 
-/** Today's seconds by hour, in distracting apps and in any, refreshed as they're counted. */
+/**
+ * Today's seconds by hour, in distracting apps and in any, kept current: Android's record with usage
+ * access, refuge's own count without it, so the dots never need the permission.
+ */
 @Composable
-fun rememberTodayHours(): DayHours = rememberDayHours(HourlyUse.today()) ?: DayHours()
+fun rememberTodayHours(): DayHours = rememberDayHours(HourlyUse.today(), live = true) ?: DayHours()
 
 /** [day]'s seconds by hour and by distracting app, or null if nothing was counted that day. */
 @Composable
-fun rememberDayHours(day: Long): DayHours? {
-    val context = LocalContext.current
-    val repo = remember { Repository.get(context.applicationContext) }
-    val usage by repo.usage.collectAsStateWithLifecycle(initialValue = emptyList())
-    return usage.lastOrNull { it.day == day }?.let { DayHours(it.hourly, it.hourlyAll, it.distractingSeconds) }
+fun rememberDayHours(day: Long, live: Boolean = false): DayHours? {
+    val use = rememberUseDays(2, live)
+    return use.days[day]?.hours(use.distractingApps)
 }
+
+/** Today's unlocks, when Android's record says. */
+@Composable
+fun rememberTodayUnlocks(): Int? = rememberUseDays(2, live = false).days[HourlyUse.today()]?.unlocks
 
 /**
  * What's behind the dots: today's time in distracting apps and on the phone at all, against yesterday;
@@ -105,8 +110,9 @@ fun HourDetailDialog(hours: DayHours, rule: HourRule, background: Color, text: C
     val nowHour = remember { java.time.LocalTime.now().hour }
     val report = HourlyUse.report(hours, yesterday, rule, nowHour)
     val labels = remember(report.topApps) { report.topApps.associate { (pkg, _) -> pkg to AppCatalog.label(context, pkg) } }
+    val unlocks = rememberTodayUnlocks()
     Dialog(onDismissRequest = onDismiss) {
-        HourDetailContent(report, hours, rule, labels, background, text, faint, accent)
+        HourDetailContent(report, hours, rule, labels, background, text, faint, accent, unlocks = unlocks)
     }
 }
 
@@ -120,14 +126,22 @@ fun HourDetailContent(
     text: Color,
     faint: Color,
     accent: Color,
+    /** Today's unlocks, when known; the title, or none where the page already says it's today. */
+    unlocks: Int? = null,
+    title: String? = "Today so far",
+    padding: androidx.compose.ui.unit.Dp = 24.dp,
 ) {
     val context = LocalContext.current
     fun time(seconds: Long) = formatMinutes(seconds / 60)
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(background).padding(24.dp)) {
-        Text("Today so far", style = MaterialTheme.typography.titleMedium, color = text)
-        Spacer(Modifier.height(14.dp))
+    // Without padding it sits inside a card of its own, so no corners of its own to cut the text.
+    Column(Modifier.fillMaxWidth().then(if (padding > 0.dp) Modifier.clip(RoundedCornerShape(24.dp)).background(background) else Modifier).padding(padding)) {
+        if (title != null) {
+            Text(title, style = MaterialTheme.typography.titleMedium, color = text)
+            Spacer(Modifier.height(14.dp))
+        }
         Figure("In your distracting apps", time(report.inApps), report.inAppsVsYesterday?.let { HourlyUse.versus(it, ::formatMinutes) }, text, faint, accent)
         Figure("On the phone at all", time(report.overall), report.overallVsYesterday?.let { HourlyUse.versus(it, ::formatMinutes) }, text, faint, accent)
+        if (unlocks != null) Figure("Unlocks", "$unlocks", null, text, faint, accent)
         Figure(
             "Distracted hours",
             "${report.distracted} of ${report.hoursSoFar}",

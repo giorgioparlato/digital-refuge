@@ -66,6 +66,11 @@
     <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
     <!-- Alarms and timers typed into the minimal screen's search ("alarm 7:30", "timer 10 min"), handed to your clock app. -->
     <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
+    <!--
+      Statistics: which app was in front and when, as Android records it (Digital Wellbeing reads the
+      same). Only once you grant usage access in Android's settings; the hour dots don't need it.
+    -->
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:ignore="ProtectedPermissions" />
     <!-- Contacts in the minimal screen's search, read only to match what you type; asked when you switch them on. -->
     <uses-permission android:name="android.permission.READ_CONTACTS" />
 

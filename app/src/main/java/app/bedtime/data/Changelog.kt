@@ -13,6 +13,15 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            57,
+            "0.9.11",
+            listOf(
+                "Statistics are now about your days on the phone: today, two weeks day by day, apps by time and opens, the hours you use it most, and this week against last. Time in refuge sits lower down.",
+                "With usage access (asked on the statistics page), every app, your unlocks and the days before refuge are counted, from Android's own record. It stays on the phone.",
+                "The hour dots still need nothing extra; with usage access they read the same record, so the numbers always agree.",
+            ),
+        ),
+        ChangelogEntry(
             56,
             "0.9.10",
             listOf(

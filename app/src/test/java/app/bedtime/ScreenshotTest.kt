@@ -363,6 +363,36 @@ class ScreenshotTest {
     }
 
     @Test
+    fun statsPhone() = shot(tall = true, height = 6400) {
+        val ui = Samples.home(hour = 21)
+        val today = java.time.Instant.ofEpochMilli(ui.now).atZone(ZoneId.systemDefault()).toLocalDate().toEpochDay()
+        val apps = listOf("com.instagram.android" to 2400L, "com.google.android.apps.maps" to 900L, "org.wikipedia" to 1500L, "com.spotify.music" to 600L)
+        val days = (0..13).associate { back ->
+            val d = today - back
+            val scale = 1 + (back % 4)
+            d to app.bedtime.data.UseDay(
+                d,
+                all = mapOf(8 to 600L * scale, 12 to 900L, 18 to 1200L * scale, 21 to 1500L),
+                distracting = mapOf(18 to 600L * scale, 21 to 900L),
+                apps = apps.associate { (p, s) -> p to s * scale / 2 },
+                opens = mapOf("com.instagram.android" to 12, "org.wikipedia" to 3),
+                unlocks = 40 + back,
+                complete = true,
+            )
+        }
+        app.bedtime.ui.stats.StatsContent(
+            history = Samples.fortnight(ui.now),
+            limits = Samples.limits,
+            usage = emptyList(),
+            now = ui.now,
+            zone = ZoneId.systemDefault(),
+            onBack = {},
+            use = app.bedtime.ui.components.UseDays(days, fromAndroid = true, distractingApps = setOf("com.instagram.android")),
+            labels = mapOf("com.instagram.android" to "Instagram", "com.google.android.apps.maps" to "Maps", "org.wikipedia" to "Wikipedia", "com.spotify.music" to "Spotify"),
+        )
+    }
+
+    @Test
     fun homeStats() = shot(tall = true) { Home(Samples.home().let { it.copy(history = Samples.fortnight(it.now)) }) }
 
     @Test

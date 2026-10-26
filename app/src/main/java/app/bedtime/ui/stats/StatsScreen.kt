@@ -46,6 +46,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.bedtime.ui.components.PageGutter
+import app.bedtime.ui.components.SectionLabel
+import app.bedtime.ui.components.UseDays
+import app.bedtime.ui.components.rememberUseDays
+import app.bedtime.apps.AppCatalog
+import app.bedtime.data.HourRule
+import app.bedtime.data.HourlyUse
+import app.bedtime.service.UsageReader
+import androidx.compose.runtime.produceState
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import app.bedtime.data.AppLimit
 import app.bedtime.data.Repository
 import app.bedtime.data.SessionLog
@@ -65,7 +75,10 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.ceil
 
-/** "Your refuge": how the week has gone, a fortnight of days, each schedule, and time in limited apps. */
+/**
+ * Your days: phone use first (today, day by day, apps, hours, this week against last), then time in
+ * refuge and in limited apps.
+ */
 @Composable
 fun StatsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
@@ -73,6 +86,11 @@ fun StatsScreen(onBack: () -> Unit) {
     val history by repo.history.collectAsStateWithLifecycle(initialValue = emptyList())
     val settings by repo.settings.collectAsStateWithLifecycle(initialValue = null)
     val usage by repo.usage.collectAsStateWithLifecycle(initialValue = emptyList())
+    val use = rememberUseDays(14, live = false)
+    val packages = use.days.values.flatMap { it.apps.keys }.toSet()
+    val labels by produceState(emptyMap<String, String>(), packages) {
+        value = withContext(Dispatchers.IO) { packages.associateWith { AppCatalog.label(context, it) } }
+    }
     StatsContent(
         history = history,
         limits = settings?.limits.orEmpty(),
@@ -80,6 +98,10 @@ fun StatsScreen(onBack: () -> Unit) {
         now = System.currentTimeMillis(),
         zone = ZoneId.systemDefault(),
         onBack = onBack,
+        use = use,
+        rule = settings?.let { HourlyUse.rule(it) } ?: HourRule(5),
+        labels = labels,
+        onAllowAccess = { runCatching { context.startActivity(UsageReader.accessIntent(context)) } },
     )
 }
 
@@ -102,6 +124,11 @@ internal fun StatsContent(
     now: Long,
     zone: ZoneId,
     onBack: () -> Unit,
+    /** Phone use, and what makes an hour a distracted one; no phone sections without it. */
+    use: UseDays? = null,
+    rule: HourRule = HourRule(5),
+    labels: Map<String, String> = emptyMap(),
+    onAllowAccess: (() -> Unit)? = null,
 ) {
     val c = Obsidian.colors
     val week = Stats.week(history, now)
@@ -110,14 +137,19 @@ internal fun StatsContent(
     val bars = Stats.daily(history, now, zone)
     val bySchedule = Stats.bySchedule(history, now)
     val today = java.time.Instant.ofEpochMilli(now).atZone(zone).toLocalDate().toEpochDay()
-    Scaffold(containerColor = c.bgPrimary, topBar = { ObsidianTopBar("Your refuge", onBack = onBack) }) { padding ->
+    Scaffold(containerColor = c.bgPrimary, topBar = { ObsidianTopBar("Your days", onBack = onBack) }) { padding ->
         Column(
             Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = PageGutter),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Spacer(Modifier.height(2.dp))
+            if (use != null) {
+                val nowHour = java.time.Instant.ofEpochMilli(now).atZone(zone).hour
+                PhoneUseSections(use, today, nowHour, rule, labels, onAllowAccess)
+                SectionLabel("Time in refuge")
+            }
             SectionCard {
-                Text(formatMinutes(week.protectedMinutes), fontSize = 48.sp, fontWeight = FontWeight.Light, color = c.textNormal)
+                Text(formatMinutes(week.protectedMinutes), fontSize = 32.sp, fontWeight = FontWeight.Light, color = c.textNormal)
                 Text("in refuge in the last seven days", style = MaterialTheme.typography.bodyMedium, color = c.textMuted)
                 Spacer(Modifier.height(18.dp))
                 Row(Modifier.fillMaxWidth()) {
