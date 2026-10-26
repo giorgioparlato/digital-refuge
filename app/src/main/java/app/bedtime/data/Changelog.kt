@@ -13,6 +13,19 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            56,
+            "0.9.10",
+            listOf(
+                "Widgets: pick and order what's on your home screen and lock screen, each its own (greeting, clock, date, weather, next event, hours, quote). Hiding the clock is now a switch.",
+                "Weather can show just the five days, without \"now\".",
+                "Search settings list only what you've added; \"Add to the search\" offers the rest.",
+                "Up to three messaging apps beside contacts: message, WhatsApp, Signal, Telegram. \"@anna running late\" opens the chat with it typed (copied for Signal and Telegram).",
+                "A calculator in the search: \"12 * 3\" shows the answer; a tap copies it.",
+                "Limits' pause uses the same rows as a block's steps, with \"harder each time\" by how much you choose.",
+                "Schedules and blocks can carry their own mark on the session pill.",
+            ),
+        ),
+        ChangelogEntry(
             55,
             "0.9.9",
             listOf(

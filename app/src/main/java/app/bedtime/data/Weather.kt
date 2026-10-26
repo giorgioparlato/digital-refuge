@@ -31,7 +31,7 @@ data class WeatherNow(
  * line of their own under the date. [NOW] is no longer offered; saved, it reads as [TODAY].
  */
 @Serializable
-enum class WeatherStyle { NOW, TODAY, DAYS, WEEK }
+enum class WeatherStyle { NOW, TODAY, DAYS, WEEK, FIVE_DAYS }
 
 /** Celsius or Fahrenheit, or whichever is usual where the phone is set. */
 @Serializable
@@ -163,15 +163,16 @@ object Weather {
                 range = if (weather.low != null && weather.high != null) "${degrees(weather.low, fahrenheit)}°–${degrees(weather.high, fahrenheit)}°" else null,
             )
             WeatherStyle.DAYS -> WeatherView(sky, temperature, days = coming(weather, fahrenheit).take(2))
-            WeatherStyle.WEEK -> WeatherView(
-                sky,
-                temperature,
-                condition = weather.condition,
-                week = listOf(WeatherDayView(0, sky, weather.high?.let { degrees(it, fahrenheit) }, weather.low?.let { degrees(it, fahrenheit) })) +
-                    coming(weather, fahrenheit).take(4),
-            )
+            WeatherStyle.WEEK -> WeatherView(sky, temperature, condition = weather.condition, week = week(weather, sky, fahrenheit))
+            // The five days alone: nothing beside the clock or after the date.
+            WeatherStyle.FIVE_DAYS -> WeatherView(null, "", week = week(weather, sky, fahrenheit))
         }
     }
+
+    /** Today and the four days after it. */
+    private fun week(weather: WeatherNow, sky: WeatherIcon?, fahrenheit: Boolean): List<WeatherDayView> =
+        listOf(WeatherDayView(0, sky, weather.high?.let { degrees(it, fahrenheit) }, weather.low?.let { degrees(it, fahrenheit) })) +
+            coming(weather, fahrenheit).take(4)
 
     /** The days after today, as sent, tomorrow first. */
     private fun coming(weather: WeatherNow, fahrenheit: Boolean): List<WeatherDayView> = weather.days.mapIndexed { i, d ->

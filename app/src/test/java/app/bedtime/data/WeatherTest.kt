@@ -83,6 +83,10 @@ class WeatherTest {
         // Five days: today, then the forecasts sent (here three).
         assertEquals(listOf(0, 1, 2, 3), Weather.view(w, now, false, WeatherStyle.WEEK)!!.week.map { it.offset })
         assertEquals(WeatherDayView(0, WeatherIcon.RAIN, 14, 8), Weather.view(w, now, false, WeatherStyle.WEEK)!!.week.first())
+        // The five days alone: the same days, and nothing for beside the clock or after the date.
+        val five = Weather.view(w, now, false, WeatherStyle.FIVE_DAYS)!!
+        assertEquals(Weather.view(w, now, false, WeatherStyle.WEEK)!!.week, five.week)
+        assertEquals(WeatherView(null, "", week = five.week), five)
     }
 
     @Test

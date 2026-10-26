@@ -57,63 +57,16 @@ internal fun UnlockStepsEditor(
     val c = Obsidian.colors
     fun setUnlock(transform: (UnlockConfig) -> UnlockConfig) = onChange(transform(unlock))
     Column {
-        OptionRow(BedtimeIcons.Hourglass, "Wait it out", description = "Start a timer, come back when it's done", enabled = editable) {
-            ObsidianToggle(unlock.waitEnabled, { on -> setUnlock { it.copy(waitEnabled = on) } }, enabled = editable)
-        }
-        AnimatedVisibility(unlock.waitEnabled) {
-            SubOptionRow("Timer") {
-                NumberStepper(
-                    unlock.waitDurationSeconds,
-                    { v -> setUnlock { it.copy(waitSeconds = v) } },
-                    5..3600,
-                    step = 5,
-                    enabled = editable,
-                    presets = listOf(10, 30, 60, 120, 300, 600),
-                    title = "timer",
-                    format = { formatWaitSeconds(it) },
-                )
-            }
-        }
-        OptionRow(Icons.Default.Edit, "Type random text", description = "No pasting, typos don't count", enabled = editable) {
-            ObsidianToggle(unlock.textEnabled, { on -> setUnlock { it.copy(textEnabled = on) } }, enabled = editable)
-        }
-        AnimatedVisibility(unlock.textEnabled) {
-            Column {
-                SubOptionRow("Characters") {
-                    NumberStepper(
-                        unlock.textLength,
-                        { v -> setUnlock { it.copy(textLength = v) } },
-                        25..2000,
-                        step = 25,
-                        enabled = editable,
-                        presets = listOf(50, 100, 150, 200, 300, 500, 1000),
-                        title = "characters",
-                    )
-                }
-                Text(
-                    "What to copy",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = c.textMuted,
-                    modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
-                )
-                SegmentedChoice(
-                    options = listOf("Letters", "Words", "Passages"),
-                    selected = unlock.textSource.ordinal,
-                    onSelect = { setUnlock { u -> u.copy(textSource = TextSource.entries[it]) } },
-                    enabled = editable,
-                )
-                Text(
-                    when (unlock.textSource) {
-                        TextSource.LETTERS -> "Random letters and digits. Nothing to read, only to copy."
-                        TextSource.WORDS -> "Plain words, easier on the eyes at midnight."
-                        TextSource.PASSAGES -> "Quotes and longer passages, worth reading while you type them."
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = c.textFaint,
-                    modifier = Modifier.padding(top = 8.dp),
-                )
-            }
-        }
+        WaitStep(unlock.waitEnabled, { on -> setUnlock { it.copy(waitEnabled = on) } }, unlock.waitDurationSeconds, { v -> setUnlock { it.copy(waitSeconds = v) } }, editable)
+        TypingStep(
+            unlock.textEnabled,
+            { on -> setUnlock { it.copy(textEnabled = on) } },
+            unlock.textLength,
+            { v -> setUnlock { it.copy(textLength = v) } },
+            unlock.textSource,
+            { v -> setUnlock { it.copy(textSource = v) } },
+            editable,
+        )
         OptionRow(Icons.Default.Lock, "Password", description = "Tip: let someone else choose it", enabled = editable) {
             ObsidianToggle(unlock.passwordEnabled, { on -> setUnlock { it.copy(passwordEnabled = on) } }, enabled = editable)
         }
@@ -128,25 +81,14 @@ internal fun UnlockStepsEditor(
         }
         AnimatedVisibility(unlock.waitEnabled || unlock.textEnabled) {
             Column {
-                OptionRow(
-                    Icons.Default.Refresh,
-                    "Harder each time",
+                HarderStep(
+                    unlock.escalate,
+                    { on -> setUnlock { it.copy(escalate = on) } },
+                    (unlock.escalateFactor * 10).roundToInt(),
+                    { v -> setUnlock { it.copy(escalateFactor = v / 10f) } },
+                    editable,
                     description = "Each early unlock in a day makes the wait and text longer",
-                    enabled = editable,
-                ) { ObsidianToggle(unlock.escalate, { on -> setUnlock { it.copy(escalate = on) } }, enabled = editable) }
-                AnimatedVisibility(unlock.escalate) {
-                    SubOptionRow("How much") {
-                        NumberStepper(
-                            (unlock.escalateFactor * 10).roundToInt(),
-                            { v -> setUnlock { it.copy(escalateFactor = v / 10f) } },
-                            11..40,
-                            enabled = editable,
-                            presets = listOf(15, 20, 25, 30, 40),
-                            title = "each time",
-                            format = { "%.1f×".format(it / 10f) },
-                        )
-                    }
-                }
+                )
             }
         }
         val anyStep = unlock.waitEnabled || unlock.textEnabled ||
@@ -157,6 +99,99 @@ internal fun UnlockStepsEditor(
                 kind = CalloutKind.WARNING,
                 body = "Unlocking will take a single tap.",
                 modifier = Modifier.padding(top = 8.dp),
+            )
+        }
+    }
+}
+
+/** "Wait it out": a timer to sit through, and how long. The same row wherever a wait is asked for. */
+@Composable
+internal fun WaitStep(
+    on: Boolean,
+    onToggle: (Boolean) -> Unit,
+    seconds: Int,
+    onSeconds: (Int) -> Unit,
+    editable: Boolean,
+    description: String = "Start a timer, come back when it's done",
+    range: IntRange = 5..3600,
+    step: Int = 5,
+    presets: List<Int> = listOf(10, 30, 60, 120, 300, 600),
+) {
+    OptionRow(BedtimeIcons.Hourglass, "Wait it out", description = description, enabled = editable) {
+        ObsidianToggle(on, onToggle, enabled = editable)
+    }
+    AnimatedVisibility(on) {
+        SubOptionRow("Timer") {
+            NumberStepper(seconds, onSeconds, range, step = step, enabled = editable, presets = presets, title = "timer", format = { formatWaitSeconds(it) })
+        }
+    }
+}
+
+/** "Type random text": how much, and from what. The same row wherever typing is asked for. */
+@Composable
+internal fun TypingStep(
+    on: Boolean,
+    onToggle: (Boolean) -> Unit,
+    length: Int,
+    onLength: (Int) -> Unit,
+    source: TextSource,
+    onSource: (TextSource) -> Unit,
+    editable: Boolean,
+    range: IntRange = 25..2000,
+    step: Int = 25,
+    presets: List<Int> = listOf(50, 100, 150, 200, 300, 500, 1000),
+) {
+    val c = Obsidian.colors
+    OptionRow(Icons.Default.Edit, "Type random text", description = "No pasting, typos don't count", enabled = editable) {
+        ObsidianToggle(on, onToggle, enabled = editable)
+    }
+    AnimatedVisibility(on) {
+        Column {
+            SubOptionRow("Characters") {
+                NumberStepper(length, onLength, range, step = step, enabled = editable, presets = presets, title = "characters")
+            }
+            Text(
+                "What to copy",
+                style = MaterialTheme.typography.bodyMedium,
+                color = c.textMuted,
+                modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
+            )
+            SegmentedChoice(
+                options = listOf("Letters", "Words", "Passages"),
+                selected = source.ordinal,
+                onSelect = { onSource(TextSource.entries[it]) },
+                enabled = editable,
+            )
+            Text(
+                when (source) {
+                    TextSource.LETTERS -> "Random letters and digits. Nothing to read, only to copy."
+                    TextSource.WORDS -> "Plain words, easier on the eyes at midnight."
+                    TextSource.PASSAGES -> "Quotes and longer passages, worth reading while you type them."
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = c.textFaint,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+        }
+    }
+}
+
+/** "Harder each time", and by how much, in tenths: 15 is 1.5× the time before. */
+@Composable
+internal fun HarderStep(on: Boolean, onToggle: (Boolean) -> Unit, tenths: Int, onTenths: (Int) -> Unit, editable: Boolean, description: String) {
+    OptionRow(Icons.Default.Refresh, "Harder each time", description = description, enabled = editable) {
+        ObsidianToggle(on, onToggle, enabled = editable)
+    }
+    AnimatedVisibility(on) {
+        SubOptionRow("How much") {
+            NumberStepper(
+                tenths,
+                onTenths,
+                11..40,
+                enabled = editable,
+                presets = listOf(15, 20, 25, 30, 40),
+                title = "each time",
+                format = { "%.1f×".format(it / 10f) },
             )
         }
     }

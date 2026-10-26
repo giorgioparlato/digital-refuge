@@ -24,6 +24,8 @@ enum class DndMode { OFF, PRIORITY, SILENCE }
 data class Schedule(
     val id: String = UUID.randomUUID().toString(),
     val name: String = "Bedtime",
+    /** Its mark on the session pill and in the lists, one of [app.bedtime.ui.components.ScheduleIcons]; the moon if null. */
+    val icon: String? = null,
     val kind: ScheduleKind = ScheduleKind.RECURRING,
     val enabled: Boolean = true,
     /** ISO day-of-week numbers (1 = Monday … 7 = Sunday) on which a session *starts*. */
@@ -239,6 +241,12 @@ data class HomeStyle(
     val showCalendar: Boolean = false,
     /** Whether the lock screen names the event, or only says when it is. */
     val calendarNamesOnLock: Boolean = false,
+    /**
+     * The widgets on the minimal screen and the lock screen, in order; null until changed, following the
+     * older switches above until then. Read through [Modules].
+     */
+    val homeModules: List<ModuleChoice>? = null,
+    val lockModules: List<ModuleChoice>? = null,
 )
 
 /** The lock screen's gestures: four swipes starting around the clock, and a double tap anywhere. */
@@ -312,6 +320,8 @@ data class AppSettings(
     /** Keywords for the search's choices and for apps ("app:" + package); the suggested ones until [keywordsCustom]. */
     val keywords: Map<String, String> = emptyMap(),
     val keywordsCustom: Boolean = false,
+    /** The messaging apps beside a contact in the search, by [ChatApp.key], in order, at most three. */
+    val contactApps: List<String> = ChatApp.DEFAULT,
     /** Your Obsidian vault's folder (a tree URI), whose notes' titles the search finds; null until chosen. */
     val obsidianVault: String? = null,
     /** The one folder of files from 0.9.8; kept so it still loads. Use [fileFolders]. */

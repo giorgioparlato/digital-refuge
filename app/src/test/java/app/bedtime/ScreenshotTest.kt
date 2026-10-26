@@ -199,13 +199,46 @@ class ScreenshotTest {
                 choice("note:refuge", true) to "Save in refuge notes",
                 choice("note:x", true) to "Add to today",
                 choice("calendar", true) to "Add to calendar, when the words say when",
+                choice("contacts", true) to "Contacts: call and message",
                 choice("web:b", false) to "Search the web · Firefox",
                 choice("maps:c", true) to "Maps · Google Maps",
                 choice("lookup:d", false) to "Look up in Translate",
             ),
             onChange = {},
             onBack = {},
-            keywords = mapOf("web:a" to "w", "note:refuge" to "n", "note:x" to "to", "calendar" to "c", "maps:c" to "m"),
+            keywords = mapOf("web:a" to "w", "note:refuge" to "n", "note:x" to "to", "calendar" to "c", "maps:c" to "m", "contacts" to "@"),
+            chatApps = app.bedtime.data.ChatApp.entries,
+            chosenChats = listOf(app.bedtime.data.ChatApp.SMS, app.bedtime.data.ChatApp.SIGNAL),
+        )
+    }
+
+    @Test
+    fun addToSearch() = shot {
+        Box(Modifier.padding(24.dp)) {
+            app.bedtime.ui.settings.AddToSearchContent(
+                listOf(
+                    "web:b" to "Search the web · Firefox",
+                    "lookup:d" to "Look up in Translate",
+                    "contacts" to "Contacts: call and message",
+                    "calculator" to "Calculator: \"12 * 3\"",
+                    "files" to "Files in your folders, by name",
+                    "spotify:s" to "Search in Spotify",
+                ),
+            ) {}
+        }
+    }
+
+    @Test
+    fun drawerContacts() = shot {
+        val anna = app.bedtime.data.ContactHit("Anna Maria", "+46 70 123", "+4670123")
+        app.bedtime.ui.minimal.AppDrawerContent(
+            apps = drawerApps, style = HomeStyle(), query = "@anna maria running late", onQuery = {},
+            results = listOf(
+                app.bedtime.ui.minimal.DrawerResult.Contact(anna, "running late"),
+                app.bedtime.ui.minimal.DrawerResult.Calculation("36"),
+            ),
+            onLaunch = {}, onResult = {}, preview = true,
+            chatApps = listOf(app.bedtime.data.ChatApp.SMS, app.bedtime.data.ChatApp.WHATSAPP, app.bedtime.data.ChatApp.SIGNAL),
         )
     }
 
@@ -243,7 +276,7 @@ class ScreenshotTest {
             scheduleName = null,
             until = null,
             apps = Samples.minimalApps,
-            style = HomeStyle(topSpace = app.bedtime.data.TopSpace.NONE),
+            style = HomeStyle(topSpace = app.bedtime.data.TopSpace.NONE, hoursOnHome = true),
             onLaunch = {},
             onUnlock = null,
             quote = Samples.shortQuote,
@@ -619,6 +652,32 @@ class ScreenshotTest {
     }
 
     @Test
+    fun homeWidgetsReordered() = shot {
+        val style = app.bedtime.data.Modules.with(
+            HomeStyle(weatherStyle = app.bedtime.data.WeatherStyle.FIVE_DAYS),
+            app.bedtime.data.Screen.HOME,
+            listOf(
+                app.bedtime.data.ModuleChoice(app.bedtime.data.Module.QUOTE),
+                app.bedtime.data.ModuleChoice(app.bedtime.data.Module.WEATHER),
+                app.bedtime.data.ModuleChoice(app.bedtime.data.Module.CLOCK, on = false),
+                app.bedtime.data.ModuleChoice(app.bedtime.data.Module.DATE, on = false),
+            ),
+        )
+        MinimalHomeContent(
+            now = Samples.lateEvening,
+            scheduleName = "Deep work",
+            until = "17:00",
+            scheduleIcon = "book",
+            apps = Samples.minimalApps,
+            style = style,
+            onLaunch = {},
+            onUnlock = {},
+            quote = Samples.shortQuote,
+            weather = app.bedtime.data.Weather.view(app.bedtime.data.Weather.SAMPLE, app.bedtime.data.Weather.SAMPLE.at + 1, false, app.bedtime.data.WeatherStyle.FIVE_DAYS),
+        )
+    }
+
+    @Test
     fun everydayHomeEmpty() = shot {
         MinimalHomeContent(
             now = Samples.lateEvening,
@@ -700,7 +759,7 @@ class ScreenshotTest {
             scheduleName = "Bedtime",
             until = "07:00",
             apps = Samples.minimalApps,
-            style = HomeStyle(clockSize = app.bedtime.data.ClockSize.VERY_SMALL, textColor = 0xFFFFFFFF),
+            style = HomeStyle(showCalendar = true, clockSize = app.bedtime.data.ClockSize.VERY_SMALL, textColor = 0xFFFFFFFF),
             onLaunch = {},
             onUnlock = {},
             quote = Samples.shortQuote,
@@ -793,7 +852,7 @@ class ScreenshotTest {
     @Test
     fun lockScreenWeather() = shot {
         app.bedtime.ui.lock.LockScreenContent(
-            now = Samples.lateEvening, scheduleName = "Bedtime", until = "07:00", style = HomeStyle(), quote = Samples.shortQuote,
+            now = Samples.lateEvening, scheduleName = "Bedtime", until = "07:00", style = HomeStyle(showWeather = true, showCalendar = true), quote = Samples.shortQuote,
             weather = app.bedtime.data.Weather.view(app.bedtime.data.Weather.SAMPLE, 2L, false, app.bedtime.data.WeatherStyle.WEEK),
             calendar = "next · dentist at 9:00 am",
         )
@@ -916,7 +975,7 @@ class ScreenshotTest {
     @Test
     fun lockScreenWeatherToday() = shot {
         app.bedtime.ui.lock.LockScreenContent(
-            now = Samples.lateEvening, scheduleName = "Bedtime", until = "07:00", style = HomeStyle(), quote = Samples.shortQuote,
+            now = Samples.lateEvening, scheduleName = "Bedtime", until = "07:00", style = HomeStyle(showWeather = true), quote = Samples.shortQuote,
             weather = app.bedtime.data.Weather.view(app.bedtime.data.Weather.SAMPLE, 2L, false, app.bedtime.data.WeatherStyle.TODAY),
         )
     }
@@ -924,7 +983,7 @@ class ScreenshotTest {
     @Test
     fun lockScreenWeatherDays() = shot {
         app.bedtime.ui.lock.LockScreenContent(
-            now = Samples.lateEvening, scheduleName = "Bedtime", until = "07:00", style = HomeStyle(), quote = Samples.shortQuote,
+            now = Samples.lateEvening, scheduleName = "Bedtime", until = "07:00", style = HomeStyle(showWeather = true), quote = Samples.shortQuote,
             weather = app.bedtime.data.Weather.view(app.bedtime.data.Weather.SAMPLE, 2L, false, app.bedtime.data.WeatherStyle.DAYS),
         )
     }

@@ -6,6 +6,13 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.width
 import app.bedtime.data.Keywords
+import app.bedtime.data.ChatApp
+import app.bedtime.ui.components.DragList
+import app.bedtime.ui.components.SectionLabel
+import app.bedtime.ui.components.CardRadius
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.material.icons.filled.Call
+import androidx.compose.ui.window.Dialog
 import android.content.Intent
 import android.net.Uri
 import app.bedtime.apps.AppCatalog
@@ -101,7 +108,8 @@ fun SearchSettingsScreen(onBack: () -> Unit) {
         mapOf(
             SearchOrder.REFUGE_NOTES to "Save in refuge notes",
             SearchOrder.CALENDAR to "Add to calendar, when the words say when",
-            SearchOrder.CONTACTS to "Contacts: call, message, WhatsApp",
+            SearchOrder.CONTACTS to "Contacts: call and message",
+            SearchOrder.CALCULATOR to "Calculator: \"12 * 3\"",
             SearchOrder.ALARM to "Alarms: \"alarm 7:30\"",
             SearchOrder.TIMER to "Timers: \"timer 10 min\"",
             SearchOrder.SETTINGS to "Settings pages",
@@ -144,6 +152,7 @@ fun SearchSettingsScreen(onBack: () -> Unit) {
         waitingContacts = null
     }
     val keywords = Keywords.effective(current.keywords, current.keywordsCustom, Keywords.defaults(choices, current.noteTargets))
+    val chatApps = remember { ContactSearch.chatApps(context) }
     SearchSettingsContent(
         choices = choices.map { it to (labels[it.key] ?: it.key) },
         keywords = keywords,
@@ -168,6 +177,9 @@ fun SearchSettingsScreen(onBack: () -> Unit) {
         folders = listOfNotNull(Triple(SearchOrder.OBSIDIAN, "Obsidian vault", vaultName).takeIf { obsidian }) +
             folderNames.mapIndexed { i, name -> Triple("${SearchOrder.FILES}:$i", "Folder of files", name) },
         onFolder = { key -> if (key == SearchOrder.OBSIDIAN || key == SearchOrder.FILES) choose(key, null) },
+        chatApps = chatApps,
+        chosenChats = ChatApp.chosen(current.contactApps, chatApps),
+        onChats = { chosen -> scope.launch { repo.updateSettings { it.copy(contactApps = chosen.map { app -> app.key }) } } },
         onRemoveFolder = { key ->
             val at = key.substringAfter(':').toIntOrNull()
             if (at != null) scope.launch {
@@ -197,84 +209,58 @@ internal fun SearchSettingsContent(
     onFolder: (key: String) -> Unit = {},
     /** Takes away one of the folders of files ("files:<n>"). */
     onRemoveFolder: (key: String) -> Unit = {},
+    /** The messaging apps on the phone, those beside contacts first, in their order. */
+    chatApps: List<ChatApp> = emptyList(),
+    chosenChats: List<ChatApp> = emptyList(),
+    onChats: (List<ChatApp>) -> Unit = {},
 ) {
     val c = Obsidian.colors
     val list = choices.map { it.first }
     val labels = choices.associate { (choice, label) -> choice.key to label }
-    // While a row is dragged, the order lives here; it's saved when the row is let go.
-    var local by remember(list) { mutableStateOf(list) }
-    var dragging by remember { mutableStateOf<String?>(null) }
-    var offset by remember { mutableFloatStateOf(0f) }
-    var rowHeight by remember { mutableIntStateOf(1) }
+    val added = list.filter { it.on }
+    val left = list.filterNot { it.on }
+    var adding by remember { mutableStateOf(false) }
     Scaffold(containerColor = c.bgPrimary, topBar = { ObsidianTopBar("Search", onBack = onBack) }) { padding ->
         Column(
             Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = PageGutter, vertical = 4.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(
-                "Matching apps always come first. Then, in this order, whatever is switched on. Drag a row by its handle to move it; switched off, it moves below the rest. Only apps a session allows are offered during it.\n\nA keyword sends straight to one of them: type it, a space, then your words (\"m cafe\"). A sign like @ needs no space. It works even for those switched off here.",
+                "Matching apps always come first. Then what you've added here, in this order; drag a row by its handle to move it. Only apps a session allows are offered during it.\n\nA keyword sends straight to one of them: type it, a space, then your words (\"m cafe\"). A sign like @ needs no space.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = c.textMuted,
             )
             SectionCard {
-                local.forEach { choice ->
-                    key(choice.key) {
-                        val lifted = dragging == choice.key
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .onSizeChanged { rowHeight = it.height.coerceAtLeast(1) }
-                                .zIndex(if (lifted) 1f else 0f)
-                                .graphicsLayer { translationY = if (lifted) offset else 0f }
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(if (lifted) c.bgPrimaryAlt else Color.Transparent)
-                                .padding(vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Box(
-                                Modifier
-                                    .size(40.dp)
-                                    .pointerInput(choice.key) {
-                                        detectDragGestures(
-                                            onDragStart = {
-                                                dragging = choice.key
-                                                offset = 0f
-                                            },
-                                            onDragEnd = {
-                                                dragging = null
-                                                offset = 0f
-                                                onChange(SearchOrder.onFirst(local))
-                                            },
-                                            onDragCancel = {
-                                                dragging = null
-                                                offset = 0f
-                                                local = list
-                                            },
-                                        ) { change, amount ->
-                                            change.consume()
-                                            offset += amount.y
-                                            // Past half a row, it trades places with its neighbour.
-                                            val at = local.indexOfFirst { it.key == choice.key }
-                                            if (offset > rowHeight / 2f && at < local.lastIndex) {
-                                                local = SearchOrder.move(local, at, at + 1)
-                                                offset -= rowHeight
-                                            } else if (offset < -rowHeight / 2f && at > 0) {
-                                                local = SearchOrder.move(local, at, at - 1)
-                                                offset += rowHeight
-                                            }
-                                        }
-                                    },
-                                contentAlignment = Alignment.Center,
-                            ) { Icon(Icons.Default.Menu, contentDescription = "drag to move", tint = c.textFaint, modifier = Modifier.size(20.dp)) }
-                            Text(
-                                labels[choice.key] ?: choice.key,
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = if (choice.on) c.textNormal else c.textFaint,
-                                modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                DragList(added, key = { it.key }, onMoved = { moved -> onChange(moved + left) }) { choice ->
+                    Text(
+                        labels[choice.key] ?: choice.key,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = c.textNormal,
+                        modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                    )
+                    KeywordBox(keywords[choice.key].orEmpty()) { onKeyword(choice.key, it) }
+                    Icon(
+                        Icons.Default.Clear,
+                        contentDescription = "take it out of the search",
+                        tint = c.textFaint,
+                        modifier = Modifier.size(40.dp).clip(RoundedCornerShape(50)).clickable { onChange(SearchOrder.switched(list, choice.key, false)) }.padding(10.dp),
+                    )
+                }
+                if (added.isEmpty()) Text("Only apps, for now.", style = MaterialTheme.typography.bodyMedium, color = c.textFaint, modifier = Modifier.padding(8.dp))
+                if (left.isNotEmpty()) {
+                    OptionRow(Icons.Default.Add, "Add to the search", description = "${left.size} more to choose from", onClick = { adding = true }, trailing = { Chevron() })
+                }
+            }
+            if (added.any { it.key == SearchOrder.CONTACTS } && chatApps.size > 1) {
+                SectionCard(title = "Beside each contact", subtitle = "Up to ${ChatApp.MAX} ways to message them, in the order you pick them") {
+                    chatApps.forEach { app ->
+                        val on = app in chosenChats
+                        OptionRow(Icons.Default.Call, app.label.replaceFirstChar { it.uppercase() }, description = if (app.takesText) null else "A message typed after their name is copied, to paste") {
+                            ObsidianToggle(
+                                on,
+                                { now -> onChats(if (now) chosenChats + app else chosenChats - app) },
+                                enabled = on || chosenChats.size < ChatApp.MAX,
                             )
-                            KeywordBox(keywords[choice.key].orEmpty()) { onKeyword(choice.key, it) }
-                            Spacer(Modifier.width(8.dp))
-                            ObsidianToggle(choice.on, { on -> onChange(SearchOrder.switched(local, choice.key, on)) })
                         }
                     }
                 }
@@ -304,6 +290,45 @@ internal fun SearchSettingsContent(
                 OptionRow(Icons.Default.Add, "Add a folder of files", onClick = { onFolder(SearchOrder.FILES) }, trailing = { Chevron() })
             }
             Spacer(Modifier.height(24.dp))
+        }
+    }
+    if (adding) {
+        Dialog(onDismissRequest = { adding = false }) {
+            AddToSearchContent(left.map { it.key to (labels[it.key] ?: it.key) }) { key ->
+                adding = false
+                onChange(SearchOrder.switched(list, key, true))
+            }
+        }
+    }
+}
+
+/** What could still be added to the search, under its heading; a tap adds it at the end of the list. */
+@Composable
+internal fun AddToSearchContent(choices: List<Pair<String, String>>, onAdd: (String) -> Unit) {
+    val c = Obsidian.colors
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(max = 560.dp)
+            .clip(RoundedCornerShape(CardRadius))
+            .background(c.bgSecondary)
+            .verticalScroll(rememberScrollState())
+            .padding(20.dp),
+    ) {
+        Text("Add to the search", style = MaterialTheme.typography.titleMedium, color = c.textNormal)
+        val grouped = choices.groupBy { (key, _) -> SearchOrder.group(key) }
+        SearchOrder.GROUPS.filter { it in grouped }.forEach { group ->
+            SectionLabel(group)
+            grouped.getValue(group).forEach { (key, label) ->
+                Row(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable { onAdd(key) }.padding(vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null, tint = c.accent, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(12.dp))
+                    Text(label, style = MaterialTheme.typography.bodyLarge, color = c.textNormal)
+                }
+            }
         }
     }
 }

@@ -1,6 +1,11 @@
 package app.bedtime.ui.minimal
 
 import app.bedtime.data.Keywords
+import app.bedtime.data.Module
+import app.bedtime.data.Modules
+import app.bedtime.data.Screen
+import app.bedtime.data.ChatApp
+import app.bedtime.data.Calculator
 import app.bedtime.data.ClockActions
 import app.bedtime.data.FolderIndex
 import app.bedtime.data.IndexedFile
@@ -357,13 +362,22 @@ private fun MinimalHomeScreen(
     val words = keyword?.words ?: query.trim()
     // Contacts are looked up as you type, only when you've switched them on in the search or used their keyword.
     val contactsOn = searchChoices.any { it.key == SearchOrder.CONTACTS && it.on } || keyword?.key == SearchOrder.CONTACTS
-    val contacts by produceState(emptyList<ContactHit>(), words, contactsOn) {
-        value = if (contactsOn && words.length >= 2) withContext(Dispatchers.IO) { ContactSearch.find(context, words) } else emptyList()
+    // Words that start with someone's name and go on are a message for them: "@anna running late".
+    val contactsFound by produceState(emptyList<ContactHit>() to "", words, contactsOn) {
+        value = if (contactsOn && words.length >= 2) withContext(Dispatchers.IO) {
+            val byFirstWord = ContactSearch.find(context, words.substringBefore(' '), limit = 12)
+            val (named, message) = ContactSearch.split(words, byFirstWord.map { it.name })
+            if (named.isNotEmpty()) byFirstWord.filter { it.name in named }.take(3) to message else ContactSearch.find(context, words) to ""
+        } else {
+            emptyList<ContactHit>() to ""
+        }
     }
-    val whatsApp = remember { ContactSearch.hasWhatsApp(context) }
+    val (contacts, contactMessage) = contactsFound
+    val chatApps = remember(settings.contactApps) { ChatApp.chosen(settings.contactApps, ContactSearch.chatApps(context)) }
     val openablePackages = openable.map { it.packageName }.toSet()
     // An alarm or timer, settings pages (when Settings could be opened now), and notes and files by name.
     val found = buildMap {
+        Calculator.evaluate(words)?.let { put(SearchOrder.CALCULATOR, listOf(DrawerResult.Calculation(Calculator.format(it)))) }
         // With its keyword just the time ("a 7:30", "t 10"); without, starting "alarm" or "timer".
         val clock = ClockActions.parse(words)
         (if (keyword?.key == SearchOrder.ALARM) ClockActions.alarm(words) else clock as? app.bedtime.data.ClockAction.Alarm)
@@ -404,17 +418,22 @@ private fun MinimalHomeScreen(
                 runCatching { context.startActivity(ContactSearch.call(result.hit)) }
                 closeDrawer()
             }
-            is DrawerResult.Message -> {
-                runCatching { context.startActivity(ContactSearch.message(result.hit)) }
-                closeDrawer()
-            }
-            is DrawerResult.WhatsApp -> {
-                val chat = ContactSearch.whatsapp(result.hit)
+            is DrawerResult.Chat -> {
+                val chat = ContactSearch.chat(result.app, result.hit, result.text)
                 if (chat == null || runCatching { context.startActivity(chat) }.isFailure) {
-                    Toast.makeText(context, "whatsapp needs their number with its country code", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "${result.app.label} needs their number with its country code", Toast.LENGTH_SHORT).show()
                 } else {
+                    // Apps whose links can't carry a message get it copied, to paste.
+                    if (result.text.isNotBlank() && !result.app.takesText) {
+                        copy(context, result.text)
+                        Toast.makeText(context, "message copied: paste it in ${result.app.label}", Toast.LENGTH_SHORT).show()
+                    }
                     closeDrawer()
                 }
+            }
+            is DrawerResult.Calculation -> {
+                copy(context, result.answer)
+                Toast.makeText(context, "copied ${result.answer}", Toast.LENGTH_SHORT).show()
             }
             DrawerResult.OpenNotes -> {
                 notesOpen = true
@@ -453,8 +472,9 @@ private fun MinimalHomeScreen(
                     contacts,
                     keyword,
                     found,
+                    message = contactMessage,
                 ),
-                whatsApp = whatsApp,
+                chatApps = chatApps,
                 words = words,
                 keyworded = keyword != null,
                 onLaunch = { pkg ->
@@ -496,6 +516,7 @@ private fun MinimalHomeScreen(
             now = now,
             scheduleName = session?.schedule?.name,
             until = session?.let { formatTime(context, it.end) },
+            scheduleIcon = session?.schedule?.icon,
             apps = apps,
             style = style,
             onLaunch = { AppCatalog.launch(context, it) },
@@ -519,7 +540,7 @@ private fun MinimalHomeScreen(
             onOpenDrawer = { drawer = true },
             onOpenRefuge = { AppCatalog.launch(context, context.packageName) },
             onGesture = onGesture,
-            hours = todayHours.takeIf { style.hoursOnHome && HourlyUse.counting(settings) }
+            hours = todayHours.takeIf { Modules.isOn(style, Screen.HOME, Module.HOURS) && HourlyUse.counting(settings) }
                 ?.let { HourlyUse.states(it, now.hour, HourlyUse.rule(settings)) },
             onHours = { hoursDetail = true },
             weather = rememberWeather(style, now),
@@ -617,6 +638,8 @@ internal fun MinimalHomeContent(
     onNextQuote: () -> Unit = {},
     /** Opens digital refuge, from a tap on its mark at the foot. */
     onOpenRefuge: () -> Unit = {},
+    /** The session's mark on its pill. */
+    scheduleIcon: String? = null,
     preview: Boolean = false,
 ) {
     val p = style.palette()
@@ -674,43 +697,25 @@ internal fun MinimalHomeContent(
                 .padding(bottom = 24.dp),
         ) {
             Spacer(Modifier.height(if (preview) 12.dp else style.topSpace.dp.dp))
-            SessionHeader(now, scheduleName, until, style, calendar, onCalendar, weather, onWeather)
-            if (hours != null) {
-                HourDots(
-                    hours,
-                    text = style.palette().text,
-                    accent = style.palette().accent,
-                    modifier = Modifier.padding(top = 12.dp),
-                    calmColor = style.hourCalmColor,
-                    distractedColor = style.hourDistractedColor,
-                    onClick = onHours,
-                )
-            }
-            if (quote != null && style.showQuote) {
-                Spacer(Modifier.height(if (preview) 20.dp else 28.dp))
-                // A tap moves on, as it always has; a long press offers to keep it or never see it again.
-                var menu by remember { mutableStateOf(false) }
-                Box {
-                    QuoteBlock(
-                        quote,
-                        style,
-                        Modifier.clip(RoundedCornerShape(8.dp)).combinedClickable(
-                            onClickLabel = "show another quote",
-                            onLongClickLabel = "favourite or hide this quote",
-                            onLongClick = { menu = true },
-                            onClick = onNextQuote,
-                        ),
-                    )
-                    QuoteMenu(
-                        expanded = menu,
-                        onDismiss = { menu = false },
-                        favourite = quoteFavourite,
-                        onFavourite = onQuoteFavourite,
-                        onHide = onQuoteHide,
-                        onAnother = onNextQuote,
-                    )
-                }
-            }
+            SessionHeader(
+                now, scheduleName, until, style, calendar, onCalendar, weather, onWeather,
+                modules = Modules.shown(style, Screen.HOME),
+                scheduleIcon = scheduleIcon,
+                hours = hours?.let { states ->
+                    {
+                        HourDots(
+                            states,
+                            text = style.palette().text,
+                            accent = style.palette().accent,
+                            modifier = Modifier.padding(top = 12.dp),
+                            calmColor = style.hourCalmColor,
+                            distractedColor = style.hourDistractedColor,
+                            onClick = onHours,
+                        )
+                    }
+                },
+                quote = quote?.let { q -> { HomeQuote(q, style, preview, quoteFavourite, onQuoteFavourite, onQuoteHide, onNextQuote) } },
+            )
             Spacer(Modifier.height(if (preview) 28.dp else 44.dp))
             LazyColumn(Modifier.weight(1f).fillMaxWidth().nestedScroll(overscroll)) {
                 items(apps, key = { it.packageName }) { app ->
@@ -782,5 +787,40 @@ internal fun MinimalHomeContent(
                 }
             }
         }
+    }
+}
+
+/** [text] on the clipboard, to paste somewhere else. */
+private fun copy(context: Context, text: String) {
+    context.getSystemService(android.content.ClipboardManager::class.java)
+        ?.setPrimaryClip(android.content.ClipData.newPlainText("digital refuge", text))
+}
+
+/** The quote on the minimal screen: a tap moves on, as it always has; a long press offers to keep it or never see it again. */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun HomeQuote(
+    quote: Quote,
+    style: HomeStyle,
+    preview: Boolean,
+    favourite: Boolean,
+    onFavourite: () -> Unit,
+    onHide: () -> Unit,
+    onNext: () -> Unit,
+) {
+    Spacer(Modifier.height(if (preview) 20.dp else 28.dp))
+    var menu by remember { mutableStateOf(false) }
+    Box {
+        QuoteBlock(
+            quote,
+            style,
+            Modifier.clip(RoundedCornerShape(8.dp)).combinedClickable(
+                onClickLabel = "show another quote",
+                onLongClickLabel = "favourite or hide this quote",
+                onLongClick = { menu = true },
+                onClick = onNext,
+            ),
+        )
+        QuoteMenu(expanded = menu, onDismiss = { menu = false }, favourite = favourite, onFavourite = onFavourite, onHide = onHide, onAnother = onNext)
     }
 }

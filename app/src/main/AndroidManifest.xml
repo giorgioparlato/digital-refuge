@@ -43,8 +43,10 @@
             <action android:name="android.intent.action.PROCESS_TEXT" />
             <data android:mimeType="text/plain" />
         </intent>
-        <!-- WhatsApp, to offer a chat with a contact the search found. -->
+        <!-- WhatsApp, Signal and Telegram, to offer a chat with a contact the search found. -->
         <package android:name="com.whatsapp" />
+        <package android:name="org.thoughtcrime.securesms" />
+        <package android:name="org.telegram.messenger" />
     </queries>
 
     <!-- Do Not Disturb and hidden notifications; granted by the user in "Do Not Disturb access". -->

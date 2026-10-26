@@ -101,6 +101,11 @@ import app.bedtime.data.Repository
 import app.bedtime.data.QuoteRefresh
 import app.bedtime.data.TextSize
 import app.bedtime.ui.components.BedtimeIcons
+import app.bedtime.ui.components.DragList
+import app.bedtime.data.Module
+import app.bedtime.data.Modules
+import app.bedtime.data.Screen
+import app.bedtime.ui.lock.LockScreenContent
 import app.bedtime.ui.components.ObsidianTextField
 import app.bedtime.ui.components.ObsidianToggle
 import app.bedtime.ui.components.ObsidianTopBar
@@ -127,11 +132,14 @@ fun HomeStyleScreen(onBack: () -> Unit, onQuotes: () -> Unit = {}, page: StylePa
     LaunchedEffect(Unit) {
         allApps = withContext(Dispatchers.IO) { AppCatalog.launchableApps(context).sortedBy { it.label.lowercase() } }
     }
-    // Calendar access is asked for only when the line is switched on, and the line stays off without it.
+    // Calendar access is asked for only when the next event is switched on, and it stays off without it.
+    var waitingCalendar by remember { mutableStateOf<HomeStyle?>(null) }
     val askCalendar = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) {
-            scope.launch { repo.updateSettings { it.copy(homeStyle = it.homeStyle.copy(showCalendar = true)) } }
-        } else {
+        val style = waitingCalendar
+        waitingCalendar = null
+        if (granted && style != null) {
+            scope.launch { repo.updateSettings { it.copy(homeStyle = style) } }
+        } else if (!granted) {
             Toast.makeText(context, "calendar access wasn't allowed", Toast.LENGTH_SHORT).show()
         }
     }
@@ -205,11 +213,12 @@ fun HomeStyleScreen(onBack: () -> Unit, onQuotes: () -> Unit = {}, page: StylePa
         onChange = { style -> scope.launch { repo.updateSettings { it.copy(homeStyle = style) } } },
         previewApps = allApps.take(4),
         allApps = allApps,
-        onShowCalendar = { on ->
-            if (on && !CalendarSource.hasPermission(context)) {
+        onShowCalendar = { style ->
+            if (!CalendarSource.hasPermission(context)) {
+                waitingCalendar = style
                 askCalendar.launch(Manifest.permission.READ_CALENDAR)
             } else {
-                scope.launch { repo.updateSettings { it.copy(homeStyle = it.homeStyle.copy(showCalendar = on)) } }
+                scope.launch { repo.updateSettings { it.copy(homeStyle = style) } }
             }
         },
         onLockNotifications = { on ->
@@ -237,7 +246,7 @@ fun HomeStyleScreen(onBack: () -> Unit, onQuotes: () -> Unit = {}, page: StylePa
         weatherHeardAt = weather?.at,
         page = page,
         // The preview shows the real weather if there is some, otherwise an example.
-        weatherPreview = current.homeStyle.takeIf { it.showWeather }?.let { style ->
+        weatherPreview = current.homeStyle.takeIf { Modules.onAnywhere(it, Module.WEATHER) }?.let { style ->
             Weather.view(weather ?: Weather.SAMPLE, (weather?.at ?: Weather.SAMPLE.at) + 1, Weather.fahrenheit(style.weatherUnit), style.weatherStyle)
         },
         now = LocalDateTime.now(),
@@ -263,8 +272,8 @@ internal fun HomeStyleContent(
     onAddFont: (forQuote: Boolean) -> Unit = {},
     /** Every app that can be opened, for the lock-screen swipes. */
     allApps: List<AppEntry> = emptyList(),
-    /** Switches the calendar line, asking for calendar access first if needed. */
-    onShowCalendar: (Boolean) -> Unit = {},
+    /** [HomeStyle] with the next event switched on somewhere, saved once calendar access is there (asked for if needed). */
+    onShowCalendar: (HomeStyle) -> Unit = {},
     /** Opens the quotes page: your own, favourites, hidden ones. */
     onQuotes: () -> Unit = {},
     /** Switches lock-screen notifications, sending you to grant notification access first if needed. */
@@ -284,6 +293,7 @@ internal fun HomeStyleContent(
     val context = LocalContext.current
     val c = Obsidian.colors
     var pickingSwipe by rememberSaveable { mutableStateOf<Swipe?>(null) }
+    var widgetScreen by rememberSaveable { mutableStateOf(Screen.HOME) }
     var pickingGesture by rememberSaveable { mutableStateOf<HomeGesture?>(null) }
     pickingGesture?.let { gesture ->
         HomeGestureDialog(
@@ -329,18 +339,31 @@ internal fun HomeStyleContent(
                     .clip(previewShape)
                     .border(1.dp, c.border, previewShape),
             ) {
-                MinimalHomeContent(
-                    now = now,
-                    scheduleName = "Bedtime",
-                    until = formatMinuteOfDay(context, 7 * 60),
-                    apps = previewApps,
-                    style = style,
-                    onLaunch = {},
-                    onUnlock = {},
-                    quote = quote,
-                    weather = weatherPreview,
-                    preview = true,
-                )
+                // The lock screen while its widgets are being set; otherwise the minimal home.
+                if (page == StylePage.SHOWN && widgetScreen == Screen.LOCK) {
+                    LockScreenContent(
+                        now = now,
+                        scheduleName = "Bedtime",
+                        until = formatMinuteOfDay(context, 7 * 60),
+                        style = style,
+                        quote = quote,
+                        weather = weatherPreview,
+                        preview = true,
+                    )
+                } else {
+                    MinimalHomeContent(
+                        now = now,
+                        scheduleName = "Bedtime",
+                        until = formatMinuteOfDay(context, 7 * 60),
+                        apps = previewApps,
+                        style = style,
+                        onLaunch = {},
+                        onUnlock = {},
+                        quote = quote,
+                        weather = weatherPreview,
+                        preview = true,
+                    )
+                }
             }
 
             if (page == StylePage.LOOK) {
@@ -408,13 +431,16 @@ internal fun HomeStyleContent(
                 }
             }
             if (page == StylePage.SHOWN) {
+                SectionCard(title = "Widgets", subtitle = "Each screen has its own. Drag by the handle to change the order") {
+                    SegmentedChoice(
+                        options = listOf("Home screen", "Lock screen"),
+                        selected = widgetScreen.ordinal,
+                        onSelect = { widgetScreen = Screen.entries[it] },
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    WidgetList(style, widgetScreen, onChange, onShowCalendar)
+                }
                 SectionCard(title = "Show") {
-                    OptionRow(Icons.Default.Face, "Greeting", description = "“Good evening”, “Good morning”…") {
-                        ObsidianToggle(style.showGreeting, { onChange(style.copy(showGreeting = it)) })
-                    }
-                    OptionRow(Icons.Default.DateRange, "Date") {
-                        ObsidianToggle(style.showDate, { onChange(style.copy(showDate = it)) })
-                    }
                     OptionRow(Icons.Default.Notifications, "Android's status bar", description = "Off hides it here and on the lock screen; a swipe down from the top edge shows it") {
                         ObsidianToggle(!style.hideStatusBar, { onChange(style.copy(hideStatusBar = !it)) })
                     }
@@ -427,11 +453,10 @@ internal fun HomeStyleContent(
                     OptionRow(Icons.Default.KeyboardArrowUp, "The arrow to all apps", description = "At the foot; swiping up works either way") {
                         ObsidianToggle(style.showSwipeArrow, { onChange(style.copy(showSwipeArrow = it)) })
                     }
-                    OptionRow(BedtimeIcons.Leaf, "Quote", description = "Here and on the lock screen. Tap it for another, hold it to favourite or hide it") {
-                        ObsidianToggle(style.showQuote, { onChange(style.copy(showQuote = it)) })
-                    }
-                    if (style.showQuote) {
-                        SizeLabel("A new one every", Modifier.padding(top = 12.dp, bottom = 8.dp))
+                }
+                if (Modules.onAnywhere(style, Module.QUOTE)) SectionCard(title = "Quote", subtitle = "Tap it for another, hold it to favourite or hide it") {
+                    run {
+                        SizeLabel("A new one every", Modifier.padding(bottom = 8.dp))
                         SegmentedChoice(
                             options = listOf("Hour", "6 hours", "Day", "Week"),
                             selected = style.quoteRefresh.ordinal,
@@ -445,21 +470,20 @@ internal fun HomeStyleContent(
                         ) { Chevron() }
                     }
                 }
-                SectionCard(title = "Weather", subtitle = "From Breezy Weather, a free app that does the fetching; this one never goes online") {
+                if (Modules.onAnywhere(style, Module.WEATHER)) SectionCard(title = "Weather", subtitle = "From Breezy Weather, a free app that does the fetching; this one never goes online") {
                     OptionRow(
                         Icons.Default.Info,
-                        "Weather after the date",
-                        description = when {
-                            !style.showWeather -> "Like “12° · light rain”, here and on the lock screen"
-                            weatherHeardAt == null -> "Nothing from Breezy Weather yet"
-                            else -> "Last heard ${formatRelativePast(System.currentTimeMillis() - weatherHeardAt)}. Hidden when over 3 hours old"
+                        "Last heard",
+                        description = when (weatherHeardAt) {
+                            null -> "Nothing from Breezy Weather yet"
+                            else -> "${formatRelativePast(System.currentTimeMillis() - weatherHeardAt).replaceFirstChar { it.uppercase() }}. Hidden when over 3 hours old"
                         },
-                    ) { ObsidianToggle(style.showWeather, { onChange(style.copy(showWeather = it)) }) }
-                    if (style.showWeather) {
+                    )
+                    run {
                         SizeLabel("Show", Modifier.padding(top = 12.dp, bottom = 8.dp))
-                        val styles = listOf(WeatherStyle.TODAY, WeatherStyle.DAYS, WeatherStyle.WEEK)
+                        val styles = listOf(WeatherStyle.TODAY, WeatherStyle.DAYS, WeatherStyle.WEEK, WeatherStyle.FIVE_DAYS)
                         SegmentedChoice(
-                            options = listOf("Today", "3 days", "5 days"),
+                            options = listOf("Today", "3 days", "Now + 5", "5 days"),
                             selected = styles.indexOf(style.weatherStyle).coerceAtLeast(0),
                             onSelect = { onChange(style.copy(weatherStyle = styles[it])) },
                         )
@@ -477,19 +501,12 @@ internal fun HomeStyleContent(
                         )
                     }
                 }
-                SectionCard(title = "Calendar") {
+                if (Modules.isOn(style, Screen.LOCK, Module.EVENT)) SectionCard(title = "Next event", subtitle = "Read from the calendar already on this phone. Nothing is fetched") {
                     OptionRow(
-                        Icons.Default.DateRange,
-                        "Today's next event",
-                        description = "Under the date, read from the calendar already on this phone. Nothing is fetched",
-                    ) { ObsidianToggle(style.showCalendar, onShowCalendar) }
-                    if (style.showCalendar) {
-                        OptionRow(
-                            Icons.Default.Lock,
-                            "Event names on the lock screen",
-                            description = "Off, the lock screen only says when the next one is",
-                        ) { ObsidianToggle(style.calendarNamesOnLock, { onChange(style.copy(calendarNamesOnLock = it)) }) }
-                    }
+                        Icons.Default.Lock,
+                        "Event names on the lock screen",
+                        description = "Off, the lock screen only says when the next one is",
+                    ) { ObsidianToggle(style.calendarNamesOnLock, { onChange(style.copy(calendarNamesOnLock = it)) }) }
                 }
             }
             if (page == StylePage.NOTIFICATIONS) {
@@ -576,7 +593,7 @@ internal fun HomeStyleContent(
 /** The pages the home and lock screen's choices are split into, each reached from settings. */
 enum class StylePage(val title: String, val intro: String) {
     LOOK("Look", "Colours, sizes and fonts, for your home screen, the minimal one in sessions, and the lock screen. Changes save as you go."),
-    SHOWN("What's shown", "What sits around the clock: greeting, date, weather, your next event and a quote. Changes save as you go."),
+    SHOWN("What's shown", "The widgets on your home screen and lock screen, each with its own, in the order you like; and what else shows around them. Changes save as you go."),
     SWIPES(
         "Lock-screen gestures",
         "Swipes start around the clock; a double tap is anywhere. Each can open an app once you've unlocked, or straight away the camera, a quick note or your notifications. The middle is for swiping notifications away; from the bottom, any swipe just unlocks.",
@@ -740,5 +757,27 @@ private fun formatRelativePast(millis: Long): String {
         minutes < 60 -> "$minutes min ago"
         minutes < 48 * 60 -> "${minutes / 60} h ago"
         else -> "${minutes / (24 * 60)} days ago"
+    }
+}
+
+/**
+ * One screen's widgets, in order, each switched on or off. The next event asks for calendar access the
+ * first time it's switched on.
+ */
+@Composable
+private fun WidgetList(style: HomeStyle, screen: Screen, onChange: (HomeStyle) -> Unit, onShowCalendar: (HomeStyle) -> Unit) {
+    val c = Obsidian.colors
+    val list = Modules.of(style, screen)
+    DragList(list, key = { it.module.name }, onMoved = { moved -> onChange(Modules.with(style, screen, moved)) }) { choice ->
+        Text(
+            choice.module.label,
+            style = MaterialTheme.typography.bodyLarge,
+            color = if (choice.on) c.textNormal else c.textFaint,
+            modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+        )
+        ObsidianToggle(choice.on, { on ->
+            val updated = Modules.switched(style, screen, choice.module, on)
+            if (on && choice.module == Module.EVENT) onShowCalendar(updated) else onChange(updated)
+        })
     }
 }

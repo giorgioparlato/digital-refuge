@@ -1,5 +1,8 @@
 package app.bedtime.ui.minimal
 
+import app.bedtime.data.Module
+import app.bedtime.data.Modules
+import app.bedtime.data.Screen
 import android.Manifest
 import android.content.ContentUris
 import android.content.ContentValues
@@ -166,8 +169,9 @@ fun rememberCalendarLine(style: HomeStyle, now: LocalDateTime, onLockScreen: Boo
     val context = LocalContext.current
     var line by remember { mutableStateOf<String?>(null) }
     val minute = now.withSecond(0).withNano(0)
-    LaunchedEffect(style.showCalendar, style.calendarNamesOnLock, onLockScreen, minute) {
-        if (!style.showCalendar || !CalendarSource.hasPermission(context)) {
+    val shown = Modules.isOn(style, if (onLockScreen) Screen.LOCK else Screen.HOME, Module.EVENT)
+    LaunchedEffect(shown, style.calendarNamesOnLock, onLockScreen, minute) {
+        if (!shown || !CalendarSource.hasPermission(context)) {
             line = null
             return@LaunchedEffect
         }
@@ -177,5 +181,5 @@ fun rememberCalendarLine(style: HomeStyle, now: LocalDateTime, onLockScreen: Boo
         val events = withContext(Dispatchers.IO) { CalendarSource.upcoming(context, start, midnight) }
         line = calendarLine(events, start, showNames = !onLockScreen || style.calendarNamesOnLock) { formatTime(context, it) }
     }
-    return if (style.showCalendar) line else null
+    return if (shown) line else null
 }

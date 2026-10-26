@@ -1,5 +1,8 @@
 package app.bedtime.ui.settings
 
+import app.bedtime.data.Module
+import app.bedtime.data.Modules
+import app.bedtime.data.Screen
 import app.bedtime.ui.homestyle.TextPresets
 import app.bedtime.ui.homestyle.SwatchRow
 import app.bedtime.ui.homestyle.AccentPresets
@@ -72,14 +75,14 @@ fun DistractionScreen(onBack: () -> Unit) {
     DistractionContent(
         appCount = current.distractingApps.size,
         minutes = current.distractionMinutes,
-        onHome = current.homeStyle.hoursOnHome,
-        onLock = current.homeStyle.hoursOnLock,
+        onHome = Modules.isOn(current.homeStyle, Screen.HOME, Module.HOURS),
+        onLock = Modules.isOn(current.homeStyle, Screen.LOCK, Module.HOURS),
         onPick = { picking = true },
         onMinutes = { m -> scope.launch { repo.updateSettings { it.copy(distractionMinutes = m) } } },
         totalMinutes = current.distractionTotalMinutes,
         onTotalMinutes = { m -> scope.launch { repo.updateSettings { it.copy(distractionTotalMinutes = m) } } },
-        onShowHome = { on -> scope.launch { repo.updateSettings { it.copy(homeStyle = it.homeStyle.copy(hoursOnHome = on)) } } },
-        onShowLock = { on -> scope.launch { repo.updateSettings { it.copy(homeStyle = it.homeStyle.copy(hoursOnLock = on)) } } },
+        onShowHome = { on -> scope.launch { repo.updateSettings { it.copy(homeStyle = Modules.switched(it.homeStyle, Screen.HOME, Module.HOURS, on)) } } },
+        onShowLock = { on -> scope.launch { repo.updateSettings { it.copy(homeStyle = Modules.switched(it.homeStyle, Screen.LOCK, Module.HOURS, on)) } } },
         calmColor = current.homeStyle.hourCalmColor,
         distractedColor = current.homeStyle.hourDistractedColor,
         onCalmColor = { v -> scope.launch { repo.updateSettings { it.copy(homeStyle = it.homeStyle.copy(hourCalmColor = v)) } } },

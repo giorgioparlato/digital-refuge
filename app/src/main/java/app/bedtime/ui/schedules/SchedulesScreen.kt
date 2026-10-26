@@ -1,5 +1,7 @@
 package app.bedtime.ui.schedules
 
+import androidx.compose.foundation.layout.size
+import app.bedtime.ui.components.ScheduleIcons
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -190,6 +192,7 @@ private fun ScheduleCard(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f).alpha(if (schedule.enabled) 1f else 0.6f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(ScheduleIcons.of(schedule.icon), contentDescription = null, tint = c.accent, modifier = Modifier.padding(end = 8.dp).size(18.dp))
                     Text(schedule.name, style = MaterialTheme.typography.titleMedium, color = c.textNormal)
                     if (running) {
                         Spacer(Modifier.width(8.dp))

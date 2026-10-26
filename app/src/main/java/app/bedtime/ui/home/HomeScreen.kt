@@ -1,5 +1,7 @@
 package app.bedtime.ui.home
 
+import app.bedtime.data.Module
+import app.bedtime.data.Modules
 import app.bedtime.data.HourRule
 import app.bedtime.data.DayHours
 import app.bedtime.ui.components.rememberTodayHours
@@ -196,7 +198,7 @@ fun HomeScreen(
     val installed = remember { Changelog.installedVersion(context) }
     // Before the walk-through there's nothing to compare with; it marks the version as seen itself.
     val whatsNew = if (settings.onboarded) Changelog.unseen(settings.lastSeenVersion, installed) else null
-    val quote = if (style.showQuote) {
+    val quote = if (Modules.onAnywhere(style, Module.QUOTE)) {
         Quotes.forPeriod(Instant.ofEpochMilli(now).atZone(ZoneId.systemDefault()).toLocalDateTime(), style.quoteRefresh, quoteOffset, settings.quotes)
     } else {
         null

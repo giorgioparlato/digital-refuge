@@ -105,6 +105,9 @@ import app.bedtime.ui.homestyle.HomePalette
 import app.bedtime.ui.homestyle.palette
 import app.bedtime.ui.minimal.QuoteBlock
 import app.bedtime.ui.minimal.SessionHeader
+import app.bedtime.data.Module
+import app.bedtime.data.Modules
+import app.bedtime.data.Screen
 import app.bedtime.ui.theme.BedtimeTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -374,6 +377,7 @@ private fun LockScreen(
     LockScreenContent(
         now = now,
         scheduleName = occurrence?.schedule?.name,
+        scheduleIcon = occurrence?.schedule?.icon,
         until = occurrence?.let { formatTime(context, it.end) },
         style = style,
         onOpen = onOpen,
@@ -385,7 +389,7 @@ private fun LockScreen(
         calendar = rememberCalendarLine(style, now, onLockScreen = true),
         weather = rememberWeather(style, now),
         onWeather = breezy?.let { app -> { onOpenApp(app) } },
-        hours = todayHours.takeIf { style.hoursOnLock && HourlyUse.counting(settings) }
+        hours = todayHours.takeIf { Modules.isOn(style, Screen.LOCK, Module.HOURS) && HourlyUse.counting(settings) }
             ?.let { HourlyUse.states(it, now.hour, HourlyUse.rule(settings)) },
         notifications = if (style.lockNotifications) {
             val nowMs = System.currentTimeMillis()
@@ -443,6 +447,8 @@ internal fun LockScreenContent(
     handlers: NoteHandlers = NoteHandlers(),
     initialExpanded: String? = null,
     initialReplying: String? = null,
+    /** The session's mark on its pill. */
+    scheduleIcon: String? = null,
 ) {
     var expanded by remember { mutableStateOf(initialExpanded) }
     var replying by remember { mutableStateOf(initialReplying) }
@@ -486,18 +492,33 @@ internal fun LockScreenContent(
                 .padding(bottom = 24.dp),
         ) {
             Spacer(Modifier.height(if (preview) 12.dp else style.topSpace.dp.dp))
-            SessionHeader(now, scheduleName, until, style, calendar, weather = weather, onWeather = onWeather)
-            if (hours != null) {
-                HourDots(
-                    hours,
-                    text = style.palette().text,
-                    accent = style.palette().accent,
-                    modifier = Modifier.padding(top = 12.dp),
-                    calmColor = style.hourCalmColor,
-                    distractedColor = style.hourDistractedColor,
-                    onClick = onHours,
-                )
-            }
+            // The quote keeps its place at the foot when it's the last widget, as it always has; anywhere else it's in line.
+            val modules = Modules.shown(style, Screen.LOCK)
+            val quoteAtFoot = modules.lastOrNull() == Module.QUOTE
+            SessionHeader(
+                now, scheduleName, until, style, calendar, weather = weather, onWeather = onWeather,
+                modules = modules,
+                scheduleIcon = scheduleIcon,
+                hours = hours?.let { states ->
+                    {
+                        HourDots(
+                            states,
+                            text = style.palette().text,
+                            accent = style.palette().accent,
+                            modifier = Modifier.padding(top = 12.dp),
+                            calmColor = style.hourCalmColor,
+                            distractedColor = style.hourDistractedColor,
+                            onClick = onHours,
+                        )
+                    }
+                },
+                quote = quote?.takeIf { !quoteAtFoot }?.let { q ->
+                    {
+                        Spacer(Modifier.height(24.dp))
+                        QuoteBlock(q, style)
+                    }
+                },
+            )
             if (notifications.isNotEmpty()) {
                 Spacer(Modifier.height(28.dp))
                 NotificationArea(
@@ -516,7 +537,7 @@ internal fun LockScreenContent(
                 )
             }
             if (notifications.isEmpty() || !listOpen) Spacer(Modifier.weight(1f)) else Spacer(Modifier.height(24.dp))
-            if (quote != null && style.showQuote && replying == null) {
+            if (quote != null && quoteAtFoot && replying == null) {
                 QuoteBlock(quote, style)
                 Spacer(Modifier.height(40.dp))
             }

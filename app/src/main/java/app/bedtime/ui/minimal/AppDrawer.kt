@@ -2,6 +2,8 @@ package app.bedtime.ui.minimal
 
 import androidx.compose.foundation.lazy.itemsIndexed
 import app.bedtime.data.Keywords
+import app.bedtime.data.ChatApp
+import androidx.compose.material.icons.filled.Add
 import app.bedtime.data.ClockAction
 import app.bedtime.data.ClockActions
 import app.bedtime.data.FolderIndex
@@ -100,10 +102,14 @@ sealed interface DrawerResult {
     data class AddNote(val target: NoteTarget?) : DrawerResult
     data class AddEvent(val event: ParsedEvent) : DrawerResult
     data object OpenNotes : DrawerResult
-    /** A contact: tapped, the phone app with their number; [Message] and [WhatsApp] are its two buttons. */
-    data class Contact(val hit: ContactHit) : DrawerResult
-    data class Message(val hit: ContactHit) : DrawerResult
-    data class WhatsApp(val hit: ContactHit) : DrawerResult
+    /**
+     * A contact: tapped, the phone app with their number. Its buttons are [Chat]s, carrying [message]
+     * when the words went on past their name ("@anna running late").
+     */
+    data class Contact(val hit: ContactHit, val message: String = "") : DrawerResult
+    data class Chat(val hit: ContactHit, val app: ChatApp, val text: String) : DrawerResult
+    /** The answer to a sum, copied when tapped. */
+    data class Calculation(val answer: String) : DrawerResult
     data class Clock(val action: ClockAction) : DrawerResult
     data class Setting(val page: SettingsPage) : DrawerResult
     /** A note in your Obsidian vault, found by its title. */
@@ -139,6 +145,8 @@ object AppDrawer {
         keyword: Keywords.Hit? = null,
         /** What else the words found, by choice key: an alarm, settings pages, notes and files by name. */
         found: Map<String, List<DrawerResult>> = emptyMap(),
+        /** What the words say after a contact's name, for their messaging buttons. */
+        message: String = "",
     ): List<DrawerResult> {
         val q = query.trim()
         if (q.isEmpty()) return emptyList()
@@ -154,7 +162,7 @@ object AppDrawer {
             noteTargets.forEach { put(SearchOrder.noteKey(it), listOf(DrawerResult.AddNote(it))) }
             put(SearchOrder.REFUGE_NOTES, listOf(DrawerResult.AddNote(null)))
             event?.let { put(SearchOrder.CALENDAR, listOf(DrawerResult.AddEvent(it))) }
-            put(SearchOrder.CONTACTS, contacts.map { DrawerResult.Contact(it) })
+            put(SearchOrder.CONTACTS, contacts.map { DrawerResult.Contact(it, message) })
         }
         if (keyword != null) return offers[keyword.key].orEmpty()
         // What was found (apps, contacts, notes, files, settings pages) comes before what would be done
@@ -200,8 +208,8 @@ internal fun AppDrawerContent(
     preview: Boolean = false,
     /** A long press on an app: its actions. */
     onLongPress: ((AppEntry) -> Unit)? = null,
-    /** Whether contacts get a WhatsApp button. */
-    whatsApp: Boolean = false,
+    /** The messaging apps beside each contact, in order. */
+    chatApps: List<ChatApp> = listOf(ChatApp.SMS),
     /** The words the results are about: what was typed, or what follows a keyword. */
     words: String = query,
     /** A keyword was typed: its one result is marked, and Enter runs it. */
@@ -237,7 +245,7 @@ internal fun AppDrawerContent(
                             p,
                             marked = keyworded && i == 0,
                             onLongPress = (result as? DrawerResult.App)?.let { r -> onLongPress?.let { { it(r.app) } } },
-                            whatsApp = whatsApp,
+                            chatApps = chatApps,
                             onAction = onResult,
                         ) { onResult(result) }
                     }
@@ -381,7 +389,7 @@ private fun ResultRow(
     style: HomeStyle,
     p: HomePalette,
     onLongPress: (() -> Unit)? = null,
-    whatsApp: Boolean = false,
+    chatApps: List<ChatApp> = listOf(ChatApp.SMS),
     onAction: (DrawerResult) -> Unit = {},
     marked: Boolean = false,
     onClick: () -> Unit,
@@ -404,7 +412,8 @@ private fun ResultRow(
             is DrawerResult.AddEvent -> AppDrawer.eventLabel(result.event) { formatTime(context, it.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()) }
             DrawerResult.OpenNotes -> "open refuge notes"
             is DrawerResult.Contact -> result.hit.name
-            is DrawerResult.Message, is DrawerResult.WhatsApp -> ""
+            is DrawerResult.Chat -> ""
+            is DrawerResult.Calculation -> "= ${result.answer}"
             is DrawerResult.Clock -> ClockActions.label(result.action) { h, m ->
                 formatTime(context, java.time.LocalDate.now().atTime(h, m).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()).lowercase()
             }
@@ -422,6 +431,7 @@ private fun ResultRow(
             }
             is DrawerResult.AddEvent -> Icons.Default.DateRange
             is DrawerResult.Contact -> Icons.Default.Call
+            is DrawerResult.Calculation -> Icons.Default.Add
             is DrawerResult.Clock -> Icons.Default.Notifications
             is DrawerResult.Setting -> Icons.Default.Settings
             is DrawerResult.VaultNote -> Icons.Default.Create
@@ -437,16 +447,22 @@ private fun ResultRow(
         }
         Spacer(Modifier.width(14.dp))
         // App names are lowercased like the rest; what you typed keeps its case.
-        if (result is DrawerResult.App || result == DrawerResult.OpenNotes) {
+        if (result is DrawerResult.Contact) {
+            // The name, the message if one was typed, and a button for each messaging app beneath.
+            Column(Modifier.weight(1f)) {
+                VerbatimText(label, color = p.text, fontSize = (26 * names).sp, lineHeight = (32 * names).sp)
+                if (result.message.isNotBlank()) {
+                    VerbatimText("“${result.message}”", color = p.faint, fontSize = (18 * names).sp)
+                }
+                Row(Modifier.padding(top = 8.dp)) {
+                    chatApps.forEach { app -> ContactButton(app.label, p) { onAction(DrawerResult.Chat(result.hit, app, result.message)) } }
+                }
+            }
+        } else if (result is DrawerResult.App || result == DrawerResult.OpenNotes) {
             Text(label, fontSize = (26 * names).sp, lineHeight = (32 * names).sp, color = p.text, maxLines = 2, overflow = TextOverflow.Ellipsis)
         } else {
             // The suggestions as large as the apps in the list.
             VerbatimText(label, color = p.text, fontSize = (26 * names).sp, lineHeight = (32 * names).sp, modifier = Modifier.weight(1f, fill = false))
-        }
-        if (result is DrawerResult.Contact) {
-            Spacer(Modifier.weight(1f))
-            ContactButton("message", p) { onAction(DrawerResult.Message(result.hit)) }
-            if (whatsApp) ContactButton("whatsapp", p) { onAction(DrawerResult.WhatsApp(result.hit)) }
         }
     }
 }
@@ -458,7 +474,7 @@ private fun ContactButton(label: String, p: HomePalette, onClick: () -> Unit) {
         style = MaterialTheme.typography.labelMedium,
         color = p.text,
         modifier = Modifier
-            .padding(start = 8.dp)
+            .padding(end = 8.dp)
             .clip(RoundedCornerShape(50))
             .border(1.dp, p.faint.copy(alpha = 0.5f), RoundedCornerShape(50))
             .clickable(onClick = onClick)

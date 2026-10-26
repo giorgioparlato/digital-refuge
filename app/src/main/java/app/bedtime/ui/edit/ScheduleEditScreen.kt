@@ -1,5 +1,9 @@
 package app.bedtime.ui.edit
 
+import app.bedtime.ui.components.ScheduleIcons
+import app.bedtime.ui.components.ScheduleIconDialog
+import androidx.compose.ui.graphics.vector.ImageVector
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
@@ -460,6 +464,10 @@ internal fun ScheduleEditContent(
         open = if (open == section) null else section
     }
 
+    var pickingIcon by rememberSaveable { mutableStateOf(false) }
+    if (pickingIcon) {
+        ScheduleIconDialog(draft.icon, onDismiss = { pickingIcon = false }, onPick = { onDraftChange(draft.copy(icon = it)); pickingIcon = false })
+    }
     if (renaming) {
         RenameDialog(
             name = draft.name,
@@ -518,6 +526,7 @@ internal fun ScheduleEditContent(
                 onBack = onBack,
                 onHowItWorks = onHowItWorks,
                 onRename = { renaming = true },
+                onIcon = { pickingIcon = true },
                 onDraftChange = onDraftChange,
                 onEditStart = onEditStart,
                 onEditEnd = onEditEnd,
@@ -846,6 +855,9 @@ internal fun EditorHeader(
     onBack: () -> Unit,
     onRename: () -> Unit,
     onInfo: (() -> Unit)? = null,
+    /** Its mark, tapped to choose another; none for limits. */
+    icon: ImageVector? = null,
+    onIcon: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val c = Obsidian.colors
@@ -865,6 +877,15 @@ internal fun EditorHeader(
                 modifier = Modifier.clip(CircleShape).clickable(onClick = onBack).padding(4.dp).size(22.dp),
             )
             Spacer(Modifier.width(10.dp))
+            if (icon != null) {
+                Icon(
+                    icon,
+                    contentDescription = "its mark",
+                    tint = c.accent,
+                    modifier = Modifier.clip(CircleShape).clickable(enabled = editable && onIcon != null) { onIcon?.invoke() }.padding(4.dp).size(18.dp),
+                )
+                Spacer(Modifier.width(4.dp))
+            }
             Row(
                 Modifier
                     .weight(1f)
@@ -904,6 +925,7 @@ private fun ScheduleHeader(
     onBack: () -> Unit,
     onHowItWorks: () -> Unit,
     onRename: () -> Unit,
+    onIcon: () -> Unit,
     onDraftChange: (Schedule) -> Unit,
     onEditStart: () -> Unit,
     onEditEnd: () -> Unit,
@@ -917,6 +939,8 @@ private fun ScheduleHeader(
         onBack = onBack,
         onRename = onRename,
         onInfo = onHowItWorks,
+        icon = ScheduleIcons.of(draft.icon),
+        onIcon = onIcon,
     ) {
         if (draft.isBlock) {
             Row(verticalAlignment = Alignment.Bottom) {
