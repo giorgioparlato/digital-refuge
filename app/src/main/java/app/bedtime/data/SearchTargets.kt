@@ -102,7 +102,8 @@ object SearchOrder {
     const val REFUGE_NOTES = "note:refuge"
     const val CALENDAR = "calendar"
     const val CONTACTS = "contacts"
-    const val CLOCK = "clock"
+    const val ALARM = "alarm"
+    const val TIMER = "timer"
     const val SETTINGS = "settings"
     const val OBSIDIAN = "obsidian"
     const val FILES = "files"
@@ -120,7 +121,8 @@ object SearchOrder {
                 SearchChoice(REFUGE_NOTES, true) +
                 SearchChoice(CALENDAR, true) +
                 SearchChoice(CONTACTS, false) +
-                SearchChoice(CLOCK, true) +
+                SearchChoice(ALARM, true) +
+                SearchChoice(TIMER, true) +
                 SearchChoice(SETTINGS, true) +
                 listOfNotNull(SearchChoice(OBSIDIAN, false).takeIf { obsidian }) +
                 SearchChoice(FILES, false),

@@ -184,6 +184,10 @@ data class HomeStyle(
     val showGreeting: Boolean = true,
     val showDate: Boolean = true,
     val showIcons: Boolean = false,
+    /** The refuge mark at the bottom left of the minimal screen, a tap into the app. */
+    val showLogo: Boolean = false,
+    /** The ⌃ at the foot that opens all apps; swiping up works either way. */
+    val showSwipeArrow: Boolean = true,
     /** A quote under the session, on the minimal home and the lock screen. */
     val showQuote: Boolean = true,
     /** How often that quote changes. */
@@ -310,8 +314,10 @@ data class AppSettings(
     val keywordsCustom: Boolean = false,
     /** Your Obsidian vault's folder (a tree URI), whose notes' titles the search finds; null until chosen. */
     val obsidianVault: String? = null,
-    /** A folder (a tree URI) whose files the search finds by name; null until chosen. */
+    /** The one folder of files from 0.9.8; kept so it still loads. Use [fileFolders]. */
     val filesFolder: String? = null,
+    /** Folders (tree URIs) whose files the search finds by name. */
+    val filesFolders: List<String> = emptyList(),
     /** What the search offers after apps, in your order, each on or off; empty until you change it. */
     val searchChoices: List<SearchChoice> = emptyList(),
     /** Which block each home-screen widget starts, by widget id; missing means the tile's block, then the first. */
@@ -335,7 +341,10 @@ data class AppSettings(
     val noteTargets: List<NoteTarget> = emptyList(),
     /** Which calendar the search adds events to; null for the first one that can take them. */
     val eventCalendarId: Long? = null,
-)
+) {
+    /** The folders the search finds files in, including the single one chosen before there could be several. */
+    val fileFolders: List<String> get() = (listOfNotNull(filesFolder) + filesFolders).distinct()
+}
 
 /** Which quotes rotate: the app's and yours, only yours, or only favourites. */
 @Serializable

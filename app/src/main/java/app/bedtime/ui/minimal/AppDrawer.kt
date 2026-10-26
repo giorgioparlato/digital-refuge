@@ -157,12 +157,24 @@ object AppDrawer {
             put(SearchOrder.CONTACTS, contacts.map { DrawerResult.Contact(it) })
         }
         if (keyword != null) return offers[keyword.key].orEmpty()
+        // What was found (apps, contacts, notes, files, settings pages) comes before what would be done
+        // with the words, each part in your order, so the two never interleave.
+        val chosen = (choices ?: SearchOrder.defaults(targets, noteTargets)).filter { it.on }.flatMap { offers[it.key].orEmpty() }
         return buildList {
             matching.forEach { add(DrawerResult.App(it)) }
             if (q.length >= 2 && "notes".startsWith(q.lowercase())) add(DrawerResult.OpenNotes)
-            (choices ?: SearchOrder.defaults(targets, noteTargets)).filter { it.on }.forEach { choice -> addAll(offers[choice.key].orEmpty()) }
+            addAll(chosen.filterNot(::isAction))
+            addAll(chosen.filter(::isAction))
         }
     }
+
+    /** Whether [result] does something with the words (searches, saves a note or an event, sets the clock), rather than opening something found. */
+    fun isAction(result: DrawerResult): Boolean =
+        result is DrawerResult.Search || result is DrawerResult.AddNote || result is DrawerResult.AddEvent || result is DrawerResult.Clock
+
+    /** Where the line between what was found and the actions goes: before the first action, if anything found comes before it. */
+    fun dividerAt(results: List<DrawerResult>): Int? =
+        results.indexOfFirst(::isAction).takeIf { it > 0 }
 
     /** How an event reads before it's saved: "add to calendar: Dentist · fri 30 oct, 09:00–10:00", the title as typed. */
     fun eventLabel(event: ParsedEvent, time: (java.time.LocalDateTime) -> String): String {
@@ -211,8 +223,13 @@ internal fun AppDrawerContent(
             if (query.isBlank()) {
                 AppList(apps, style, p, onLaunch, onLongPress)
             } else {
+                val divider = AppDrawer.dividerAt(results)
                 LazyColumn(Modifier.fillMaxSize()) {
                     itemsIndexed(results) { i, result ->
+                        if (i == divider) {
+                            // Room between opening what was found and doing something with the words, so a tap meant for one can't land on the other.
+                            Box(Modifier.fillMaxWidth().padding(vertical = 14.dp).height(1.dp).background(p.faint.copy(alpha = 0.3f)))
+                        }
                         ResultRow(
                             result,
                             words.trim(),

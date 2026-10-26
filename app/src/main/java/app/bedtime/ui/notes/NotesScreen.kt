@@ -175,7 +175,7 @@ private fun NoteEditor(initial: String, onDone: (String) -> Unit, onDelete: (() 
         Column(Modifier.fillMaxSize().padding(padding).imePadding()) {
             BasicTextField(
                 value = value,
-                onValueChange = { value = it },
+                onValueChange = { value = Markdown.continueList(value, it) },
                 textStyle = MaterialTheme.typography.bodyLarge.copy(color = c.textNormal),
                 cursorBrush = SolidColor(c.accent),
                 visualTransformation = remember(c.textFaint, c.accent) { MarkdownTransformation(c.textFaint, c.accent) },
@@ -192,7 +192,7 @@ private fun NoteEditor(initial: String, onDone: (String) -> Unit, onDelete: (() 
     }
 }
 
-/** The marks Obsidian keeps above its keyboard: brackets, bold, italic, a heading, a list, a to-do. */
+/** The marks Obsidian keeps above its keyboard: brackets, bold, italic, headings, a list, a to-do, and indenting. */
 @Composable
 private fun MarkdownBar(onEdit: ((TextFieldValue) -> TextFieldValue) -> Unit) {
     val c = Obsidian.colors
@@ -204,9 +204,11 @@ private fun MarkdownBar(onEdit: ((TextFieldValue) -> TextFieldValue) -> Unit) {
         BarKey("]", "closing bracket") { onEdit { Markdown.insert(it, "]") } }
         BarKey("B", "bold", bold = true) { onEdit { Markdown.wrap(it, "**") } }
         BarKey("I", "italic", italic = true) { onEdit { Markdown.wrap(it, "*") } }
-        BarKey("H", "heading") { onEdit { Markdown.toggleLine(it, "# ") } }
+        BarKey("H", "heading: tap again for a smaller one") { onEdit { Markdown.cycleHeading(it) } }
         BarKey("•", "list") { onEdit { Markdown.toggleLine(it, "- ") } }
         BarKey("☐", "to-do") { onEdit { Markdown.toggleLine(it, "- [ ] ") } }
+        BarKey("→", "indent") { onEdit { Markdown.indent(it, inward = true) } }
+        BarKey("←", "outdent") { onEdit { Markdown.indent(it, inward = false) } }
     }
 }
 

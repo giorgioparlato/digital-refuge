@@ -15,6 +15,9 @@ class SearchExtrasTest {
         assertNull(ClockActions.parse("alarm 25:00"))
         assertNull(ClockActions.parse("alarm clock"))
         assertNull(ClockActions.parse("alarmed 7"))
+        // After its own keyword, just the time.
+        assertEquals(ClockAction.Alarm(7, 30, "run"), ClockActions.alarm("7:30 run"))
+        assertNull(ClockActions.alarm("tomorrow"))
     }
 
     @Test
@@ -25,6 +28,7 @@ class SearchExtrasTest {
         assertEquals(ClockAction.Timer(330, ""), ClockActions.parse("timer 5 min 30"))
         assertEquals(ClockAction.Timer(90, "eggs"), ClockActions.parse("timer 90s eggs"))
         assertNull(ClockActions.parse("timer tea"))
+        assertEquals(ClockAction.Timer(600, ""), ClockActions.timer("10"))
         assertEquals("start a 1 h 30 min timer", ClockActions.label(ClockAction.Timer(5400, "")) { _, _ -> "" })
     }
 

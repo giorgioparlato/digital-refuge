@@ -327,6 +327,9 @@ private fun LockScreen(
         when (action) {
             HomeActions.NOTE -> quickNote = true
             HomeActions.NOTIFICATIONS -> BlockingState.globalAction(context, AccessibilityService.GLOBAL_ACTION_NOTIFICATIONS)
+            HomeActions.LOCK -> if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                BlockingState.globalAction(context, AccessibilityService.GLOBAL_ACTION_LOCK_SCREEN)
+            }
             else -> onOpenApp(action)
         }
     }

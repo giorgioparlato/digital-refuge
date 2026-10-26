@@ -75,7 +75,8 @@ class AppDrawerTest {
                 SearchChoice("note:content://s", true),
                 SearchChoice(SearchOrder.REFUGE_NOTES, true),
                 SearchChoice(SearchOrder.CALENDAR, true),
-                SearchChoice(SearchOrder.CLOCK, true),
+                SearchChoice(SearchOrder.ALARM, true),
+                SearchChoice(SearchOrder.TIMER, true),
                 SearchChoice(SearchOrder.SETTINGS, true),
                 SearchChoice("web:pkg.firefox", false),
                 SearchChoice("wikipedia:pkg.wiki", false),
@@ -104,7 +105,8 @@ class AppDrawerTest {
                 SearchChoice(SearchOrder.REFUGE_NOTES, true),
                 SearchChoice("web:pkg.browser", true),
                 SearchChoice(SearchOrder.CALENDAR, true),
-                SearchChoice(SearchOrder.CLOCK, true),
+                SearchChoice(SearchOrder.ALARM, true),
+                SearchChoice(SearchOrder.TIMER, true),
                 SearchChoice(SearchOrder.SETTINGS, true),
                 SearchChoice("wikipedia:pkg.wiki", false),
                 SearchChoice(SearchOrder.CONTACTS, false),
@@ -156,6 +158,12 @@ class AppDrawerTest {
             listOf(DrawerResult.File(pdf), DrawerResult.AddNote(null)),
             AppDrawer.results("trip", emptyList(), emptyList(), emptyList(), null, choices, found = found),
         )
+        // What's found comes before what would be done, whatever the order of the choices, with a line between.
+        val actionFirst = listOf(SearchChoice(SearchOrder.REFUGE_NOTES, true), SearchChoice(SearchOrder.FILES, true))
+        val mixed = AppDrawer.results("trip", apps, emptyList(), emptyList(), null, actionFirst, found = found)
+        assertEquals(listOf(DrawerResult.File(pdf), DrawerResult.AddNote(null)), mixed)
+        assertEquals(1, AppDrawer.dividerAt(mixed))
+        assertEquals(null, AppDrawer.dividerAt(listOf(DrawerResult.AddNote(null))))
         // A keyword reaches it even switched off.
         assertEquals(
             listOf(DrawerResult.VaultNote(note)),

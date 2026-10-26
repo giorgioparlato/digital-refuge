@@ -13,6 +13,19 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            55,
+            "0.9.9",
+            listOf(
+                "Alarms and timers each have their own keyword in the search: \"a 7:30\", \"t 10 min\".",
+                "The search shows what it found first, then a line, then what it can do with your words, so a tap meant for one can't land on the other.",
+                "File search can look in several folders.",
+                "Notes: Enter carries a list, to-do or numbered list on, new keys indent and outdent, and H steps through three heading sizes.",
+                "The refuge mark can sit at the bottom left of the minimal screen, and the arrow to all apps can be hidden.",
+                "A lock-screen gesture can turn the screen off.",
+                "The emergency screen no longer lists always-available apps; they're in the full list.",
+            ),
+        ),
+        ChangelogEntry(
             54,
             "0.9.8",
             listOf(

@@ -51,6 +51,13 @@ class ModelsCompatTest {
     }
 
     @Test
+    fun theOneFolderOfFilesFrom098StillCounts() {
+        val settings = AppJson.decodeFromString(AppSettings.serializer(), """{"filesFolder":"content://a"}""")
+        assertEquals(listOf("content://a"), settings.fileFolders)
+        assertEquals(listOf("content://a", "content://b"), settings.copy(filesFolders = listOf("content://a", "content://b")).fileFolders)
+    }
+
+    @Test
     fun settingsWithoutLastSeenVersionLoad() {
         val settings = AppJson.decodeFromString(AppSettings.serializer(), """{"onboarded":true}""")
         assertEquals(0, settings.lastSeenVersion)

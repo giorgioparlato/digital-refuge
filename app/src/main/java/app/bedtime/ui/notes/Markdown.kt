@@ -148,6 +148,53 @@ object Markdown {
             TextFieldValue(value.text.replaceRange(lineStart, lineStart, prefix), TextRange(at + prefix.length))
         }
     }
+
+    private val listItem = Regex("""^(\s*)(- \[[ xX]] |[-*+] |(\d+)([.)]) )(.*)$""")
+
+    /**
+     * [new] as typed after [old], except that Enter at the end of a list item carries the list on: the
+     * same mark, the next number, a fresh box for a to-do. Enter on an item with nothing in it ends
+     * the list instead, taking its mark away.
+     */
+    fun continueList(old: TextFieldValue, new: TextFieldValue): TextFieldValue {
+        val at = new.selection.start - 1
+        if (!new.selection.collapsed || at < 0 || new.text.length != old.text.length + 1 || new.text[at] != '\n') return new
+        if (new.text.removeRange(at, at + 1) != old.text) return new
+        val lineStart = new.text.lastIndexOf('\n', at - 1) + 1
+        val m = listItem.matchEntire(new.text.substring(lineStart, at)) ?: return new
+        if (m.groupValues[5].isBlank()) return TextFieldValue(new.text.removeRange(lineStart, at + 1), TextRange(lineStart))
+        val mark = when {
+            m.groupValues[3].isNotEmpty() -> "${m.groupValues[3].toInt() + 1}${m.groupValues[4]} "
+            m.groupValues[2].startsWith("- [") -> "- [ ] "
+            else -> m.groupValues[2]
+        }
+        val carried = m.groupValues[1] + mark
+        return TextFieldValue(new.text.replaceRange(at + 1, at + 1, carried), TextRange(at + 1 + carried.length))
+    }
+
+    /** The cursor's line changed by [change], the cursor kept where it was in the words. */
+    private fun changeLine(value: TextFieldValue, change: (String) -> String): TextFieldValue {
+        val at = value.selection.min
+        val lineStart = value.text.lastIndexOf('\n', at - 1) + 1
+        val lineEnd = value.text.indexOf('\n', at).let { if (it < 0) value.text.length else it }
+        val line = value.text.substring(lineStart, lineEnd)
+        val changed = change(line)
+        return TextFieldValue(value.text.replaceRange(lineStart, lineEnd, changed), TextRange((at + changed.length - line.length).coerceAtLeast(lineStart)))
+    }
+
+    /** The line two spaces further in (a sub-item), or out again. */
+    fun indent(value: TextFieldValue, inward: Boolean): TextFieldValue =
+        changeLine(value) { line -> if (inward) "  $line" else line.removePrefix(line.take(2).takeWhile { it == ' ' }) }
+
+    /** The line's heading one level smaller each time, # to ## to ###, then plain again. */
+    fun cycleHeading(value: TextFieldValue): TextFieldValue = changeLine(value) { line ->
+        when {
+            line.startsWith("### ") -> line.removePrefix("### ")
+            line.startsWith("## ") -> "#$line"
+            line.startsWith("# ") -> "#$line"
+            else -> "# $line"
+        }
+    }
 }
 
 /** Shows a note styled as Markdown while it's typed; nothing is added or taken away, so the cursor maps one to one. */

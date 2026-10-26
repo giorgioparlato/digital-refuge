@@ -14,6 +14,9 @@ import app.bedtime.ui.components.Chevron
 import app.bedtime.ui.components.OptionRow
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Create
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.foundation.clickable
 import app.bedtime.data.ContactSearch
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -90,8 +93,8 @@ fun SearchSettingsScreen(onBack: () -> Unit) {
     val vaultName by produceState<String?>(null, current.obsidianVault) {
         value = current.obsidianVault?.let { withContext(Dispatchers.IO) { FolderIndex.folderName(context, Uri.parse(it)) } }
     }
-    val folderName by produceState<String?>(null, current.filesFolder) {
-        value = current.filesFolder?.let { withContext(Dispatchers.IO) { FolderIndex.folderName(context, Uri.parse(it)) } }
+    val folderNames by produceState(emptyList<String>(), current.fileFolders) {
+        value = withContext(Dispatchers.IO) { current.fileFolders.map { FolderIndex.folderName(context, Uri.parse(it)) } }
     }
     val labels = targets.associate { it.key to it.choiceLabel() } +
         current.noteTargets.associate { SearchOrder.noteKey(it) to "Add to ${it.name}" } +
@@ -99,10 +102,11 @@ fun SearchSettingsScreen(onBack: () -> Unit) {
             SearchOrder.REFUGE_NOTES to "Save in refuge notes",
             SearchOrder.CALENDAR to "Add to calendar, when the words say when",
             SearchOrder.CONTACTS to "Contacts: call, message, WhatsApp",
-            SearchOrder.CLOCK to "Alarms and timers: \"alarm 7:30\", \"timer 10 min\"",
+            SearchOrder.ALARM to "Alarms: \"alarm 7:30\"",
+            SearchOrder.TIMER to "Timers: \"timer 10 min\"",
             SearchOrder.SETTINGS to "Settings pages",
             SearchOrder.OBSIDIAN to "Obsidian notes, by title",
-            SearchOrder.FILES to "Files in a folder, by name",
+            SearchOrder.FILES to "Files in your folders, by name",
         )
     val save = { updated: List<SearchChoice> -> scope.launch { repo.updateSettings { it.copy(searchChoices = updated) } } }
     // Obsidian notes and files need their folder first: switching them on without one asks for it.
@@ -117,7 +121,11 @@ fun SearchSettingsScreen(onBack: () -> Unit) {
         runCatching { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
         scope.launch {
             repo.updateSettings {
-                val withFolder = if (key == SearchOrder.OBSIDIAN) it.copy(obsidianVault = uri.toString()) else it.copy(filesFolder = uri.toString())
+                val withFolder = if (key == SearchOrder.OBSIDIAN) {
+                    it.copy(obsidianVault = uri.toString())
+                } else {
+                    it.copy(filesFolders = (it.fileFolders + uri.toString()).distinct(), filesFolder = null)
+                }
                 // Chosen from the toggle, it's switched on too; chosen from the folder row, it stays as it was.
                 if (updated != null) withFolder.copy(searchChoices = updated) else withFolder
             }
@@ -128,7 +136,7 @@ fun SearchSettingsScreen(onBack: () -> Unit) {
         waitingFolder = updated
         pickFolder.launch(null)
     }
-    val folderOf = mapOf(SearchOrder.OBSIDIAN to current.obsidianVault, SearchOrder.FILES to current.filesFolder)
+    val folderOf = mapOf(SearchOrder.OBSIDIAN to current.obsidianVault, SearchOrder.FILES to current.fileFolders.firstOrNull())
     // Contacts are read only once you've said so, here.
     var waitingContacts by remember { mutableStateOf<List<SearchChoice>?>(null) }
     val askContacts = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -157,11 +165,15 @@ fun SearchSettingsScreen(onBack: () -> Unit) {
             }
         },
         onBack = onBack,
-        folders = listOfNotNull(
-            Triple(SearchOrder.OBSIDIAN, "Obsidian vault", vaultName).takeIf { obsidian },
-            Triple(SearchOrder.FILES, "Folder of files", folderName),
-        ),
-        onFolder = { key -> choose(key, null) },
+        folders = listOfNotNull(Triple(SearchOrder.OBSIDIAN, "Obsidian vault", vaultName).takeIf { obsidian }) +
+            folderNames.mapIndexed { i, name -> Triple("${SearchOrder.FILES}:$i", "Folder of files", name) },
+        onFolder = { key -> if (key == SearchOrder.OBSIDIAN || key == SearchOrder.FILES) choose(key, null) },
+        onRemoveFolder = { key ->
+            val at = key.substringAfter(':').toIntOrNull()
+            if (at != null) scope.launch {
+                repo.updateSettings { s -> s.copy(filesFolders = s.fileFolders.filterIndexed { i, _ -> i != at }, filesFolder = null) }
+            }
+        },
     )
 }
 
@@ -183,6 +195,8 @@ internal fun SearchSettingsContent(
     /** The folders searched by name: their choice key, what they are, and the one chosen (null if none). */
     folders: List<Triple<String, String, String?>> = emptyList(),
     onFolder: (key: String) -> Unit = {},
+    /** Takes away one of the folders of files ("files:<n>"). */
+    onRemoveFolder: (key: String) -> Unit = {},
 ) {
     val c = Obsidian.colors
     val list = choices.map { it.first }
@@ -265,18 +279,29 @@ internal fun SearchSettingsContent(
                     }
                 }
             }
-            if (folders.isNotEmpty()) {
-                SectionCard(title = "Folders", subtitle = "Only names are read, to match what you type; nothing inside the files.") {
-                    folders.forEach { (key, title, chosen) ->
-                        OptionRow(
-                            icon = if (key == SearchOrder.OBSIDIAN) Icons.Default.Create else Icons.AutoMirrored.Filled.List,
-                            title = title,
-                            description = chosen ?: "None chosen yet",
-                            onClick = { onFolder(key) },
-                            trailing = { Chevron() },
-                        )
-                    }
+            SectionCard(title = "Folders", subtitle = "Only names are read, to match what you type; nothing inside the files.") {
+                folders.forEach { (key, title, chosen) ->
+                    val removable = key.startsWith("${SearchOrder.FILES}:")
+                    OptionRow(
+                        icon = if (key == SearchOrder.OBSIDIAN) Icons.Default.Create else Icons.AutoMirrored.Filled.List,
+                        title = title,
+                        description = chosen ?: "None chosen yet",
+                        onClick = if (removable) null else ({ onFolder(key) }),
+                        trailing = {
+                            if (removable) {
+                                Icon(
+                                    Icons.Default.Clear,
+                                    contentDescription = "take this folder away",
+                                    tint = c.textFaint,
+                                    modifier = Modifier.size(36.dp).clip(RoundedCornerShape(50)).clickable { onRemoveFolder(key) }.padding(8.dp),
+                                )
+                            } else {
+                                Chevron()
+                            }
+                        },
+                    )
                 }
+                OptionRow(Icons.Default.Add, "Add a folder of files", onClick = { onFolder(SearchOrder.FILES) }, trailing = { Chevron() })
             }
             Spacer(Modifier.height(24.dp))
         }

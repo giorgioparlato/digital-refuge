@@ -46,6 +46,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.runtime.produceState
 import androidx.compose.material3.IconButton
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import app.bedtime.ui.components.BedtimeIcons
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -247,9 +248,9 @@ private fun MinimalHomeScreen(
             FolderIndex.folderName(context, uri) to FolderIndex.list(context, uri) { it.endsWith(".md") }
         }
     }
-    val folderFiles by produceState(emptyList<IndexedFile>(), drawer, settings.filesFolder) {
-        val tree = settings.filesFolder
-        if (drawer && tree != null) value = withContext(Dispatchers.IO) { FolderIndex.list(context, Uri.parse(tree)) }
+    val folderFiles by produceState(emptyList<IndexedFile>(), drawer, settings.fileFolders) {
+        val trees = settings.fileFolders
+        if (drawer && trees.isNotEmpty()) value = withContext(Dispatchers.IO) { trees.flatMap { FolderIndex.list(context, Uri.parse(it)) } }
     }
     // An event waiting for calendar access, saved once it's given.
     var pendingEvent by remember { mutableStateOf<ParsedEvent?>(null) }
@@ -307,10 +308,6 @@ private fun MinimalHomeScreen(
         dialer = dialer,
     )
     val apps = lists.home.mapNotNull(byPackage::get).let { home -> if (occurrence != null) home.sortedBy { it.label.lowercase() } else home }
-    var alwaysAvailableApps by remember { mutableStateOf(emptyList<AppEntry>()) }
-    LaunchedEffect(settings.alwaysAvailable) {
-        alwaysAvailableApps = withContext(Dispatchers.IO) { entries(context, settings.alwaysAvailable) }
-    }
     var now by remember { mutableStateOf(LocalDateTime.now()) }
     LaunchedEffect(Unit) {
         while (true) {
@@ -367,7 +364,12 @@ private fun MinimalHomeScreen(
     val openablePackages = openable.map { it.packageName }.toSet()
     // An alarm or timer, settings pages (when Settings could be opened now), and notes and files by name.
     val found = buildMap {
-        ClockActions.parse(words)?.let { put(SearchOrder.CLOCK, listOf(DrawerResult.Clock(it))) }
+        // With its keyword just the time ("a 7:30", "t 10"); without, starting "alarm" or "timer".
+        val clock = ClockActions.parse(words)
+        (if (keyword?.key == SearchOrder.ALARM) ClockActions.alarm(words) else clock as? app.bedtime.data.ClockAction.Alarm)
+            ?.let { put(SearchOrder.ALARM, listOf(DrawerResult.Clock(it))) }
+        (if (keyword?.key == SearchOrder.TIMER) ClockActions.timer(words) else clock as? app.bedtime.data.ClockAction.Timer)
+            ?.let { put(SearchOrder.TIMER, listOf(DrawerResult.Clock(it))) }
         if (settingsApp == null || settingsApp in openablePackages) put(SearchOrder.SETTINGS, SettingsPages.match(words).map { DrawerResult.Setting(it) })
         if (FolderIndex.OBSIDIAN in openablePackages) put(SearchOrder.OBSIDIAN, FolderIndex.match(vault.second, words, name = FolderIndex::title).map { DrawerResult.VaultNote(it) })
         put(SearchOrder.FILES, FolderIndex.match(folderFiles, words).map { DrawerResult.File(it) })
@@ -468,8 +470,6 @@ private fun MinimalHomeScreen(
             EmergencyContent(
                 onBack = { emergency = false },
                 onCall = { SystemApps.dialerPackage(context)?.let { AppCatalog.launch(context, it) } },
-                alwaysAvailable = alwaysAvailableApps,
-                onOpenApp = { AppCatalog.launch(context, it) },
                 onOpenRefuge = { AppCatalog.launch(context, context.packageName) },
                 onPauseBlocking = {
                     if (!BlockingState.pause(occurrence.schedule.breakMinutes)) context.startActivity(BlockingState.accessibilityIntent())
@@ -517,6 +517,7 @@ private fun MinimalHomeScreen(
             calendar = rememberCalendarLine(style, now, onLockScreen = false),
             onCalendar = { scope.launch { week = loadCalendarWeek(context, LocalDateTime.now()) } },
             onOpenDrawer = { drawer = true },
+            onOpenRefuge = { AppCatalog.launch(context, context.packageName) },
             onGesture = onGesture,
             hours = todayHours.takeIf { style.hoursOnHome && HourlyUse.counting(settings) }
                 ?.let { HourlyUse.states(it, now.hour, HourlyUse.rule(settings)) },
@@ -574,13 +575,6 @@ private fun MinimalHomeScreen(
     }
 }
 
-/** Launchable apps among [packages], with labels, sorted by name. */
-private fun entries(context: Context, packages: Set<String>): List<AppEntry> =
-    packages
-        .filter { AppCatalog.isLaunchable(context, it) }
-        .map { AppEntry(it, AppCatalog.label(context, it)) }
-        .sortedBy { it.label.lowercase() }
-
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun MinimalHomeContent(
@@ -621,6 +615,8 @@ internal fun MinimalHomeContent(
     onQuoteFavourite: () -> Unit = {},
     onQuoteHide: () -> Unit = {},
     onNextQuote: () -> Unit = {},
+    /** Opens digital refuge, from a tap on its mark at the foot. */
+    onOpenRefuge: () -> Unit = {},
     preview: Boolean = false,
 ) {
     val p = style.palette()
@@ -746,14 +742,23 @@ internal fun MinimalHomeContent(
                     item { Text(emptyHint ?: "nothing to open right now. enjoy the quiet.", fontSize = (18 * scale).sp, color = p.faint) }
                 }
             }
+            val logo = @Composable {
+                IconButton(onClick = onOpenRefuge) {
+                    Icon(BedtimeIcons.Refuge, contentDescription = "digital refuge", tint = p.faint, modifier = Modifier.size(26.dp))
+                }
+            }
             if (onUnlock == null) {
-                // Your everyday home: just the way to all apps (digital refuge itself is among them).
-                Box(Modifier.fillMaxWidth()) {
-                    IconButton(onClick = onOpenDrawer, modifier = Modifier.align(Alignment.Center)) {
-                        Icon(Icons.Default.KeyboardArrowUp, contentDescription = "all apps and search", tint = p.faint)
+                // Your everyday home: the way to all apps (digital refuge itself is among them), and its mark if you like.
+                if (style.showLogo || style.showSwipeArrow) Box(Modifier.fillMaxWidth()) {
+                    if (style.showLogo) Box(Modifier.align(Alignment.CenterStart)) { logo() }
+                    if (style.showSwipeArrow) {
+                        IconButton(onClick = onOpenDrawer, modifier = Modifier.align(Alignment.Center)) {
+                            Icon(Icons.Default.KeyboardArrowUp, contentDescription = "all apps and search", tint = p.faint)
+                        }
                     }
                 }
             } else Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                if (style.showLogo) logo()
                 if (onUndo != null) {
                     TextButton(onClick = onUndo) { Text("undo", color = p.accent, fontWeight = FontWeight.SemiBold) }
                 } else {
@@ -764,10 +769,12 @@ internal fun MinimalHomeContent(
                     }
                 }
                 Spacer(Modifier.weight(1f))
-                IconButton(onClick = onOpenDrawer) {
-                    Icon(Icons.Default.KeyboardArrowUp, contentDescription = "all apps and search", tint = p.faint)
+                if (style.showSwipeArrow) {
+                    IconButton(onClick = onOpenDrawer) {
+                        Icon(Icons.Default.KeyboardArrowUp, contentDescription = "all apps and search", tint = p.faint)
+                    }
+                    Spacer(Modifier.weight(1f))
                 }
-                Spacer(Modifier.weight(1f))
                 TextButton(onClick = onEmergency) {
                     Icon(Icons.Default.Warning, contentDescription = null, tint = p.faint, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(8.dp))

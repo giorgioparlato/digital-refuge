@@ -421,6 +421,12 @@ internal fun HomeStyleContent(
                     OptionRow(BedtimeIcons.Grid, "App icons", description = "Small icons next to app names") {
                         ObsidianToggle(style.showIcons, { onChange(style.copy(showIcons = it)) })
                     }
+                    OptionRow(BedtimeIcons.Refuge, "The refuge mark", description = "Bottom left; a tap opens digital refuge") {
+                        ObsidianToggle(style.showLogo, { onChange(style.copy(showLogo = it)) })
+                    }
+                    OptionRow(Icons.Default.KeyboardArrowUp, "The arrow to all apps", description = "At the foot; swiping up works either way") {
+                        ObsidianToggle(style.showSwipeArrow, { onChange(style.copy(showSwipeArrow = it)) })
+                    }
                     OptionRow(BedtimeIcons.Leaf, "Quote", description = "Here and on the lock screen. Tap it for another, hold it to favourite or hide it") {
                         ObsidianToggle(style.showQuote, { onChange(style.copy(showQuote = it)) })
                     }
@@ -555,6 +561,7 @@ internal fun HomeStyleContent(
                                 GESTURE_CAMERA -> "Camera"
                                 HomeActions.NOTE -> "Write a quick note"
                                 HomeActions.NOTIFICATIONS -> "Show notifications"
+                                HomeActions.LOCK -> "Turn the screen off"
                                 else -> allApps.firstOrNull { it.packageName == target }?.label?.let { "Open $it" } ?: target
                             },
                             onClick = { pickingSwipe = swipe },
@@ -640,6 +647,7 @@ private fun SwipeTargetDialog(swipe: Swipe, apps: List<AppEntry>, onDismiss: () 
                 item { DialogChoice("Camera, without unlocking") { onPick(GESTURE_CAMERA) } }
                 item { DialogChoice("Write a quick note, without unlocking") { onPick(HomeActions.NOTE) } }
                 item { DialogChoice("Show notifications") { onPick(HomeActions.NOTIFICATIONS) } }
+                item { DialogChoice("Turn the screen off") { onPick(HomeActions.LOCK) } }
                 item { Text("Or open an app, once unlocked", style = MaterialTheme.typography.labelLarge, color = c.accentText, modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)) }
                 items(apps.size) { i -> DialogChoice(apps[i].label) { onPick(apps[i].packageName) } }
             }

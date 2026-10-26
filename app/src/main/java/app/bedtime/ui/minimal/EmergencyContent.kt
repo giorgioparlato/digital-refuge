@@ -34,20 +34,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
-import app.bedtime.apps.AppEntry
-import app.bedtime.ui.components.AppIcon
 import app.bedtime.ui.components.Chevron
 import app.bedtime.ui.components.PlainButton
 import app.bedtime.ui.components.SectionCard
 import app.bedtime.ui.theme.Obsidian
 
-/** Emergency options from minimal mode that keep the session in place: calling, and always-available apps. */
+/**
+ * Emergency options from minimal mode that keep the session in place: calling, digital refuge, and a
+ * short break. Always-available apps are in the full list behind a swipe up.
+ */
 @Composable
 internal fun EmergencyContent(
     onBack: () -> Unit,
     onCall: () -> Unit,
-    alwaysAvailable: List<AppEntry>,
-    onOpenApp: (String) -> Unit,
     onOpenRefuge: () -> Unit = {},
     onPauseBlocking: () -> Unit = {},
     breakMinutes: Int = 1,
@@ -83,18 +82,6 @@ internal fun EmergencyContent(
                         Modifier.size(36.dp).clip(CircleShape).background(c.accent.copy(alpha = 0.16f)),
                         contentAlignment = Alignment.Center,
                     ) { Icon(Icons.Default.Call, contentDescription = null, tint = c.accent, modifier = Modifier.size(20.dp)) }
-                }
-            }
-
-            SectionCard(title = "always available", subtitle = "never blocked, whatever the session") {
-                if (alwaysAvailable.isEmpty()) {
-                    Body("none yet. add a few — maps, rides, your authenticator — in settings \u2192 emergency.")
-                } else {
-                    alwaysAvailable.forEach { app ->
-                        ActionRow(onClick = { onOpenApp(app.packageName) }, label = app.label) {
-                            AppIcon(app.packageName, app.label, 36.dp)
-                        }
-                    }
                 }
             }
 
