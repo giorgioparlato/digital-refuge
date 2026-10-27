@@ -334,6 +334,14 @@ internal fun HomeStyleContent(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(page.intro, style = MaterialTheme.typography.bodyMedium, color = c.textMuted)
+            // Which screen's widgets: first, so the lock screen's are easy to find; the preview follows it.
+            if (page == StylePage.SHOWN) {
+                SegmentedChoice(
+                    options = listOf("Home screen", "Lock screen"),
+                    selected = widgetScreen.ordinal,
+                    onSelect = { widgetScreen = Screen.entries[it] },
+                )
+            }
             val previewShape = RoundedCornerShape(24.dp)
             if (page == StylePage.LOOK || page == StylePage.SHOWN) Box(
                 Modifier
@@ -434,13 +442,10 @@ internal fun HomeStyleContent(
                 }
             }
             if (page == StylePage.SHOWN) {
-                SectionCard(title = "Widgets", subtitle = "Each screen has its own. Drag by the handle to change the order") {
-                    SegmentedChoice(
-                        options = listOf("Home screen", "Lock screen"),
-                        selected = widgetScreen.ordinal,
-                        onSelect = { widgetScreen = Screen.entries[it] },
-                    )
-                    Spacer(Modifier.height(8.dp))
+                SectionCard(
+                    title = if (widgetScreen == Screen.HOME) "On the home screen" else "On the lock screen",
+                    subtitle = "Drag by the handle to change the order",
+                ) {
                     WidgetList(style, widgetScreen, onChange, onShowCalendar)
                 }
                 SectionCard(title = "Show") {
@@ -596,7 +601,7 @@ internal fun HomeStyleContent(
 /** The pages the home and lock screen's choices are split into, each reached from settings. */
 enum class StylePage(val title: String, val intro: String) {
     LOOK("Look", "Colours, sizes and fonts, for your home screen, the minimal one in sessions, and the lock screen. Changes save as you go."),
-    SHOWN("What's shown", "The widgets on your home screen and lock screen, each with its own, in the order you like; and what else shows around them. Changes save as you go."),
+    SHOWN("Widgets", "What your home screen and lock screen show, each its own, in the order you like. Pick the screen here first. Changes save as you go."),
     SWIPES(
         "Lock-screen gestures",
         "Swipes start around the clock; a double tap is anywhere. Each can open an app once you've unlocked, or straight away the camera, a quick note or your notifications. The middle is for swiping notifications away; from the bottom, any swipe just unlocks.",

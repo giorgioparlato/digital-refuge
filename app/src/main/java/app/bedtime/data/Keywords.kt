@@ -38,6 +38,10 @@ object Keywords {
     fun effective(saved: Map<String, String>, custom: Boolean, defaults: Map<String, String>): Map<String, String> =
         if (custom) saved else defaults
 
+    /** What already has [keyword], other than [key] itself; null when it's free (or empty). */
+    fun takenBy(keywords: Map<String, String>, key: String, keyword: String): String? =
+        if (keyword.isEmpty()) null else keywords.entries.firstOrNull { it.key != key && it.value == keyword }?.key
+
     /** A keyword as kept: lowercase, no spaces, at most a few characters. */
     fun clean(keyword: String): String = keyword.filterNot { it.isWhitespace() }.lowercase().take(4)
 

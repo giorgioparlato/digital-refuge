@@ -449,6 +449,18 @@ class ScreenshotTest {
     fun editScheduleOpen() = shot(tall = true) { Edit(Samples.bedtime, isNew = true) }
 
     @Test
+    fun widgetSheet() = shot {
+        Box(Modifier.padding(24.dp)) {
+            app.bedtime.ui.minimal.WidgetSheetContent(
+                app.bedtime.data.Module.WEATHER,
+                HomeStyle(weatherStyle = app.bedtime.data.WeatherStyle.WEEK),
+                sessionOwned = false,
+                handlers = app.bedtime.ui.minimal.WidgetHandlers(),
+            )
+        }
+    }
+
+    @Test
     fun blockSheet() = shot {
         Box(Modifier.padding(24.dp)) {
             app.bedtime.ui.minimal.BlockSheetContent(

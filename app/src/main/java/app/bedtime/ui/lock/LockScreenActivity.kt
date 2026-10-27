@@ -1,5 +1,7 @@
 package app.bedtime.ui.lock
 
+import app.bedtime.ui.minimal.WidgetHandlers
+import app.bedtime.ui.minimal.WidgetSheet
 import app.bedtime.ui.components.rememberNowPlaying
 import app.bedtime.ui.components.NowPlayingWidget
 import app.bedtime.data.Habits
@@ -163,6 +165,7 @@ class LockScreenActivity : ComponentActivity() {
                         onLightBackground = ::useLightSystemBars,
                         onScreenOff = ::screenOff,
                         onConfirmed = ::unlockActLock,
+                        onOpenRoute = { route -> unlockThen { startActivity(app.bedtime.MainActivity.intent(this, route)) } },
                     )
                     if (blackout.value) {
                         Box(
@@ -360,6 +363,8 @@ private fun LockScreen(
     onScreenOff: () -> Unit = {},
     /** Asks for the usual unlock, does it, and locks the phone again: for ticking a habit from here. */
     onConfirmed: (() -> Unit) -> Unit = { it() },
+    /** Digital refuge on one of its pages, after the usual unlock. */
+    onOpenRoute: (String) -> Unit = {},
 ) {
     val context = LocalContext.current
     val repo = remember { Repository.get(context) }
@@ -385,6 +390,37 @@ private fun LockScreen(
             HomeActions.LOCK -> onScreenOff()
             else -> onOpenApp(action)
         }
+    }
+    var holding by remember { mutableStateOf<Module?>(null) }
+    holding?.let { module ->
+        // Changes from here ask for the usual unlock first, then lock again, as ticking a habit does.
+        val sessions = state?.active.orEmpty().map { it.start to it.schedule }
+        val owner = Modules.owner(sessions, Screen.LOCK)
+        WidgetSheet(
+            module,
+            Modules.during(settings.homeStyle, sessions),
+            sessionOwned = owner != null,
+            handlers = WidgetHandlers(
+                hide = {
+                    onConfirmed {
+                        scope.launch {
+                            if (owner != null) {
+                                repo.upsert(owner.copy(lockModules = owner.lockModules.orEmpty().map { if (it.module == module) it.copy(on = false) else it }))
+                            } else {
+                                repo.updateSettings { s -> s.copy(homeStyle = Modules.switched(s.homeStyle, Screen.LOCK, module, false)) }
+                            }
+                        }
+                    }
+                },
+                change = { changed ->
+                    onConfirmed {
+                        scope.launch { repo.updateSettings { s -> s.copy(homeStyle = s.homeStyle.copy(weatherStyle = changed.weatherStyle, clockSize = changed.clockSize, quoteRefresh = changed.quoteRefresh)) } }
+                    }
+                },
+                open = onOpenRoute,
+            ),
+            onDismiss = { holding = null },
+        )
     }
     if (quickNote) {
         QuickNoteDialog(
@@ -429,6 +465,7 @@ private fun LockScreen(
         scheduleName = occurrence?.schedule?.name,
         scheduleIcon = occurrence?.schedule?.icon,
         nowPlaying = nowPlaying?.let { playing -> { NowPlayingWidget(playing, style.palette().text, style.palette().faint, Modifier.padding(top = 12.dp)) } },
+        onWidgetHold = { holding = it },
         // Ticking from here asks for the usual unlock first, then locks again, as a reply does.
         habits = habitList.takeIf { it.isNotEmpty() && Modules.isOn(style, Screen.LOCK, Module.HABITS) }?.let { list ->
             {
@@ -438,6 +475,7 @@ private fun LockScreen(
                     Modifier.padding(top = 14.dp),
                     onTap = { h -> onConfirmed { scope.launch { repo.markHabit(h.id, today, Habits.tapped(h, habitMarks[h.id]?.get(today) ?: 0)) } } },
                     onOpen = {},
+                    onHold = { holding = Module.HABITS },
                 )
             }
         },
@@ -515,6 +553,8 @@ internal fun LockScreenContent(
     /** The habits and now-playing widgets, drawn by the screen, when they're on. */
     habits: (@Composable () -> Unit)? = null,
     nowPlaying: (@Composable () -> Unit)? = null,
+    /** A long press on a widget: its own sheet, to hide or change it. */
+    onWidgetHold: ((Module) -> Unit)? = null,
 ) {
     var expanded by remember { mutableStateOf(initialExpanded) }
     var replying by remember { mutableStateOf(initialReplying) }
@@ -567,6 +607,7 @@ internal fun LockScreenContent(
                 scheduleIcon = scheduleIcon,
                 habits = habits,
                 nowPlaying = nowPlaying,
+                onHold = onWidgetHold,
                 hours = hours?.let { states ->
                     {
                         HourDots(
@@ -577,6 +618,7 @@ internal fun LockScreenContent(
                             calmColor = style.hourCalmColor,
                             distractedColor = style.hourDistractedColor,
                             onClick = onHours,
+                            onLongClick = onWidgetHold?.let { { it(Module.HOURS) } },
                         )
                     }
                 },

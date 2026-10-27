@@ -111,7 +111,7 @@ internal fun DistractionContent(
     onDistractedColor: (Long?) -> Unit = {},
 ) {
     val c = Obsidian.colors
-    Scaffold(containerColor = c.bgPrimary, topBar = { ObsidianTopBar("Distracting apps", onBack = onBack) }) { padding ->
+    Scaffold(containerColor = c.bgPrimary, topBar = { ObsidianTopBar("Distraction tracker", onBack = onBack) }) { padding ->
         Column(
             Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = PageGutter, vertical = 4.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),

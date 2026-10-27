@@ -1,5 +1,12 @@
 package app.bedtime.ui.settings
 
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.AlertDialog
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.foundation.text.BasicTextField
@@ -159,8 +166,15 @@ fun SearchSettingsScreen(onBack: () -> Unit) {
         keywords = keywords,
         onKeyword = { key, typed ->
             val keyword = Keywords.clean(typed)
-            val updated = if (keyword.isEmpty()) keywords - key else keywords + (key to keyword)
-            scope.launch { repo.updateSettings { it.copy(keywords = updated, keywordsCustom = true) } }
+            // A keyword already in use isn't taken: you're told what has it instead.
+            val taken = Keywords.takenBy(keywords, key, keyword)
+            if (taken != null) {
+                taken.removePrefix(Keywords.APP).takeIf { taken.startsWith(Keywords.APP) }?.let { AppCatalog.label(context, it) } ?: labels[taken] ?: taken
+            } else {
+                val updated = if (keyword.isEmpty()) keywords - key else keywords + (key to keyword)
+                scope.launch { repo.updateSettings { it.copy(keywords = updated, keywordsCustom = true) } }
+                null
+            }
         },
         onChange = { updated ->
             val turnedOn = updated.filter { it.on }.map { it.key }.toSet() - choices.filter { it.on }.map { it.key }.toSet()
@@ -204,7 +218,8 @@ internal fun SearchSettingsContent(
     onChange: (List<SearchChoice>) -> Unit,
     onBack: () -> Unit,
     keywords: Map<String, String> = emptyMap(),
-    onKeyword: (key: String, keyword: String) -> Unit = { _, _ -> },
+    /** Sets [key]'s keyword; returns what already has it instead, if anything, and then nothing changes. */
+    onKeyword: (key: String, keyword: String) -> String? = { _, _ -> null },
     /** The folders searched by name: their choice key, what they are, and the one chosen (null if none). */
     folders: List<Triple<String, String, String?>> = emptyList(),
     onFolder: (key: String) -> Unit = {},
@@ -221,6 +236,16 @@ internal fun SearchSettingsContent(
     val added = list.filter { it.on }
     val left = list.filterNot { it.on }
     var adding by remember { mutableStateOf(false) }
+    var conflict by remember { mutableStateOf<Pair<String, String>?>(null) }
+    conflict?.let { (keyword, owner) ->
+        AlertDialog(
+            onDismissRequest = { conflict = null },
+            containerColor = c.bgSecondary,
+            title = { Text("“$keyword” is taken") },
+            text = { Text("It's already the keyword for $owner. Pick another, or change that one first.", color = c.textMuted) },
+            confirmButton = { TextButton(onClick = { conflict = null }) { Text("OK", color = c.accentText) } },
+        )
+    }
     Scaffold(containerColor = c.bgPrimary, topBar = { ObsidianTopBar("Search", onBack = onBack) }) { padding ->
         Column(
             Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = PageGutter, vertical = 4.dp),
@@ -239,7 +264,7 @@ internal fun SearchSettingsContent(
                         color = c.textNormal,
                         modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
                     )
-                    KeywordBox(keywords[choice.key].orEmpty()) { onKeyword(choice.key, it) }
+                    KeywordBox(keywords[choice.key].orEmpty()) { typed -> onKeyword(choice.key, typed)?.let { owner -> conflict = Keywords.clean(typed) to owner } }
                     Icon(
                         Icons.Default.Clear,
                         contentDescription = "take it out of the search",
@@ -334,22 +359,35 @@ internal fun AddToSearchContent(choices: List<Pair<String, String>>, onAdd: (Str
     }
 }
 
-/** A short box for a keyword, saved as you type; empty means none. */
+/**
+ * A short box for a keyword; empty means none. It's kept once you're done with it (Done, or moving
+ * on), so a keyword on its way to another ("w" before "wp") isn't checked halfway; if it isn't kept,
+ * the box goes back to what it was.
+ */
 @Composable
-private fun KeywordBox(keyword: String, onChange: (String) -> Unit) {
+private fun KeywordBox(keyword: String, onDone: (String) -> Unit) {
     val c = Obsidian.colors
     var text by remember(keyword) { mutableStateOf(keyword) }
+    var focused by remember { mutableStateOf(false) }
+    val focus = LocalFocusManager.current
+    fun commit() {
+        if (text != keyword) onDone(text)
+        text = keyword
+    }
     BasicTextField(
         value = text,
-        onValueChange = {
-            text = Keywords.clean(it)
-            onChange(text)
-        },
+        onValueChange = { text = Keywords.clean(it) },
         singleLine = true,
         textStyle = MaterialTheme.typography.bodyMedium.copy(color = c.accentText, textAlign = TextAlign.Center),
         cursorBrush = SolidColor(c.accent),
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+        keyboardActions = KeyboardActions(onDone = { focus.clearFocus() }),
         modifier = Modifier
             .width(48.dp)
+            .onFocusChanged { state ->
+                if (focused && !state.isFocused) commit()
+                focused = state.isFocused
+            }
             .clip(RoundedCornerShape(8.dp))
             .border(1.dp, c.border, RoundedCornerShape(8.dp))
             .padding(vertical = 8.dp, horizontal = 4.dp),

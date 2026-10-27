@@ -1,5 +1,6 @@
 package app.bedtime.ui.minimal
 
+import app.bedtime.ui.minimal.WidgetSheet
 import androidx.compose.foundation.shape.CircleShape
 import app.bedtime.data.Schedule
 import app.bedtime.ui.components.rememberNowPlaying
@@ -250,6 +251,7 @@ private fun MinimalHomeScreen(
     val allSchedules by repo.schedules.collectAsStateWithLifecycle(initialValue = emptyList())
     val blocks = allSchedules.filter { it.isBlock && it.enabled }
     var blocksOpen by remember { mutableStateOf(false) }
+    var holding by remember { mutableStateOf<Module?>(null) }
     val startBlock: (Schedule) -> Unit = { block ->
         scope.launch {
             repo.startBlock(block, block.durationMinutes)
@@ -569,6 +571,7 @@ private fun MinimalHomeScreen(
             onOpenDrawer = { drawer = true },
             onOpenRefuge = { AppCatalog.launch(context, context.packageName) },
             onRefugeHold = { blocksOpen = true },
+            onWidgetHold = { holding = it },
             nowPlaying = nowPlaying?.takeIf { Modules.isOn(style, Screen.HOME, Module.NOW_PLAYING) }?.let { playing ->
                 { NowPlayingWidget(playing, style.palette().text, style.palette().faint, Modifier.padding(top = 12.dp)) }
             },
@@ -580,6 +583,7 @@ private fun MinimalHomeScreen(
                         Modifier.padding(top = 14.dp),
                         onTap = { h -> scope.launch { repo.markHabit(h.id, today, Habits.tapped(h, habitMarks[h.id]?.get(today) ?: 0)) } },
                         onOpen = { openHabit = it.id },
+                        onHold = { holding = Module.HABITS },
                     )
                 }
             },
@@ -606,6 +610,32 @@ private fun MinimalHomeScreen(
                 scope.launch { repo.markHabit(habit.id, day, value) }
             })
         }
+    }
+    holding?.let { module ->
+        // Hiding goes to the running session's own list when it has one, otherwise to your usual widgets.
+        val sessions = state?.active.orEmpty().map { it.start to it.schedule }
+        val owner = Modules.owner(sessions, Screen.HOME)
+        WidgetSheet(
+            module,
+            style,
+            sessionOwned = owner != null,
+            handlers = WidgetHandlers(
+                hide = {
+                    scope.launch {
+                        if (owner != null) {
+                            repo.upsert(owner.copy(homeModules = owner.homeModules.orEmpty().map { if (it.module == module) it.copy(on = false) else it }))
+                        } else {
+                            repo.updateSettings { s -> s.copy(homeStyle = Modules.switched(s.homeStyle, Screen.HOME, module, false)) }
+                        }
+                    }
+                },
+                change = { changed ->
+                    scope.launch { repo.updateSettings { s -> s.copy(homeStyle = s.homeStyle.copy(weatherStyle = changed.weatherStyle, clockSize = changed.clockSize, quoteRefresh = changed.quoteRefresh)) } }
+                },
+                open = { route -> runCatching { context.startActivity(app.bedtime.MainActivity.intent(context, route)) } },
+            ),
+            onDismiss = { holding = null },
+        )
     }
     if (blocksOpen) {
         BlockSheet(blocks, state?.active.orEmpty().map { it.schedule.id }.toSet(), style, onStart = { block ->
@@ -651,7 +681,15 @@ private fun MinimalHomeScreen(
                     val key = Keywords.appKey(app.packageName)
                     val clean = Keywords.clean(typed)
                     val now = Keywords.effective(settings.keywords, settings.keywordsCustom, Keywords.defaults(searchChoices, settings.quickTargets))
-                    save { s -> s.copy(keywords = if (clean.isEmpty()) now - key else now + (key to clean), keywordsCustom = true) }
+                    val taken = Keywords.takenBy(now, key, clean)
+                    if (taken == null) {
+                        save { s -> s.copy(keywords = if (clean.isEmpty()) now - key else now + (key to clean), keywordsCustom = true) }
+                        null
+                    } else if (taken.startsWith(Keywords.APP)) {
+                        AppCatalog.label(context, taken.removePrefix(Keywords.APP))
+                    } else {
+                        searchKeyLabel(taken)
+                    }
                 },
             ),
             keyword = keywords[Keywords.appKey(app.packageName)].orEmpty(),
@@ -704,6 +742,8 @@ internal fun MinimalHomeContent(
     onOpenRefuge: () -> Unit = {},
     /** A long press on the refuge mark: your blocks, to start one. */
     onRefugeHold: (() -> Unit)? = null,
+    /** A long press on a widget: its own sheet, to hide or change it. */
+    onWidgetHold: ((Module) -> Unit)? = null,
     /** The session's mark on its pill. */
     scheduleIcon: String? = null,
     /** The habits and now-playing widgets, drawn by the screen, when they're on. */
@@ -780,12 +820,14 @@ internal fun MinimalHomeContent(
                             calmColor = style.hourCalmColor,
                             distractedColor = style.hourDistractedColor,
                             onClick = onHours,
+                            onLongClick = onWidgetHold?.let { { it(Module.HOURS) } },
                         )
                     }
                 },
-                quote = quote?.let { q -> { HomeQuote(q, style, preview, quoteFavourite, onQuoteFavourite, onQuoteHide, onNextQuote) } },
+                quote = quote?.let { q -> { HomeQuote(q, style, preview, quoteFavourite, onQuoteFavourite, onQuoteHide, onNextQuote, onWidgetHold?.let { { it(Module.QUOTE) } }) } },
                 habits = habits,
                 nowPlaying = nowPlaying,
+                onHold = onWidgetHold,
             )
             Spacer(Modifier.height(if (preview) 28.dp else 44.dp))
             LazyColumn(Modifier.weight(1f).fillMaxWidth().nestedScroll(overscroll)) {
@@ -885,6 +927,7 @@ private fun HomeQuote(
     onFavourite: () -> Unit,
     onHide: () -> Unit,
     onNext: () -> Unit,
+    onWidget: (() -> Unit)? = null,
 ) {
     Spacer(Modifier.height(if (preview) 20.dp else 28.dp))
     var menu by remember { mutableStateOf(false) }
@@ -899,6 +942,25 @@ private fun HomeQuote(
                 onClick = onNext,
             ),
         )
-        QuoteMenu(expanded = menu, onDismiss = { menu = false }, favourite = favourite, onFavourite = onFavourite, onHide = onHide, onAnother = onNext)
+        QuoteMenu(expanded = menu, onDismiss = { menu = false }, favourite = favourite, onFavourite = onFavourite, onHide = onHide, onAnother = onNext, onWidget = onWidget)
     }
+}
+
+/** A search choice in words, for saying what already has a keyword. */
+private fun searchKeyLabel(key: String): String = when {
+    key.startsWith("web:") -> "web search"
+    key.startsWith("maps:") -> "maps"
+    key.startsWith("wikipedia:") -> "Wikipedia"
+    key.startsWith("lookup:") -> "look up"
+    key.startsWith("spotify:") -> "Spotify search"
+    key == SearchOrder.REFUGE_NOTES -> "refuge notes"
+    key.startsWith("note:") -> "a note file"
+    key == SearchOrder.CALENDAR -> "the calendar"
+    key == SearchOrder.CONTACTS -> "contacts"
+    key == SearchOrder.ALARM -> "alarms"
+    key == SearchOrder.TIMER -> "timers"
+    key == SearchOrder.FILES -> "files"
+    key == SearchOrder.OBSIDIAN -> "Obsidian notes"
+    key == SearchOrder.BLOCKS -> "blocks"
+    else -> key
 }

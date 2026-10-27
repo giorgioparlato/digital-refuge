@@ -53,4 +53,14 @@ class KeywordsTest {
         assertEquals("mu", d["note:z"])
         assertEquals("m", Keywords.clean(" M "))
     }
+
+    @Test
+    fun aKeywordInUseIsntTakenAgain() {
+        assertEquals("maps:g", Keywords.takenBy(keywords, "web:c", "m"))
+        // Its own keyword again, a new one, or none at all are fine; so is one that only begins another.
+        assertNull(Keywords.takenBy(keywords, "maps:g", "m"))
+        assertNull(Keywords.takenBy(keywords, "web:c", "x"))
+        assertNull(Keywords.takenBy(keywords, "web:c", ""))
+        assertNull(Keywords.takenBy(keywords, "app:x", "wpx"))
+    }
 }

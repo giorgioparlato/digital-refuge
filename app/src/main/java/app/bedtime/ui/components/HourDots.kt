@@ -1,5 +1,6 @@
 package app.bedtime.ui.components
 
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.height
@@ -44,6 +45,7 @@ import app.bedtime.ui.formatMinuteOfDay
  * Today as 24 dots, one an hour: calm ones soft, distracted ones in [accent], this one ringed, those
  * still to come faint. A tap opens the minutes behind them.
  */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun HourDots(
     states: List<HourState>,
@@ -54,6 +56,8 @@ fun HourDots(
     calmColor: Long? = null,
     distractedColor: Long? = null,
     onClick: (() -> Unit)? = null,
+    /** A long press: the widget's own sheet. */
+    onLongClick: (() -> Unit)? = null,
 ) {
     val calm = calmColor?.let { Color(it) } ?: text.copy(alpha = 0.55f)
     val distracted = distractedColor?.let { Color(it) } ?: accent
@@ -61,7 +65,7 @@ fun HourDots(
         modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(10.dp))
-            .then(if (onClick != null) Modifier.clickable(onClickLabel = "today by the hour", onClick = onClick) else Modifier)
+            .then(if (onClick != null || onLongClick != null) Modifier.combinedClickable(onClickLabel = "today by the hour", onLongClick = onLongClick, onClick = onClick ?: {}) else Modifier)
             .padding(vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,

@@ -10,7 +10,7 @@ enum class Module(val label: String) {
     DATE("Date"),
     WEATHER("Weather"),
     EVENT("Today's next event"),
-    HOURS("Today by the hour"),
+    HOURS("Distraction tracker"),
     QUOTE("Quote"),
     HABITS("Habits"),
     NOW_PLAYING("Now playing"),
@@ -51,6 +51,11 @@ object Modules {
             lockModules = latest.firstNotNullOfOrNull { it.lockModules } ?: style.lockModules,
         )
     }
+
+    /** The running session whose own widgets [screen] shows now, if any: the one that started last with its own. */
+    fun owner(sessions: List<Pair<Long, Schedule>>, screen: Screen): Schedule? =
+        sessions.sortedByDescending { it.first }.map { it.second }
+            .firstOrNull { (if (screen == Screen.HOME) it.homeModules else it.lockModules) != null }
 
     /** [style] with [screen]'s widgets set to [list]. */
     fun with(style: HomeStyle, screen: Screen, list: List<ModuleChoice>): HomeStyle =

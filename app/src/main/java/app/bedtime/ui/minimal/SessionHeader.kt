@@ -1,5 +1,9 @@
 package app.bedtime.ui.minimal
 
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.text.style.TextOverflow
@@ -77,7 +81,14 @@ internal fun SessionHeader(
     quote: (@Composable () -> Unit)? = null,
     habits: (@Composable () -> Unit)? = null,
     nowPlaying: (@Composable () -> Unit)? = null,
+    /** A long press on a widget: its own sheet, to hide or change it. */
+    onHold: ((Module) -> Unit)? = null,
 ) {
+    val hold: (Module) -> (() -> Unit)? = { m -> onHold?.let { { it(m) } } }
+    // Long-pressing a widget that has no tap of its own.
+    val held: (Module) -> Modifier = { m ->
+        if (onHold == null) Modifier else Modifier.pointerInput(m) { detectTapGestures(onLongPress = { onHold(m) }) }
+    }
     val context = LocalContext.current
     val p = style.palette()
     val clock = style.clockSize.scale
@@ -93,8 +104,8 @@ internal fun SessionHeader(
         if (pillAfter < 0) SessionPill(scheduleName, until, scheduleIcon, style)
         modules.forEachIndexed { at, module ->
             when (module) {
-                Module.GREETING -> Text(greeting(now.hour), style = MaterialTheme.typography.titleMedium, color = p.accent)
-                Module.CLOCK -> Row(verticalAlignment = Alignment.CenterVertically) {
+                Module.GREETING -> Text(greeting(now.hour), style = MaterialTheme.typography.titleMedium, color = p.accent, modifier = held(Module.GREETING))
+                Module.CLOCK -> Row(held(Module.CLOCK), verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         styledTime(timeFormatter(context).format(now), suffixSize = (30 * clock).sp),
                         style = MaterialTheme.typography.displayLarge.copy(
@@ -107,10 +118,10 @@ internal fun SessionHeader(
                     )
                     if (weather != null && hasNow && Module.WEATHER in modules) {
                         Spacer(Modifier.weight(1f))
-                        WeatherBeside(weather, style, onWeather)
+                        WeatherBeside(weather, style, onWeather, hold(Module.WEATHER))
                     }
                 }
-                Module.DATE -> Row(verticalAlignment = Alignment.CenterVertically) {
+                Module.DATE -> Row(held(Module.DATE), verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         DateTimeFormatter.ofPattern("EEEE, d MMMM", Locale.getDefault()).format(now),
                         style = MaterialTheme.typography.titleMedium,
@@ -120,17 +131,17 @@ internal fun SessionHeader(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f),
                     )
-                    if (weather != null && detailOnDate) WeatherDetail(weather, style, onWeather)
+                    if (weather != null && detailOnDate) WeatherDetail(weather, style, onWeather, onWeatherHold = hold(Module.WEATHER))
                 }
                 Module.WEATHER -> if (weather != null) {
                     val nowHere = hasNow && !clockShown
                     if (nowHere || (detail && !detailOnDate)) {
                         Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                            if (nowHere) WeatherInline(weather, style, onWeather)
-                            if (detail && !detailOnDate) WeatherDetail(weather, style, onWeather, start = if (nowHere) 12.dp else 0.dp)
+                            if (nowHere) WeatherInline(weather, style, onWeather, hold(Module.WEATHER))
+                            if (detail && !detailOnDate) WeatherDetail(weather, style, onWeather, start = if (nowHere) 12.dp else 0.dp, onWeatherHold = hold(Module.WEATHER))
                         }
                     }
-                    if (weather.week.isNotEmpty()) WeatherWeek(weather, style, now, onWeather)
+                    if (weather.week.isNotEmpty()) WeatherWeek(weather, style, now, onWeather, hold(Module.WEATHER))
                 }
                 Module.EVENT -> if (calendar != null) {
                     Text(
@@ -139,13 +150,14 @@ internal fun SessionHeader(
                         color = p.muted,
                         modifier = Modifier
                             .padding(top = 4.dp)
-                            .then(if (onCalendar != null) Modifier.clip(RoundedCornerShape(6.dp)).clickable(onClickLabel = "see the week ahead", onClick = onCalendar) else Modifier),
+                            .clip(RoundedCornerShape(6.dp))
+                            .then(if (onCalendar != null || onHold != null) Modifier.tapAndHold("see the week ahead", onCalendar, hold(Module.EVENT)) else Modifier),
                     )
                 }
-                Module.HOURS -> hours?.invoke()
-                Module.QUOTE -> quote?.invoke()
-                Module.HABITS -> habits?.invoke()
-                Module.NOW_PLAYING -> nowPlaying?.invoke()
+                Module.HOURS -> hours?.let { Box(held(Module.HOURS)) { it() } }
+                Module.QUOTE -> quote?.let { Box(held(Module.QUOTE)) { it() } }
+                Module.HABITS -> habits?.let { Box(held(Module.HABITS)) { it() } }
+                Module.NOW_PLAYING -> nowPlaying?.let { Box(held(Module.NOW_PLAYING)) { it() } }
             }
             if (at == pillAfter) SessionPill(scheduleName, until, scheduleIcon, style)
         }
@@ -173,12 +185,12 @@ private fun SessionPill(scheduleName: String?, until: String?, scheduleIcon: Str
 
 /** The sky and temperature on a line, for when the clock isn't there to sit beside. */
 @Composable
-private fun WeatherInline(weather: WeatherView, style: HomeStyle, onWeather: (() -> Unit)?) {
+private fun WeatherInline(weather: WeatherView, style: HomeStyle, onWeather: (() -> Unit)?, onWeatherHold: (() -> Unit)? = null) {
     val p = style.palette()
     Row(
         Modifier
             .clip(RoundedCornerShape(10.dp))
-            .then(if (onWeather != null) Modifier.clickable(onClickLabel = "open the weather", onClick = onWeather) else Modifier)
+            .tapAndHold("open the weather", onWeather, onWeatherHold)
             .padding(vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -214,14 +226,14 @@ internal fun QuoteBlock(quote: Quote, style: HomeStyle, modifier: Modifier = Mod
 
 /** The sky and temperature beside the clock, no taller than it; a tap opens the weather app. */
 @Composable
-private fun WeatherBeside(weather: WeatherView, style: HomeStyle, onWeather: (() -> Unit)?) {
+private fun WeatherBeside(weather: WeatherView, style: HomeStyle, onWeather: (() -> Unit)?, onWeatherHold: (() -> Unit)? = null) {
     val p = style.palette()
     val clock = style.clockSize.scale
     Column(
         Modifier
             .padding(start = 10.dp)
             .clip(RoundedCornerShape(14.dp))
-            .then(if (onWeather != null) Modifier.clickable(onClickLabel = "open the weather", onClick = onWeather) else Modifier)
+            .tapAndHold("open the weather", onWeather, onWeatherHold)
             .padding(horizontal = 4.dp, vertical = 2.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -235,13 +247,13 @@ private fun WeatherBeside(weather: WeatherView, style: HomeStyle, onWeather: (()
  * two days as small skies with their highs.
  */
 @Composable
-private fun WeatherDetail(weather: WeatherView, style: HomeStyle, onWeather: (() -> Unit)?, start: androidx.compose.ui.unit.Dp = 12.dp) {
+private fun WeatherDetail(weather: WeatherView, style: HomeStyle, onWeather: (() -> Unit)?, start: androidx.compose.ui.unit.Dp = 12.dp, onWeatherHold: (() -> Unit)? = null) {
     val p = style.palette()
     Row(
         Modifier
             .padding(start = start)
             .clip(RoundedCornerShape(10.dp))
-            .then(if (onWeather != null) Modifier.clickable(onClickLabel = "open the weather", onClick = onWeather) else Modifier)
+            .tapAndHold("open the weather", onWeather, onWeatherHold)
             .padding(horizontal = 4.dp, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -258,14 +270,14 @@ private fun WeatherDetail(weather: WeatherView, style: HomeStyle, onWeather: (()
 
 /** Five days on a line of their own under the date: each day's name, its sky, and its high over its low. */
 @Composable
-private fun WeatherWeek(weather: WeatherView, style: HomeStyle, now: LocalDateTime, onWeather: (() -> Unit)?) {
+private fun WeatherWeek(weather: WeatherView, style: HomeStyle, now: LocalDateTime, onWeather: (() -> Unit)?, onWeatherHold: (() -> Unit)? = null) {
     val p = style.palette()
     Row(
         Modifier
             .fillMaxWidth()
             .padding(top = 10.dp)
             .clip(RoundedCornerShape(12.dp))
-            .then(if (onWeather != null) Modifier.clickable(onClickLabel = "open the weather", onClick = onWeather) else Modifier)
+            .tapAndHold("open the weather", onWeather, onWeatherHold)
             .padding(vertical = 4.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
@@ -285,3 +297,8 @@ private fun WeatherWeek(weather: WeatherView, style: HomeStyle, now: LocalDateTi
         }
     }
 }
+
+/** A tap does [onTap] and a long press [onHold], either of which may be missing. */
+@OptIn(ExperimentalFoundationApi::class)
+private fun Modifier.tapAndHold(label: String, onTap: (() -> Unit)?, onHold: (() -> Unit)?): Modifier =
+    if (onTap == null && onHold == null) this else combinedClickable(onClickLabel = label, onLongClick = onHold, onClick = onTap ?: {})

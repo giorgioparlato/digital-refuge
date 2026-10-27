@@ -13,6 +13,18 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            60,
+            "0.9.14",
+            listOf(
+                "Settings, arranged by what they're for, with a search at the top: type \"keyword\", \"weather\" or \"colour\" to go straight there.",
+                "Settings now say plainly that refuge's home screen takes over in minimal sessions and can be your everyday launcher, and that its lock screen is up to you.",
+                "Widgets: pick the home screen or the lock screen at the top of the page.",
+                "Hold a widget on your home or lock screen to hide it, or change it there: the weather's style, the clock's size, the quote, your habits.",
+                "A search keyword that's already taken now says what has it, and isn't set twice.",
+                "\"Today by the hour\" is now the distraction tracker.",
+            ),
+        ),
+        ChangelogEntry(
             59,
             "0.9.13",
             listOf(

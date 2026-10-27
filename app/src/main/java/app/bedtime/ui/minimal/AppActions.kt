@@ -60,7 +60,8 @@ class AppActionHandlers(
     val toggleFavourite: () -> Unit = {},
     val move: (up: Boolean) -> Unit = {},
     val rename: (String) -> Unit = {},
-    val setKeyword: (String) -> Unit = {},
+    /** Sets the app's keyword; returns what already has it instead, if anything, and then nothing changes. */
+    val setKeyword: (String) -> String? = { null },
     val toggleHidden: () -> Unit = {},
     val info: () -> Unit = {},
     val uninstall: () -> Unit = {},
@@ -108,6 +109,7 @@ internal fun AppActionsContent(
     var keying by remember { mutableStateOf(false) }
     var name by remember { mutableStateOf(app.label) }
     var typed by remember { mutableStateOf(keyword) }
+    var taken by remember { mutableStateOf<String?>(null) }
     Column(
         Modifier
             .fillMaxWidth()
@@ -127,12 +129,18 @@ internal fun AppActionsContent(
                 Spacer(Modifier.height(8.dp))
                 BasicTextField(
                     value = typed,
-                    onValueChange = { typed = it.filterNot { c -> c.isWhitespace() }.lowercase().take(4) },
+                    onValueChange = {
+                        typed = it.filterNot { c -> c.isWhitespace() }.lowercase().take(4)
+                        taken = null
+                    },
                     singleLine = true,
                     textStyle = MaterialTheme.typography.bodyLarge.copy(color = p.text),
                     cursorBrush = SolidColor(p.accent),
                     modifier = Modifier.fillMaxWidth().border(1.dp, p.faint.copy(alpha = 0.5f), RoundedCornerShape(12.dp)).padding(12.dp),
                 )
+                taken?.let { owner ->
+                    Text("“$typed” is already the keyword for $owner. Pick another.", style = MaterialTheme.typography.bodySmall, color = p.accent, modifier = Modifier.padding(top = 8.dp))
+                }
                 Spacer(Modifier.height(8.dp))
                 Row {
                     Spacer(Modifier.weight(1f))
@@ -141,8 +149,8 @@ internal fun AppActionsContent(
                         style = MaterialTheme.typography.labelLarge,
                         color = p.accent,
                         modifier = Modifier.clip(RoundedCornerShape(50)).clickable {
-                            handlers.setKeyword(typed)
-                            onDone()
+                            taken = handlers.setKeyword(typed)
+                            if (taken == null) onDone()
                         }.padding(horizontal = 14.dp, vertical = 8.dp),
                     )
                 }

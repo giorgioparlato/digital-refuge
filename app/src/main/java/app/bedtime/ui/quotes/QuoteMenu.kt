@@ -1,5 +1,6 @@
 package app.bedtime.ui.quotes
 
+import androidx.compose.material.icons.filled.Settings
 import android.widget.Toast
 import androidx.compose.foundation.layout.Box
 import androidx.compose.material.icons.Icons
@@ -60,6 +61,8 @@ fun QuoteMenu(
     onHide: () -> Unit,
     onAnother: () -> Unit,
     modifier: Modifier = Modifier,
+    /** The quote widget's own sheet, where the screen has one. */
+    onWidget: (() -> Unit)? = null,
 ) {
     val c = Obsidian.colors
     Box(modifier) {
@@ -88,6 +91,16 @@ fun QuoteMenu(
                     onDismiss()
                 },
             )
+            if (onWidget != null) {
+                DropdownMenuItem(
+                    text = { Text("The quote widget…", color = c.textNormal) },
+                    leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null, tint = c.textMuted) },
+                    onClick = {
+                        onWidget()
+                        onDismiss()
+                    },
+                )
+            }
         }
     }
 }

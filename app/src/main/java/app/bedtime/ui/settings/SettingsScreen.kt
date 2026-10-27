@@ -1,5 +1,7 @@
 package app.bedtime.ui.settings
 
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Refresh
@@ -280,13 +282,15 @@ internal fun SettingsContent(
 ) {
     val c = Obsidian.colors
     var otherOpen by rememberSaveable { mutableStateOf(false) }
+    var query by rememberSaveable { mutableStateOf("") }
     // The version and where your data lives are said once, at the foot of the page.
     Scaffold(containerColor = c.bgPrimary, topBar = { ObsidianTopBar("settings", onBack = onBack, subtitle = "set up once, then left alone") }) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())) {
             Column(Modifier.padding(horizontal = PageGutter)) {
+                SettingsSearch(query, { query = it })
                 Spacer(Modifier.height(4.dp))
                 // Not a preference but a health check: the one row that can be wrong, so it sits alone.
-                SettingsRow(
+                if (query.isBlank()) SettingsRow(
                     Icons.Default.Build,
                     "Permissions & setup",
                     when (setupStepsLeft) {
@@ -298,93 +302,114 @@ internal fun SettingsContent(
                     last = true,
                 )
 
-                SectionLabel("minimal screen")
-                SettingsRow(Icons.Default.Home, "Look", "Colours, sizes and fonts", onClick = onHomeStyle)
-                SettingsRow(Icons.Default.DateRange, "What's shown", "Greeting, date, weather, your next event, a quote", onClick = onShown)
-                SettingsRow(Icons.Default.Refresh, "Gestures", "Swipes and a double tap: an app, a quick note, notifications…", onClick = onGestures)
-                SettingsRow(Icons.Default.Search, "Search", "What it offers after apps, and in what order", onClick = onSearch)
-                SettingsRow(Icons.Default.FavoriteBorder, "Quotes", "Your own, favourites, hidden ones", onClick = onQuotes)
-                if (homeScreen) {
-                    SettingsRow(
-                        Icons.Default.Clear,
-                        "Hidden apps",
-                        when (hiddenCount) {
-                            0 -> "None · hold an app to hide it from the lists"
-                            1 -> "1 app left out of the lists and search"
-                            else -> "$hiddenCount apps left out of the lists and search"
-                        },
-                        onClick = onHiddenApps,
+                // Every setting by what it's for; the search finds one by its name or a word in it.
+                val lockShown = lockScreen || (homeScreen && lockAlways)
+                val entries = buildList {
+                    add(
+                        Entry(
+                            "staying focused",
+                            BedtimeIcons.Grid,
+                            "App groups",
+                            when (groupCount) {
+                                0 -> "Tick many apps at once when choosing"
+                                1 -> "1 group"
+                                else -> "$groupCount groups"
+                            },
+                            "groups apps",
+                            onGroups,
+                        ),
                     )
-                }
-                SettingsRow(
-                    Icons.Default.Edit,
-                    "Notes & quick notes",
-                    "Your notes, and where the search sends notes and events",
-                    onClick = onQuickNotes,
-                    last = true,
-                )
-
-                SectionLabel("your lock screen")
-                SettingsRow(
-                    Icons.Default.Lock,
-                    "Show during sessions",
-                    "The clock and the session over the lock screen, without the apps",
-                    trailing = { ObsidianToggle(lockScreen, onLockScreen) },
-                    last = !lockScreen && !homeScreen,
-                )
-                if (homeScreen) {
-                    SettingsRow(
-                        Icons.Default.Lock,
-                        "Also outside sessions",
-                        "Your lock screen all the time, while digital refuge is your launcher",
-                        trailing = { ObsidianToggle(lockAlways, onLockAlways) },
-                        last = !lockScreen && !lockAlways,
+                    add(
+                        Entry(
+                            "staying focused",
+                            Icons.Default.Warning,
+                            "Always-available apps",
+                            when (alwaysAvailableCount) {
+                                0 -> "None yet · maps, rides, authenticators…"
+                                1 -> "1 app, never blocked, whichever session is on"
+                                else -> "$alwaysAvailableCount apps, never blocked, whichever session is on"
+                            },
+                            "always available emergency maps authenticator",
+                            onAlwaysAvailable,
+                        ),
                     )
+                    add(Entry("staying focused", Icons.Default.DateRange, "Distraction tracker", "Your distracting apps, and today by the hour", "distraction distracting tracker hours dots colours", onDistraction))
+                    add(Entry("look & feel", Icons.Default.Edit, "Look", "Colours, sizes and fonts", "colour color theme background accent text font size clock size top space", onHomeStyle))
+                    add(
+                        Entry(
+                            "what's on my screens",
+                            Icons.Default.Home,
+                            "Everyday launcher",
+                            if (homeScreen) "On · refuge's home screen all the time" else "Off · only in minimal sessions",
+                            "launcher home screen default home app everyday minimal",
+                            onSetup,
+                        ),
+                    )
+                    add(Entry("what's on my screens", Icons.Default.Lock, "Lock screen in sessions", "The clock and your widgets over the lock screen", "lock screen sessions", trailing = { ObsidianToggle(lockScreen, onLockScreen) }))
+                    if (homeScreen) {
+                        add(Entry("what's on my screens", Icons.Default.Lock, "Lock screen outside sessions", "Refuge's lock screen all the time, as your launcher", "lock screen always launcher", trailing = { ObsidianToggle(lockAlways, onLockAlways) }))
+                    }
+                    add(Entry("what's on my screens", BedtimeIcons.Grid, "Widgets", "Weather, habits, a quote… for each screen", "widget widgets weather calendar event date greeting clock hours distraction habits quote quotes now playing music status bar logo mark arrow icons lock screen home screen", onShown))
+                    if (lockShown) {
+                        add(Entry("what's on my screens", Icons.Default.Notifications, "Lock-screen notifications", "From the apps and people you choose", "notifications messages reply people contacts lock screen", onLockNotifications))
+                    }
+                    add(Entry("gestures", Icons.Default.Refresh, "Home-screen gestures", "An app, a note, your blocks…", "gesture gestures swipe double tap home blocks", onGestures))
+                    if (lockShown) {
+                        add(Entry("gestures", Icons.Default.KeyboardArrowUp, "Lock-screen gestures", "An app, the camera, screen off…", "gesture gestures swipe double tap lock camera screen off", onSwipes))
+                    }
+                    add(Entry("finding things", Icons.Default.Search, "Search", "What it offers, keywords, and in what order", "search keyword keywords web maps contacts messaging whatsapp signal telegram alarm timer calculator settings pages files folder obsidian spotify blocks", onSearch))
+                    if (homeScreen) {
+                        add(
+                            Entry(
+                                "finding things",
+                                Icons.Default.Clear,
+                                "Hidden apps",
+                                when (hiddenCount) {
+                                    0 -> "None · hold an app to hide it from the lists"
+                                    1 -> "1 app left out of the lists and search"
+                                    else -> "$hiddenCount apps left out of the lists and search"
+                                },
+                                "hidden hide apps",
+                                onHiddenApps,
+                            ),
+                        )
+                    }
+                    add(Entry("notes & habits", Icons.Default.Edit, "Notes & quick notes", "Your notes, the to-do, where quick notes go", "notes note quick to-do todo obsidian daily file", onQuickNotes))
+                    add(Entry("notes & habits", Icons.Default.CheckCircle, "Habits", "Tick them off, here or on your screens", "habits habit streak", onHabits))
+                    // Found by the search only: quotes live with the widgets, the rest under "setup & backup".
+                    add(Entry(SEARCH_ONLY, Icons.Default.FavoriteBorder, "Quotes", "Your own, favourites, hidden ones", "quote quotes favourite hide", onQuotes))
+                    add(Entry(SEARCH_ONLY, Icons.Default.Build, "Permissions & setup", "Blocking, Do Not Disturb, greyscale, your launcher", "permissions setup accessibility greyscale dnd do not disturb usage access", onSetup))
+                    add(Entry(SEARCH_ONLY, Icons.Default.Share, "Export settings", "Save schedules, blocks, groups and stats to a file", "export backup save file", onExport))
+                    add(Entry(SEARCH_ONLY, BedtimeIcons.Refuge, "Import settings", "Replace everything with a saved file", "import restore backup file", onImport))
+                    add(Entry(SEARCH_ONLY, Icons.Default.Info, "How it works", "What a session locks, and your ways out", "how it works help", onHowItWorks))
                 }
-                if (lockScreen || (homeScreen && lockAlways)) {
-                    SettingsRow(Icons.Default.KeyboardArrowUp, "Gestures", "Swipes and a double tap: an app, the camera, a note…", onClick = onSwipes)
-                    SettingsRow(Icons.Default.Notifications, "Notifications", "From the apps you choose; read, reply or keep for later", onClick = onLockNotifications, last = true)
+                if (query.isNotBlank()) {
+                    val found = entries.filter { it.matches(query) }
+                    Spacer(Modifier.height(8.dp))
+                    if (found.isEmpty()) {
+                        Text("Nothing by that name.", style = MaterialTheme.typography.bodyMedium, color = c.textFaint, modifier = Modifier.padding(vertical = 12.dp))
+                    }
+                    found.forEachIndexed { i, e -> SettingsRow(e.icon, e.title, e.description, onClick = e.onClick, trailing = e.trailing ?: { Chevron() }, last = i == found.lastIndex) }
+                    Spacer(Modifier.height(28.dp))
+                    return@Column
                 }
-
-                SectionLabel("your sessions")
-                SettingsRow(
-                    BedtimeIcons.Grid,
-                    "App groups",
-                    when (groupCount) {
-                        0 -> "Tick many apps at once when choosing"
-                        1 -> "1 group"
-                        else -> "$groupCount groups"
-                    },
-                    onClick = onGroups,
-                )
-                SettingsRow(
-                    Icons.Default.Warning,
-                    "Always-available apps",
-                    when (alwaysAvailableCount) {
-                        0 -> "None yet · maps, rides, authenticators…"
-                        1 -> "1 app, never blocked, whichever session is on"
-                        else -> "$alwaysAvailableCount apps, never blocked, whichever session is on"
-                    },
-                    onClick = onAlwaysAvailable,
-                )
-                SettingsRow(
-                    Icons.Default.DateRange,
-                    "Distracting apps",
-                    "Today by the hour, on the home tab",
-                    onClick = onDistraction,
-                )
-                SettingsRow(
-                    Icons.Default.CheckCircle,
-                    "Habits",
-                    "Tick them off, from here or your home or lock screen",
-                    onClick = onHabits,
-                    last = true,
-                )
+                entries.filter { it.group != SEARCH_ONLY }.groupBy { it.group }.forEach { (group, rows) ->
+                    SectionLabel(group)
+                    if (group == "what's on my screens") {
+                        Text(
+                            "Refuge's home screen takes over during sessions with minimal mode, and can be your everyday launcher too. Its lock screen is up to you. Both share the settings below.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = c.textFaint,
+                            modifier = Modifier.padding(start = 2.dp, bottom = 6.dp),
+                        )
+                    }
+                    rows.forEachIndexed { i, e -> SettingsRow(e.icon, e.title, e.description, onClick = e.onClick, trailing = e.trailing ?: { Chevron() }, last = i == rows.lastIndex) }
+                }
 
                 // How firmly a session holds now belongs to each schedule, under "the ways around it".
                 Spacer(Modifier.height(26.dp))
                 SettingsFold(
-                    title = "Other",
+                    title = "Setup & backup",
                     summary = "How it works · the intro · shortcuts · backup",
                     open = otherOpen,
                     onToggle = { otherOpen = !otherOpen },
@@ -528,5 +553,54 @@ private fun SettingsFold(
         }
         AnimatedVisibility(open) { Column(content = content) }
         HorizontalDivider(color = c.border.copy(alpha = if (open) 0f else 0.5f))
+    }
+}
+
+/** Settings the search finds but the groups leave out, as they live elsewhere. */
+private const val SEARCH_ONLY = "search only"
+
+/** One setting in the list: its group, how it reads, other words it's found by, and what a tap does (or its switch). */
+private class Entry(
+    val group: String,
+    val icon: ImageVector,
+    val title: String,
+    val description: String,
+    val words: String,
+    val onClick: (() -> Unit)? = null,
+    val trailing: (@Composable () -> Unit)? = null,
+) {
+    fun matches(query: String): Boolean {
+        val q = query.trim().lowercase()
+        return listOf(title, description, words).any { it.lowercase().contains(q) }
+    }
+}
+
+/** "Find a setting": filters the list as you type. */
+@Composable
+private fun SettingsSearch(query: String, onQuery: (String) -> Unit) {
+    val c = Obsidian.colors
+    Row(
+        Modifier.fillMaxWidth().padding(top = 14.dp).clip(RoundedCornerShape(14.dp)).background(c.bgSecondary).padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Default.Search, contentDescription = null, tint = c.textFaint, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.width(10.dp))
+        BasicTextField(
+            value = query,
+            onValueChange = onQuery,
+            singleLine = true,
+            textStyle = MaterialTheme.typography.bodyLarge.copy(color = c.textNormal),
+            cursorBrush = SolidColor(c.accent),
+            modifier = Modifier.weight(1f),
+            decorationBox = { field ->
+                Box {
+                    if (query.isEmpty()) Text("Find a setting: keyword, weather, colour…", style = MaterialTheme.typography.bodyLarge, color = c.textFaint)
+                    field()
+                }
+            },
+        )
+        if (query.isNotEmpty()) {
+            Icon(Icons.Default.Clear, contentDescription = "clear", tint = c.textFaint, modifier = Modifier.size(20.dp).clip(RoundedCornerShape(50)).clickable { onQuery("") })
+        }
     }
 }

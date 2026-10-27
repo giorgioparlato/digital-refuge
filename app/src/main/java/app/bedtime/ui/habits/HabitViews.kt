@@ -71,20 +71,22 @@ fun HabitsWidget(
     modifier: Modifier = Modifier,
     onTap: (Habit) -> Unit,
     onOpen: (Habit) -> Unit,
+    /** A long press on a line: the widget's own sheet; without one, it opens the habit as a tap does. */
+    onHold: (() -> Unit)? = null,
 ) {
     Column(modifier.fillMaxWidth()) {
-        habits.forEach { habit -> HabitLine(habit, marks[habit.id].orEmpty(), today, text, faint, habit.tint(accent), { onTap(habit) }, { onOpen(habit) }) }
+        habits.forEach { habit -> HabitLine(habit, marks[habit.id].orEmpty(), today, text, faint, habit.tint(accent), { onTap(habit) }, { onOpen(habit) }, onHold) }
     }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun HabitLine(habit: Habit, marks: Map<Long, Int>, today: Long, text: Color, faint: Color, accent: Color, onTap: () -> Unit, onOpen: () -> Unit) {
+private fun HabitLine(habit: Habit, marks: Map<Long, Int>, today: Long, text: Color, faint: Color, accent: Color, onTap: () -> Unit, onOpen: () -> Unit, onHold: (() -> Unit)?) {
     Row(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(8.dp))
-            .combinedClickable(onClickLabel = "open ${habit.name}", onLongClick = onOpen, onClick = onOpen)
+            .combinedClickable(onClickLabel = "open ${habit.name}", onLongClick = onHold ?: onOpen, onClick = onOpen)
             .padding(vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
