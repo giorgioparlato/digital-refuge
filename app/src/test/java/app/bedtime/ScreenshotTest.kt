@@ -449,6 +449,22 @@ class ScreenshotTest {
     fun editScheduleOpen() = shot(tall = true) { Edit(Samples.bedtime, isNew = true) }
 
     @Test
+    fun blockSheet() = shot {
+        Box(Modifier.padding(24.dp)) {
+            app.bedtime.ui.minimal.BlockSheetContent(
+                listOf(
+                    Samples.focus,
+                    Samples.focus.copy(id = "read", name = "Reading", durationMinutes = 30, icon = "book"),
+                    Samples.focus.copy(id = "walk", name = "A walk", durationMinutes = 45, icon = "leaf"),
+                ),
+                running = setOf("walk"),
+                style = HomeStyle(),
+                onStart = {},
+            )
+        }
+    }
+
+    @Test
     fun editBlock() = shot { Edit(Samples.focus, dndAvailable = false) }
 
     @Test

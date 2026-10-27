@@ -13,6 +13,15 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            59,
+            "0.9.13",
+            listOf(
+                "Schedules and blocks can bring their own widgets to your home and lock screen while they run (\"On the screens\" in each).",
+                "Start a block from the minimal screen: hold the refuge mark, use a gesture, or type its name in the search (\"b\" for short).",
+                "Your blocks also appear on digital refuge's icon: long-press it in any launcher and tap one to start it.",
+            ),
+        ),
+        ChangelogEntry(
             58,
             "0.9.12",
             listOf(

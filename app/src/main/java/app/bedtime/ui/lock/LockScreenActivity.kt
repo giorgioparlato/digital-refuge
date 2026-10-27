@@ -372,7 +372,9 @@ private fun LockScreen(
     val breezy = remember { Weather.APPS.firstOrNull { AppCatalog.isLaunchable(context, it) } }
     val todayHours = rememberTodayHours()
     val (habitList, habitMarks) = rememberHabits()
-    val nowPlaying = if (Modules.isOn(settings.homeStyle, Screen.LOCK, Module.NOW_PLAYING)) rememberNowPlaying() else null
+    // A session can bring its own widgets.
+    val sessionStyle = Modules.during(settings.homeStyle, state?.active.orEmpty().map { it.start to it.schedule })
+    val nowPlaying = if (Modules.isOn(sessionStyle, Screen.LOCK, Module.NOW_PLAYING)) rememberNowPlaying() else null
     var quickNote by remember { mutableStateOf(false) }
     // A gesture's action: a quick note or the notification shade right here, otherwise an app (the camera
     // straight away, any other once unlocked).
@@ -397,7 +399,7 @@ private fun LockScreen(
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { listOpen = false }
     // With several sessions at once, show the one that lasts longest.
     val occurrence = state?.active?.maxByOrNull { it.end }
-    val style = settings.homeStyle
+    val style = sessionStyle
     val light = style.palette().isLight
     // With digital refuge as your launcher, it can be your lock screen outside sessions too.
     val always = settings.homeScreen && style.lockAlways

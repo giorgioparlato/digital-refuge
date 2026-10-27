@@ -1,5 +1,7 @@
 package app.bedtime.ui.minimal
 
+import androidx.compose.foundation.shape.CircleShape
+import app.bedtime.data.Schedule
 import app.bedtime.ui.components.rememberNowPlaying
 import app.bedtime.ui.components.NowPlayingWidget
 import app.bedtime.data.Habits
@@ -244,7 +246,19 @@ private fun MinimalHomeScreen(
     var hoursDetail by remember { mutableStateOf(false) }
     val todayHours = rememberTodayHours()
     val (habitList, habitMarks) = rememberHabits()
-    val nowPlaying = if (Modules.isOn(settings.homeStyle, Screen.HOME, Module.NOW_PLAYING)) rememberNowPlaying() else null
+    // Your blocks, to start from the refuge mark, a gesture or the search.
+    val allSchedules by repo.schedules.collectAsStateWithLifecycle(initialValue = emptyList())
+    val blocks = allSchedules.filter { it.isBlock && it.enabled }
+    var blocksOpen by remember { mutableStateOf(false) }
+    val startBlock: (Schedule) -> Unit = { block ->
+        scope.launch {
+            repo.startBlock(block, block.durationMinutes)
+            Toast.makeText(context, "${block.name} until ${formatTime(context, System.currentTimeMillis() + block.durationMinutes * 60_000L)}".lowercase(), Toast.LENGTH_SHORT).show()
+        }
+    }
+    // A session can bring its own widgets.
+    val sessionStyle = Modules.during(settings.homeStyle, state?.active.orEmpty().map { it.start to it.schedule })
+    val nowPlaying = if (Modules.isOn(sessionStyle, Screen.HOME, Module.NOW_PLAYING)) rememberNowPlaying() else null
     var openHabit by remember { mutableStateOf<String?>(null) }
     // Looked for when the drawer first opens, so Home itself comes up at once.
     val searchTargets by produceState(emptyList<SearchTarget>(), drawer) {
@@ -282,7 +296,7 @@ private fun MinimalHomeScreen(
         else Toast.makeText(context, "calendar access wasn't allowed", Toast.LENGTH_SHORT).show()
     }
     val quoteActions = rememberQuoteActions()
-    val style = settings.homeStyle
+    val style = sessionStyle
     val light = style.palette().isLight
 
     LaunchedEffect(state, loadedSettings) {
@@ -358,6 +372,7 @@ private fun MinimalHomeScreen(
             HomeActions.SEARCH -> drawer = true
             HomeActions.NOTES -> notesOpen = true
             HomeActions.WEEK -> scope.launch { week = loadCalendarWeek(context, LocalDateTime.now()) }
+            HomeActions.BLOCKS -> blocksOpen = true
             HomeActions.CAMERA -> runCatching {
                 context.startActivity(Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             }
@@ -387,6 +402,7 @@ private fun MinimalHomeScreen(
     // An alarm or timer, settings pages (when Settings could be opened now), and notes and files by name.
     val found = buildMap {
         Calculator.evaluate(words)?.let { put(SearchOrder.CALCULATOR, listOf(DrawerResult.Calculation(Calculator.format(it)))) }
+        if (words.length >= 2) put(SearchOrder.BLOCKS, blocks.filter { it.name.contains(words, ignoreCase = true) }.map { DrawerResult.StartBlock(it) })
         // With its keyword just the time ("a 7:30", "t 10"); without, starting "alarm" or "timer".
         val clock = ClockActions.parse(words)
         (if (keyword?.key == SearchOrder.ALARM) ClockActions.alarm(words) else clock as? app.bedtime.data.ClockAction.Alarm)
@@ -439,6 +455,10 @@ private fun MinimalHomeScreen(
                     }
                     closeDrawer()
                 }
+            }
+            is DrawerResult.StartBlock -> {
+                startBlock(result.block)
+                closeDrawer()
             }
             is DrawerResult.Calculation -> {
                 copy(context, result.answer)
@@ -548,6 +568,7 @@ private fun MinimalHomeScreen(
             onCalendar = { scope.launch { week = loadCalendarWeek(context, LocalDateTime.now()) } },
             onOpenDrawer = { drawer = true },
             onOpenRefuge = { AppCatalog.launch(context, context.packageName) },
+            onRefugeHold = { blocksOpen = true },
             nowPlaying = nowPlaying?.takeIf { Modules.isOn(style, Screen.HOME, Module.NOW_PLAYING) }?.let { playing ->
                 { NowPlayingWidget(playing, style.palette().text, style.palette().faint, Modifier.padding(top = 12.dp)) }
             },
@@ -585,6 +606,12 @@ private fun MinimalHomeScreen(
                 scope.launch { repo.markHabit(habit.id, day, value) }
             })
         }
+    }
+    if (blocksOpen) {
+        BlockSheet(blocks, state?.active.orEmpty().map { it.schedule.id }.toSet(), style, onStart = { block ->
+            startBlock(block)
+            blocksOpen = false
+        }, onDismiss = { blocksOpen = false })
     }
     if (quickNote) QuickNoteDialog(style, settings.quickTargets, onSave = saveNote, onDismiss = { quickNote = false })
     if (hoursDetail) {
@@ -675,6 +702,8 @@ internal fun MinimalHomeContent(
     onNextQuote: () -> Unit = {},
     /** Opens digital refuge, from a tap on its mark at the foot. */
     onOpenRefuge: () -> Unit = {},
+    /** A long press on the refuge mark: your blocks, to start one. */
+    onRefugeHold: (() -> Unit)? = null,
     /** The session's mark on its pill. */
     scheduleIcon: String? = null,
     /** The habits and now-playing widgets, drawn by the screen, when they're on. */
@@ -789,8 +818,15 @@ internal fun MinimalHomeContent(
                     item { Text(emptyHint ?: "nothing to open right now. enjoy the quiet.", fontSize = (18 * scale).sp, color = p.faint) }
                 }
             }
+            // A tap opens digital refuge; a long press offers your blocks.
             val logo = @Composable {
-                IconButton(onClick = onOpenRefuge) {
+                Box(
+                    Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .combinedClickable(onClickLabel = "open digital refuge", onLongClickLabel = "start a block", onLongClick = onRefugeHold, onClick = onOpenRefuge),
+                    contentAlignment = Alignment.Center,
+                ) {
                     Icon(BedtimeIcons.Refuge, contentDescription = "digital refuge", tint = p.faint, modifier = Modifier.size(26.dp))
                 }
             }

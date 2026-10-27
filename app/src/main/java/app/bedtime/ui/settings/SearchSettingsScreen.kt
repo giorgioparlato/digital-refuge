@@ -110,6 +110,7 @@ fun SearchSettingsScreen(onBack: () -> Unit) {
             SearchOrder.CALENDAR to "Add to calendar, when the words say when",
             SearchOrder.CONTACTS to "Contacts: call and message",
             SearchOrder.CALCULATOR to "Calculator: \"12 * 3\"",
+            SearchOrder.BLOCKS to "Start a block, by its name",
             SearchOrder.ALARM to "Alarms: \"alarm 7:30\"",
             SearchOrder.TIMER to "Timers: \"timer 10 min\"",
             SearchOrder.SETTINGS to "Settings pages",

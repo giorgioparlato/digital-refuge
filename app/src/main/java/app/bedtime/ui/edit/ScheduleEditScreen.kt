@@ -1,5 +1,9 @@
 package app.bedtime.ui.edit
 
+import app.bedtime.ui.homestyle.ModuleListEditor
+import app.bedtime.data.Screen
+import app.bedtime.data.Modules
+import app.bedtime.data.ModuleChoice
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.material.icons.filled.Person
@@ -188,6 +192,7 @@ fun ScheduleEditScreen(
     val c = Obsidian.colors
     val repo = remember { Repository.get(context) }
     val scope = rememberCoroutineScope()
+    val appSettings by repo.settings.collectAsStateWithLifecycle(initialValue = null)
     val state by Engine.state(context).collectAsStateWithLifecycle()
     val history by repo.history.collectAsStateWithLifecycle(initialValue = emptyList())
     val essentials = remember { SystemApps.essentials(context) }
@@ -403,6 +408,8 @@ fun ScheduleEditScreen(
         onEditWindowStart = { editingTime = TIME_WINDOW_START },
         onEditWindowEnd = { editingTime = TIME_WINDOW_END },
         onOpenSetup = onSetup,
+        usualHome = appSettings?.let { Modules.of(it.homeStyle, Screen.HOME) }.orEmpty(),
+        usualLock = appSettings?.let { Modules.of(it.homeStyle, Screen.LOCK) }.orEmpty(),
         onHowItWorks = onHowItWorks,
         appLabel = { AppCatalog.label(context, it) },
         essentials = essentials,
@@ -412,6 +419,7 @@ fun ScheduleEditScreen(
 /** Which fold is open. Only one at a time, so the page never grows past a screenful of scrolling. */
 private const val SECTION_DOES = "does"
 private const val SECTION_LEAVING = "leaving"
+private const val SECTION_SCREENS = "screens"
 private const val SECTION_AROUND = "around"
 
 /** The line "what it does" shows while it is shut. */
@@ -476,6 +484,9 @@ internal fun ScheduleEditContent(
     onEditWindowStart: () -> Unit = {},
     onEditWindowEnd: () -> Unit = {},
     onOpenSetup: () -> Unit,
+    /** Your usual widgets on each screen, to start a session's own from. */
+    usualHome: List<ModuleChoice> = emptyList(),
+    usualLock: List<ModuleChoice> = emptyList(),
     onHowItWorks: () -> Unit = {},
     appLabel: (String) -> String = { it },
     /** Pre-filled as allowed apps when minimal mode is switched on with none chosen yet. */
@@ -742,6 +753,42 @@ internal fun ScheduleEditContent(
                             modifier = Modifier.padding(top = 8.dp),
                         )
                     }
+                }
+
+                // ---------------------------------------------------------------- on the screens
+                FoldSection(
+                    title = "On the screens",
+                    summary = when {
+                        draft.homeModules == null && draft.lockModules == null -> "Your usual widgets"
+                        draft.homeModules != null && draft.lockModules != null -> "Its own widgets on home and the lock screen"
+                        draft.homeModules != null -> "Its own widgets on home"
+                        else -> "Its own widgets on the lock screen"
+                    },
+                    open = open == SECTION_SCREENS,
+                    onToggle = { toggle(SECTION_SCREENS) },
+                ) {
+                    var lock by rememberSaveable { mutableStateOf(false) }
+                    SegmentedChoice(options = listOf("Home screen", "Lock screen"), selected = if (lock) 1 else 0, onSelect = { lock = it == 1 })
+                    val own = if (lock) draft.lockModules else draft.homeModules
+                    fun setOwn(list: List<ModuleChoice>?) = onDraftChange(if (lock) draft.copy(lockModules = list) else draft.copy(homeModules = list))
+                    Spacer(Modifier.height(10.dp))
+                    SegmentedChoice(
+                        options = listOf("As usual", "Its own"),
+                        selected = if (own == null) 0 else 1,
+                        onSelect = { setOwn(if (it == 0) null else own ?: if (lock) usualLock else usualHome) },
+                        enabled = editable,
+                    )
+                    Text(
+                        if (own == null) {
+                            "While it runs, the ${if (lock) "lock screen" else "minimal screen"} shows your usual widgets."
+                        } else {
+                            "While it runs, these instead, in this order. If another session with its own starts later, its own win."
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = c.textMuted,
+                        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
+                    )
+                    if (own != null) ModuleListEditor(own, enabled = editable, onChange = { setOwn(it) })
                 }
 
                 // ---------------------------------------------------------------- how hard to leave

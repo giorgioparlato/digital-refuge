@@ -1,5 +1,6 @@
 package app.bedtime
 
+import androidx.lifecycle.lifecycleScope
 import app.bedtime.ui.settings.DistractionScreen
 import app.bedtime.ui.settings.SearchSettingsScreen
 import app.bedtime.ui.homestyle.StylePage
@@ -132,6 +133,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // Your blocks on the app icon's long press, kept as they change (the blocking service does it too).
+        lifecycleScope.launch { app.bedtime.data.Repository.get(this@MainActivity).schedules.collect { app.bedtime.service.BlockShortcuts.update(this@MainActivity, it) } }
         if (savedInstanceState == null) pendingRoute.value = intent.getStringExtra(EXTRA_ROUTE)
         setContent {
             BedtimeTheme {

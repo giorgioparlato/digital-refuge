@@ -146,6 +146,15 @@
             </intent-filter>
         </activity-alias>
 
+        <!-- A block started from a shortcut on the app's icon: no screen, just the start and a short message. -->
+        <activity
+            android:name=".service.StartBlockActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
         <activity
             android:name=".ui.lock.LockScreenActivity"
             android:excludeFromRecents="true"

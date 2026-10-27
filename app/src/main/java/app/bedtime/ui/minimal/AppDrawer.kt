@@ -108,6 +108,8 @@ sealed interface DrawerResult {
      */
     data class Contact(val hit: ContactHit, val message: String = "") : DrawerResult
     data class Chat(val hit: ContactHit, val app: ChatApp, val text: String) : DrawerResult
+    /** A block of yours, started for its usual length. */
+    data class StartBlock(val block: app.bedtime.data.Schedule) : DrawerResult
     /** The answer to a sum, copied when tapped. */
     data class Calculation(val answer: String) : DrawerResult
     data class Clock(val action: ClockAction) : DrawerResult
@@ -178,7 +180,8 @@ object AppDrawer {
 
     /** Whether [result] does something with the words (searches, saves a note or an event, sets the clock), rather than opening something found. */
     fun isAction(result: DrawerResult): Boolean =
-        result is DrawerResult.Search || result is DrawerResult.AddNote || result is DrawerResult.AddEvent || result is DrawerResult.Clock
+        result is DrawerResult.Search || result is DrawerResult.AddNote || result is DrawerResult.AddEvent || result is DrawerResult.Clock ||
+            result is DrawerResult.StartBlock
 
     /** Where the line between what was found and the actions goes: before the first action, if anything found comes before it. */
     fun dividerAt(results: List<DrawerResult>): Int? =
@@ -414,6 +417,7 @@ private fun ResultRow(
             is DrawerResult.Contact -> result.hit.name
             is DrawerResult.Chat -> ""
             is DrawerResult.Calculation -> "= ${result.answer}"
+            is DrawerResult.StartBlock -> "start ${result.block.name.lowercase()} · ${app.bedtime.ui.formatMinutes(result.block.durationMinutes.toLong())}"
             is DrawerResult.Clock -> ClockActions.label(result.action) { h, m ->
                 formatTime(context, java.time.LocalDate.now().atTime(h, m).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()).lowercase()
             }
@@ -432,6 +436,7 @@ private fun ResultRow(
             is DrawerResult.AddEvent -> Icons.Default.DateRange
             is DrawerResult.Contact -> Icons.Default.Call
             is DrawerResult.Calculation -> Icons.Default.Add
+            is DrawerResult.StartBlock -> app.bedtime.ui.components.ScheduleIcons.of(result.block.icon)
             is DrawerResult.Clock -> Icons.Default.Notifications
             is DrawerResult.Setting -> Icons.Default.Settings
             is DrawerResult.VaultNote -> Icons.Default.Create

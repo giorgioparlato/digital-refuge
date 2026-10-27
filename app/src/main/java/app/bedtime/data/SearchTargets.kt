@@ -108,11 +108,12 @@ object SearchOrder {
     const val OBSIDIAN = "obsidian"
     const val FILES = "files"
     const val CALCULATOR = "calculator"
+    const val BLOCKS = "blocks"
 
     /** The heading a choice sits under when adding to the search. */
     fun group(key: String): String = when {
         key.startsWith("web:") || key.startsWith("wikipedia:") || key.startsWith("maps:") || key.startsWith("lookup:") -> GROUPS[0]
-        key in setOf(CONTACTS, ALARM, TIMER, SETTINGS, CALCULATOR) -> GROUPS[1]
+        key in setOf(CONTACTS, ALARM, TIMER, SETTINGS, CALCULATOR, BLOCKS) -> GROUPS[1]
         key.startsWith("note:") || key == CALENDAR -> GROUPS[2]
         key == FILES || key == OBSIDIAN -> GROUPS[3]
         else -> GROUPS[4]
@@ -137,6 +138,7 @@ object SearchOrder {
                 SearchChoice(TIMER, true) +
                 SearchChoice(SETTINGS, true) +
                 SearchChoice(CALCULATOR, true) +
+                SearchChoice(BLOCKS, true) +
                 listOfNotNull(SearchChoice(OBSIDIAN, false).takeIf { obsidian }) +
                 SearchChoice(FILES, false),
         )

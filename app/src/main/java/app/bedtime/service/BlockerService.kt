@@ -161,6 +161,8 @@ class BlockerService : AccessibilityService() {
 
         val repo = Repository.get(this)
         limitTracker.start()
+        // Your blocks on the app icon's long press, kept as they change.
+        scope.launch { repo.schedules.collect { BlockShortcuts.update(this@BlockerService, it) } }
         scope.launch {
             repo.settings.collect {
                 settings = it

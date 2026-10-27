@@ -26,6 +26,7 @@ object Keywords {
         put(choices.firstOrNull { it.key.startsWith("spotify:") }?.key, "s")
         put(choices.firstOrNull { it.key == SearchOrder.OBSIDIAN }?.key, "o")
         put(choices.firstOrNull { it.key == SearchOrder.FILES }?.key, "f")
+        put(choices.firstOrNull { it.key == SearchOrder.BLOCKS }?.key, "b")
         put(SearchOrder.REFUGE_NOTES, "n")
         put(SearchOrder.CALENDAR, "c")
         put(SearchOrder.CONTACTS, "@")

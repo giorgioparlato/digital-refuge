@@ -48,6 +48,9 @@ data class Schedule(
     val lockNotes: LockNotes = LockNotes.USUAL,
     val lockNoteApps: Set<String> = emptySet(),
     val lockNotePeople: Set<String> = emptySet(),
+    /** Its own widgets on the minimal and lock screens while it runs, in order; null keeps your usual ones. */
+    val homeModules: List<ModuleChoice>? = null,
+    val lockModules: List<ModuleChoice>? = null,
     val unlock: UnlockConfig = UnlockConfig(),
     val unlockAction: UnlockAction = UnlockAction(),
     /** Offer a short break for apps that won't run while blocking is on. Off means no way out but unlocking. */
@@ -280,6 +283,7 @@ object HomeActions {
     const val SEARCH = "search"
     const val NOTES = "notes"
     const val WEEK = "week"
+    const val BLOCKS = "blocks"
     const val CAMERA = GESTURE_CAMERA
 
     /** In the order they're offered, with how each reads. */
@@ -290,6 +294,7 @@ object HomeActions {
         SEARCH to "Search",
         NOTES to "Your notes",
         WEEK to "The week ahead",
+        BLOCKS to "Your blocks, to start one",
         CAMERA to "Camera",
     )
 

@@ -31,4 +31,18 @@ class ModulesTest {
         val noClock = Modules.switchedEverywhere(lock, Module.CLOCK, false)
         assertFalse(Modules.onAnywhere(noClock, Module.CLOCK))
     }
+
+    @Test
+    fun aSessionCanBringItsOwn() {
+        val usual = HomeStyle()
+        val deepWork = Schedule(name = "Deep work", homeModules = listOf(ModuleChoice(Module.CLOCK), ModuleChoice(Module.HABITS)))
+        val bed = Schedule(name = "Bed", homeModules = listOf(ModuleChoice(Module.QUOTE)), lockModules = listOf(ModuleChoice(Module.CLOCK)))
+        // Nothing of its own: your usual ones.
+        assertEquals(Modules.shown(usual, Screen.HOME), Modules.shown(Modules.during(usual, listOf(1L to Schedule())), Screen.HOME))
+        assertEquals(listOf(Module.CLOCK, Module.HABITS), Modules.shown(Modules.during(usual, listOf(1L to deepWork)), Screen.HOME))
+        // The one that started last wins, screen by screen.
+        val both = Modules.during(usual, listOf(5L to bed, 9L to deepWork))
+        assertEquals(listOf(Module.CLOCK, Module.HABITS), Modules.shown(both, Screen.HOME))
+        assertEquals(listOf(Module.CLOCK), Modules.shown(both, Screen.LOCK))
+    }
 }

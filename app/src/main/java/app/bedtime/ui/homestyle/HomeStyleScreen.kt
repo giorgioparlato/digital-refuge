@@ -1,5 +1,6 @@
 package app.bedtime.ui.homestyle
 
+import app.bedtime.data.ModuleChoice
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.filled.Person
@@ -837,9 +838,22 @@ private fun formatRelativePast(millis: Long): String {
  */
 @Composable
 private fun WidgetList(style: HomeStyle, screen: Screen, onChange: (HomeStyle) -> Unit, onShowCalendar: (HomeStyle) -> Unit) {
+    ModuleListEditor(Modules.of(style, screen), onChange = { list -> onChange(Modules.with(style, screen, list)) }) { list, module ->
+        val updated = Modules.with(style, screen, list)
+        if (module == Module.EVENT) onShowCalendar(updated) else onChange(updated)
+    }
+}
+
+/** A list of widgets to drag into order and switch on or off; [onSwitchedOn] when one is switched on, [onChange] otherwise. */
+@Composable
+internal fun ModuleListEditor(
+    list: List<ModuleChoice>,
+    enabled: Boolean = true,
+    onChange: (List<ModuleChoice>) -> Unit,
+    onSwitchedOn: (List<ModuleChoice>, Module) -> Unit = { l, _ -> onChange(l) },
+) {
     val c = Obsidian.colors
-    val list = Modules.of(style, screen)
-    DragList(list, key = { it.module.name }, onMoved = { moved -> onChange(Modules.with(style, screen, moved)) }) { choice ->
+    DragList(list, key = { it.module.name }, onMoved = { moved -> if (enabled) onChange(moved) }) { choice ->
         Text(
             choice.module.label,
             style = MaterialTheme.typography.bodyLarge,
@@ -847,8 +861,8 @@ private fun WidgetList(style: HomeStyle, screen: Screen, onChange: (HomeStyle) -
             modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
         )
         ObsidianToggle(choice.on, { on ->
-            val updated = Modules.switched(style, screen, choice.module, on)
-            if (on && choice.module == Module.EVENT) onShowCalendar(updated) else onChange(updated)
-        })
+            val updated = list.map { if (it.module == choice.module) it.copy(on = on) else it }
+            if (on) onSwitchedOn(updated, choice.module) else onChange(updated)
+        }, enabled = enabled)
     }
 }

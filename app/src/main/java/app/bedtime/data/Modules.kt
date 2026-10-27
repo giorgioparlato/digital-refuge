@@ -40,6 +40,18 @@ object Modules {
 
     fun onAnywhere(style: HomeStyle, module: Module): Boolean = Screen.entries.any { isOn(style, it, module) }
 
+    /**
+     * [style] as the screens show it while [sessions] (start, schedule) run: each screen's widgets from
+     * the session that started last and has its own for it, otherwise your usual ones.
+     */
+    fun during(style: HomeStyle, sessions: List<Pair<Long, Schedule>>): HomeStyle {
+        val latest = sessions.sortedByDescending { it.first }.map { it.second }
+        return style.copy(
+            homeModules = latest.firstNotNullOfOrNull { it.homeModules } ?: style.homeModules,
+            lockModules = latest.firstNotNullOfOrNull { it.lockModules } ?: style.lockModules,
+        )
+    }
+
     /** [style] with [screen]'s widgets set to [list]. */
     fun with(style: HomeStyle, screen: Screen, list: List<ModuleChoice>): HomeStyle =
         if (screen == Screen.HOME) style.copy(homeModules = list) else style.copy(lockModules = list)
