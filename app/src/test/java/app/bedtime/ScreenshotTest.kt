@@ -460,6 +460,45 @@ class ScreenshotTest {
         }
     }
 
+    private val groceries = app.bedtime.data.Note("g", "# Groceries\n- [ ] oat milk\n- [x] bread\n- [ ] lemons\n- [ ] coffee beans", 0L)
+
+    @Test
+    fun homeNote() = shot {
+        val style = app.bedtime.data.Modules.with(
+            HomeStyle(),
+            app.bedtime.data.Screen.HOME,
+            listOf(app.bedtime.data.Module.GREETING, app.bedtime.data.Module.CLOCK, app.bedtime.data.Module.DATE, app.bedtime.data.Module.NOTE).map { app.bedtime.data.ModuleChoice(it) },
+        )
+        MinimalHomeContent(
+            now = java.time.LocalDateTime.of(2026, 10, 27, 21, 41),
+            scheduleName = null,
+            until = null,
+            apps = Samples.minimalApps,
+            style = style,
+            onLaunch = {},
+            onUnlock = null,
+            note = {
+                app.bedtime.ui.notes.NoteWidgetView(
+                    groceries, androidx.compose.ui.graphics.Color(0xFFE8DCC8), androidx.compose.ui.graphics.Color(0xFF8C8478), androidx.compose.ui.graphics.Color(0xFF7FBF9A),
+                    Modifier.padding(top = 16.dp),
+                )
+            },
+        )
+    }
+
+    @Test
+    fun noteWidgetSheet() = shot {
+        Box(Modifier.padding(24.dp)) {
+            app.bedtime.ui.minimal.WidgetSheetContent(
+                app.bedtime.data.Module.NOTE,
+                HomeStyle(noteWidgetId = "g"),
+                sessionOwned = false,
+                handlers = app.bedtime.ui.minimal.WidgetHandlers(),
+                notes = listOf(app.bedtime.data.Note(app.bedtime.data.Notes.TODO_ID, "# To-do\n- [ ] call mum", 0L), groceries, app.bedtime.data.Note("i", "Ideas for the garden", 0L)),
+            )
+        }
+    }
+
     @Test
     fun blockSheet() = shot {
         Box(Modifier.padding(24.dp)) {

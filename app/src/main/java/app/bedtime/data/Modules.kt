@@ -14,6 +14,7 @@ enum class Module(val label: String) {
     QUOTE("Quote"),
     HABITS("Habits"),
     NOW_PLAYING("Now playing"),
+    NOTE("Note"),
 }
 
 @Serializable
@@ -86,7 +87,7 @@ object Modules {
                 Module.EVENT -> style.showCalendar
                 Module.HOURS -> if (screen == Screen.HOME) style.hoursOnHome else style.hoursOnLock
                 Module.QUOTE -> style.showQuote
-                Module.HABITS, Module.NOW_PLAYING -> false
+                Module.HABITS, Module.NOW_PLAYING, Module.NOTE -> false
             },
         )
     }

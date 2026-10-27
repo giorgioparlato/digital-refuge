@@ -19,6 +19,7 @@ object Changelog {
                 "Settings, arranged by what they're for, with a search at the top: type \"keyword\", \"weather\" or \"colour\" to go straight there.",
                 "Settings now say plainly that refuge's home screen takes over in minimal sessions and can be your everyday launcher, and that its lock screen is up to you.",
                 "Widgets: pick the home screen or the lock screen at the top of the page.",
+                "A note widget: one of your refuge notes on the home or lock screen, with boxes to tick and a line to add. Hold it to choose which note.",
                 "Hold a widget on your home or lock screen to hide it, or change it there: the weather's style, the clock's size, the quote, your habits.",
                 "A search keyword that's already taken now says what has it, and isn't set twice.",
                 "\"Today by the hour\" is now the distraction tracker.",

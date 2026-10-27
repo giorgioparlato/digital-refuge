@@ -1,5 +1,9 @@
 package app.bedtime.ui.minimal
 
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.background
@@ -51,13 +55,21 @@ class WidgetHandlers(
  * distracting apps.
  */
 @Composable
-internal fun WidgetSheet(module: Module, style: HomeStyle, sessionOwned: Boolean, handlers: WidgetHandlers, onDismiss: () -> Unit) {
-    Dialog(onDismissRequest = onDismiss) { WidgetSheetContent(module, style, sessionOwned, handlers, onDismiss) }
+internal fun WidgetSheet(module: Module, style: HomeStyle, sessionOwned: Boolean, handlers: WidgetHandlers, onDismiss: () -> Unit, notes: List<app.bedtime.data.Note> = emptyList()) {
+    Dialog(onDismissRequest = onDismiss) { WidgetSheetContent(module, style, sessionOwned, handlers, onDismiss, notes) }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun WidgetSheetContent(module: Module, style: HomeStyle, sessionOwned: Boolean, handlers: WidgetHandlers, onDone: () -> Unit = {}) {
+internal fun WidgetSheetContent(
+    module: Module,
+    style: HomeStyle,
+    sessionOwned: Boolean,
+    handlers: WidgetHandlers,
+    onDone: () -> Unit = {},
+    /** Your refuge notes, for the note widget to show one of. */
+    notes: List<app.bedtime.data.Note> = emptyList(),
+) {
     val p = style.palette()
     Column(
         Modifier
@@ -94,6 +106,23 @@ internal fun WidgetSheetContent(module: Module, style: HomeStyle, sessionOwned: 
             ) { handlers.change(style.copy(quoteRefresh = it)) }
             Module.HABITS -> Action(Icons.AutoMirrored.Filled.KeyboardArrowRight, "Add or remove habits", p) { handlers.open(app.bedtime.Routes.HABITS); onDone() }
             Module.HOURS -> Action(Icons.AutoMirrored.Filled.KeyboardArrowRight, "Choose your distracting apps", p) { handlers.open(app.bedtime.Routes.DISTRACTION); onDone() }
+            Module.NOTE -> {
+                Text("Show", style = MaterialTheme.typography.labelLarge, color = p.faint, modifier = Modifier.padding(horizontal = 22.dp, vertical = 6.dp))
+                val chosen = style.noteWidgetId ?: app.bedtime.data.Notes.TODO_ID
+                Column(Modifier.heightIn(max = 280.dp).verticalScroll(rememberScrollState())) {
+                    notes.sortedBy { it.id != app.bedtime.data.Notes.TODO_ID }.forEach { note ->
+                        val name = app.bedtime.data.NoteWidget.title(note.text).ifBlank { "A note" }
+                        Row(
+                            Modifier.fillMaxWidth().clickable { handlers.change(style.copy(noteWidgetId = note.id)); onDone() }.padding(horizontal = 22.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            app.bedtime.ui.components.VerbatimText(name, style = MaterialTheme.typography.bodyLarge, color = if (note.id == chosen) p.accent else p.text, modifier = Modifier.weight(1f))
+                            if (note.id == chosen) Icon(Icons.Default.Check, contentDescription = "shown now", tint = p.accent, modifier = Modifier.size(18.dp))
+                        }
+                    }
+                    if (notes.isEmpty()) Text("No notes yet. Write one in refuge notes.", style = MaterialTheme.typography.bodyMedium, color = p.faint, modifier = Modifier.padding(horizontal = 22.dp))
+                }
+            }
             else -> Unit
         }
         Action(Icons.Default.Clear, "Hide from this screen", p) { handlers.hide(); onDone() }

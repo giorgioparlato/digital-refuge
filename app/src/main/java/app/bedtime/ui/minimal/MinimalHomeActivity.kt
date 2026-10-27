@@ -1,5 +1,7 @@
 package app.bedtime.ui.minimal
 
+import app.bedtime.data.NoteWidget
+import app.bedtime.ui.notes.NoteWidgetView
 import app.bedtime.ui.minimal.WidgetSheet
 import androidx.compose.foundation.shape.CircleShape
 import app.bedtime.data.Schedule
@@ -252,6 +254,10 @@ private fun MinimalHomeScreen(
     val blocks = allSchedules.filter { it.isBlock && it.enabled }
     var blocksOpen by remember { mutableStateOf(false) }
     var holding by remember { mutableStateOf<Module?>(null) }
+    // The note the note widget shows: the one you chose, or the to-do note.
+    val allNotes by repo.notes.collectAsStateWithLifecycle(initialValue = emptyList())
+    val widgetNote = allNotes.firstOrNull { it.id == (settings.homeStyle.noteWidgetId ?: Notes.TODO_ID) }
+    var noteToOpen by remember { mutableStateOf<String?>(null) }
     val startBlock: (Schedule) -> Unit = { block ->
         scope.launch {
             repo.startBlock(block, block.durationMinutes)
@@ -484,7 +490,7 @@ private fun MinimalHomeScreen(
     when {
         notesOpen -> {
             BackHandler { notesOpen = false }
-            NotesScreen(onBack = { notesOpen = false })
+            NotesScreen(onBack = { notesOpen = false; noteToOpen = null }, initialOpen = noteToOpen)
         }
         drawer -> {
             BackHandler { closeDrawer() }
@@ -572,6 +578,29 @@ private fun MinimalHomeScreen(
             onOpenRefuge = { AppCatalog.launch(context, context.packageName) },
             onRefugeHold = { blocksOpen = true },
             onWidgetHold = { holding = it },
+            note = if (Modules.isOn(style, Screen.HOME, Module.NOTE)) {
+                {
+                    NoteWidgetView(
+                        widgetNote,
+                        style.palette().text, style.palette().faint, style.palette().accent,
+                        Modifier.padding(top = 16.dp),
+                        onToggle = { i -> widgetNote?.let { n -> scope.launch { repo.editNote(n.id, NoteWidget.toggled(n.text, i)) } } },
+                        onAdd = { words ->
+                            scope.launch {
+                                val n = widgetNote
+                                if (n != null) repo.editNote(n.id, NoteWidget.withLine(n.text, words)) else repo.addTodo(words)
+                            }
+                        },
+                        onOpen = {
+                            noteToOpen = widgetNote?.id
+                            notesOpen = true
+                        },
+                        onHold = { holding = Module.NOTE },
+                    )
+                }
+            } else {
+                null
+            },
             nowPlaying = nowPlaying?.takeIf { Modules.isOn(style, Screen.HOME, Module.NOW_PLAYING) }?.let { playing ->
                 { NowPlayingWidget(playing, style.palette().text, style.palette().faint, Modifier.padding(top = 12.dp)) }
             },
@@ -630,11 +659,12 @@ private fun MinimalHomeScreen(
                     }
                 },
                 change = { changed ->
-                    scope.launch { repo.updateSettings { s -> s.copy(homeStyle = s.homeStyle.copy(weatherStyle = changed.weatherStyle, clockSize = changed.clockSize, quoteRefresh = changed.quoteRefresh)) } }
+                    scope.launch { repo.updateSettings { s -> s.copy(homeStyle = s.homeStyle.copy(weatherStyle = changed.weatherStyle, clockSize = changed.clockSize, quoteRefresh = changed.quoteRefresh, noteWidgetId = changed.noteWidgetId)) } }
                 },
                 open = { route -> runCatching { context.startActivity(app.bedtime.MainActivity.intent(context, route)) } },
             ),
             onDismiss = { holding = null },
+            notes = allNotes,
         )
     }
     if (blocksOpen) {
@@ -749,6 +779,7 @@ internal fun MinimalHomeContent(
     /** The habits and now-playing widgets, drawn by the screen, when they're on. */
     habits: (@Composable () -> Unit)? = null,
     nowPlaying: (@Composable () -> Unit)? = null,
+    note: (@Composable () -> Unit)? = null,
     preview: Boolean = false,
 ) {
     val p = style.palette()
@@ -827,6 +858,7 @@ internal fun MinimalHomeContent(
                 quote = quote?.let { q -> { HomeQuote(q, style, preview, quoteFavourite, onQuoteFavourite, onQuoteHide, onNextQuote, onWidgetHold?.let { { it(Module.QUOTE) } }) } },
                 habits = habits,
                 nowPlaying = nowPlaying,
+                note = note,
                 onHold = onWidgetHold,
             )
             Spacer(Modifier.height(if (preview) 28.dp else 44.dp))

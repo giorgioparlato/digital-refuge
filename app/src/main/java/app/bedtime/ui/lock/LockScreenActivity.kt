@@ -1,5 +1,7 @@
 package app.bedtime.ui.lock
 
+import app.bedtime.data.NoteWidget
+import app.bedtime.ui.notes.NoteWidgetView
 import app.bedtime.ui.minimal.WidgetHandlers
 import app.bedtime.ui.minimal.WidgetSheet
 import app.bedtime.ui.components.rememberNowPlaying
@@ -392,6 +394,8 @@ private fun LockScreen(
         }
     }
     var holding by remember { mutableStateOf<Module?>(null) }
+    val allNotes by repo.notes.collectAsStateWithLifecycle(initialValue = emptyList())
+    val widgetNote = allNotes.firstOrNull { it.id == (settings.homeStyle.noteWidgetId ?: Notes.TODO_ID) }
     holding?.let { module ->
         // Changes from here ask for the usual unlock first, then lock again, as ticking a habit does.
         val sessions = state?.active.orEmpty().map { it.start to it.schedule }
@@ -414,12 +418,13 @@ private fun LockScreen(
                 },
                 change = { changed ->
                     onConfirmed {
-                        scope.launch { repo.updateSettings { s -> s.copy(homeStyle = s.homeStyle.copy(weatherStyle = changed.weatherStyle, clockSize = changed.clockSize, quoteRefresh = changed.quoteRefresh)) } }
+                        scope.launch { repo.updateSettings { s -> s.copy(homeStyle = s.homeStyle.copy(weatherStyle = changed.weatherStyle, clockSize = changed.clockSize, quoteRefresh = changed.quoteRefresh, noteWidgetId = changed.noteWidgetId)) } }
                     }
                 },
                 open = onOpenRoute,
             ),
             onDismiss = { holding = null },
+            notes = allNotes,
         )
     }
     if (quickNote) {
@@ -466,6 +471,29 @@ private fun LockScreen(
         scheduleIcon = occurrence?.schedule?.icon,
         nowPlaying = nowPlaying?.let { playing -> { NowPlayingWidget(playing, style.palette().text, style.palette().faint, Modifier.padding(top = 12.dp)) } },
         onWidgetHold = { holding = it },
+        // Ticking or adding from here asks for the usual unlock, then locks again; a tap on the words opens it after unlocking.
+        note = if (Modules.isOn(style, Screen.LOCK, Module.NOTE)) {
+            {
+                NoteWidgetView(
+                    widgetNote,
+                    style.palette().text, style.palette().faint, style.palette().accent,
+                    Modifier.padding(top = 16.dp),
+                    onToggle = { i -> widgetNote?.let { n -> onConfirmed { scope.launch { repo.editNote(n.id, NoteWidget.toggled(n.text, i)) } } } },
+                    onAdd = { words ->
+                        onConfirmed {
+                            scope.launch {
+                                val n = widgetNote
+                                if (n != null) repo.editNote(n.id, NoteWidget.withLine(n.text, words)) else repo.addTodo(words)
+                            }
+                        }
+                    },
+                    onOpen = { onOpenRoute(app.bedtime.Routes.NOTES) },
+                    onHold = { holding = Module.NOTE },
+                )
+            }
+        } else {
+            null
+        },
         // Ticking from here asks for the usual unlock first, then locks again, as a reply does.
         habits = habitList.takeIf { it.isNotEmpty() && Modules.isOn(style, Screen.LOCK, Module.HABITS) }?.let { list ->
             {
@@ -555,6 +583,7 @@ internal fun LockScreenContent(
     nowPlaying: (@Composable () -> Unit)? = null,
     /** A long press on a widget: its own sheet, to hide or change it. */
     onWidgetHold: ((Module) -> Unit)? = null,
+    note: (@Composable () -> Unit)? = null,
 ) {
     var expanded by remember { mutableStateOf(initialExpanded) }
     var replying by remember { mutableStateOf(initialReplying) }
@@ -607,6 +636,7 @@ internal fun LockScreenContent(
                 scheduleIcon = scheduleIcon,
                 habits = habits,
                 nowPlaying = nowPlaying,
+                note = note,
                 onHold = onWidgetHold,
                 hours = hours?.let { states ->
                     {

@@ -111,4 +111,22 @@ class NotesTest {
         assertEquals(false, daily.daily)
         assertEquals("YYYY-MM-DD", daily.dailyFormat)
     }
+
+    @Test
+    fun theNoteWidgetReadsTicksAndAdds() {
+        val text = "# Groceries\n- [ ] oat milk\n  - [x] bread\n\n- lemons\nplain words"
+        assertEquals("Groceries", NoteWidget.title(text))
+        val lines = NoteWidget.lines(text, 3)
+        assertEquals(listOf("oat milk", "bread", "lemons"), lines.map { it.text })
+        assertEquals(listOf(false, true, null), lines.map { it.box })
+        assertEquals(1, lines[1].indent)
+        assertEquals(true, lines[2].bullet)
+        // Ticking the first box, then unticking the second.
+        assertEquals("# Groceries\n- [x] oat milk\n  - [x] bread\n\n- lemons\nplain words", NoteWidget.toggled(text, 1))
+        assertEquals("# Groceries\n- [ ] oat milk\n  - [ ] bread\n\n- lemons\nplain words", NoteWidget.toggled(text, 2))
+        // A line added as the note already writes its lines.
+        assertEquals("# Groceries\n- [ ] eggs", NoteWidget.withLine("# Groceries\n- [x] bread", "eggs").replace("- [x] bread\n", ""))
+        assertEquals("Ideas\n- tea\n- coffee", NoteWidget.withLine("Ideas\n- tea", "coffee"))
+        assertEquals("Thoughts\nsomething", NoteWidget.withLine("Thoughts", "something"))
+    }
 }

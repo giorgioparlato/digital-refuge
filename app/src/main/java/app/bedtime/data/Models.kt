@@ -258,6 +258,8 @@ data class HomeStyle(
      */
     val homeModules: List<ModuleChoice>? = null,
     val lockModules: List<ModuleChoice>? = null,
+    /** The refuge note the note widget shows; null shows the to-do note. */
+    val noteWidgetId: String? = null,
 )
 
 /** The lock screen's gestures: four swipes starting around the clock, and a double tap anywhere. */

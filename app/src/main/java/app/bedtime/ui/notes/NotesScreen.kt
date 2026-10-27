@@ -63,7 +63,7 @@ import java.util.Locale
 
 /** Your notes, kept in the app: quick ones from the minimal home's search, and any you write here. */
 @Composable
-fun NotesScreen(onBack: () -> Unit) {
+fun NotesScreen(onBack: () -> Unit, initialOpen: String? = null) {
     val context = LocalContext.current
     val repo = remember { Repository.get(context) }
     val scope = rememberCoroutineScope()
@@ -81,6 +81,7 @@ fun NotesScreen(onBack: () -> Unit) {
         },
         onDelete = { id -> scope.launch { repo.deleteNote(id) } },
         onBack = onBack,
+        initialOpen = initialOpen,
     )
 }
 

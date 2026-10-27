@@ -81,6 +81,7 @@ internal fun SessionHeader(
     quote: (@Composable () -> Unit)? = null,
     habits: (@Composable () -> Unit)? = null,
     nowPlaying: (@Composable () -> Unit)? = null,
+    note: (@Composable () -> Unit)? = null,
     /** A long press on a widget: its own sheet, to hide or change it. */
     onHold: ((Module) -> Unit)? = null,
 ) {
@@ -158,6 +159,7 @@ internal fun SessionHeader(
                 Module.QUOTE -> quote?.let { Box(held(Module.QUOTE)) { it() } }
                 Module.HABITS -> habits?.let { Box(held(Module.HABITS)) { it() } }
                 Module.NOW_PLAYING -> nowPlaying?.let { Box(held(Module.NOW_PLAYING)) { it() } }
+                Module.NOTE -> note?.let { Box(held(Module.NOTE)) { it() } }
             }
             if (at == pillAfter) SessionPill(scheduleName, until, scheduleIcon, style)
         }
