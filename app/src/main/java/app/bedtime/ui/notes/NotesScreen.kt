@@ -1,5 +1,7 @@
 package app.bedtime.ui.notes
 
+import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.delay
 import app.bedtime.data.Notes
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.font.FontWeight
@@ -70,39 +72,42 @@ fun NotesScreen(onBack: () -> Unit, initialOpen: String? = null) {
     val notes by repo.notes.collectAsStateWithLifecycle(initialValue = null)
     NotesContent(
         notes = notes ?: return,
-        onSave = { id, text ->
-            scope.launch {
-                when {
-                    id == null -> if (text.isNotBlank()) repo.addNote(text)
-                    text.isBlank() -> repo.deleteNote(id)
-                    else -> repo.editNote(id, text)
-                }
-            }
-        },
+        onSave = { id, text -> scope.launch { repo.saveNote(id, text) } },
         onDelete = { id -> scope.launch { repo.deleteNote(id) } },
         onBack = onBack,
         initialOpen = initialOpen,
     )
 }
 
-/** The list of notes, or one open to edit. [onSave] with a null id is a new note. */
+/**
+ * The list of notes, or one open to edit. It's saved as you type ([onSave] with its id, new or not), so
+ * nothing waits on leaving cleanly; a note left empty is deleted on the way out.
+ */
 @Composable
 internal fun NotesContent(
     notes: List<Note>,
-    onSave: (id: String?, text: String) -> Unit,
+    onSave: (id: String, text: String) -> Unit,
     onDelete: (String) -> Unit,
     onBack: () -> Unit,
     initialOpen: String? = null,
 ) {
-    // The note open to edit, by id; "" for a new one.
+    // The note open to edit, by id; a new one gets its id as it opens.
     var open by rememberSaveable { mutableStateOf(initialOpen) }
     val editing = open
     if (editing != null) {
         val note = notes.firstOrNull { it.id == editing }
+        // What the editor started from, fixed once it's open (the note itself changes as it's saved).
+        val initial = remember(editing) { note?.text.orEmpty() }
         NoteEditor(
-            initial = note?.text.orEmpty(),
+            initial = initial,
+            isNew = note == null && initial.isEmpty(),
+            onSave = { text -> if (text.isNotBlank() && text != note?.text) onSave(editing, text) },
             onDone = { text ->
-                if (text != note?.text.orEmpty()) onSave(note?.id, text)
+                if (text.isBlank()) {
+                    if (note != null) onDelete(editing)
+                } else if (text != note?.text) {
+                    onSave(editing, text)
+                }
                 open = null
             },
             onDelete = note?.let { { onDelete(it.id); open = null } },
@@ -113,7 +118,7 @@ internal fun NotesContent(
     Scaffold(
         containerColor = c.bgPrimary,
         topBar = { ObsidianTopBar("Notes", onBack = onBack, subtitle = "Written in Markdown, kept on this phone") },
-        floatingActionButton = { AddCircleButton("new note", onClick = { open = "" }) },
+        floatingActionButton = { AddCircleButton("new note", onClick = { open = java.util.UUID.randomUUID().toString() }) },
     ) { padding ->
         if (notes.isEmpty()) {
             Text(
@@ -161,14 +166,19 @@ internal fun NotesContent(
 
 /** One note, styled as Markdown as you type, with a few marks a tap away; saved when you go back. */
 @Composable
-private fun NoteEditor(initial: String, onDone: (String) -> Unit, onDelete: (() -> Unit)?) {
+private fun NoteEditor(initial: String, isNew: Boolean, onSave: (String) -> Unit, onDone: (String) -> Unit, onDelete: (() -> Unit)?) {
     val c = Obsidian.colors
     var value by remember { mutableStateOf(TextFieldValue(initial, TextRange(initial.length))) }
     BackHandler { onDone(value.text) }
+    // Saved a moment after you pause typing.
+    LaunchedEffect(value.text) {
+        delay(600)
+        onSave(value.text)
+    }
     Scaffold(
         containerColor = c.bgPrimary,
         topBar = {
-            ObsidianTopBar(if (onDelete == null) "New note" else "Note", onBack = { onDone(value.text) }) {
+            ObsidianTopBar(if (isNew) "New note" else "Note", onBack = { onDone(value.text) }) {
                 if (onDelete != null) {
                     IconButton(onClick = onDelete) { Icon(Icons.Default.Delete, contentDescription = "delete", tint = c.textMuted) }
                 }

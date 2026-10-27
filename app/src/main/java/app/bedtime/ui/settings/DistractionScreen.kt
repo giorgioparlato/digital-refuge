@@ -76,14 +76,10 @@ fun DistractionScreen(onBack: () -> Unit) {
     DistractionContent(
         appCount = current.distractingApps.size,
         minutes = current.distractionMinutes,
-        onHome = Modules.isOn(current.homeStyle, Screen.HOME, Module.HOURS),
-        onLock = Modules.isOn(current.homeStyle, Screen.LOCK, Module.HOURS),
         onPick = { picking = true },
         onMinutes = { m -> scope.launch { repo.updateSettings { it.copy(distractionMinutes = m) } } },
         totalMinutes = current.distractionTotalMinutes,
         onTotalMinutes = { m -> scope.launch { repo.updateSettings { it.copy(distractionTotalMinutes = m) } } },
-        onShowHome = { on -> scope.launch { repo.updateSettings { it.copy(homeStyle = Modules.switched(it.homeStyle, Screen.HOME, Module.HOURS, on)) } } },
-        onShowLock = { on -> scope.launch { repo.updateSettings { it.copy(homeStyle = Modules.switched(it.homeStyle, Screen.LOCK, Module.HOURS, on)) } } },
         calmColor = current.homeStyle.hourCalmColor,
         distractedColor = current.homeStyle.hourDistractedColor,
         onCalmColor = { v -> scope.launch { repo.updateSettings { it.copy(homeStyle = it.homeStyle.copy(hourCalmColor = v)) } } },
@@ -96,12 +92,8 @@ fun DistractionScreen(onBack: () -> Unit) {
 internal fun DistractionContent(
     appCount: Int,
     minutes: Int,
-    onHome: Boolean,
-    onLock: Boolean,
     onPick: () -> Unit,
     onMinutes: (Int) -> Unit,
-    onShowHome: (Boolean) -> Unit,
-    onShowLock: (Boolean) -> Unit,
     onBack: () -> Unit,
     calmColor: Long? = null,
     distractedColor: Long? = null,
@@ -158,10 +150,12 @@ internal fun DistractionContent(
                 Text("Distracted hours", style = MaterialTheme.typography.labelMedium, color = c.textMuted, modifier = Modifier.padding(top = 16.dp, bottom = 8.dp))
                 ColourChoice(AccentPresets + DistractedPresets, distractedColor, onDistractedColor, automatic = "Accent")
             }
-            SectionCard(title = "Also show it") {
-                OptionRow(Icons.Default.Home, "On the minimal screen", description = "A row under the date") { ObsidianToggle(onHome, onShowHome) }
-                OptionRow(Icons.Default.Lock, "On the lock screen") { ObsidianToggle(onLock, onShowLock) }
-            }
+            Text(
+                "To see it on your home or lock screen, switch on the distraction tracker in Widgets.",
+                style = MaterialTheme.typography.bodySmall,
+                color = c.textMuted,
+                modifier = Modifier.padding(horizontal = 4.dp),
+            )
             Spacer(Modifier.height(24.dp))
         }
     }

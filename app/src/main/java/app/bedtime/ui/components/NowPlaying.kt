@@ -43,6 +43,8 @@ data class NowPlaying(
     val previous: () -> Unit = {},
     val toggle: () -> Unit = {},
     val next: () -> Unit = {},
+    /** The app playing it, to open with a tap on the title. */
+    val app: String = "",
 )
 
 /**
@@ -75,6 +77,7 @@ fun rememberNowPlaying(): NowPlaying? {
                     previous = { controls.skipToPrevious() },
                     toggle = { if (playing) controls.pause() else controls.play() },
                     next = { controls.skipToNext() },
+                    app = c.packageName.orEmpty(),
                 )
             }
         }
@@ -106,9 +109,12 @@ fun rememberNowPlaying(): NowPlaying? {
 
 /** A quiet line: the title over its artist, and previous, play or pause, next. */
 @Composable
-fun NowPlayingWidget(now: NowPlaying, text: Color, faint: Color, modifier: Modifier = Modifier) {
+fun NowPlayingWidget(now: NowPlaying, text: Color, faint: Color, modifier: Modifier = Modifier, onOpen: ((String) -> Unit)? = null) {
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f)) {
+        Column(
+            Modifier.weight(1f).clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                .then(if (onOpen != null && now.app.isNotEmpty()) Modifier.clickable(onClickLabel = "open the player") { onOpen(now.app) } else Modifier),
+        ) {
             VerbatimText(AnnotatedString(now.title), color = text, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (now.artist.isNotBlank()) {
                 VerbatimText(AnnotatedString(now.artist), color = faint, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)

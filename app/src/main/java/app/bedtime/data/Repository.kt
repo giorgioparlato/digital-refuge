@@ -40,6 +40,11 @@ class Repository private constructor(context: Context) {
     suspend fun addNote(text: String, at: Long = System.currentTimeMillis()) =
         update(NOTES, notesSerializer, emptyList()) { listOf(Note(text = text, createdAt = at)) + it }
 
+    /** [id]'s note set to [text], or a new note with that id if there isn't one yet. */
+    suspend fun saveNote(id: String, text: String, at: Long = System.currentTimeMillis()) = update(NOTES, notesSerializer, emptyList()) { notes ->
+        if (notes.any { it.id == id }) notes.map { if (it.id == id) it.copy(text = text, editedAt = at) else it } else listOf(Note(id, text, at)) + notes
+    }
+
     suspend fun editNote(id: String, text: String) = update(NOTES, notesSerializer, emptyList()) { notes ->
         notes.map { if (it.id == id) it.copy(text = text, editedAt = System.currentTimeMillis()) else it }
     }

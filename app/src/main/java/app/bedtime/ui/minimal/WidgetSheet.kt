@@ -1,5 +1,6 @@
 package app.bedtime.ui.minimal
 
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -55,8 +56,16 @@ class WidgetHandlers(
  * distracting apps.
  */
 @Composable
-internal fun WidgetSheet(module: Module, style: HomeStyle, sessionOwned: Boolean, handlers: WidgetHandlers, onDismiss: () -> Unit, notes: List<app.bedtime.data.Note> = emptyList()) {
-    Dialog(onDismissRequest = onDismiss) { WidgetSheetContent(module, style, sessionOwned, handlers, onDismiss, notes) }
+internal fun WidgetSheet(
+    module: Module,
+    style: HomeStyle,
+    sessionOwned: Boolean,
+    handlers: WidgetHandlers,
+    onDismiss: () -> Unit,
+    notes: List<app.bedtime.data.Note> = emptyList(),
+    screen: app.bedtime.data.Screen = app.bedtime.data.Screen.HOME,
+) {
+    Dialog(onDismissRequest = onDismiss) { WidgetSheetContent(module, style, sessionOwned, handlers, onDismiss, notes, screen) }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -69,6 +78,7 @@ internal fun WidgetSheetContent(
     onDone: () -> Unit = {},
     /** Your refuge notes, for the note widget to show one of. */
     notes: List<app.bedtime.data.Note> = emptyList(),
+    screen: app.bedtime.data.Screen = app.bedtime.data.Screen.HOME,
 ) {
     val p = style.palette()
     Column(
@@ -104,9 +114,29 @@ internal fun WidgetSheetContent(
                 listOf("Hour" to QuoteRefresh.HOURLY, "6 hours" to QuoteRefresh.SIX_HOURS, "Day" to QuoteRefresh.DAILY, "Week" to QuoteRefresh.WEEKLY),
                 style.quoteRefresh,
             ) { handlers.change(style.copy(quoteRefresh = it)) }
-            Module.HABITS -> Action(Icons.AutoMirrored.Filled.KeyboardArrowRight, "Add or remove habits", p) { handlers.open(app.bedtime.Routes.HABITS); onDone() }
-            Module.HOURS -> Action(Icons.AutoMirrored.Filled.KeyboardArrowRight, "Choose your distracting apps", p) { handlers.open(app.bedtime.Routes.DISTRACTION); onDone() }
+            Module.HABITS -> Action(Icons.AutoMirrored.Filled.KeyboardArrowRight, "Open your habits: add, change or remove", p) { handlers.open(app.bedtime.Routes.HABITS); onDone() }
+            Module.HOURS -> {
+                Action(Icons.AutoMirrored.Filled.KeyboardArrowRight, "Open your statistics", p) { handlers.open(app.bedtime.Routes.STATS); onDone() }
+                Action(Icons.AutoMirrored.Filled.KeyboardArrowRight, "Choose your distracting apps", p) { handlers.open(app.bedtime.Routes.DISTRACTION); onDone() }
+            }
+            Module.EVENT -> Action(
+                Icons.Default.DateRange,
+                if (style.calendarIconWhenEmpty) "No calendar icon when nothing's coming" else "A calendar icon when nothing's coming",
+                p,
+            ) { handlers.change(style.copy(calendarIconWhenEmpty = !style.calendarIconWhenEmpty)); onDone() }
             Module.NOTE -> {
+                choices("Lines", listOf("3" to 3, "6" to 6, "10" to 10), style.noteLines) { handlers.change(style.copy(noteLines = it)) }
+                val fits = style.noteFitsBesideClock(screen)
+                Action(
+                    Icons.Default.DateRange,
+                    when {
+                        style.noteBesideClock && fits -> "In the list, not beside the clock"
+                        fits -> "Beside the clock"
+                        else -> "Beside the clock: needs a small clock, and no weather there"
+                    },
+                    p,
+                    enabled = fits || style.noteBesideClock,
+                ) { handlers.change(style.copy(noteBesideClock = !style.noteBesideClock)); onDone() }
                 Text("Show", style = MaterialTheme.typography.labelLarge, color = p.faint, modifier = Modifier.padding(horizontal = 22.dp, vertical = 6.dp))
                 val chosen = style.noteWidgetId ?: app.bedtime.data.Notes.TODO_ID
                 Column(Modifier.heightIn(max = 280.dp).verticalScroll(rememberScrollState())) {
@@ -151,10 +181,10 @@ private fun Chip(label: String, selected: Boolean, p: HomePalette, onClick: () -
 }
 
 @Composable
-private fun Action(icon: ImageVector, label: String, p: HomePalette, onClick: () -> Unit) {
-    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 22.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+private fun Action(icon: ImageVector, label: String, p: HomePalette, enabled: Boolean = true, onClick: () -> Unit) {
+    Row(Modifier.fillMaxWidth().clickable(enabled = enabled, onClick = onClick).padding(horizontal = 22.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
         Icon(icon, contentDescription = null, tint = p.faint, modifier = Modifier.size(20.dp))
         Spacer(Modifier.width(16.dp))
-        Text(label, style = MaterialTheme.typography.bodyLarge, color = p.text)
+        Text(label, style = MaterialTheme.typography.bodyLarge, color = if (enabled) p.text else p.faint)
     }
 }

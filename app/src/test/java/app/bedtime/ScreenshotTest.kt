@@ -264,7 +264,7 @@ class ScreenshotTest {
     @Test
     fun distraction() = shot {
         app.bedtime.ui.settings.DistractionContent(
-            appCount = 4, minutes = 5, onHome = true, onLock = false, onPick = {}, onMinutes = {}, onShowHome = {}, onShowLock = {}, onBack = {},
+            appCount = 4, minutes = 5, onPick = {}, onMinutes = {}, onBack = {},
             totalMinutes = 30, distractedColor = 0xFFD9604AL,
         )
     }
@@ -481,6 +481,30 @@ class ScreenshotTest {
                 app.bedtime.ui.notes.NoteWidgetView(
                     groceries, androidx.compose.ui.graphics.Color(0xFFE8DCC8), androidx.compose.ui.graphics.Color(0xFF8C8478), androidx.compose.ui.graphics.Color(0xFF7FBF9A),
                     Modifier.padding(top = 16.dp),
+                )
+            },
+        )
+    }
+
+    @Test
+    fun homeNoteBesideClock() = shot {
+        val style = app.bedtime.data.Modules.with(
+            HomeStyle(clockSize = app.bedtime.data.ClockSize.SMALL, noteBesideClock = true),
+            app.bedtime.data.Screen.HOME,
+            listOf(app.bedtime.data.Module.GREETING, app.bedtime.data.Module.CLOCK, app.bedtime.data.Module.DATE, app.bedtime.data.Module.NOTE).map { app.bedtime.data.ModuleChoice(it) },
+        )
+        MinimalHomeContent(
+            now = java.time.LocalDateTime.of(2026, 10, 27, 21, 41),
+            scheduleName = null,
+            until = null,
+            apps = Samples.minimalApps,
+            style = style.copy(showNotesButton = true, showLogo = true),
+            onLaunch = {},
+            onUnlock = null,
+            noteBeside = {
+                app.bedtime.ui.notes.NoteWidgetView(
+                    groceries, androidx.compose.ui.graphics.Color(0xFFE8DCC8), androidx.compose.ui.graphics.Color(0xFF8C8478), androidx.compose.ui.graphics.Color(0xFF7FBF9A),
+                    maxLines = 3, compact = true,
                 )
             },
         )

@@ -176,7 +176,7 @@ object Notes {
 /** One line of a note as the note widget shows it: a box (ticked or not), a bullet, or plain words. */
 data class NoteWidgetLine(val index: Int, val text: String, val box: Boolean? = null, val bullet: Boolean = false, val indent: Int = 0)
 
-/** A note read for its widget: its title, its first lines, and the small changes made from there. */
+/** A note read for its widget: its title, its first lines, and ticking a box from there. */
 object NoteWidget {
     private val box = Regex("""^(\s*)[-*+]\s+\[([ xX])]\s+(.*)$""")
     private val bullet = Regex("""^(\s*)[-*+]\s+(.*)$""")
@@ -205,15 +205,5 @@ object NoteWidget {
         if (index !in lines.indices) return text
         lines[index] = lines[index].replace(Regex("""\[([ xX])]""")) { if (it.groupValues[1].isBlank()) "[x]" else "[ ]" }
         return lines.joinToString("\n")
-    }
-
-    /** [text] with [words] added at the end: as a to-do where the note has boxes, a bullet where it has those, plain otherwise. */
-    fun withLine(text: String, words: String): String {
-        val line = when {
-            text.lines().any { box.matches(it) } -> "- [ ] $words"
-            text.lines().any { bullet.matches(it) } -> "- $words"
-            else -> words
-        }
-        return Notes.appended(text.trimEnd('\n') + if (text.isBlank()) "" else "\n", line).trimEnd('\n')
     }
 }

@@ -13,6 +13,21 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            61,
+            "0.9.15",
+            listOf(
+                "The note widget is quieter and saves as you type: tap its lines to write right there, Enter for a new line; close the keyboard or go back to stop. Choose 3, 6 or 10 lines.",
+                "With a small clock, the note can sit beside it, top right.",
+                "Notes save as you type in the notes editor too.",
+                "An optional notes button at the bottom right of the home screen.",
+                "Tap the player to open its app; tap the distraction tracker for today's detail, on the lock screen too, with a way to your statistics.",
+                "On the lock screen, tap the next event for the week ahead; with nothing coming, a calendar icon does the same.",
+                "Notifications on the lock screen get the room the quote took at the foot.",
+                "Space at the top can differ between the home and lock screen; widgets have a little more room between them.",
+                "The status bar, app icons, the mark, the arrow and the notes button are now under Look.",
+            ),
+        ),
+        ChangelogEntry(
             60,
             "0.9.14",
             listOf(

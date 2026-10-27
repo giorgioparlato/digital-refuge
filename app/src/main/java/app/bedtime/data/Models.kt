@@ -260,7 +260,22 @@ data class HomeStyle(
     val lockModules: List<ModuleChoice>? = null,
     /** The refuge note the note widget shows; null shows the to-do note. */
     val noteWidgetId: String? = null,
-)
+    /** How many of the note's lines the note widget shows. */
+    val noteLines: Int = 6,
+    /** The note beside the clock rather than in the list; only with a small clock and no weather beside it. */
+    val noteBesideClock: Boolean = false,
+    /** A notes button at the bottom right of the minimal screen, opening refuge notes. */
+    val showNotesButton: Boolean = false,
+    /** With nothing coming today, a small calendar icon where the next event would be, opening the week ahead. */
+    val calendarIconWhenEmpty: Boolean = true,
+    /** Room above the lock screen's clock; null takes the home screen's [topSpace]. */
+    val lockTopSpace: TopSpace? = null,
+) {
+    /** Whether the note can sit beside the clock on [screen]: a small clock, and no weather reading beside it. */
+    fun noteFitsBesideClock(screen: Screen): Boolean =
+        clockSize in setOf(ClockSize.VERY_SMALL, ClockSize.SMALL) &&
+            !(Modules.isOn(this, screen, Module.WEATHER) && weatherStyle != WeatherStyle.FIVE_DAYS)
+}
 
 /** The lock screen's gestures: four swipes starting around the clock, and a double tap anywhere. */
 @Serializable

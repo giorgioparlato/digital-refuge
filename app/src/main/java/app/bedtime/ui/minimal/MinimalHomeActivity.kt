@@ -1,5 +1,6 @@
 package app.bedtime.ui.minimal
 
+import androidx.compose.material.icons.filled.Edit
 import app.bedtime.data.NoteWidget
 import app.bedtime.ui.notes.NoteWidgetView
 import app.bedtime.ui.minimal.WidgetSheet
@@ -577,20 +578,36 @@ private fun MinimalHomeScreen(
             onOpenDrawer = { drawer = true },
             onOpenRefuge = { AppCatalog.launch(context, context.packageName) },
             onRefugeHold = { blocksOpen = true },
+            onOpenNotes = { notesOpen = true },
             onWidgetHold = { holding = it },
             note = if (Modules.isOn(style, Screen.HOME, Module.NOTE)) {
                 {
                     NoteWidgetView(
                         widgetNote,
                         style.palette().text, style.palette().faint, style.palette().accent,
-                        Modifier.padding(top = 16.dp),
+                        Modifier.padding(top = 22.dp),
+                        maxLines = style.noteLines,
                         onToggle = { i -> widgetNote?.let { n -> scope.launch { repo.editNote(n.id, NoteWidget.toggled(n.text, i)) } } },
-                        onAdd = { words ->
-                            scope.launch {
-                                val n = widgetNote
-                                if (n != null) repo.editNote(n.id, NoteWidget.withLine(n.text, words)) else repo.addTodo(words)
-                            }
+                        onSave = { written -> widgetNote?.let { n -> scope.launch { repo.editNote(n.id, written) } } },
+                        onOpen = {
+                            noteToOpen = widgetNote?.id
+                            notesOpen = true
                         },
+                        onHold = { holding = Module.NOTE },
+                    )
+                }
+            } else {
+                null
+            },
+            // Small, beside the clock, where you've asked and it fits.
+            noteBeside = if (Modules.isOn(style, Screen.HOME, Module.NOTE) && style.noteBesideClock && style.noteFitsBesideClock(Screen.HOME)) {
+                {
+                    NoteWidgetView(
+                        widgetNote,
+                        style.palette().text, style.palette().faint, style.palette().accent,
+                        maxLines = 3,
+                        compact = true,
+                        onToggle = { i -> widgetNote?.let { n -> scope.launch { repo.editNote(n.id, NoteWidget.toggled(n.text, i)) } } },
                         onOpen = {
                             noteToOpen = widgetNote?.id
                             notesOpen = true
@@ -602,14 +619,14 @@ private fun MinimalHomeScreen(
                 null
             },
             nowPlaying = nowPlaying?.takeIf { Modules.isOn(style, Screen.HOME, Module.NOW_PLAYING) }?.let { playing ->
-                { NowPlayingWidget(playing, style.palette().text, style.palette().faint, Modifier.padding(top = 12.dp)) }
+                { NowPlayingWidget(playing, style.palette().text, style.palette().faint, Modifier.padding(top = 20.dp), onOpen = { AppCatalog.launch(context, it) }) }
             },
             habits = habitList.takeIf { it.isNotEmpty() && Modules.isOn(style, Screen.HOME, Module.HABITS) }?.let { list ->
                 {
                     val today = HourlyUse.today()
                     HabitsWidget(
                         list, habitMarks, today, style.palette().text, style.palette().faint, style.palette().accent,
-                        Modifier.padding(top = 14.dp),
+                        Modifier.padding(top = 22.dp),
                         onTap = { h -> scope.launch { repo.markHabit(h.id, today, Habits.tapped(h, habitMarks[h.id]?.get(today) ?: 0)) } },
                         onOpen = { openHabit = it.id },
                         onHold = { holding = Module.HABITS },
@@ -659,12 +676,13 @@ private fun MinimalHomeScreen(
                     }
                 },
                 change = { changed ->
-                    scope.launch { repo.updateSettings { s -> s.copy(homeStyle = s.homeStyle.copy(weatherStyle = changed.weatherStyle, clockSize = changed.clockSize, quoteRefresh = changed.quoteRefresh, noteWidgetId = changed.noteWidgetId)) } }
+                    scope.launch { repo.updateSettings { s -> s.copy(homeStyle = s.homeStyle.copy(weatherStyle = changed.weatherStyle, clockSize = changed.clockSize, quoteRefresh = changed.quoteRefresh, noteWidgetId = changed.noteWidgetId, noteLines = changed.noteLines, noteBesideClock = changed.noteBesideClock, calendarIconWhenEmpty = changed.calendarIconWhenEmpty)) } }
                 },
                 open = { route -> runCatching { context.startActivity(app.bedtime.MainActivity.intent(context, route)) } },
             ),
             onDismiss = { holding = null },
             notes = allNotes,
+            screen = Screen.HOME,
         )
     }
     if (blocksOpen) {
@@ -676,7 +694,9 @@ private fun MinimalHomeScreen(
     if (quickNote) QuickNoteDialog(style, settings.quickTargets, onSave = saveNote, onDismiss = { quickNote = false })
     if (hoursDetail) {
         val p = style.palette()
-        HourDetailDialog(todayHours, HourlyUse.rule(settings), p.background, p.text, p.faint, p.accent, onDismiss = { hoursDetail = false })
+        HourDetailDialog(todayHours, HourlyUse.rule(settings), p.background, p.text, p.faint, p.accent, onDismiss = { hoursDetail = false }, onStats = {
+            runCatching { context.startActivity(app.bedtime.MainActivity.intent(context, app.bedtime.Routes.STATS)) }
+        })
     }
     actionsFor?.let { app ->
         val shortcuts by produceState(emptyList<ShortcutInfo>(), app.packageName) {
@@ -772,6 +792,8 @@ internal fun MinimalHomeContent(
     onOpenRefuge: () -> Unit = {},
     /** A long press on the refuge mark: your blocks, to start one. */
     onRefugeHold: (() -> Unit)? = null,
+    /** The notes button at the bottom right, where you've switched it on. */
+    onOpenNotes: () -> Unit = {},
     /** A long press on a widget: its own sheet, to hide or change it. */
     onWidgetHold: ((Module) -> Unit)? = null,
     /** The session's mark on its pill. */
@@ -780,6 +802,7 @@ internal fun MinimalHomeContent(
     habits: (@Composable () -> Unit)? = null,
     nowPlaying: (@Composable () -> Unit)? = null,
     note: (@Composable () -> Unit)? = null,
+    noteBeside: (@Composable () -> Unit)? = null,
     preview: Boolean = false,
 ) {
     val p = style.palette()
@@ -859,6 +882,7 @@ internal fun MinimalHomeContent(
                 habits = habits,
                 nowPlaying = nowPlaying,
                 note = note,
+                noteBeside = noteBeside,
                 onHold = onWidgetHold,
             )
             Spacer(Modifier.height(if (preview) 28.dp else 44.dp))
@@ -904,10 +928,16 @@ internal fun MinimalHomeContent(
                     Icon(BedtimeIcons.Refuge, contentDescription = "digital refuge", tint = p.faint, modifier = Modifier.size(26.dp))
                 }
             }
+            val notesButton = @Composable {
+                IconButton(onClick = onOpenNotes) {
+                    Icon(Icons.Default.Edit, contentDescription = "refuge notes", tint = p.faint, modifier = Modifier.size(22.dp))
+                }
+            }
             if (onUnlock == null) {
                 // Your everyday home: the way to all apps (digital refuge itself is among them), and its mark if you like.
-                if (style.showLogo || style.showSwipeArrow) Box(Modifier.fillMaxWidth()) {
+                if (style.showLogo || style.showSwipeArrow || style.showNotesButton) Box(Modifier.fillMaxWidth()) {
                     if (style.showLogo) Box(Modifier.align(Alignment.CenterStart)) { logo() }
+                    if (style.showNotesButton) Box(Modifier.align(Alignment.CenterEnd)) { notesButton() }
                     if (style.showSwipeArrow) {
                         IconButton(onClick = onOpenDrawer, modifier = Modifier.align(Alignment.Center)) {
                             Icon(Icons.Default.KeyboardArrowUp, contentDescription = "all apps and search", tint = p.faint)
@@ -932,6 +962,7 @@ internal fun MinimalHomeContent(
                     }
                     Spacer(Modifier.weight(1f))
                 }
+                if (style.showNotesButton) notesButton()
                 TextButton(onClick = onEmergency) {
                     Icon(Icons.Default.Warning, contentDescription = null, tint = p.faint, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(8.dp))

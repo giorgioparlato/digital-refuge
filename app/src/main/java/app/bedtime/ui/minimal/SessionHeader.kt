@@ -1,5 +1,7 @@
 package app.bedtime.ui.minimal
 
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.Icons
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.combinedClickable
@@ -82,6 +84,8 @@ internal fun SessionHeader(
     habits: (@Composable () -> Unit)? = null,
     nowPlaying: (@Composable () -> Unit)? = null,
     note: (@Composable () -> Unit)? = null,
+    /** The note, small, beside the clock instead of in the list (only offered with a small clock and no weather there). */
+    noteBeside: (@Composable () -> Unit)? = null,
     /** A long press on a widget: its own sheet, to hide or change it. */
     onHold: ((Module) -> Unit)? = null,
 ) {
@@ -120,6 +124,9 @@ internal fun SessionHeader(
                     if (weather != null && hasNow && Module.WEATHER in modules) {
                         Spacer(Modifier.weight(1f))
                         WeatherBeside(weather, style, onWeather, hold(Module.WEATHER))
+                    } else if (noteBeside != null && Module.NOTE in modules) {
+                        Spacer(Modifier.width(16.dp))
+                        Box(Modifier.weight(1f)) { noteBeside() }
                     }
                 }
                 Module.DATE -> Row(held(Module.DATE), verticalAlignment = Alignment.CenterVertically) {
@@ -144,7 +151,16 @@ internal fun SessionHeader(
                     }
                     if (weather.week.isNotEmpty()) WeatherWeek(weather, style, now, onWeather, hold(Module.WEATHER))
                 }
-                Module.EVENT -> if (calendar != null) {
+                // Nothing coming today: a small calendar icon still opens the week ahead, unless you'd rather not.
+                Module.EVENT -> if (calendar == null && style.calendarIconWhenEmpty && (onCalendar != null || onHold != null)) {
+                    Icon(
+                        Icons.Default.DateRange,
+                        contentDescription = "the week ahead",
+                        tint = p.faint,
+                        modifier = Modifier.padding(top = 6.dp).size(28.dp).clip(RoundedCornerShape(8.dp))
+                            .tapAndHold("see the week ahead", onCalendar, hold(Module.EVENT)).padding(4.dp),
+                    )
+                } else if (calendar != null) {
                     Text(
                         calendar,
                         style = MaterialTheme.typography.bodyMedium,
@@ -159,7 +175,7 @@ internal fun SessionHeader(
                 Module.QUOTE -> quote?.let { Box(held(Module.QUOTE)) { it() } }
                 Module.HABITS -> habits?.let { Box(held(Module.HABITS)) { it() } }
                 Module.NOW_PLAYING -> nowPlaying?.let { Box(held(Module.NOW_PLAYING)) { it() } }
-                Module.NOTE -> note?.let { Box(held(Module.NOTE)) { it() } }
+                Module.NOTE -> if (noteBeside == null) note?.let { Box(held(Module.NOTE)) { it() } }
             }
             if (at == pillAfter) SessionPill(scheduleName, until, scheduleIcon, style)
         }

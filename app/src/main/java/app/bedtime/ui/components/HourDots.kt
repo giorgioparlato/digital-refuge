@@ -108,7 +108,7 @@ fun rememberTodayUnlocks(): Int? = rememberUseDays(2, live = false).days[HourlyU
  * the distracted hours so far and the heaviest; the distracting apps used most; and each hour.
  */
 @Composable
-fun HourDetailDialog(hours: DayHours, rule: HourRule, background: Color, text: Color, faint: Color, accent: Color, onDismiss: () -> Unit) {
+fun HourDetailDialog(hours: DayHours, rule: HourRule, background: Color, text: Color, faint: Color, accent: Color, onDismiss: () -> Unit, onStats: (() -> Unit)? = null) {
     val context = LocalContext.current
     val yesterday = rememberDayHours(HourlyUse.today() - 1)
     val nowHour = remember { java.time.LocalTime.now().hour }
@@ -116,7 +116,7 @@ fun HourDetailDialog(hours: DayHours, rule: HourRule, background: Color, text: C
     val labels = remember(report.topApps) { report.topApps.associate { (pkg, _) -> pkg to AppCatalog.label(context, pkg) } }
     val unlocks = rememberTodayUnlocks()
     Dialog(onDismissRequest = onDismiss) {
-        HourDetailContent(report, hours, rule, labels, background, text, faint, accent, unlocks = unlocks)
+        HourDetailContent(report, hours, rule, labels, background, text, faint, accent, unlocks = unlocks, onStats = onStats?.let { { onDismiss(); it() } })
     }
 }
 
@@ -134,6 +134,8 @@ fun HourDetailContent(
     unlocks: Int? = null,
     title: String? = "Today so far",
     padding: androidx.compose.ui.unit.Dp = 24.dp,
+    /** Opens the statistics, from a link at the foot. */
+    onStats: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     fun time(seconds: Long) = formatMinutes(seconds / 60)
@@ -198,6 +200,15 @@ fun HourDetailContent(
                 }
             }
             Text("Minutes in distracting apps · on the phone at all", style = MaterialTheme.typography.labelSmall, color = faint, modifier = Modifier.padding(top = 6.dp))
+        }
+        if (onStats != null) {
+            Text(
+                "Your statistics",
+                style = MaterialTheme.typography.labelLarge,
+                color = accent,
+                modifier = Modifier.padding(top = 16.dp).clip(RoundedCornerShape(50)).border(1.dp, accent.copy(alpha = 0.5f), RoundedCornerShape(50))
+                    .clickable(onClick = onStats).padding(horizontal = 16.dp, vertical = 10.dp),
+            )
         }
     }
 }

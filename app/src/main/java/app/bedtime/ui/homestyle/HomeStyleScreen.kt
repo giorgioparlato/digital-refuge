@@ -393,12 +393,18 @@ internal fun HomeStyleContent(
                     HexField(style.textColor ?: style.palette().text.toArgb().toLong() and 0xFFFFFFFFL) { onChange(style.copy(textColor = it)) }
                 }
                 SectionCard(title = "Sizes") {
-                    SizeLabel("Space at the top", Modifier.padding(bottom = 8.dp))
-                SegmentedChoice(
-                    options = listOf("None", "Small", "Medium", "Large"),
-                    selected = style.topSpace.ordinal,
-                    onSelect = { onChange(style.copy(topSpace = TopSpace.entries[it])) },
-                )
+                    SizeLabel("Space at the top of the home screen", Modifier.padding(bottom = 8.dp))
+                    SegmentedChoice(
+                        options = listOf("None", "Small", "Medium", "Large"),
+                        selected = style.topSpace.ordinal,
+                        onSelect = { onChange(style.copy(topSpace = TopSpace.entries[it])) },
+                    )
+                    SizeLabel("And of the lock screen", Modifier.padding(top = 16.dp, bottom = 8.dp))
+                    SegmentedChoice(
+                        options = listOf("None", "Small", "Medium", "Large"),
+                        selected = (style.lockTopSpace ?: style.topSpace).ordinal,
+                        onSelect = { onChange(style.copy(lockTopSpace = TopSpace.entries[it])) },
+                    )
                 SizeLabel("Clock", Modifier.padding(top = 16.dp, bottom = 8.dp))
                     SegmentedChoice(
                         options = listOf("Very small", "Small", "Medium", "Large"),
@@ -440,15 +446,7 @@ internal fun HomeStyleContent(
                 TextButton(onClick = { onChange(HomeStyle(customFontName = style.customFontName)) }, modifier = Modifier.align(Alignment.CenterHorizontally)) {
                     Text("Reset to default", color = c.textMuted)
                 }
-            }
-            if (page == StylePage.SHOWN) {
-                SectionCard(
-                    title = if (widgetScreen == Screen.HOME) "On the home screen" else "On the lock screen",
-                    subtitle = "Drag by the handle to change the order",
-                ) {
-                    WidgetList(style, widgetScreen, onChange, onShowCalendar)
-                }
-                SectionCard(title = "Show") {
+                SectionCard(title = "Show", subtitle = "Around your apps on the home screen; the status bar on the lock screen too") {
                     OptionRow(Icons.Default.Notifications, "Android's status bar", description = "Off hides it here and on the lock screen; a swipe down from the top edge shows it") {
                         ObsidianToggle(!style.hideStatusBar, { onChange(style.copy(hideStatusBar = !it)) })
                     }
@@ -461,6 +459,37 @@ internal fun HomeStyleContent(
                     OptionRow(Icons.Default.KeyboardArrowUp, "The arrow to all apps", description = "At the foot; swiping up works either way") {
                         ObsidianToggle(style.showSwipeArrow, { onChange(style.copy(showSwipeArrow = it)) })
                     }
+                    OptionRow(Icons.Default.Edit, "A notes button", description = "Bottom right; a tap opens refuge notes") {
+                        ObsidianToggle(style.showNotesButton, { onChange(style.copy(showNotesButton = it)) })
+                    }
+                }
+            }
+            if (page == StylePage.SHOWN) {
+                SectionCard(
+                    title = if (widgetScreen == Screen.HOME) "On the home screen" else "On the lock screen",
+                    subtitle = "Drag by the handle to change the order",
+                ) {
+                    WidgetList(style, widgetScreen, onChange, onShowCalendar)
+                }
+                if (Modules.onAnywhere(style, Module.NOTE)) SectionCard(title = "Note", subtitle = "Hold it on your screen to choose which note it shows") {
+                    SizeLabel("Lines shown", Modifier.padding(bottom = 8.dp))
+                    val lineChoices = listOf(3, 6, 10)
+                    SegmentedChoice(
+                        options = listOf("3", "6", "10"),
+                        selected = lineChoices.indexOf(style.noteLines).coerceAtLeast(0),
+                        onSelect = { onChange(style.copy(noteLines = lineChoices[it])) },
+                    )
+                    val fits = style.noteFitsBesideClock(widgetScreen)
+                    OptionRow(
+                        Icons.Default.DateRange,
+                        "Beside the clock",
+                        description = if (fits) {
+                            "Small, at the top right: its title and first lines"
+                        } else {
+                            "Only with a small or very small clock (Look), and the weather not beside it (off, or set to 5 days)"
+                        },
+                        enabled = fits,
+                    ) { ObsidianToggle(style.noteBesideClock && fits, { onChange(style.copy(noteBesideClock = it)) }, enabled = fits) }
                 }
                 if (Modules.onAnywhere(style, Module.QUOTE)) SectionCard(title = "Quote", subtitle = "Tap it for another, hold it to favourite or hide it") {
                     run {
@@ -509,12 +538,19 @@ internal fun HomeStyleContent(
                         )
                     }
                 }
-                if (Modules.isOn(style, Screen.LOCK, Module.EVENT)) SectionCard(title = "Next event", subtitle = "Read from the calendar already on this phone. Nothing is fetched") {
+                if (Modules.onAnywhere(style, Module.EVENT)) SectionCard(title = "Next event", subtitle = "Read from the calendar already on this phone. Nothing is fetched") {
                     OptionRow(
-                        Icons.Default.Lock,
-                        "Event names on the lock screen",
-                        description = "Off, the lock screen only says when the next one is",
-                    ) { ObsidianToggle(style.calendarNamesOnLock, { onChange(style.copy(calendarNamesOnLock = it)) }) }
+                        Icons.Default.DateRange,
+                        "A calendar icon when nothing's coming",
+                        description = "A tap shows the week ahead",
+                    ) { ObsidianToggle(style.calendarIconWhenEmpty, { onChange(style.copy(calendarIconWhenEmpty = it)) }) }
+                    if (Modules.isOn(style, Screen.LOCK, Module.EVENT)) {
+                        OptionRow(
+                            Icons.Default.Lock,
+                            "Event names on the lock screen",
+                            description = "Off, the lock screen only says when the next one is",
+                        ) { ObsidianToggle(style.calendarNamesOnLock, { onChange(style.copy(calendarNamesOnLock = it)) }) }
+                    }
                 }
             }
             if (page == StylePage.NOTIFICATIONS) {

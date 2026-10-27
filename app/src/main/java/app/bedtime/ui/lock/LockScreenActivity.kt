@@ -1,5 +1,7 @@
 package app.bedtime.ui.lock
 
+import app.bedtime.ui.components.HourDetailDialog
+import app.bedtime.ui.minimal.loadCalendarWeek
 import app.bedtime.data.NoteWidget
 import app.bedtime.ui.notes.NoteWidgetView
 import app.bedtime.ui.minimal.WidgetHandlers
@@ -168,6 +170,7 @@ class LockScreenActivity : ComponentActivity() {
                         onScreenOff = ::screenOff,
                         onConfirmed = ::unlockActLock,
                         onOpenRoute = { route -> unlockThen { startActivity(app.bedtime.MainActivity.intent(this, route)) } },
+                        onOpenIntent = { intent -> unlockThen { runCatching { startActivity(intent) } } },
                     )
                     if (blackout.value) {
                         Box(
@@ -367,6 +370,8 @@ private fun LockScreen(
     onConfirmed: (() -> Unit) -> Unit = { it() },
     /** Digital refuge on one of its pages, after the usual unlock. */
     onOpenRoute: (String) -> Unit = {},
+    /** Any other app's screen (an event in the calendar), after the usual unlock. */
+    onOpenIntent: (Intent) -> Unit = {},
 ) {
     val context = LocalContext.current
     val repo = remember { Repository.get(context) }
@@ -394,6 +399,22 @@ private fun LockScreen(
         }
     }
     var holding by remember { mutableStateOf<Module?>(null) }
+    var hoursDetail by remember { mutableStateOf(false) }
+    if (hoursDetail) {
+        val p = settings.homeStyle.palette()
+        HourDetailDialog(todayHours, HourlyUse.rule(settings), p.background, p.text, p.faint, p.accent, onDismiss = { hoursDetail = false }, onStats = {
+            onOpenRoute(app.bedtime.Routes.STATS)
+        })
+    }
+    // The week ahead, as on the home screen; names only if you show them on the lock screen.
+    var week by remember { mutableStateOf<List<app.bedtime.ui.minimal.CalendarDay>?>(null) }
+    week?.let { days ->
+        val shown = if (settings.homeStyle.calendarNamesOnLock) days else days.map { d -> d.copy(events = d.events.map { it.copy(title = "", location = "", description = "") }) }
+        app.bedtime.ui.minimal.CalendarWeekDialog(shown, settings.homeStyle, onDismiss = { week = null }, onOpenEvent = { event ->
+            onOpenIntent(app.bedtime.ui.minimal.CalendarSource.openIntent(event))
+            week = null
+        })
+    }
     val allNotes by repo.notes.collectAsStateWithLifecycle(initialValue = emptyList())
     val widgetNote = allNotes.firstOrNull { it.id == (settings.homeStyle.noteWidgetId ?: Notes.TODO_ID) }
     holding?.let { module ->
@@ -418,13 +439,14 @@ private fun LockScreen(
                 },
                 change = { changed ->
                     onConfirmed {
-                        scope.launch { repo.updateSettings { s -> s.copy(homeStyle = s.homeStyle.copy(weatherStyle = changed.weatherStyle, clockSize = changed.clockSize, quoteRefresh = changed.quoteRefresh, noteWidgetId = changed.noteWidgetId)) } }
+                        scope.launch { repo.updateSettings { s -> s.copy(homeStyle = s.homeStyle.copy(weatherStyle = changed.weatherStyle, clockSize = changed.clockSize, quoteRefresh = changed.quoteRefresh, noteWidgetId = changed.noteWidgetId, noteLines = changed.noteLines, noteBesideClock = changed.noteBesideClock, calendarIconWhenEmpty = changed.calendarIconWhenEmpty)) } }
                     }
                 },
                 open = onOpenRoute,
             ),
             onDismiss = { holding = null },
             notes = allNotes,
+            screen = Screen.LOCK,
         )
     }
     if (quickNote) {
@@ -469,24 +491,34 @@ private fun LockScreen(
         now = now,
         scheduleName = occurrence?.schedule?.name,
         scheduleIcon = occurrence?.schedule?.icon,
-        nowPlaying = nowPlaying?.let { playing -> { NowPlayingWidget(playing, style.palette().text, style.palette().faint, Modifier.padding(top = 12.dp)) } },
+        nowPlaying = nowPlaying?.let { playing -> { NowPlayingWidget(playing, style.palette().text, style.palette().faint, Modifier.padding(top = 20.dp), onOpen = onOpenApp) } },
         onWidgetHold = { holding = it },
-        // Ticking or adding from here asks for the usual unlock, then locks again; a tap on the words opens it after unlocking.
+        // Ticking, or saving what was typed, asks for the usual unlock, then locks again; a tap on the title opens it after unlocking.
+        // Like a quick note, writing in it here saves as you go; a tap on the title opens it after unlocking.
         note = if (Modules.isOn(style, Screen.LOCK, Module.NOTE)) {
             {
                 NoteWidgetView(
                     widgetNote,
                     style.palette().text, style.palette().faint, style.palette().accent,
-                    Modifier.padding(top = 16.dp),
-                    onToggle = { i -> widgetNote?.let { n -> onConfirmed { scope.launch { repo.editNote(n.id, NoteWidget.toggled(n.text, i)) } } } },
-                    onAdd = { words ->
-                        onConfirmed {
-                            scope.launch {
-                                val n = widgetNote
-                                if (n != null) repo.editNote(n.id, NoteWidget.withLine(n.text, words)) else repo.addTodo(words)
-                            }
-                        }
-                    },
+                    Modifier.padding(top = 22.dp),
+                    maxLines = style.noteLines,
+                    onToggle = { i -> widgetNote?.let { n -> scope.launch { repo.editNote(n.id, NoteWidget.toggled(n.text, i)) } } },
+                    onSave = { written -> widgetNote?.let { n -> scope.launch { repo.editNote(n.id, written) } } },
+                    onOpen = { onOpenRoute(app.bedtime.Routes.NOTES) },
+                    onHold = { holding = Module.NOTE },
+                )
+            }
+        } else {
+            null
+        },
+        noteBeside = if (Modules.isOn(style, Screen.LOCK, Module.NOTE) && style.noteBesideClock && style.noteFitsBesideClock(Screen.LOCK)) {
+            {
+                NoteWidgetView(
+                    widgetNote,
+                    style.palette().text, style.palette().faint, style.palette().accent,
+                    maxLines = 3,
+                    compact = true,
+                    onToggle = { i -> widgetNote?.let { n -> scope.launch { repo.editNote(n.id, NoteWidget.toggled(n.text, i)) } } },
                     onOpen = { onOpenRoute(app.bedtime.Routes.NOTES) },
                     onHold = { holding = Module.NOTE },
                 )
@@ -500,7 +532,7 @@ private fun LockScreen(
                 val today = HourlyUse.today()
                 HabitsWidget(
                     list, habitMarks, today, style.palette().text, style.palette().faint, style.palette().accent,
-                    Modifier.padding(top = 14.dp),
+                    Modifier.padding(top = 22.dp),
                     onTap = { h -> onConfirmed { scope.launch { repo.markHabit(h.id, today, Habits.tapped(h, habitMarks[h.id]?.get(today) ?: 0)) } } },
                     onOpen = {},
                     onHold = { holding = Module.HABITS },
@@ -516,6 +548,9 @@ private fun LockScreen(
         onShade = { BlockingState.globalAction(context, AccessibilityService.GLOBAL_ACTION_NOTIFICATIONS) },
         quote = Quotes.forPeriod(now, style.quoteRefresh, prefs = settings.quotes),
         calendar = rememberCalendarLine(style, now, onLockScreen = true),
+        onCalendar = { scope.launch { week = loadCalendarWeek(context, LocalDateTime.now()) } },
+        // The distraction tracker's tap: today's detail right here, as at home; only the statistics ask for the unlock.
+        onHours = { hoursDetail = true },
         weather = rememberWeather(style, now),
         onWeather = breezy?.let { app -> { onOpenApp(app) } },
         hours = todayHours.takeIf { Modules.isOn(style, Screen.LOCK, Module.HOURS) && HourlyUse.counting(settings) }
@@ -558,6 +593,8 @@ internal fun LockScreenContent(
     onSwipe: (Swipe) -> Unit = {},
     quote: Quote? = null,
     calendar: String? = null,
+    /** The week ahead, from a tap on the next event (or its icon). */
+    onCalendar: (() -> Unit)? = null,
     weather: WeatherView? = null,
     /** Opens the weather app after the usual unlock. */
     onWeather: (() -> Unit)? = null,
@@ -584,6 +621,7 @@ internal fun LockScreenContent(
     /** A long press on a widget: its own sheet, to hide or change it. */
     onWidgetHold: ((Module) -> Unit)? = null,
     note: (@Composable () -> Unit)? = null,
+    noteBeside: (@Composable () -> Unit)? = null,
 ) {
     var expanded by remember { mutableStateOf(initialExpanded) }
     var replying by remember { mutableStateOf(initialReplying) }
@@ -626,17 +664,18 @@ internal fun LockScreenContent(
                 .padding(horizontal = 28.dp)
                 .padding(bottom = 24.dp),
         ) {
-            Spacer(Modifier.height(if (preview) 12.dp else style.topSpace.dp.dp))
+            Spacer(Modifier.height(if (preview) 12.dp else (style.lockTopSpace ?: style.topSpace).dp.dp))
             // The quote keeps its place at the foot when it's the last widget, as it always has; anywhere else it's in line.
             val modules = Modules.shown(style, Screen.LOCK)
             val quoteAtFoot = modules.lastOrNull() == Module.QUOTE
             SessionHeader(
-                now, scheduleName, until, style, calendar, weather = weather, onWeather = onWeather,
+                now, scheduleName, until, style, calendar, onCalendar, weather = weather, onWeather = onWeather,
                 modules = modules,
                 scheduleIcon = scheduleIcon,
                 habits = habits,
                 nowPlaying = nowPlaying,
                 note = note,
+                noteBeside = noteBeside,
                 onHold = onWidgetHold,
                 hours = hours?.let { states ->
                     {
@@ -677,7 +716,8 @@ internal fun LockScreenContent(
                 )
             }
             if (notifications.isEmpty() || !listOpen) Spacer(Modifier.weight(1f)) else Spacer(Modifier.height(24.dp))
-            if (quote != null && quoteAtFoot && replying == null) {
+            // Notifications get the room: with any showing, the quote at the foot gives way.
+            if (quote != null && quoteAtFoot && replying == null && notifications.isEmpty()) {
                 QuoteBlock(quote, style)
                 Spacer(Modifier.height(40.dp))
             }

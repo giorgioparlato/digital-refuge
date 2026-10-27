@@ -345,7 +345,7 @@ internal fun HomeContent(
                 }
             }
             item(key = "hours") {
-                HoursSection(ui.hourly, ui.hourRule, Instant.ofEpochMilli(ui.now).atZone(ZoneId.systemDefault()).hour, ui.hourCalmColor, ui.hourDistractedColor, onDistraction)
+                HoursSection(ui.hourly, ui.hourRule, Instant.ofEpochMilli(ui.now).atZone(ZoneId.systemDefault()).hour, ui.hourCalmColor, ui.hourDistractedColor, onDistraction, onStats)
             }
             // Habits here once you have some; otherwise they're only in settings.
             if (ui.habits.isNotEmpty()) {
@@ -722,7 +722,7 @@ private fun EmptyState(onCreate: () -> Unit, onTemplate: (String) -> Unit, isIns
  * distracting apps are chosen, a line inviting you to choose them.
  */
 @Composable
-private fun HoursSection(hourly: DayHours?, rule: HourRule, nowHour: Int, calmColor: Long?, distractedColor: Long?, onChoose: () -> Unit) {
+private fun HoursSection(hourly: DayHours?, rule: HourRule, nowHour: Int, calmColor: Long?, distractedColor: Long?, onChoose: () -> Unit, onStats: () -> Unit = {}) {
     val c = Obsidian.colors
     var detail by remember { mutableStateOf(false) }
     Column(Modifier.padding(horizontal = PageGutter).padding(top = 26.dp)) {
@@ -748,6 +748,6 @@ private fun HoursSection(hourly: DayHours?, rule: HourRule, nowHour: Int, calmCo
             distractedColor = distractedColor,
             onClick = { detail = true },
         )
-        if (detail) HourDetailDialog(hourly, rule, c.bgSecondary, c.textNormal, c.textFaint, c.accent, onDismiss = { detail = false })
+        if (detail) HourDetailDialog(hourly, rule, c.bgSecondary, c.textNormal, c.textFaint, c.accent, onDismiss = { detail = false }, onStats = onStats)
     }
 }
