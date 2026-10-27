@@ -48,10 +48,10 @@ import app.bedtime.ui.components.Text
 import app.bedtime.ui.components.VerbatimText
 
 /**
- * One of your refuge notes on the screen: its title, its first lines with boxes to tick. A tap on the
- * title opens the whole note; a tap on the lines types into it right here, Enter starting a new line
- * (and carrying a list on). Closing the keyboard or going back saves it and stops typing; only then is
- * there a cursor. A long press chooses another note.
+ * One of your refuge notes on the screen: its title, its first lines with boxes to tick. A tap anywhere
+ * on it types into it right here, Enter starting a new line (and carrying a list on); it's saved as you
+ * go, and closing the keyboard or going back stops typing. Only then is there a cursor. A long press
+ * chooses another note.
  */
 @OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
@@ -65,12 +65,11 @@ fun NoteWidgetView(
     onToggle: (lineIndex: Int) -> Unit = {},
     /** The note's new text, once you're done typing. */
     onSave: (String) -> Unit = {},
-    onOpen: () -> Unit = {},
     onHold: (() -> Unit)? = null,
-    /** Small, beside the clock: fewer lines, a smaller type, and a tap on the words opens the note. */
+    /** Small, beside the clock: fewer lines and a smaller type. */
     compact: Boolean = false,
 ) {
-    val holdOnly = Modifier.combinedClickable(onClickLabel = "open the note", onLongClick = onHold, onClick = onOpen)
+    val holdOnly = Modifier.combinedClickable(onClickLabel = "choose a note", onLongClick = onHold, onClick = { onHold?.invoke() })
     var typing by remember(note?.id) { mutableStateOf(false) }
     var value by remember(note?.id) { mutableStateOf(TextFieldValue(note?.text.orEmpty())) }
     val focus = remember { FocusRequester() }
@@ -117,20 +116,16 @@ fun NoteWidgetView(
             )
             return@Column
         }
+        val startTyping = Modifier.combinedClickable(onClickLabel = "write in the note", onLongClick = onHold) {
+            value = TextFieldValue(note.text, TextRange(note.text.length))
+            typing = true
+        }
         VerbatimText(
             NoteWidget.title(note.text).ifBlank { "Note" },
             style = MaterialTheme.typography.labelLarge,
             color = faint,
-            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).then(holdOnly).padding(vertical = 2.dp),
+            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).then(startTyping).padding(vertical = 2.dp),
         )
-        val startTyping = if (compact) {
-            holdOnly
-        } else {
-            Modifier.combinedClickable(onClickLabel = "write in the note", onLongClick = onHold) {
-                value = TextFieldValue(note.text, TextRange(note.text.length))
-                typing = true
-            }
-        }
         val body = if (compact) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodyLarge
         NoteWidget.lines(note.text, maxLines).forEach { line ->
             Row(Modifier.fillMaxWidth().padding(start = (16 * line.indent).dp, top = 4.dp), verticalAlignment = Alignment.CenterVertically) {

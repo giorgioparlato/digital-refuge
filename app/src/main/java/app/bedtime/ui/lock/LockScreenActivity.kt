@@ -439,7 +439,7 @@ private fun LockScreen(
                 },
                 change = { changed ->
                     onConfirmed {
-                        scope.launch { repo.updateSettings { s -> s.copy(homeStyle = s.homeStyle.copy(weatherStyle = changed.weatherStyle, clockSize = changed.clockSize, quoteRefresh = changed.quoteRefresh, noteWidgetId = changed.noteWidgetId, noteLines = changed.noteLines, noteBesideClock = changed.noteBesideClock, calendarIconWhenEmpty = changed.calendarIconWhenEmpty)) } }
+                        scope.launch { repo.updateSettings { s -> s.copy(homeStyle = s.homeStyle.copy(weatherStyle = changed.weatherStyle, clockSize = changed.clockSize, quoteRefresh = changed.quoteRefresh, noteWidgetId = changed.noteWidgetId, noteLines = changed.noteLines, noteBesideClock = changed.noteBesideClock, lockNoteBesideClock = changed.lockNoteBesideClock, calendarIconWhenEmpty = changed.calendarIconWhenEmpty, lockCalendarIconWhenEmpty = changed.lockCalendarIconWhenEmpty)) } }
                     }
                 },
                 open = onOpenRoute,
@@ -494,7 +494,7 @@ private fun LockScreen(
         nowPlaying = nowPlaying?.let { playing -> { NowPlayingWidget(playing, style.palette().text, style.palette().faint, Modifier.padding(top = 20.dp), onOpen = onOpenApp) } },
         onWidgetHold = { holding = it },
         // Ticking, or saving what was typed, asks for the usual unlock, then locks again; a tap on the title opens it after unlocking.
-        // Like a quick note, writing in it here saves as you go; a tap on the title opens it after unlocking.
+        // Like a quick note, writing in it here saves as you go.
         note = if (Modules.isOn(style, Screen.LOCK, Module.NOTE)) {
             {
                 NoteWidgetView(
@@ -504,14 +504,13 @@ private fun LockScreen(
                     maxLines = style.noteLines,
                     onToggle = { i -> widgetNote?.let { n -> scope.launch { repo.editNote(n.id, NoteWidget.toggled(n.text, i)) } } },
                     onSave = { written -> widgetNote?.let { n -> scope.launch { repo.editNote(n.id, written) } } },
-                    onOpen = { onOpenRoute(app.bedtime.Routes.NOTES) },
                     onHold = { holding = Module.NOTE },
                 )
             }
         } else {
             null
         },
-        noteBeside = if (Modules.isOn(style, Screen.LOCK, Module.NOTE) && style.noteBesideClock && style.noteFitsBesideClock(Screen.LOCK)) {
+        noteBeside = if (Modules.isOn(style, Screen.LOCK, Module.NOTE) && style.noteBeside(Screen.LOCK) && style.noteFitsBesideClock(Screen.LOCK)) {
             {
                 NoteWidgetView(
                     widgetNote,
@@ -519,7 +518,7 @@ private fun LockScreen(
                     maxLines = 3,
                     compact = true,
                     onToggle = { i -> widgetNote?.let { n -> scope.launch { repo.editNote(n.id, NoteWidget.toggled(n.text, i)) } } },
-                    onOpen = { onOpenRoute(app.bedtime.Routes.NOTES) },
+                    onSave = { written -> widgetNote?.let { n -> scope.launch { repo.editNote(n.id, written) } } },
                     onHold = { holding = Module.NOTE },
                 )
             }
@@ -677,6 +676,7 @@ internal fun LockScreenContent(
                 note = note,
                 noteBeside = noteBeside,
                 onHold = onWidgetHold,
+                screen = Screen.LOCK,
                 hours = hours?.let { states ->
                     {
                         HourDots(

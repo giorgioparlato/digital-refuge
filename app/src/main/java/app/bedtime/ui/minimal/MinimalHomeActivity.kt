@@ -258,7 +258,6 @@ private fun MinimalHomeScreen(
     // The note the note widget shows: the one you chose, or the to-do note.
     val allNotes by repo.notes.collectAsStateWithLifecycle(initialValue = emptyList())
     val widgetNote = allNotes.firstOrNull { it.id == (settings.homeStyle.noteWidgetId ?: Notes.TODO_ID) }
-    var noteToOpen by remember { mutableStateOf<String?>(null) }
     val startBlock: (Schedule) -> Unit = { block ->
         scope.launch {
             repo.startBlock(block, block.durationMinutes)
@@ -491,7 +490,7 @@ private fun MinimalHomeScreen(
     when {
         notesOpen -> {
             BackHandler { notesOpen = false }
-            NotesScreen(onBack = { notesOpen = false; noteToOpen = null }, initialOpen = noteToOpen)
+            NotesScreen(onBack = { notesOpen = false })
         }
         drawer -> {
             BackHandler { closeDrawer() }
@@ -589,10 +588,6 @@ private fun MinimalHomeScreen(
                         maxLines = style.noteLines,
                         onToggle = { i -> widgetNote?.let { n -> scope.launch { repo.editNote(n.id, NoteWidget.toggled(n.text, i)) } } },
                         onSave = { written -> widgetNote?.let { n -> scope.launch { repo.editNote(n.id, written) } } },
-                        onOpen = {
-                            noteToOpen = widgetNote?.id
-                            notesOpen = true
-                        },
                         onHold = { holding = Module.NOTE },
                     )
                 }
@@ -600,7 +595,7 @@ private fun MinimalHomeScreen(
                 null
             },
             // Small, beside the clock, where you've asked and it fits.
-            noteBeside = if (Modules.isOn(style, Screen.HOME, Module.NOTE) && style.noteBesideClock && style.noteFitsBesideClock(Screen.HOME)) {
+            noteBeside = if (Modules.isOn(style, Screen.HOME, Module.NOTE) && style.noteBeside(Screen.HOME) && style.noteFitsBesideClock(Screen.HOME)) {
                 {
                     NoteWidgetView(
                         widgetNote,
@@ -608,10 +603,7 @@ private fun MinimalHomeScreen(
                         maxLines = 3,
                         compact = true,
                         onToggle = { i -> widgetNote?.let { n -> scope.launch { repo.editNote(n.id, NoteWidget.toggled(n.text, i)) } } },
-                        onOpen = {
-                            noteToOpen = widgetNote?.id
-                            notesOpen = true
-                        },
+                        onSave = { written -> widgetNote?.let { n -> scope.launch { repo.editNote(n.id, written) } } },
                         onHold = { holding = Module.NOTE },
                     )
                 }
@@ -654,6 +646,9 @@ private fun MinimalHomeScreen(
         androidx.compose.ui.window.Dialog(onDismissRequest = { openHabit = null }) {
             HabitDetailContent(habit, habitMarks[habit.id].orEmpty(), HourlyUse.today(), p.background, p.text, p.faint, p.accent, onSet = { day, value ->
                 scope.launch { repo.markHabit(habit.id, day, value) }
+            }, onOpenAll = {
+                openHabit = null
+                runCatching { context.startActivity(app.bedtime.MainActivity.intent(context, app.bedtime.Routes.HABITS)) }
             })
         }
     }
@@ -676,7 +671,7 @@ private fun MinimalHomeScreen(
                     }
                 },
                 change = { changed ->
-                    scope.launch { repo.updateSettings { s -> s.copy(homeStyle = s.homeStyle.copy(weatherStyle = changed.weatherStyle, clockSize = changed.clockSize, quoteRefresh = changed.quoteRefresh, noteWidgetId = changed.noteWidgetId, noteLines = changed.noteLines, noteBesideClock = changed.noteBesideClock, calendarIconWhenEmpty = changed.calendarIconWhenEmpty)) } }
+                    scope.launch { repo.updateSettings { s -> s.copy(homeStyle = s.homeStyle.copy(weatherStyle = changed.weatherStyle, clockSize = changed.clockSize, quoteRefresh = changed.quoteRefresh, noteWidgetId = changed.noteWidgetId, noteLines = changed.noteLines, noteBesideClock = changed.noteBesideClock, lockNoteBesideClock = changed.lockNoteBesideClock, calendarIconWhenEmpty = changed.calendarIconWhenEmpty, lockCalendarIconWhenEmpty = changed.lockCalendarIconWhenEmpty)) } }
                 },
                 open = { route -> runCatching { context.startActivity(app.bedtime.MainActivity.intent(context, route)) } },
             ),

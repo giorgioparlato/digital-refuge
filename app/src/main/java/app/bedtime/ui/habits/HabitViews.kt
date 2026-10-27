@@ -140,6 +140,8 @@ fun HabitDetailContent(
     accent: Color,
     onSet: (day: Long, value: Int) -> Unit,
     onEdit: (() -> Unit)? = null,
+    /** Opens all your habits, from a link at the foot. */
+    onOpenAll: (() -> Unit)? = null,
 ) {
     val accent = habit.tint(accent)
     var shown by remember { mutableIntStateOf(0) }
@@ -177,6 +179,15 @@ fun HabitDetailContent(
         MonthGrid(habit, marks, month, today, text, faint, accent, onSet)
         if (habit.kind == HabitKind.YES_NO) {
             Text("Tap a day to tick or untick it.", style = MaterialTheme.typography.labelSmall, color = faint, modifier = Modifier.padding(top = 6.dp))
+        }
+        if (onOpenAll != null) {
+            Text(
+                "All your habits",
+                style = MaterialTheme.typography.labelLarge,
+                color = accent,
+                modifier = Modifier.padding(top = 16.dp).clip(RoundedCornerShape(50)).border(1.dp, accent.copy(alpha = 0.5f), RoundedCornerShape(50))
+                    .clickable(onClick = onOpenAll).padding(horizontal = 16.dp, vertical = 10.dp),
+            )
         }
         if (onEdit != null) {
             Text(

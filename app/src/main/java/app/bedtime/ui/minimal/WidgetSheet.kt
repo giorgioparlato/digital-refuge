@@ -121,22 +121,22 @@ internal fun WidgetSheetContent(
             }
             Module.EVENT -> Action(
                 Icons.Default.DateRange,
-                if (style.calendarIconWhenEmpty) "No calendar icon when nothing's coming" else "A calendar icon when nothing's coming",
+                if (style.calendarIcon(screen)) "No calendar icon when nothing's coming" else "A calendar icon when nothing's coming",
                 p,
-            ) { handlers.change(style.copy(calendarIconWhenEmpty = !style.calendarIconWhenEmpty)); onDone() }
+            ) { handlers.change(style.withCalendarIcon(screen, !style.calendarIcon(screen))); onDone() }
             Module.NOTE -> {
                 choices("Lines", listOf("3" to 3, "6" to 6, "10" to 10), style.noteLines) { handlers.change(style.copy(noteLines = it)) }
                 val fits = style.noteFitsBesideClock(screen)
                 Action(
                     Icons.Default.DateRange,
                     when {
-                        style.noteBesideClock && fits -> "In the list, not beside the clock"
+                        style.noteBeside(screen) && fits -> "In the list, not beside the clock"
                         fits -> "Beside the clock"
                         else -> "Beside the clock: needs a small clock, and no weather there"
                     },
                     p,
-                    enabled = fits || style.noteBesideClock,
-                ) { handlers.change(style.copy(noteBesideClock = !style.noteBesideClock)); onDone() }
+                    enabled = fits || style.noteBeside(screen),
+                ) { handlers.change(style.withNoteBeside(screen, !style.noteBeside(screen))); onDone() }
                 Text("Show", style = MaterialTheme.typography.labelLarge, color = p.faint, modifier = Modifier.padding(horizontal = 22.dp, vertical = 6.dp))
                 val chosen = style.noteWidgetId ?: app.bedtime.data.Notes.TODO_ID
                 Column(Modifier.heightIn(max = 280.dp).verticalScroll(rememberScrollState())) {

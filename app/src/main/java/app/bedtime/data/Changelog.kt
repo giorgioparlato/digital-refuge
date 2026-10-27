@@ -13,6 +13,16 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            62,
+            "0.9.16",
+            listOf(
+                "Tap a note on your home or lock screen to write in it, title included; the note beside the clock too.",
+                "\"Beside the clock\" and the calendar icon are set for the home and lock screen apart.",
+                "A habit's popup leads to all your habits.",
+                "The quote and the other widgets get their space above them again.",
+            ),
+        ),
+        ChangelogEntry(
             61,
             "0.9.15",
             listOf(

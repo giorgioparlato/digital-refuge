@@ -262,15 +262,25 @@ data class HomeStyle(
     val noteWidgetId: String? = null,
     /** How many of the note's lines the note widget shows. */
     val noteLines: Int = 6,
-    /** The note beside the clock rather than in the list; only with a small clock and no weather beside it. */
+    /** The note beside the clock rather than in the list, on the home screen and on the lock screen; only with a small clock and no weather beside it. */
     val noteBesideClock: Boolean = false,
+    val lockNoteBesideClock: Boolean = false,
     /** A notes button at the bottom right of the minimal screen, opening refuge notes. */
     val showNotesButton: Boolean = false,
-    /** With nothing coming today, a small calendar icon where the next event would be, opening the week ahead. */
+    /** With nothing coming today, a small calendar icon where the next event would be, opening the week ahead; on each screen. */
     val calendarIconWhenEmpty: Boolean = true,
+    val lockCalendarIconWhenEmpty: Boolean = true,
     /** Room above the lock screen's clock; null takes the home screen's [topSpace]. */
     val lockTopSpace: TopSpace? = null,
 ) {
+    fun noteBeside(screen: Screen): Boolean = if (screen == Screen.HOME) noteBesideClock else lockNoteBesideClock
+
+    fun withNoteBeside(screen: Screen, on: Boolean): HomeStyle = if (screen == Screen.HOME) copy(noteBesideClock = on) else copy(lockNoteBesideClock = on)
+
+    fun calendarIcon(screen: Screen): Boolean = if (screen == Screen.HOME) calendarIconWhenEmpty else lockCalendarIconWhenEmpty
+
+    fun withCalendarIcon(screen: Screen, on: Boolean): HomeStyle = if (screen == Screen.HOME) copy(calendarIconWhenEmpty = on) else copy(lockCalendarIconWhenEmpty = on)
+
     /** Whether the note can sit beside the clock on [screen]: a small clock, and no weather reading beside it. */
     fun noteFitsBesideClock(screen: Screen): Boolean =
         clockSize in setOf(ClockSize.VERY_SMALL, ClockSize.SMALL) &&

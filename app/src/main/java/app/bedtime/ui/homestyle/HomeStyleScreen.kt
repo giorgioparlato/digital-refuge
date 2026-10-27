@@ -482,14 +482,14 @@ internal fun HomeStyleContent(
                     val fits = style.noteFitsBesideClock(widgetScreen)
                     OptionRow(
                         Icons.Default.DateRange,
-                        "Beside the clock",
+                        if (widgetScreen == Screen.HOME) "Beside the clock" else "Beside the clock on the lock screen",
                         description = if (fits) {
                             "Small, at the top right: its title and first lines"
                         } else {
                             "Only with a small or very small clock (Look), and the weather not beside it (off, or set to 5 days)"
                         },
                         enabled = fits,
-                    ) { ObsidianToggle(style.noteBesideClock && fits, { onChange(style.copy(noteBesideClock = it)) }, enabled = fits) }
+                    ) { ObsidianToggle(style.noteBeside(widgetScreen) && fits, { onChange(style.withNoteBeside(widgetScreen, it)) }, enabled = fits) }
                 }
                 if (Modules.onAnywhere(style, Module.QUOTE)) SectionCard(title = "Quote", subtitle = "Tap it for another, hold it to favourite or hide it") {
                     run {
@@ -541,9 +541,9 @@ internal fun HomeStyleContent(
                 if (Modules.onAnywhere(style, Module.EVENT)) SectionCard(title = "Next event", subtitle = "Read from the calendar already on this phone. Nothing is fetched") {
                     OptionRow(
                         Icons.Default.DateRange,
-                        "A calendar icon when nothing's coming",
+                        if (widgetScreen == Screen.HOME) "A calendar icon when nothing's coming" else "A calendar icon on the lock screen when nothing's coming",
                         description = "A tap shows the week ahead",
-                    ) { ObsidianToggle(style.calendarIconWhenEmpty, { onChange(style.copy(calendarIconWhenEmpty = it)) }) }
+                    ) { ObsidianToggle(style.calendarIcon(widgetScreen), { onChange(style.withCalendarIcon(widgetScreen, it)) }) }
                     if (Modules.isOn(style, Screen.LOCK, Module.EVENT)) {
                         OptionRow(
                             Icons.Default.Lock,

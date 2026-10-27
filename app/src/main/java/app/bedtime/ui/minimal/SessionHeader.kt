@@ -88,6 +88,8 @@ internal fun SessionHeader(
     noteBeside: (@Composable () -> Unit)? = null,
     /** A long press on a widget: its own sheet, to hide or change it. */
     onHold: ((Module) -> Unit)? = null,
+    /** Which screen this is, for the settings each has its own of. */
+    screen: Screen = Screen.HOME,
 ) {
     val hold: (Module) -> (() -> Unit)? = { m -> onHold?.let { { it(m) } } }
     // Long-pressing a widget that has no tap of its own.
@@ -152,7 +154,7 @@ internal fun SessionHeader(
                     if (weather.week.isNotEmpty()) WeatherWeek(weather, style, now, onWeather, hold(Module.WEATHER))
                 }
                 // Nothing coming today: a small calendar icon still opens the week ahead, unless you'd rather not.
-                Module.EVENT -> if (calendar == null && style.calendarIconWhenEmpty && (onCalendar != null || onHold != null)) {
+                Module.EVENT -> if (calendar == null && style.calendarIcon(screen) && (onCalendar != null || onHold != null)) {
                     Icon(
                         Icons.Default.DateRange,
                         contentDescription = "the week ahead",
@@ -171,11 +173,11 @@ internal fun SessionHeader(
                             .then(if (onCalendar != null || onHold != null) Modifier.tapAndHold("see the week ahead", onCalendar, hold(Module.EVENT)) else Modifier),
                     )
                 }
-                Module.HOURS -> hours?.let { Box(held(Module.HOURS)) { it() } }
-                Module.QUOTE -> quote?.let { Box(held(Module.QUOTE)) { it() } }
-                Module.HABITS -> habits?.let { Box(held(Module.HABITS)) { it() } }
-                Module.NOW_PLAYING -> nowPlaying?.let { Box(held(Module.NOW_PLAYING)) { it() } }
-                Module.NOTE -> if (noteBeside == null) note?.let { Box(held(Module.NOTE)) { it() } }
+                Module.HOURS -> hours?.let { Column(held(Module.HOURS)) { it() } }
+                Module.QUOTE -> quote?.let { Column(held(Module.QUOTE)) { it() } }
+                Module.HABITS -> habits?.let { Column(held(Module.HABITS)) { it() } }
+                Module.NOW_PLAYING -> nowPlaying?.let { Column(held(Module.NOW_PLAYING)) { it() } }
+                Module.NOTE -> if (noteBeside == null) note?.let { Column(held(Module.NOTE)) { it() } }
             }
             if (at == pillAfter) SessionPill(scheduleName, until, scheduleIcon, style)
         }
