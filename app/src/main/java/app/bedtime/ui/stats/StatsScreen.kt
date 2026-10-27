@@ -105,17 +105,6 @@ fun StatsScreen(onBack: () -> Unit) {
     )
 }
 
-/** The one line home shows: the week's time in refuge and the current run, or null with nothing yet. */
-fun homeSummary(week: WeekStats, streak: Int): String? {
-    if (week.protectedMinutes == 0L && streak == 0) return null
-    val run = when (streak) {
-        0 -> null
-        1 -> "1 kept"
-        else -> "$streak kept in a row"
-    }
-    return listOfNotNull("${formatMinutes(week.protectedMinutes)} in refuge this week", run).joinToString(" · ")
-}
-
 @Composable
 internal fun StatsContent(
     history: List<SessionLog>,

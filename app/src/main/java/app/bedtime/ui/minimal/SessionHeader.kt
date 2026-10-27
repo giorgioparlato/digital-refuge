@@ -107,9 +107,14 @@ internal fun SessionHeader(
     // The pill follows the last of the clock's neighbours (greeting, clock, date, weather, next event),
     // before the hours and the quote, as it always has.
     val pillAfter = modules.indexOfLast { it in Modules.CLOCK_GROUP }
-    Column {
-        if (pillAfter < 0) SessionPill(scheduleName, until, scheduleIcon, style)
-        modules.forEachIndexed { at, module ->
+    // The note beside the clock takes a column of its own on the right, beside the greeting, clock and
+    // date at the top, with room between.
+    val besideHead = if (noteBeside != null && Module.NOTE in modules) {
+        modules.takeWhile { it == Module.GREETING || it == Module.CLOCK || it == Module.DATE }.size
+    } else {
+        0
+    }
+    val one: @Composable (Int, Module) -> Unit = { at, module ->
             when (module) {
                 Module.GREETING -> Text(greeting(now.hour), style = MaterialTheme.typography.titleMedium, color = p.accent, modifier = held(Module.GREETING))
                 Module.CLOCK -> Row(held(Module.CLOCK), verticalAlignment = Alignment.CenterVertically) {
@@ -126,9 +131,6 @@ internal fun SessionHeader(
                     if (weather != null && hasNow && Module.WEATHER in modules) {
                         Spacer(Modifier.weight(1f))
                         WeatherBeside(weather, style, onWeather, hold(Module.WEATHER))
-                    } else if (noteBeside != null && Module.NOTE in modules) {
-                        Spacer(Modifier.width(16.dp))
-                        Box(Modifier.weight(1f)) { noteBeside() }
                     }
                 }
                 Module.DATE -> Row(held(Module.DATE), verticalAlignment = Alignment.CenterVertically) {
@@ -177,10 +179,20 @@ internal fun SessionHeader(
                 Module.QUOTE -> quote?.let { Column(held(Module.QUOTE)) { it() } }
                 Module.HABITS -> habits?.let { Column(held(Module.HABITS)) { it() } }
                 Module.NOW_PLAYING -> nowPlaying?.let { Column(held(Module.NOW_PLAYING)) { it() } }
-                Module.NOTE -> if (noteBeside == null) note?.let { Column(held(Module.NOTE)) { it() } }
+                Module.NOTE -> if (besideHead == 0) note?.let { Column(held(Module.NOTE)) { it() } }
             }
-            if (at == pillAfter) SessionPill(scheduleName, until, scheduleIcon, style)
+            if (at == pillAfter && at >= besideHead) SessionPill(scheduleName, until, scheduleIcon, style)
+    }
+    Column {
+        if (pillAfter < 0) SessionPill(scheduleName, until, scheduleIcon, style)
+        if (besideHead > 0 && noteBeside != null) {
+            Row(Modifier.fillMaxWidth()) {
+                Column(Modifier.weight(1.3f)) { modules.take(besideHead).forEachIndexed { at, m -> one(at, m) } }
+                Box(Modifier.weight(1f).padding(start = 24.dp, top = 6.dp)) { noteBeside() }
+            }
+            if (pillAfter in 0 until besideHead) SessionPill(scheduleName, until, scheduleIcon, style)
         }
+        modules.drop(besideHead).forEachIndexed { i, m -> one(besideHead + i, m) }
     }
 }
 

@@ -1,5 +1,15 @@
 package app.bedtime.ui.components
 
+import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.draw.alpha
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.animation.core.Animatable
 import android.media.MediaMetadata
 import android.media.session.MediaController
 import android.media.session.MediaSessionManager
@@ -35,6 +45,11 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import app.bedtime.service.LockNotificationListener
 
+/** The track you swiped the player away on: it stays away until something else plays. */
+object NowPlayingDismissal {
+    val track = mutableStateOf<String?>(null)
+}
+
 /** What's playing: its title and artist, whether it's playing, and the buttons that steer it. */
 data class NowPlaying(
     val title: String,
@@ -45,7 +60,9 @@ data class NowPlaying(
     val next: () -> Unit = {},
     /** The app playing it, to open with a tap on the title. */
     val app: String = "",
-)
+) {
+    val key: String get() = "$app|$title"
+}
 
 /**
  * The music or podcast playing now, from whichever app plays it, kept current; null when nothing does
@@ -104,13 +121,41 @@ fun rememberNowPlaying(): NowPlaying? {
             controller?.unregisterCallback(callback)
         }
     }
-    return now
+    return now?.takeIf { it.key != NowPlayingDismissal.track.value }
 }
 
 /** A quiet line: the title over its artist, and previous, play or pause, next. */
 @Composable
 fun NowPlayingWidget(now: NowPlaying, text: Color, faint: Color, modifier: Modifier = Modifier, onOpen: ((String) -> Unit)? = null) {
-    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+    val scope = rememberCoroutineScope()
+    val offset = remember(now.key) { Animatable(0f) }
+    val dismiss = { NowPlayingDismissal.track.value = now.key }
+    // Swiped far enough either way, it goes until the next track; otherwise it springs back.
+    Row(
+        modifier
+            .fillMaxWidth()
+            .offset { IntOffset(offset.value.roundToInt(), 0) }
+            .alpha((1f - kotlin.math.abs(offset.value) / 600f).coerceIn(0.2f, 1f))
+            .pointerInput(now.key) {
+                detectHorizontalDragGestures(
+                    onDragEnd = {
+                        scope.launch {
+                            if (kotlin.math.abs(offset.value) > size.width * 0.35f) {
+                                offset.animateTo(if (offset.value > 0) size.width.toFloat() else -size.width.toFloat())
+                                dismiss()
+                            } else {
+                                offset.animateTo(0f)
+                            }
+                        }
+                    },
+                    onDragCancel = { scope.launch { offset.animateTo(0f) } },
+                ) { change, dx ->
+                    change.consume()
+                    scope.launch { offset.snapTo(offset.value + dx) }
+                }
+            },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         Column(
             Modifier.weight(1f).clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
                 .then(if (onOpen != null && now.app.isNotEmpty()) Modifier.clickable(onClickLabel = "open the player") { onOpen(now.app) } else Modifier),
@@ -123,6 +168,9 @@ fun NowPlayingWidget(now: NowPlaying, text: Color, faint: Color, modifier: Modif
         MediaButton(BedtimeIcons.Previous, "previous", faint, now.previous)
         MediaButton(if (now.playing) BedtimeIcons.Pause else Icons.Default.PlayArrow, if (now.playing) "pause" else "play", text, now.toggle)
         MediaButton(BedtimeIcons.Next, "next", faint, now.next)
+        Box(Modifier.size(32.dp).clip(CircleShape).clickable(onClickLabel = "close the player", onClick = dismiss), contentAlignment = Alignment.Center) {
+            Icon(Icons.Default.Close, contentDescription = "close the player", tint = faint.copy(alpha = 0.7f), modifier = Modifier.size(16.dp))
+        }
     }
 }
 

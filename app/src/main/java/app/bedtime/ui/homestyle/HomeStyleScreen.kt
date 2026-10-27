@@ -252,6 +252,11 @@ fun HomeStyleScreen(onBack: () -> Unit, onQuotes: () -> Unit = {}, page: StylePa
         weatherPreview = current.homeStyle.takeIf { Modules.onAnywhere(it, Module.WEATHER) }?.let { style ->
             Weather.view(weather ?: Weather.SAMPLE, (weather?.at ?: Weather.SAMPLE.at) + 1, Weather.fahrenheit(style.weatherUnit), style.weatherStyle)
         },
+        weatherPreviewFor = { ws ->
+            current.homeStyle.takeIf { Modules.onAnywhere(it, Module.WEATHER) }?.let { style ->
+                Weather.view(weather ?: Weather.SAMPLE, (weather?.at ?: Weather.SAMPLE.at) + 1, Weather.fahrenheit(style.weatherUnit), ws)
+            }
+        },
         now = LocalDateTime.now(),
         onBack = onBack,
         quote = Quotes.forPeriod(LocalDateTime.now(), current.homeStyle.quoteRefresh, prefs = current.quotes),
@@ -288,8 +293,9 @@ internal fun HomeStyleContent(
     onPickPeople: () -> Unit = {},
     /** When Breezy Weather last sent the weather, if ever. */
     weatherHeardAt: Long? = null,
-    /** The weather as the preview shows it. */
+    /** The weather as the preview shows it, and as it would be in another style. */
     weatherPreview: WeatherView? = null,
+    weatherPreviewFor: ((WeatherStyle) -> WeatherView?)? = null,
     /** Which of the home and lock screen's pages this is. */
     page: StylePage = StylePage.LOOK,
 ) {
@@ -358,7 +364,7 @@ internal fun HomeStyleContent(
                         until = formatMinuteOfDay(context, 7 * 60),
                         style = style,
                         quote = quote,
-                        weather = weatherPreview,
+                        weather = weatherPreviewFor?.invoke(style.weatherStyleFor(if (page == StylePage.SHOWN) widgetScreen else Screen.HOME)) ?: weatherPreview,
                         preview = true,
                     )
                 } else {
@@ -371,7 +377,7 @@ internal fun HomeStyleContent(
                         onLaunch = {},
                         onUnlock = {},
                         quote = quote,
-                        weather = weatherPreview,
+                        weather = weatherPreviewFor?.invoke(style.weatherStyleFor(if (page == StylePage.SHOWN) widgetScreen else Screen.HOME)) ?: weatherPreview,
                         preview = true,
                     )
                 }
@@ -517,12 +523,12 @@ internal fun HomeStyleContent(
                         },
                     )
                     run {
-                        SizeLabel("Show", Modifier.padding(top = 12.dp, bottom = 8.dp))
+                        SizeLabel(if (widgetScreen == Screen.HOME) "Show on the home screen" else "Show on the lock screen", Modifier.padding(top = 12.dp, bottom = 8.dp))
                         val styles = listOf(WeatherStyle.TODAY, WeatherStyle.DAYS, WeatherStyle.WEEK, WeatherStyle.FIVE_DAYS)
                         SegmentedChoice(
                             options = listOf("Today", "3 days", "Now + 5", "5 days"),
-                            selected = styles.indexOf(style.weatherStyle).coerceAtLeast(0),
-                            onSelect = { onChange(style.copy(weatherStyle = styles[it])) },
+                            selected = styles.indexOf(style.weatherStyleFor(widgetScreen)).coerceAtLeast(0),
+                            onSelect = { onChange(style.withWeatherStyle(widgetScreen, styles[it])) },
                         )
                         SizeLabel("In", Modifier.padding(top = 12.dp, bottom = 8.dp))
                         SegmentedChoice(

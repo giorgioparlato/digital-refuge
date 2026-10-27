@@ -229,6 +229,8 @@ data class HomeStyle(
     val hourDistractedColor: Long? = null,
     /** How much of it: now, today's range too, or three days with their skies. */
     val weatherStyle: WeatherStyle = WeatherStyle.TODAY,
+    /** The lock screen's own weather style; null takes the home screen's [weatherStyle]. */
+    val lockWeatherStyle: WeatherStyle? = null,
     /** Celsius, Fahrenheit, or the usual one where the phone is set. */
     val weatherUnit: TempUnit = TempUnit.AUTO,
     /** The clock, date and app names. */
@@ -273,6 +275,10 @@ data class HomeStyle(
     /** Room above the lock screen's clock; null takes the home screen's [topSpace]. */
     val lockTopSpace: TopSpace? = null,
 ) {
+    fun weatherStyleFor(screen: Screen): WeatherStyle = if (screen == Screen.HOME) weatherStyle else lockWeatherStyle ?: weatherStyle
+
+    fun withWeatherStyle(screen: Screen, ws: WeatherStyle): HomeStyle = if (screen == Screen.HOME) copy(weatherStyle = ws) else copy(lockWeatherStyle = ws)
+
     fun noteBeside(screen: Screen): Boolean = if (screen == Screen.HOME) noteBesideClock else lockNoteBesideClock
 
     fun withNoteBeside(screen: Screen, on: Boolean): HomeStyle = if (screen == Screen.HOME) copy(noteBesideClock = on) else copy(lockNoteBesideClock = on)
@@ -284,7 +290,7 @@ data class HomeStyle(
     /** Whether the note can sit beside the clock on [screen]: a small clock, and no weather reading beside it. */
     fun noteFitsBesideClock(screen: Screen): Boolean =
         clockSize in setOf(ClockSize.VERY_SMALL, ClockSize.SMALL) &&
-            !(Modules.isOn(this, screen, Module.WEATHER) && weatherStyle != WeatherStyle.FIVE_DAYS)
+            !(Modules.isOn(this, screen, Module.WEATHER) && weatherStyleFor(screen) != WeatherStyle.FIVE_DAYS)
 }
 
 /** The lock screen's gestures: four swipes starting around the clock, and a double tap anywhere. */

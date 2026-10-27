@@ -1,5 +1,7 @@
 package app.bedtime.ui.home
 
+import app.bedtime.data.PhoneUsage
+import app.bedtime.ui.components.rememberUseDays
 import app.bedtime.ui.habits.rememberHabits
 import app.bedtime.ui.habits.HabitsWidget
 import app.bedtime.data.Habits
@@ -92,7 +94,6 @@ import app.bedtime.engine.Engine
 import app.bedtime.engine.Occurrence
 import app.bedtime.engine.ScheduleEvaluator
 import app.bedtime.engine.Stats
-import app.bedtime.ui.stats.homeSummary
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import app.bedtime.service.DndController
 import app.bedtime.service.GreyscaleController
@@ -142,6 +143,8 @@ internal data class HomeUiState(
     val hourRule: HourRule = HourRule(5),
     val hourCalmColor: Long? = null,
     val hourDistractedColor: Long? = null,
+    /** Seconds in your distracting apps over the last seven days; null until there are distracting apps to count. */
+    val weekDistracting: Long? = null,
     /** Your habits and their marks; the section shows once there's at least one. */
     val habits: List<Habit> = emptyList(),
     val habitMarks: Map<String, Map<Long, Int>> = emptyMap(),
@@ -163,6 +166,7 @@ fun HomeScreen(
     val context = LocalContext.current
     val repo = remember { Repository.get(context) }
     val (habits, habitMarks) = rememberHabits()
+    val use = rememberUseDays(7, live = false)
     val notes by repo.notes.collectAsStateWithLifecycle(initialValue = emptyList())
     val hourly = rememberTodayHours()
     val scope = rememberCoroutineScope()
@@ -223,6 +227,10 @@ fun HomeScreen(
             hourDistractedColor = settings.homeStyle.hourDistractedColor,
             habits = habits,
             habitMarks = habitMarks,
+            weekDistracting = settings.distractingApps.takeIf { it.isNotEmpty() }?.let {
+                val today = HourlyUse.today()
+                PhoneUsage.range(use.days, today - 6, today).sumOf { d -> d.distractingTotal }
+            },
         ),
         onHabits = onHabits,
         onTickHabit = { habit ->
@@ -368,9 +376,9 @@ internal fun HomeContent(
                     }
                 }
             }
-            // The week in one quiet line at the very foot; the full figures are a tap away.
-            homeSummary(Stats.week(ui.history, ui.now), Stats.streak(ui.history, ui.now))?.let { summary ->
-                item(key = "stats") { StatsLine(summary, onStats) }
+            // The week in one quiet line at the very foot: your time in distracting apps; the full figures are a tap away.
+            ui.weekDistracting?.let { seconds ->
+                item(key = "stats") { StatsLine("${formatMinutes(seconds / 60)} in distracting apps this week", onStats, label = "Open your statistics") }
             }
             item(key = "notes") {
                 StatsLine(

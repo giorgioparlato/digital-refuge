@@ -1,5 +1,9 @@
 package app.bedtime.ui.habits
 
+import app.bedtime.data.Screen
+import androidx.compose.material.icons.filled.Lock
+import app.bedtime.ui.components.ObsidianToggle
+import androidx.compose.material.icons.filled.Home
 import java.util.Locale
 import java.time.format.DateTimeFormatter
 import java.time.LocalDate
@@ -281,6 +285,12 @@ private fun HabitEditDialog(habit: Habit, isNew: Boolean, onDismiss: () -> Unit,
                     Text("A day's aim", style = MaterialTheme.typography.labelLarge, color = c.textMuted)
                     NumberStepper(draft.target, { draft = draft.copy(target = it, times = 1, days = 1) }, 1..1000, title = "aim", presets = listOf(5, 8, 10, 20, 30, 50, 100))
                     ObsidianTextField(draft.unit, { draft = draft.copy(unit = it.take(20)) }, placeholder = "reps, pages, glasses…")
+                }
+                OptionRow(Icons.Default.Home, "In the home screen's habits widget") {
+                    ObsidianToggle(draft.shownOn(Screen.HOME), { draft = draft.withShownOn(Screen.HOME, it) })
+                }
+                OptionRow(Icons.Default.Lock, "In the lock screen's habits widget") {
+                    ObsidianToggle(draft.shownOn(Screen.LOCK), { draft = draft.withShownOn(Screen.LOCK, it) })
                 }
                 Text("Its colour", style = MaterialTheme.typography.labelLarge, color = c.textMuted)
                 ColourChoice(HabitColours, draft.color, { draft = draft.copy(color = it) }, automatic = "Accent")

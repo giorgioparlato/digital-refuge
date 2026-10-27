@@ -1,5 +1,6 @@
 package app.bedtime.ui.notes
 
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -99,6 +100,17 @@ object Markdown {
         return String(out)
     }
 
+    /** Where each to-do's box mark sits in [text] (it's the same in what's drawn), and whether it's ticked. */
+    fun boxes(text: String): List<Pair<Int, Boolean>> {
+        val out = mutableListOf<Pair<Int, Boolean>>()
+        var start = 0
+        text.split("\n").forEach { line ->
+            Regex("""^(\s*)[-*] \[([ xX])] """).find(line)?.let { m -> out.add(start + m.groupValues[1].length + 2 to m.groupValues[2].isNotBlank()) }
+            start += line.length + 1
+        }
+        return out
+    }
+
     private val checkbox = Regex("""^(\s*)[-*] \[([ xX])] """)
 
     /**
@@ -151,7 +163,10 @@ object Markdown {
             }
             Regex("""^\s*[-*]\s+\[([ xX])]\s""").find(line)?.let { m ->
                 addStyle(SpanStyle(color = accent), start + m.range.first, start + m.range.last)
-                if (m.groupValues[1].isNotBlank()) addStyle(SpanStyle(textDecoration = TextDecoration.LineThrough, color = faint), start + m.range.last, end)
+                // The box's room, a little larger than the words; the box itself is drawn over it (todoBoxes).
+                val glyph = start + m.value.takeWhile { it == ' ' || it == '\t' }.length + 2
+                addStyle(SpanStyle(fontSize = 1.3.em, color = Color.Transparent), glyph, glyph + 1)
+                if (m.groupValues[1].isNotBlank()) addStyle(SpanStyle(textDecoration = TextDecoration.LineThrough, color = faint), start + m.range.last + 1, end)
             } ?: Regex("""^\s*([-*+])\s""").find(line)?.let { m -> addStyle(SpanStyle(color = accent), start + m.groups[1]!!.range.first, start + m.groups[1]!!.range.last + 1) }
             if (line.startsWith(">")) addStyle(SpanStyle(fontStyle = FontStyle.Italic, color = faint), start, end)
             inline.findAll(line).forEach { m ->

@@ -255,6 +255,7 @@ private fun MinimalHomeScreen(
     val blocks = allSchedules.filter { it.isBlock && it.enabled }
     var blocksOpen by remember { mutableStateOf(false) }
     var holding by remember { mutableStateOf<Module?>(null) }
+    var screenSheet by remember { mutableStateOf(false) }
     // The note the note widget shows: the one you chose, or the to-do note.
     val allNotes by repo.notes.collectAsStateWithLifecycle(initialValue = emptyList())
     val widgetNote = allNotes.firstOrNull { it.id == (settings.homeStyle.noteWidgetId ?: Notes.TODO_ID) }
@@ -579,6 +580,7 @@ private fun MinimalHomeScreen(
             onRefugeHold = { blocksOpen = true },
             onOpenNotes = { notesOpen = true },
             onWidgetHold = { holding = it },
+            onScreenHold = { screenSheet = true },
             note = if (Modules.isOn(style, Screen.HOME, Module.NOTE)) {
                 {
                     NoteWidgetView(
@@ -613,7 +615,7 @@ private fun MinimalHomeScreen(
             nowPlaying = nowPlaying?.takeIf { Modules.isOn(style, Screen.HOME, Module.NOW_PLAYING) }?.let { playing ->
                 { NowPlayingWidget(playing, style.palette().text, style.palette().faint, Modifier.padding(top = 20.dp), onOpen = { AppCatalog.launch(context, it) }) }
             },
-            habits = habitList.takeIf { it.isNotEmpty() && Modules.isOn(style, Screen.HOME, Module.HABITS) }?.let { list ->
+            habits = habitList.filter { it.shownOn(Screen.HOME) }.takeIf { it.isNotEmpty() && Modules.isOn(style, Screen.HOME, Module.HABITS) }?.let { list ->
                 {
                     val today = HourlyUse.today()
                     HabitsWidget(
@@ -671,13 +673,36 @@ private fun MinimalHomeScreen(
                     }
                 },
                 change = { changed ->
-                    scope.launch { repo.updateSettings { s -> s.copy(homeStyle = s.homeStyle.copy(weatherStyle = changed.weatherStyle, clockSize = changed.clockSize, quoteRefresh = changed.quoteRefresh, noteWidgetId = changed.noteWidgetId, noteLines = changed.noteLines, noteBesideClock = changed.noteBesideClock, lockNoteBesideClock = changed.lockNoteBesideClock, calendarIconWhenEmpty = changed.calendarIconWhenEmpty, lockCalendarIconWhenEmpty = changed.lockCalendarIconWhenEmpty)) } }
+                    scope.launch { repo.updateSettings { s -> s.copy(homeStyle = s.homeStyle.copy(weatherStyle = changed.weatherStyle, lockWeatherStyle = changed.lockWeatherStyle, clockSize = changed.clockSize, quoteRefresh = changed.quoteRefresh, noteWidgetId = changed.noteWidgetId, noteLines = changed.noteLines, noteBesideClock = changed.noteBesideClock, lockNoteBesideClock = changed.lockNoteBesideClock, calendarIconWhenEmpty = changed.calendarIconWhenEmpty, lockCalendarIconWhenEmpty = changed.lockCalendarIconWhenEmpty)) } }
                 },
                 open = { route -> runCatching { context.startActivity(app.bedtime.MainActivity.intent(context, route)) } },
+                habitShown = { id, shown -> scope.launch { repo.updateSettings { s -> s.copy(habits = s.habits.map { if (it.id == id) it.withShownOn(Screen.HOME, shown) else it }) } } },
             ),
             onDismiss = { holding = null },
             notes = allNotes,
             screen = Screen.HOME,
+            habits = habitList,
+        )
+    }
+    if (screenSheet) {
+        val sessions = state?.active.orEmpty().map { it.start to it.schedule }
+        val owner = Modules.owner(sessions, Screen.HOME)
+        ScreenSheet(
+            Screen.HOME,
+            style,
+            Modules.of(style, Screen.HOME),
+            sessionOwned = owner != null,
+            onSwitch = { module, on ->
+                scope.launch {
+                    if (owner != null) {
+                        repo.upsert(owner.copy(homeModules = Modules.arrange(owner.homeModules.orEmpty()).map { if (it.module == module) it.copy(on = on) else it }))
+                    } else {
+                        repo.updateSettings { s -> s.copy(homeStyle = Modules.switched(s.homeStyle, Screen.HOME, module, on)) }
+                    }
+                }
+            },
+            onOpen = { route -> runCatching { context.startActivity(app.bedtime.MainActivity.intent(context, route)) } },
+            onDismiss = { screenSheet = false },
         )
     }
     if (blocksOpen) {
@@ -791,6 +816,8 @@ internal fun MinimalHomeContent(
     onOpenNotes: () -> Unit = {},
     /** A long press on a widget: its own sheet, to hide or change it. */
     onWidgetHold: ((Module) -> Unit)? = null,
+    /** A long press on an empty spot: this screen's widgets, and the way to their settings. */
+    onScreenHold: (() -> Unit)? = null,
     /** The session's mark on its pill. */
     scheduleIcon: String? = null,
     /** The habits and now-playing widgets, drawn by the screen, when they're on. */
@@ -849,7 +876,9 @@ internal fun MinimalHomeContent(
                     ) { _, amount -> travel += amount }
                 }
                 // Only on empty spots: apps and the quote take their own taps first.
-                .pointerInput(onGesture) { detectTapGestures(onDoubleTap = { onGesture(HomeGesture.DOUBLE_TAP) }) }
+                .pointerInput(onGesture, onScreenHold) {
+                    detectTapGestures(onDoubleTap = { onGesture(HomeGesture.DOUBLE_TAP) }, onLongPress = onScreenHold?.let { { _ -> it() } })
+                }
                 .then(if (preview) Modifier else Modifier.safeDrawingPadding())
                 .padding(horizontal = 28.dp)
                 .padding(bottom = 24.dp),

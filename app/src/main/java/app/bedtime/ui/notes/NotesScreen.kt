@@ -1,5 +1,8 @@
 package app.bedtime.ui.notes
 
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.runtime.LaunchedEffect
 import kotlinx.coroutines.delay
 import app.bedtime.data.Notes
@@ -186,13 +189,17 @@ private fun NoteEditor(initial: String, isNew: Boolean, onSave: (String) -> Unit
         },
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).imePadding()) {
+            var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
+            // The note grows inside a scrolling page, so its boxes can be drawn where its lines are.
+            Box(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = PageGutter)) {
             BasicTextField(
                 value = value,
                 onValueChange = { value = Markdown.tickOnTap(value, it) ?: Markdown.continueList(value, it) },
                 textStyle = MaterialTheme.typography.bodyLarge.copy(color = c.textNormal),
                 cursorBrush = SolidColor(c.accent),
                 visualTransformation = remember(c.textFaint, c.accent) { MarkdownTransformation(c.textFaint, c.accent) },
-                modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = PageGutter),
+                onTextLayout = { layout = it },
+                modifier = Modifier.fillMaxWidth().heightIn(min = 400.dp).todoBoxes(value.text, { layout }, c.textNormal.copy(alpha = 0.18f), c.accent),
                 decorationBox = { field ->
                     Box(contentAlignment = Alignment.TopStart) {
                         if (value.text.isEmpty()) VerbatimText("# A title\n\n- a list\n- [ ] a to-do", style = MaterialTheme.typography.bodyLarge, color = c.textFaint)
@@ -200,6 +207,7 @@ private fun NoteEditor(initial: String, isNew: Boolean, onSave: (String) -> Unit
                     }
                 },
             )
+            }
             MarkdownBar { change -> value = change(value) }
         }
     }

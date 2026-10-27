@@ -399,6 +399,32 @@ private fun LockScreen(
         }
     }
     var holding by remember { mutableStateOf<Module?>(null) }
+    var screenSheet by remember { mutableStateOf(false) }
+    if (screenSheet) {
+        // Switching a widget from here asks for the usual unlock first, then locks again.
+        val sessions = state?.active.orEmpty().map { it.start to it.schedule }
+        val owner = Modules.owner(sessions, Screen.LOCK)
+        val shown = Modules.during(settings.homeStyle, sessions)
+        app.bedtime.ui.minimal.ScreenSheet(
+            Screen.LOCK,
+            shown,
+            Modules.of(shown, Screen.LOCK),
+            sessionOwned = owner != null,
+            onSwitch = { module, on ->
+                onConfirmed {
+                    scope.launch {
+                        if (owner != null) {
+                            repo.upsert(owner.copy(lockModules = Modules.arrange(owner.lockModules.orEmpty()).map { if (it.module == module) it.copy(on = on) else it }))
+                        } else {
+                            repo.updateSettings { s -> s.copy(homeStyle = Modules.switched(s.homeStyle, Screen.LOCK, module, on)) }
+                        }
+                    }
+                }
+            },
+            onOpen = onOpenRoute,
+            onDismiss = { screenSheet = false },
+        )
+    }
     var hoursDetail by remember { mutableStateOf(false) }
     if (hoursDetail) {
         val p = settings.homeStyle.palette()
@@ -439,14 +465,16 @@ private fun LockScreen(
                 },
                 change = { changed ->
                     onConfirmed {
-                        scope.launch { repo.updateSettings { s -> s.copy(homeStyle = s.homeStyle.copy(weatherStyle = changed.weatherStyle, clockSize = changed.clockSize, quoteRefresh = changed.quoteRefresh, noteWidgetId = changed.noteWidgetId, noteLines = changed.noteLines, noteBesideClock = changed.noteBesideClock, lockNoteBesideClock = changed.lockNoteBesideClock, calendarIconWhenEmpty = changed.calendarIconWhenEmpty, lockCalendarIconWhenEmpty = changed.lockCalendarIconWhenEmpty)) } }
+                        scope.launch { repo.updateSettings { s -> s.copy(homeStyle = s.homeStyle.copy(weatherStyle = changed.weatherStyle, lockWeatherStyle = changed.lockWeatherStyle, clockSize = changed.clockSize, quoteRefresh = changed.quoteRefresh, noteWidgetId = changed.noteWidgetId, noteLines = changed.noteLines, noteBesideClock = changed.noteBesideClock, lockNoteBesideClock = changed.lockNoteBesideClock, calendarIconWhenEmpty = changed.calendarIconWhenEmpty, lockCalendarIconWhenEmpty = changed.lockCalendarIconWhenEmpty)) } }
                     }
                 },
                 open = onOpenRoute,
+                habitShown = { id, shown -> onConfirmed { scope.launch { repo.updateSettings { s -> s.copy(habits = s.habits.map { if (it.id == id) it.withShownOn(Screen.LOCK, shown) else it }) } } } },
             ),
             onDismiss = { holding = null },
             notes = allNotes,
             screen = Screen.LOCK,
+            habits = habitList,
         )
     }
     if (quickNote) {
@@ -493,6 +521,7 @@ private fun LockScreen(
         scheduleIcon = occurrence?.schedule?.icon,
         nowPlaying = nowPlaying?.let { playing -> { NowPlayingWidget(playing, style.palette().text, style.palette().faint, Modifier.padding(top = 20.dp), onOpen = onOpenApp) } },
         onWidgetHold = { holding = it },
+        onScreenHold = { screenSheet = true },
         // Ticking, or saving what was typed, asks for the usual unlock, then locks again; a tap on the title opens it after unlocking.
         // Like a quick note, writing in it here saves as you go.
         note = if (Modules.isOn(style, Screen.LOCK, Module.NOTE)) {
@@ -526,7 +555,7 @@ private fun LockScreen(
             null
         },
         // Ticking from here asks for the usual unlock first, then locks again, as a reply does.
-        habits = habitList.takeIf { it.isNotEmpty() && Modules.isOn(style, Screen.LOCK, Module.HABITS) }?.let { list ->
+        habits = habitList.filter { it.shownOn(Screen.LOCK) }.takeIf { it.isNotEmpty() && Modules.isOn(style, Screen.LOCK, Module.HABITS) }?.let { list ->
             {
                 val today = HourlyUse.today()
                 HabitsWidget(
@@ -550,7 +579,7 @@ private fun LockScreen(
         onCalendar = { scope.launch { week = loadCalendarWeek(context, LocalDateTime.now()) } },
         // The distraction tracker's tap: today's detail right here, as at home; only the statistics ask for the unlock.
         onHours = { hoursDetail = true },
-        weather = rememberWeather(style, now),
+        weather = rememberWeather(style, now, Screen.LOCK),
         onWeather = breezy?.let { app -> { onOpenApp(app) } },
         hours = todayHours.takeIf { Modules.isOn(style, Screen.LOCK, Module.HOURS) && HourlyUse.counting(settings) }
             ?.let { HourlyUse.states(it, now.hour, HourlyUse.rule(settings)) },
@@ -619,6 +648,8 @@ internal fun LockScreenContent(
     nowPlaying: (@Composable () -> Unit)? = null,
     /** A long press on a widget: its own sheet, to hide or change it. */
     onWidgetHold: ((Module) -> Unit)? = null,
+    /** A long press on an empty spot: this screen's widgets, and the way to their settings. */
+    onScreenHold: (() -> Unit)? = null,
     note: (@Composable () -> Unit)? = null,
     noteBeside: (@Composable () -> Unit)? = null,
 ) {
@@ -633,7 +664,7 @@ internal fun LockScreenContent(
                 .background(p.background)
                 .semantics { onClick(label = "unlock the phone") { onOpen(); true } }
                 .pointerInput(onOpen, onDoubleTap) {
-                    detectTapGestures(onTap = { onOpen() }, onDoubleTap = onDoubleTap?.let { { _: Offset -> it() } })
+                    detectTapGestures(onTap = { onOpen() }, onDoubleTap = onDoubleTap?.let { { _: Offset -> it() } }, onLongPress = onScreenHold?.let { { _: Offset -> it() } })
                 }
                 .pointerInput(onSwipe, onOpen) {
                     var start = Offset.Zero

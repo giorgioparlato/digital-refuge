@@ -26,7 +26,14 @@ data class Habit(
     val unit: String = "",
     /** Its colour, ARGB, in the widgets and here; null takes the accent. */
     val color: Long? = null,
-)
+    /** Whether the habits widget shows it on the home screen, and on the lock screen (null: as on home). */
+    val inWidget: Boolean = true,
+    val inLockWidget: Boolean? = null,
+) {
+    fun shownOn(screen: Screen): Boolean = if (screen == Screen.HOME) inWidget else inLockWidget ?: inWidget
+
+    fun withShownOn(screen: Screen, shown: Boolean): Habit = if (screen == Screen.HOME) copy(inWidget = shown) else copy(inLockWidget = shown)
+}
 
 /** What was marked for a habit on a day (epoch day): 1 for done, or the count. */
 @Serializable

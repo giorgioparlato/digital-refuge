@@ -1,5 +1,6 @@
 package app.bedtime.ui.minimal
 
+import app.bedtime.data.Screen
 import app.bedtime.data.Module
 import app.bedtime.data.Modules
 import androidx.compose.runtime.Composable
@@ -16,10 +17,10 @@ import java.time.ZoneId
 
 /** The weather as [style] asks for it, or null when it's off or Breezy hasn't sent anything lately. */
 @Composable
-fun rememberWeather(style: HomeStyle, now: LocalDateTime): WeatherView? {
+fun rememberWeather(style: HomeStyle, now: LocalDateTime, screen: Screen = Screen.HOME): WeatherView? {
     val context = LocalContext.current
     val repo = remember { Repository.get(context.applicationContext) }
     val weather by repo.weather.collectAsStateWithLifecycle(initialValue = null)
     if (!Modules.onAnywhere(style, Module.WEATHER)) return null
-    return Weather.view(weather, now.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(), Weather.fahrenheit(style.weatherUnit), style.weatherStyle)
+    return Weather.view(weather, now.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(), Weather.fahrenheit(style.weatherUnit), style.weatherStyleFor(screen))
 }

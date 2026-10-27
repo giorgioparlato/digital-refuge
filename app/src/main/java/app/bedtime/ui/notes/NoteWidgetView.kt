@@ -1,5 +1,8 @@
 package app.bedtime.ui.notes
 
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import kotlinx.coroutines.delay
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.TextRange
@@ -105,15 +108,19 @@ fun NoteWidgetView(
         }
         if (typing) {
             LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
-            BasicTextField(
-                value = value,
-                onValueChange = { value = Markdown.tickOnTap(value, it) ?: Markdown.continueList(value, it) },
-                textStyle = MaterialTheme.typography.bodyLarge.copy(color = text),
-                cursorBrush = SolidColor(accent),
-                visualTransformation = remember(faint, accent) { MarkdownTransformation(faint, accent) },
-                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
-                modifier = Modifier.fillMaxWidth().heightIn(max = 280.dp).focusRequester(focus),
-            )
+            var layout by remember { mutableStateOf<androidx.compose.ui.text.TextLayoutResult?>(null) }
+            Box(Modifier.fillMaxWidth().heightIn(max = 280.dp).verticalScroll(rememberScrollState())) {
+                BasicTextField(
+                    value = value,
+                    onValueChange = { value = Markdown.tickOnTap(value, it) ?: Markdown.continueList(value, it) },
+                    textStyle = MaterialTheme.typography.bodyLarge.copy(color = text),
+                    cursorBrush = SolidColor(accent),
+                    visualTransformation = remember(faint, accent) { MarkdownTransformation(faint, accent) },
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                    onTextLayout = { layout = it },
+                    modifier = Modifier.fillMaxWidth().focusRequester(focus).todoBoxes(value.text, { layout }, text.copy(alpha = 0.18f), accent),
+                )
+            }
             return@Column
         }
         val startTyping = Modifier.combinedClickable(onClickLabel = "write in the note", onLongClick = onHold) {
@@ -139,9 +146,11 @@ fun NoteWidgetView(
                         contentAlignment = Alignment.Center,
                     ) {
                         Box(
-                            Modifier.size(16.dp).clip(RoundedCornerShape(4.dp))
-                                .then(if (line.box) Modifier.background(accent) else Modifier.border(1.5.dp, faint, RoundedCornerShape(4.dp))),
-                        )
+                            Modifier.size(19.dp).clip(RoundedCornerShape(5.dp)).background(if (line.box) accent else text.copy(alpha = 0.18f)),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            if (line.box) androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                        }
                     }
                 }
                 if (line.box != null) Spacer(Modifier.width(4.dp))

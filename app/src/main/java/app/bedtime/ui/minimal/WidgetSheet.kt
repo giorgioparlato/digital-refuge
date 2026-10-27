@@ -48,6 +48,8 @@ class WidgetHandlers(
     val change: (HomeStyle) -> Unit = {},
     /** Opens digital refuge on one of its pages ([app.bedtime.Routes]). */
     val open: (String) -> Unit = {},
+    /** A habit in the habits widget, or not. */
+    val habitShown: (habitId: String, shown: Boolean) -> Unit = { _, _ -> },
 )
 
 /**
@@ -64,8 +66,9 @@ internal fun WidgetSheet(
     onDismiss: () -> Unit,
     notes: List<app.bedtime.data.Note> = emptyList(),
     screen: app.bedtime.data.Screen = app.bedtime.data.Screen.HOME,
+    habits: List<app.bedtime.data.Habit> = emptyList(),
 ) {
-    Dialog(onDismissRequest = onDismiss) { WidgetSheetContent(module, style, sessionOwned, handlers, onDismiss, notes, screen) }
+    Dialog(onDismissRequest = onDismiss) { WidgetSheetContent(module, style, sessionOwned, handlers, onDismiss, notes, screen, habits) }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -79,6 +82,8 @@ internal fun WidgetSheetContent(
     /** Your refuge notes, for the note widget to show one of. */
     notes: List<app.bedtime.data.Note> = emptyList(),
     screen: app.bedtime.data.Screen = app.bedtime.data.Screen.HOME,
+    /** Your habits, to choose which the widget shows. */
+    habits: List<app.bedtime.data.Habit> = emptyList(),
 ) {
     val p = style.palette()
     Column(
@@ -102,8 +107,8 @@ internal fun WidgetSheetContent(
             Module.WEATHER -> choices(
                 "Show",
                 listOf("Today" to WeatherStyle.TODAY, "3 days" to WeatherStyle.DAYS, "Now + 5" to WeatherStyle.WEEK, "5 days" to WeatherStyle.FIVE_DAYS),
-                style.weatherStyle,
-            ) { handlers.change(style.copy(weatherStyle = it)) }
+                style.weatherStyleFor(screen),
+            ) { handlers.change(style.withWeatherStyle(screen, it)) }
             Module.CLOCK -> choices(
                 "Size",
                 listOf("Very small" to ClockSize.VERY_SMALL, "Small" to ClockSize.SMALL, "Medium" to ClockSize.MEDIUM, "Large" to ClockSize.LARGE),
@@ -114,7 +119,21 @@ internal fun WidgetSheetContent(
                 listOf("Hour" to QuoteRefresh.HOURLY, "6 hours" to QuoteRefresh.SIX_HOURS, "Day" to QuoteRefresh.DAILY, "Week" to QuoteRefresh.WEEKLY),
                 style.quoteRefresh,
             ) { handlers.change(style.copy(quoteRefresh = it)) }
-            Module.HABITS -> Action(Icons.AutoMirrored.Filled.KeyboardArrowRight, "Open your habits: add, change or remove", p) { handlers.open(app.bedtime.Routes.HABITS); onDone() }
+            Module.HABITS -> {
+                if (habits.isNotEmpty()) {
+                    Text(if (screen == app.bedtime.data.Screen.HOME) "Show on the home screen" else "Show on the lock screen", style = MaterialTheme.typography.labelLarge, color = p.faint, modifier = Modifier.padding(horizontal = 22.dp, vertical = 6.dp))
+                    habits.forEach { habit ->
+                        Row(
+                            Modifier.fillMaxWidth().clickable { handlers.habitShown(habit.id, !habit.shownOn(screen)) }.padding(horizontal = 22.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            app.bedtime.ui.components.VerbatimText(habit.name, style = MaterialTheme.typography.bodyLarge, color = if (habit.shownOn(screen)) p.text else p.faint, modifier = Modifier.weight(1f))
+                            if (habit.shownOn(screen)) Icon(Icons.Default.Check, contentDescription = "shown", tint = p.accent, modifier = Modifier.size(18.dp))
+                        }
+                    }
+                }
+                Action(Icons.AutoMirrored.Filled.KeyboardArrowRight, "Open your habits: add, change or remove", p) { handlers.open(app.bedtime.Routes.HABITS); onDone() }
+            }
             Module.HOURS -> {
                 Action(Icons.AutoMirrored.Filled.KeyboardArrowRight, "Open your statistics", p) { handlers.open(app.bedtime.Routes.STATS); onDone() }
                 Action(Icons.AutoMirrored.Filled.KeyboardArrowRight, "Choose your distracting apps", p) { handlers.open(app.bedtime.Routes.DISTRACTION); onDone() }
