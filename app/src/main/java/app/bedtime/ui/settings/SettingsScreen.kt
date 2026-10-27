@@ -1,5 +1,6 @@
 package app.bedtime.ui.settings
 
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Notifications
@@ -118,6 +119,7 @@ fun SettingsScreen(
     onGestures: () -> Unit = {},
     onSearch: () -> Unit = {},
     onDistraction: () -> Unit = {},
+    onHabits: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val repo = remember { Repository.get(context) }
@@ -223,6 +225,7 @@ fun SettingsScreen(
         onGestures = onGestures,
         onSearch = onSearch,
         onDistraction = onDistraction,
+        onHabits = onHabits,
         onTileBlock = { id -> scope.launch { repo.updateSettings { it.copy(tileBlockId = id) } } },
         groupCount = settings.groups.size,
         onGroups = onGroups,
@@ -273,6 +276,7 @@ internal fun SettingsContent(
     onGestures: () -> Unit = {},
     onSearch: () -> Unit = {},
     onDistraction: () -> Unit = {},
+    onHabits: () -> Unit = {},
 ) {
     val c = Obsidian.colors
     var otherOpen by rememberSaveable { mutableStateOf(false) }
@@ -368,6 +372,12 @@ internal fun SettingsContent(
                     "Distracting apps",
                     "Today by the hour, on the home tab",
                     onClick = onDistraction,
+                )
+                SettingsRow(
+                    Icons.Default.CheckCircle,
+                    "Habits",
+                    "Tick them off, from here or your home or lock screen",
+                    onClick = onHabits,
                     last = true,
                 )
 

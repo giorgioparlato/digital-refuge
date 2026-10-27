@@ -26,7 +26,12 @@ object Markdown {
     fun render(text: String, faint: Color = Color.Unspecified): AnnotatedString = buildAnnotatedString {
         text.lines().forEachIndexed { i, raw ->
             if (i > 0) append("\n")
+            // Indented items keep their place under the one above: a wide space for every two.
+            val indent = raw.takeWhile { it == ' ' || it == '\t' }
+            val pad = INDENT.repeat((indent.replace("\t", "  ").length + 1) / 2)
+            val line = raw.substring(indent.length)
             val heading = Regex("""^(#{1,6})\s+(.*)$""").find(raw)
+            val numbered = Regex("""^(\d+[.)])\s+(.*)$""").find(line)
             when {
                 heading != null -> {
                     val size = when (heading.groupValues[1].length) { 1 -> 22.sp; 2 -> 19.sp; else -> 17.sp }
@@ -34,25 +39,83 @@ object Markdown {
                     inline(heading.groupValues[2])
                     pop()
                 }
-                raw.matches(Regex("""^\s*[-*]\s+\[[ ]]\s+.*""")) -> { append("☐ "); inline(raw.substringAfter("] ")) }
-                raw.matches(Regex("""^\s*[-*]\s+\[[xX]]\s+.*""")) -> {
-                    append("☑ ")
+                line.matches(Regex("""^[-*]\s+\[[ ]]\s+.*""")) -> { append("$pad☐ "); inline(line.substringAfter("] ")) }
+                line.matches(Regex("""^[-*]\s+\[[xX]]\s+.*""")) -> {
+                    append("$pad☑ ")
                     pushStyle(SpanStyle(textDecoration = TextDecoration.LineThrough, color = faint))
-                    inline(raw.substringAfter("] "))
+                    inline(line.substringAfter("] "))
                     pop()
                 }
-                raw.matches(Regex("""^\s*[-*+]\s+.*""")) -> {
-                    append(raw.takeWhile { it == ' ' } + "• ")
-                    inline(raw.trimStart().drop(1).trimStart())
+                line.matches(Regex("""^[-*+]\s+.*""")) -> {
+                    append("$pad• ")
+                    inline(line.drop(1).trimStart())
                 }
-                raw.startsWith(">") -> {
+                numbered != null -> {
+                    append("$pad${numbered.groupValues[1]} ")
+                    inline(numbered.groupValues[2])
+                }
+                line.startsWith(">") -> {
                     pushStyle(SpanStyle(fontStyle = FontStyle.Italic, color = faint))
-                    inline(raw.removePrefix(">").trimStart())
+                    inline(pad + line.removePrefix(">").trimStart())
                     pop()
                 }
-                else -> inline(raw)
+                else -> inline(pad + line)
             }
         }
+    }
+
+    private const val INDENT = "\u2003"
+    private const val HIDDEN = '\u200B'
+
+    /**
+     * The note as it's drawn while you write, the same length so the cursor maps one to one: a to-do's
+     * "- [ ] " shows as a box (ticked for "- [x] "), a "- " as a bullet, and two spaces of indent as
+     * one wide one. What's saved is unchanged.
+     */
+    fun drawn(text: String): String {
+        val out = text.toCharArray()
+        var start = 0
+        text.split("\n").forEach { line ->
+            var i = 0
+            while (i + 1 < line.length && line[i] == ' ' && line[i + 1] == ' ') {
+                out[start + i] = INDENT[0]
+                out[start + i + 1] = HIDDEN
+                i += 2
+            }
+            val rest = line.substring(i)
+            val box = Regex("""^[-*] \[([ xX])] """).find(rest)
+            if (box != null) {
+                val at = start + i
+                out[at] = HIDDEN
+                out[at + 1] = HIDDEN
+                out[at + 2] = if (box.groupValues[1].isBlank()) '☐' else '☑'
+                out[at + 3] = HIDDEN
+                out[at + 4] = HIDDEN
+            } else if (Regex("""^[-*+] """).containsMatchIn(rest)) {
+                out[start + i] = '•'
+            }
+            start += line.length + 1
+        }
+        return String(out)
+    }
+
+    private val checkbox = Regex("""^(\s*)[-*] \[([ xX])] """)
+
+    /**
+     * A tap on a to-do's box ticks it, or unticks it: [new] only moved the cursor there from elsewhere.
+     * The cursor then goes to the end of the line. Null when it was anything else.
+     */
+    fun tickOnTap(old: TextFieldValue, new: TextFieldValue): TextFieldValue? {
+        if (new.text != old.text || !new.selection.collapsed || new.selection == old.selection) return null
+        val at = new.selection.start
+        val lineStart = new.text.lastIndexOf('\n', at - 1) + 1
+        val lineEnd = new.text.indexOf('\n', at).let { if (it < 0) new.text.length else it }
+        val m = checkbox.find(new.text.substring(lineStart, lineEnd)) ?: return null
+        val boxAt = lineStart + m.groupValues[1].length
+        if (at !in boxAt..boxAt + 5) return null
+        val mark = lineStart + m.groups[2]!!.range.first
+        val text = new.text.replaceRange(mark, mark + 1, if (new.text[mark] == ' ') "x" else " ")
+        return TextFieldValue(text, TextRange(lineEnd))
     }
 
     private fun AnnotatedString.Builder.inline(line: String) {
@@ -76,7 +139,7 @@ object Markdown {
      * to-dos and quotes set off. The Markdown marks stay, faint, so what you see is what's saved.
      */
     fun styled(text: String, faint: Color, accent: Color): AnnotatedString = buildAnnotatedString {
-        append(text)
+        append(drawn(text))
         val mark = SpanStyle(color = faint)
         var start = 0
         text.split("\n").forEach { line ->

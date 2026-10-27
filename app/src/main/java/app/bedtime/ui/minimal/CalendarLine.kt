@@ -30,14 +30,33 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import java.time.ZoneId
 
-/** One event from the phone's calendar, as epoch millis. An all-day one's times are UTC midnights, as Android keeps them. */
-data class CalendarEvent(val title: String, val begin: Long, val end: Long, val allDay: Boolean = false)
+/**
+ * One event from the phone's calendar, as epoch millis. An all-day one's times are UTC midnights, as
+ * Android keeps them. Where, what it says and which calendar, for its details; its id, to open it.
+ */
+data class CalendarEvent(
+    val title: String,
+    val begin: Long,
+    val end: Long,
+    val allDay: Boolean = false,
+    val id: Long = 0,
+    val location: String = "",
+    val description: String = "",
+    val calendar: String = "",
+)
 
 /**
  * The calendar already on the phone, as your calendar apps have synced it. Nothing is fetched: the
  * app has no internet permission, so this reads what's there and nothing more.
  */
 object CalendarSource {
+    /** The calendar app on [event], at this time of it (a repeating event's own day). */
+    fun openIntent(event: CalendarEvent): android.content.Intent =
+        android.content.Intent(android.content.Intent.ACTION_VIEW, ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, event.id))
+            .putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, event.begin)
+            .putExtra(CalendarContract.EXTRA_EVENT_END_TIME, event.end)
+            .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+
     fun hasPermission(context: Context): Boolean =
         ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CALENDAR) == PackageManager.PERMISSION_GRANTED
 
@@ -95,6 +114,10 @@ object CalendarSource {
             CalendarContract.Instances.BEGIN,
             CalendarContract.Instances.END,
             CalendarContract.Instances.ALL_DAY,
+            CalendarContract.Instances.EVENT_ID,
+            CalendarContract.Instances.EVENT_LOCATION,
+            CalendarContract.Instances.DESCRIPTION,
+            CalendarContract.Instances.CALENDAR_DISPLAY_NAME,
         )
         val timedOnly = if (allDay) "" else "${CalendarContract.Instances.ALL_DAY} = 0 AND "
         val selection = timedOnly + "${CalendarContract.Instances.VISIBLE} = 1 AND " +
@@ -102,7 +125,14 @@ object CalendarSource {
         return runCatching {
             context.contentResolver.query(uri, projection, selection, null, "${CalendarContract.Instances.BEGIN} ASC")?.use { c ->
                 buildList {
-                    while (c.moveToNext()) add(CalendarEvent(c.getString(0).orEmpty(), c.getLong(1), c.getLong(2), c.getInt(3) == 1))
+                    while (c.moveToNext()) {
+                        add(
+                            CalendarEvent(
+                                c.getString(0).orEmpty(), c.getLong(1), c.getLong(2), c.getInt(3) == 1,
+                                c.getLong(4), c.getString(5).orEmpty(), c.getString(6).orEmpty(), c.getString(7).orEmpty(),
+                            ),
+                        )
+                    }
                 }
             }.orEmpty()
         }.getOrDefault(emptyList())

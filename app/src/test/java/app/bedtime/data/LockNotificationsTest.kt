@@ -108,4 +108,16 @@ class LockNotificationsTest {
         // A chosen app shows whoever it's from.
         assertTrue(LockNotifications.wanted(fromBo, apps = setOf("com.whatsapp"), people = emptySet()))
     }
+
+    @Test
+    fun aSessionCanChooseItsOwnOrNone() {
+        val usual = setOf("signal") to setOf("Anna")
+        val own = Schedule(name = "Work", lockNotes = LockNotes.OWN, lockNoteApps = setOf("slack"), lockNotePeople = emptySet())
+        val none = Schedule(name = "Bed", lockNotes = LockNotes.NONE)
+        assertEquals(usual, LockNotifications.chosen(usual.first, usual.second, emptyList()))
+        assertEquals(usual, LockNotifications.chosen(usual.first, usual.second, listOf(Schedule())))
+        assertEquals(setOf("slack") to emptySet<String>(), LockNotifications.chosen(usual.first, usual.second, listOf(Schedule(), own)))
+        // The strictest wins.
+        assertEquals(null, LockNotifications.chosen(usual.first, usual.second, listOf(own, none)))
+    }
 }

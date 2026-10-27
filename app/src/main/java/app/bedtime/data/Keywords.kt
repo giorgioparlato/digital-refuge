@@ -29,7 +29,7 @@ object Keywords {
         put(SearchOrder.REFUGE_NOTES, "n")
         put(SearchOrder.CALENDAR, "c")
         put(SearchOrder.CONTACTS, "@")
-        notes.forEach { put(SearchOrder.noteKey(it), it.name.filter { c -> c.isLetterOrDigit() }.take(2).lowercase()) }
+        notes.forEach { put(SearchOrder.noteKey(it), if (it.uri == Notes.TODO.uri) "td" else it.name.filter { c -> c.isLetterOrDigit() }.take(2).lowercase()) }
         return out
     }
 

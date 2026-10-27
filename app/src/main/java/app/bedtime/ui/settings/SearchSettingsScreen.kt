@@ -96,7 +96,7 @@ fun SearchSettingsScreen(onBack: () -> Unit) {
     val current = settings ?: return
     val targets = found ?: return
     val obsidian = remember { AppCatalog.isLaunchable(context, FolderIndex.OBSIDIAN) }
-    val choices = SearchOrder.arrange(SearchOrder.defaults(targets, current.noteTargets, obsidian), current.searchChoices)
+    val choices = SearchOrder.arrange(SearchOrder.defaults(targets, current.quickTargets, obsidian), current.searchChoices)
     val vaultName by produceState<String?>(null, current.obsidianVault) {
         value = current.obsidianVault?.let { withContext(Dispatchers.IO) { FolderIndex.folderName(context, Uri.parse(it)) } }
     }
@@ -104,7 +104,7 @@ fun SearchSettingsScreen(onBack: () -> Unit) {
         value = withContext(Dispatchers.IO) { current.fileFolders.map { FolderIndex.folderName(context, Uri.parse(it)) } }
     }
     val labels = targets.associate { it.key to it.choiceLabel() } +
-        current.noteTargets.associate { SearchOrder.noteKey(it) to "Add to ${it.name}" } +
+        current.quickTargets.associate { SearchOrder.noteKey(it) to "Add to ${it.name}" } +
         mapOf(
             SearchOrder.REFUGE_NOTES to "Save in refuge notes",
             SearchOrder.CALENDAR to "Add to calendar, when the words say when",
@@ -151,7 +151,7 @@ fun SearchSettingsScreen(onBack: () -> Unit) {
         waitingContacts?.let { updated -> if (granted) save(updated) }
         waitingContacts = null
     }
-    val keywords = Keywords.effective(current.keywords, current.keywordsCustom, Keywords.defaults(choices, current.noteTargets))
+    val keywords = Keywords.effective(current.keywords, current.keywordsCustom, Keywords.defaults(choices, current.quickTargets))
     val chatApps = remember { ContactSearch.chatApps(context) }
     SearchSettingsContent(
         choices = choices.map { it to (labels[it.key] ?: it.key) },

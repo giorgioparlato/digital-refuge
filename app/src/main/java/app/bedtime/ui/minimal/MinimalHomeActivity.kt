@@ -1,5 +1,11 @@
 package app.bedtime.ui.minimal
 
+import app.bedtime.ui.components.rememberNowPlaying
+import app.bedtime.ui.components.NowPlayingWidget
+import app.bedtime.data.Habits
+import app.bedtime.ui.habits.rememberHabits
+import app.bedtime.ui.habits.HabitDetailContent
+import app.bedtime.ui.habits.HabitsWidget
 import app.bedtime.data.Keywords
 import app.bedtime.data.Module
 import app.bedtime.data.Modules
@@ -237,6 +243,9 @@ private fun MinimalHomeScreen(
     var quickNote by rememberSaveable { mutableStateOf(false) }
     var hoursDetail by remember { mutableStateOf(false) }
     val todayHours = rememberTodayHours()
+    val (habitList, habitMarks) = rememberHabits()
+    val nowPlaying = if (Modules.isOn(settings.homeStyle, Screen.HOME, Module.NOW_PLAYING)) rememberNowPlaying() else null
+    var openHabit by remember { mutableStateOf<String?>(null) }
     // Looked for when the drawer first opens, so Home itself comes up at once.
     val searchTargets by produceState(emptyList<SearchTarget>(), drawer) {
         if (drawer && value.isEmpty()) value = withContext(Dispatchers.IO) { SearchTargets.find(context) }
@@ -355,9 +364,9 @@ private fun MinimalHomeScreen(
             else -> AppCatalog.launch(context, action)
         }
     }
-    val searchChoices = SearchOrder.arrange(SearchOrder.defaults(searchTargets, settings.noteTargets, obsidian), settings.searchChoices)
+    val searchChoices = SearchOrder.arrange(SearchOrder.defaults(searchTargets, settings.quickTargets, obsidian), settings.searchChoices)
     // A keyword first ("m cafe") sends the words after it straight to one place.
-    val keywords = Keywords.effective(settings.keywords, settings.keywordsCustom, Keywords.defaults(searchChoices, settings.noteTargets))
+    val keywords = Keywords.effective(settings.keywords, settings.keywordsCustom, Keywords.defaults(searchChoices, settings.quickTargets))
     val keyword = Keywords.match(query, keywords)
     val words = keyword?.words ?: query.trim()
     // Contacts are looked up as you type, only when you've switched them on in the search or used their keyword.
@@ -466,7 +475,7 @@ private fun MinimalHomeScreen(
                     query,
                     openable,
                     SearchTargets.offered(searchTargets, openablePackages),
-                    settings.noteTargets,
+                    settings.quickTargets,
                     EventParser.parse(words, LocalDateTime.now()),
                     searchChoices,
                     contacts,
@@ -539,6 +548,20 @@ private fun MinimalHomeScreen(
             onCalendar = { scope.launch { week = loadCalendarWeek(context, LocalDateTime.now()) } },
             onOpenDrawer = { drawer = true },
             onOpenRefuge = { AppCatalog.launch(context, context.packageName) },
+            nowPlaying = nowPlaying?.takeIf { Modules.isOn(style, Screen.HOME, Module.NOW_PLAYING) }?.let { playing ->
+                { NowPlayingWidget(playing, style.palette().text, style.palette().faint, Modifier.padding(top = 12.dp)) }
+            },
+            habits = habitList.takeIf { it.isNotEmpty() && Modules.isOn(style, Screen.HOME, Module.HABITS) }?.let { list ->
+                {
+                    val today = HourlyUse.today()
+                    HabitsWidget(
+                        list, habitMarks, today, style.palette().text, style.palette().faint, style.palette().accent,
+                        Modifier.padding(top = 14.dp),
+                        onTap = { h -> scope.launch { repo.markHabit(h.id, today, Habits.tapped(h, habitMarks[h.id]?.get(today) ?: 0)) } },
+                        onOpen = { openHabit = it.id },
+                    )
+                }
+            },
             onGesture = onGesture,
             hours = todayHours.takeIf { Modules.isOn(style, Screen.HOME, Module.HOURS) && HourlyUse.counting(settings) }
                 ?.let { HourlyUse.states(it, now.hour, HourlyUse.rule(settings)) },
@@ -548,8 +571,22 @@ private fun MinimalHomeScreen(
             onNextQuote = { quoteOffset++ },
         )
     }
-    week?.let { CalendarWeekDialog(it, style, onDismiss = { week = null }) }
-    if (quickNote) QuickNoteDialog(style, settings.noteTargets, onSave = saveNote, onDismiss = { quickNote = false })
+    week?.let {
+        CalendarWeekDialog(it, style, onDismiss = { week = null }, onOpenEvent = { event ->
+            runCatching { context.startActivity(CalendarSource.openIntent(event)) }
+                .onFailure { Toast.makeText(context, "no calendar app opened it", Toast.LENGTH_SHORT).show() }
+            week = null
+        })
+    }
+    habitList.firstOrNull { it.id == openHabit }?.let { habit ->
+        val p = style.palette()
+        androidx.compose.ui.window.Dialog(onDismissRequest = { openHabit = null }) {
+            HabitDetailContent(habit, habitMarks[habit.id].orEmpty(), HourlyUse.today(), p.background, p.text, p.faint, p.accent, onSet = { day, value ->
+                scope.launch { repo.markHabit(habit.id, day, value) }
+            })
+        }
+    }
+    if (quickNote) QuickNoteDialog(style, settings.quickTargets, onSave = saveNote, onDismiss = { quickNote = false })
     if (hoursDetail) {
         val p = style.palette()
         HourDetailDialog(todayHours, HourlyUse.rule(settings), p.background, p.text, p.faint, p.accent, onDismiss = { hoursDetail = false })
@@ -586,7 +623,7 @@ private fun MinimalHomeScreen(
                 setKeyword = { typed ->
                     val key = Keywords.appKey(app.packageName)
                     val clean = Keywords.clean(typed)
-                    val now = Keywords.effective(settings.keywords, settings.keywordsCustom, Keywords.defaults(searchChoices, settings.noteTargets))
+                    val now = Keywords.effective(settings.keywords, settings.keywordsCustom, Keywords.defaults(searchChoices, settings.quickTargets))
                     save { s -> s.copy(keywords = if (clean.isEmpty()) now - key else now + (key to clean), keywordsCustom = true) }
                 },
             ),
@@ -640,6 +677,9 @@ internal fun MinimalHomeContent(
     onOpenRefuge: () -> Unit = {},
     /** The session's mark on its pill. */
     scheduleIcon: String? = null,
+    /** The habits and now-playing widgets, drawn by the screen, when they're on. */
+    habits: (@Composable () -> Unit)? = null,
+    nowPlaying: (@Composable () -> Unit)? = null,
     preview: Boolean = false,
 ) {
     val p = style.palette()
@@ -715,6 +755,8 @@ internal fun MinimalHomeContent(
                     }
                 },
                 quote = quote?.let { q -> { HomeQuote(q, style, preview, quoteFavourite, onQuoteFavourite, onQuoteHide, onNextQuote) } },
+                habits = habits,
+                nowPlaying = nowPlaying,
             )
             Spacer(Modifier.height(if (preview) 28.dp else 44.dp))
             LazyColumn(Modifier.weight(1f).fillMaxWidth().nestedScroll(overscroll)) {

@@ -23,6 +23,8 @@ class NotesTest {
     fun markdownReadsAsText() {
         val shown = Markdown.render("# Films\n- [ ] Perfect Days\n- [x] **Paterson**\n* a `note` with [a link](https://x)\n> a quote").text
         assertEquals("Films\n☐ Perfect Days\n☑ Paterson\n• a note with a link\na quote", shown)
+        // Indented items keep their indent, a wide space for every two; numbers stay.
+        assertEquals("☐ a\n\u2003☐ b\n\u2003\u2003• c\n1. d", Markdown.render("- [ ] a\n  - [ ] b\n    - c\n1. d").text)
     }
 
     @Test
@@ -49,8 +51,26 @@ class NotesTest {
 
     @Test
     fun liveMarkdownKeepsEveryCharacter() {
-        val text = "# Films\n- [ ] **Perfect** *Days* `x` [a](b)"
+        val text = "# Films\n**Perfect** *Days* `x` [a](b)"
         assertEquals(text, Markdown.styled(text, androidx.compose.ui.graphics.Color.Gray, androidx.compose.ui.graphics.Color.Green).text)
+        // Boxes, bullets and indents are drawn as such, one character for one, so the cursor still maps.
+        val list = "- [ ] milk\n  - [x] eggs\n- bread"
+        val drawn = Markdown.drawn(list)
+        assertEquals(list.length, drawn.length)
+        assertEquals("milk\neggs\nbread", drawn.filter { it.isLetter() || it == '\n' })
+        assertEquals(listOf('☐', '☑', '•'), drawn.filter { it in "☐☑•" }.toList())
+    }
+
+    @Test
+    fun aTapOnABoxTicksIt() {
+        fun v(text: String, at: Int) = androidx.compose.ui.text.input.TextFieldValue(text, androidx.compose.ui.text.TextRange(at))
+        val text = "- [ ] milk\n  - [x] eggs"
+        // The cursor moving onto the box ticks it and goes to the line's end.
+        assertEquals(v("- [x] milk\n  - [x] eggs", 10), Markdown.tickOnTap(v(text, 20), v(text, 2)))
+        assertEquals(v("- [ ] milk\n  - [ ] eggs", 23), Markdown.tickOnTap(v(text, 0), v(text, 14)))
+        // Onto the words, or typing, is just that.
+        assertEquals(null, Markdown.tickOnTap(v(text, 0), v(text, 8)))
+        assertEquals(null, Markdown.tickOnTap(v(text, 0), v(text + "x", 24)))
     }
 
     @Test

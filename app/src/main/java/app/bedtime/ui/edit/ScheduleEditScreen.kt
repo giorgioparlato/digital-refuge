@@ -1,5 +1,9 @@
 package app.bedtime.ui.edit
 
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.compose.material.icons.filled.Person
+import app.bedtime.data.LockNotes
 import app.bedtime.ui.components.ScheduleIcons
 import app.bedtime.ui.components.ScheduleIconDialog
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -139,6 +143,8 @@ private val ScheduleSaver = Saver<Schedule, String>(
 
 private const val PICK_BLOCKED = "blocked"
 private const val PICK_ALLOWED = "allowed"
+private const val PICK_NOTE_APPS = "note-apps"
+private const val PICK_NOTE_PEOPLE = "note-people"
 /**
  * Why [draft] can't be saved yet, or null if it can. [newPassword] is what has been typed into the
  * password field, which stands in for a password the schedule doesn't have stored yet.
@@ -242,6 +248,10 @@ fun ScheduleEditScreen(
     val readOnly = running || lockedUntil != null || shutWindow != null
     val dirty = !readOnly && (draft != original || newPassword.isNotEmpty())
 
+    // People are picked from your contacts, asked for the first time they're needed.
+    val askContacts = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) picking = PICK_NOTE_PEOPLE
+    }
     when (picking) {
         PICK_BLOCKED -> {
             AppPickerScreen("Apps to block", draft.blockedApps, PickerMode.BLOCK, onDone = {
@@ -253,6 +263,20 @@ fun ScheduleEditScreen(
         PICK_ALLOWED -> {
             AppPickerScreen("Apps to allow", draft.allowedApps, PickerMode.ALLOW, onDone = {
                 draft = draft.copy(allowedApps = it)
+                picking = null
+            }, onBack = { picking = null })
+            return
+        }
+        PICK_NOTE_APPS -> {
+            AppPickerScreen("Notifications from", draft.lockNoteApps, PickerMode.NOTIFY, onDone = {
+                draft = draft.copy(lockNoteApps = it)
+                picking = null
+            }, onBack = { picking = null })
+            return
+        }
+        PICK_NOTE_PEOPLE -> {
+            app.bedtime.ui.settings.PeoplePickerScreen("Notifications from", draft.lockNotePeople, onDone = {
+                draft = draft.copy(lockNotePeople = it)
                 picking = null
             }, onBack = { picking = null })
             return
@@ -370,6 +394,10 @@ fun ScheduleEditScreen(
         onUnlock = { scheduleId?.let(onUnlock) },
         onPickBlocked = { picking = PICK_BLOCKED },
         onPickAllowed = { picking = PICK_ALLOWED },
+        onPickNoteApps = { picking = PICK_NOTE_APPS },
+        onPickNotePeople = {
+            if (app.bedtime.data.ContactSearch.canRead(context)) picking = PICK_NOTE_PEOPLE else askContacts.launch(android.Manifest.permission.READ_CONTACTS)
+        },
         onEditStart = { editingTime = TIME_START },
         onEditEnd = { editingTime = TIME_END },
         onEditWindowStart = { editingTime = TIME_WINDOW_START },
@@ -441,6 +469,8 @@ internal fun ScheduleEditContent(
     onUnlock: () -> Unit,
     onPickBlocked: () -> Unit,
     onPickAllowed: () -> Unit,
+    onPickNoteApps: () -> Unit = {},
+    onPickNotePeople: () -> Unit = {},
     onEditStart: () -> Unit,
     onEditEnd: () -> Unit,
     onEditWindowStart: () -> Unit = {},
@@ -662,6 +692,46 @@ internal fun ScheduleEditContent(
                         description = "Held back while it's on, then they all come back",
                         enabled = editable,
                     ) { ObsidianToggle(draft.hideNotifications, { onDraftChange(draft.copy(hideNotifications = it)) }, enabled = editable) }
+                    Text(
+                        "On refuge's lock screen",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = c.textMuted,
+                        modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
+                    )
+                    SegmentedChoice(
+                        options = listOf("As usual", "Only these", "None"),
+                        selected = draft.lockNotes.ordinal,
+                        onSelect = { onDraftChange(draft.copy(lockNotes = LockNotes.entries[it])) },
+                        enabled = editable,
+                    )
+                    AnimatedVisibility(draft.lockNotes == LockNotes.OWN) {
+                        Column {
+                            OptionRow(
+                                Icons.Default.Notifications,
+                                "From these apps",
+                                description = if (draft.lockNoteApps.isEmpty()) "None yet" else pluralApps(draft.lockNoteApps.size),
+                                enabled = editable,
+                                onClick = onPickNoteApps,
+                            ) { Chevron() }
+                            OptionRow(
+                                Icons.Default.Person,
+                                "And these people",
+                                description = if (draft.lockNotePeople.isEmpty()) "Nobody yet" else draft.lockNotePeople.sorted().joinToString(", "),
+                                enabled = editable,
+                                onClick = onPickNotePeople,
+                            ) { Chevron() }
+                        }
+                    }
+                    Text(
+                        when (draft.lockNotes) {
+                            LockNotes.USUAL -> "The apps and people you chose for the lock screen."
+                            LockNotes.OWN -> "Only these while it runs, whatever the lock screen usually shows."
+                            LockNotes.NONE -> "Nothing on refuge's lock screen while it runs."
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = c.textMuted,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
                     AnimatedVisibility((draft.dnd != DndMode.OFF || draft.hideNotifications) && !dndAvailable) {
                         Callout(
                             title = "Needs Do Not Disturb access",

@@ -13,6 +13,20 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            58,
+            "0.9.12",
+            listOf(
+                "Habits: daily, every few days, a few times a week or month, or a count like pages or reps, each in its own colour. Tick them from the home tab, Settings → Habits, or a widget on your home and lock screen.",
+                "A to-do note, kept at the top of your notes; add to it from the search (\"td\") or a quick note.",
+                "Notes show boxes, bullets and indents as you write; tap a box to tick it.",
+                "A \"now playing\" widget with play, pause and skip.",
+                "Each schedule can choose what refuge's lock screen shows: as usual, only some apps and people, or nothing.",
+                "Tap an event in the week ahead for its details, and open it in your calendar.",
+                "Simpler gesture choices, with a search for apps; the screen-off gesture now works on phones that ignored it.",
+                "Your own colour for the hour dots, and for each habit.",
+            ),
+        ),
+        ChangelogEntry(
             57,
             "0.9.11",
             listOf(

@@ -12,6 +12,8 @@ enum class Module(val label: String) {
     EVENT("Today's next event"),
     HOURS("Today by the hour"),
     QUOTE("Quote"),
+    HABITS("Habits"),
+    NOW_PLAYING("Now playing"),
 }
 
 @Serializable
@@ -32,6 +34,9 @@ object Modules {
     fun shown(style: HomeStyle, screen: Screen): List<Module> = of(style, screen).filter { it.on }.map { it.module }
 
     fun isOn(style: HomeStyle, screen: Screen, module: Module): Boolean = module in shown(style, screen)
+
+    /** The clock and what sits with it; the session pill comes after the last of these. */
+    val CLOCK_GROUP = setOf(Module.GREETING, Module.CLOCK, Module.DATE, Module.WEATHER, Module.EVENT)
 
     fun onAnywhere(style: HomeStyle, module: Module): Boolean = Screen.entries.any { isOn(style, it, module) }
 
@@ -64,6 +69,7 @@ object Modules {
                 Module.EVENT -> style.showCalendar
                 Module.HOURS -> if (screen == Screen.HOME) style.hoursOnHome else style.hoursOnLock
                 Module.QUOTE -> style.showQuote
+                Module.HABITS, Module.NOW_PLAYING -> false
             },
         )
     }

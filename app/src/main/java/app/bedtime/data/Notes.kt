@@ -46,6 +46,12 @@ object Notes {
     /** How many files quick notes can go to, besides the app's own notes. */
     const val MAX_TARGETS = 5
 
+    /** The to-do note's id among the app's notes; it's kept first in the list. */
+    const val TODO_ID = "todo"
+
+    /** The to-do note as a place quick notes and the search can add to, each as an unticked item. */
+    val TODO = NoteTarget("To-do", "refuge:todo", NoteStyle.TASK, withDate = false)
+
     private val stamp = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
 
     /**
@@ -151,6 +157,10 @@ object Notes {
         if (target == null) {
             repo.addNote(words)
             return "saved in refuge notes"
+        }
+        if (target.uri == TODO.uri) {
+            repo.addTodo(words)
+            return "added to your to-do"
         }
         val at = LocalDateTime.now()
         val line = line(words, at, target.style, target.withDate)

@@ -5,6 +5,7 @@ import app.bedtime.data.Modules
 import app.bedtime.data.Screen
 import app.bedtime.ui.homestyle.TextPresets
 import app.bedtime.ui.homestyle.SwatchRow
+import app.bedtime.ui.homestyle.ColourChoice
 import app.bedtime.ui.homestyle.AccentPresets
 import app.bedtime.ui.components.QuickChip
 import app.bedtime.ui.components.HourDots
@@ -153,13 +154,9 @@ internal fun DistractionContent(
                     distractedColor = distractedColor,
                 )
                 Text("Calm hours", style = MaterialTheme.typography.labelMedium, color = c.textMuted, modifier = Modifier.padding(top = 8.dp, bottom = 8.dp))
-                QuickChip("Automatic", calmColor == null) { onCalmColor(null) }
-                Spacer(Modifier.height(10.dp))
-                SwatchRow(TextPresets, calmColor ?: -1L) { onCalmColor(it) }
+                ColourChoice(TextPresets, calmColor, onCalmColor, automatic = "Automatic")
                 Text("Distracted hours", style = MaterialTheme.typography.labelMedium, color = c.textMuted, modifier = Modifier.padding(top = 16.dp, bottom = 8.dp))
-                QuickChip("Accent", distractedColor == null) { onDistractedColor(null) }
-                Spacer(Modifier.height(10.dp))
-                SwatchRow(AccentPresets + DistractedPresets, distractedColor ?: -1L) { onDistractedColor(it) }
+                ColourChoice(AccentPresets + DistractedPresets, distractedColor, onDistractedColor, automatic = "Accent")
             }
             SectionCard(title = "Also show it") {
                 OptionRow(Icons.Default.Home, "On the minimal screen", description = "A row under the date") { ObsidianToggle(onHome, onShowHome) }

@@ -1,5 +1,6 @@
 package app.bedtime.data
 
+import java.time.LocalDateTime
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
@@ -41,6 +42,30 @@ class Repository private constructor(context: Context) {
 
     suspend fun editNote(id: String, text: String) = update(NOTES, notesSerializer, emptyList()) { notes ->
         notes.map { if (it.id == id) it.copy(text = text, editedAt = System.currentTimeMillis()) else it }
+    }
+
+    /** Adds [words] to the to-do note as an unticked item, starting the note if there isn't one yet. */
+    suspend fun addTodo(words: String, at: Long = System.currentTimeMillis()) = update(NOTES, notesSerializer, emptyList()) { notes ->
+        val item = Notes.line(words, LocalDateTime.now(), NoteStyle.TASK, withDate = false)
+        if (notes.none { it.id == Notes.TODO_ID }) {
+            listOf(Note(Notes.TODO_ID, "# To-do\n$item\n", at)) + notes
+        } else {
+            notes.map { if (it.id == Notes.TODO_ID) it.copy(text = Notes.appended(it.text, item), editedAt = at) else it }
+        }
+    }
+
+    /** What's been marked for each habit, by day. */
+    val habitMarks: Flow<List<HabitMark>> = observe(HABIT_MARKS, habitMarksSerializer, emptyList())
+
+    /** [habit]'s mark on [day] set to [value]; 0 takes it away. */
+    suspend fun markHabit(habit: String, day: Long, value: Int) = update(HABIT_MARKS, habitMarksSerializer, emptyList()) { marks ->
+        marks.filterNot { it.habit == habit && it.day == day } + listOfNotNull(HabitMark(habit, day, value).takeIf { value > 0 })
+    }
+
+    /** A habit gone, and its marks with it. */
+    suspend fun deleteHabit(id: String) {
+        updateSettings { it.copy(habits = it.habits.filterNot { h -> h.id == id }) }
+        update(HABIT_MARKS, habitMarksSerializer, emptyList()) { marks -> marks.filterNot { it.habit == id } }
     }
 
     suspend fun deleteNote(id: String) = update(NOTES, notesSerializer, emptyList()) { notes -> notes.filterNot { it.id == id } }
@@ -261,6 +286,7 @@ class Repository private constructor(context: Context) {
         settings = settings.first(),
         history = history.first(),
         notes = notes.first(),
+        habitMarks = habitMarks.first(),
     )
 
     /**
@@ -273,6 +299,7 @@ class Repository private constructor(context: Context) {
             prefs[SETTINGS] = AppJson.encodeToString(AppSettings.serializer(), backup.settings)
             prefs[HISTORY] = AppJson.encodeToString(historySerializer, backup.history)
             if (backup.notes.isNotEmpty()) prefs[NOTES] = AppJson.encodeToString(notesSerializer, backup.notes)
+            if (backup.habitMarks.isNotEmpty()) prefs[HABIT_MARKS] = AppJson.encodeToString(habitMarksSerializer, backup.habitMarks)
         }
     }
 
@@ -298,6 +325,8 @@ class Repository private constructor(context: Context) {
         private val NOTES = stringPreferencesKey("notes")
         private val WEATHER = stringPreferencesKey("weather")
         private val notesSerializer = ListSerializer(Note.serializer())
+        private val HABIT_MARKS = stringPreferencesKey("habit_marks")
+        private val habitMarksSerializer = ListSerializer(HabitMark.serializer())
         private val quietSerializer = MapSerializer(String.serializer(), Long.serializer())
         /** About three years of nightly sessions, or several months of a busy mix: still a small file. */
         private const val MAX_HISTORY = 1000

@@ -1,5 +1,9 @@
 package app.bedtime.ui.home
 
+import app.bedtime.ui.habits.rememberHabits
+import app.bedtime.ui.habits.HabitsWidget
+import app.bedtime.data.Habits
+import app.bedtime.data.Habit
 import app.bedtime.data.Module
 import app.bedtime.data.Modules
 import app.bedtime.data.HourRule
@@ -138,6 +142,9 @@ internal data class HomeUiState(
     val hourRule: HourRule = HourRule(5),
     val hourCalmColor: Long? = null,
     val hourDistractedColor: Long? = null,
+    /** Your habits and their marks; the section shows once there's at least one. */
+    val habits: List<Habit> = emptyList(),
+    val habitMarks: Map<String, Map<Long, Int>> = emptyMap(),
 )
 
 /** The home tab: what's running now, how the week has gone, and the blocks you can start. */
@@ -151,9 +158,11 @@ fun HomeScreen(
     onStats: () -> Unit = {},
     onNotes: () -> Unit = {},
     onDistraction: () -> Unit = {},
+    onHabits: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val repo = remember { Repository.get(context) }
+    val (habits, habitMarks) = rememberHabits()
     val notes by repo.notes.collectAsStateWithLifecycle(initialValue = emptyList())
     val hourly = rememberTodayHours()
     val scope = rememberCoroutineScope()
@@ -212,7 +221,14 @@ fun HomeScreen(
             hourRule = HourlyUse.rule(settings),
             hourCalmColor = settings.homeStyle.hourCalmColor,
             hourDistractedColor = settings.homeStyle.hourDistractedColor,
+            habits = habits,
+            habitMarks = habitMarks,
         ),
+        onHabits = onHabits,
+        onTickHabit = { habit ->
+            val today = HourlyUse.today()
+            scope.launch { repo.markHabit(habit.id, today, Habits.tapped(habit, habitMarks[habit.id]?.get(today) ?: 0)) }
+        },
         onQuoteFavourite = { quote?.let(quoteActions.favourite) },
         onQuoteHide = { quote?.let(quoteActions.hide) },
         onQuoteAnother = { quoteOffset++ },
@@ -247,6 +263,8 @@ internal fun HomeContent(
     onStats: () -> Unit = {},
     onNotes: () -> Unit = {},
     onDistraction: () -> Unit = {},
+    onHabits: () -> Unit = {},
+    onTickHabit: (Habit) -> Unit = {},
     onQuoteFavourite: () -> Unit = {},
     onQuoteHide: () -> Unit = {},
     onQuoteAnother: () -> Unit = {},
@@ -328,6 +346,27 @@ internal fun HomeContent(
             }
             item(key = "hours") {
                 HoursSection(ui.hourly, ui.hourRule, Instant.ofEpochMilli(ui.now).atZone(ZoneId.systemDefault()).hour, ui.hourCalmColor, ui.hourDistractedColor, onDistraction)
+            }
+            // Habits here once you have some; otherwise they're only in settings.
+            if (ui.habits.isNotEmpty()) {
+                item(key = "habits") {
+                    val c = Obsidian.colors
+                    Column(Modifier.padding(horizontal = PageGutter).padding(top = 22.dp)) {
+                        Row(
+                            Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable(onClickLabel = "open habits", onClick = onHabits).padding(vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text("habits", style = MaterialTheme.typography.bodyMedium, color = c.textMuted, modifier = Modifier.weight(1f))
+                            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = c.textFaint, modifier = Modifier.size(20.dp))
+                        }
+                        HabitsWidget(
+                            ui.habits, ui.habitMarks, HourlyUse.today(Instant.ofEpochMilli(ui.now).atZone(ZoneId.systemDefault()).zone),
+                            c.textNormal, c.textMuted, c.accent,
+                            onTap = onTickHabit,
+                            onOpen = { onHabits() },
+                        )
+                    }
+                }
             }
             // The week in one quiet line at the very foot; the full figures are a tap away.
             homeSummary(Stats.week(ui.history, ui.now), Stats.streak(ui.history, ui.now))?.let { summary ->

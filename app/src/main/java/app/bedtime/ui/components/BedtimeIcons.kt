@@ -91,6 +91,12 @@ object BedtimeIcons {
         }
     }
 
+    val Pause: ImageVector by lazy { icon("Pause") { path("M7,5 H10 V19 H7 Z M14,5 H17 V19 H14 Z") } }
+
+    val Next: ImageVector by lazy { icon("Next") { path("M6,6 L14.5,12 L6,18 Z M16,6 H18 V18 H16 Z") } }
+
+    val Previous: ImageVector by lazy { icon("Previous") { path("M18,6 L9.5,12 L18,18 Z M6,6 H8 V18 H6 Z") } }
+
     private const val RING = "M12,2 A10,10 0 1,1 12,22 A10,10 0 1,1 12,2 Z M12,4.5 A7.5,7.5 0 1,0 12,19.5 A7.5,7.5 0 1,0 12,4.5 Z"
 
     private fun icon(name: String, block: ImageVector.Builder.() -> Unit): ImageVector =

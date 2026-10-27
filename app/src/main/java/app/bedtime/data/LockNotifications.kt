@@ -130,6 +130,15 @@ object LockNotifications {
         return parts.take(3).joinToString(" · ") + if (parts.size > 3) " · and more" else ""
     }
 
+    /**
+     * The apps and people whose notifications the lock screen shows while [sessions] run, the strictest
+     * winning: none if any says none (null), else the first with its own choice, else your usual ones.
+     */
+    fun chosen(usualApps: Set<String>, usualPeople: Set<String>, sessions: List<Schedule>): Pair<Set<String>, Set<String>>? {
+        if (sessions.any { it.lockNotes == LockNotes.NONE }) return null
+        return sessions.firstOrNull { it.lockNotes == LockNotes.OWN }?.let { it.lockNoteApps to it.lockNotePeople } ?: (usualApps to usualPeople)
+    }
+
     /** Whether [note] is one you asked for: from one of [apps], or from one of [people] in any app. */
     fun wanted(note: LockNotification, apps: Set<String>, people: Set<String>): Boolean =
         note.packageName in apps || note.people.any { name -> people.any { it.equals(name.trim(), ignoreCase = true) } }

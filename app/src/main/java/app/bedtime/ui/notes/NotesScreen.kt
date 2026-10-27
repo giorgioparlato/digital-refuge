@@ -1,5 +1,6 @@
 package app.bedtime.ui.notes
 
+import app.bedtime.data.Notes
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.font.FontStyle
@@ -126,7 +127,8 @@ internal fun NotesContent(
             Modifier.fillMaxSize().padding(padding).padding(horizontal = PageGutter),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            items(notes, key = { it.id }) { note ->
+            // The to-do note stays at the top.
+            items(notes.sortedBy { it.id != Notes.TODO_ID }, key = { it.id }) { note ->
                 SwipeToDelete(onDelete = { onDelete(note.id) }) {
                     Column(
                         Modifier
@@ -175,7 +177,7 @@ private fun NoteEditor(initial: String, onDone: (String) -> Unit, onDelete: (() 
         Column(Modifier.fillMaxSize().padding(padding).imePadding()) {
             BasicTextField(
                 value = value,
-                onValueChange = { value = Markdown.continueList(value, it) },
+                onValueChange = { value = Markdown.tickOnTap(value, it) ?: Markdown.continueList(value, it) },
                 textStyle = MaterialTheme.typography.bodyLarge.copy(color = c.textNormal),
                 cursorBrush = SolidColor(c.accent),
                 visualTransformation = remember(c.textFaint, c.accent) { MarkdownTransformation(c.textFaint, c.accent) },

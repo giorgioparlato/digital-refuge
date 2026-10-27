@@ -108,6 +108,7 @@ object Routes {
     const val STYLE_GESTURES = "homestyle/gestures"
     const val SEARCH = "search"
     const val DISTRACTION = "distraction"
+    const val HABITS = "habits"
     const val GROUPS = "groups"
     const val ALWAYS_AVAILABLE = "alwaysavailable"
     const val ONBOARDING = "onboarding"
@@ -254,6 +255,7 @@ private fun BedtimeNavigation(pendingRoute: String?, onRouteConsumed: () -> Unit
                         onGestures = { push(Routes.STYLE_GESTURES) },
                         onSearch = { push(Routes.SEARCH) },
                         onDistraction = { push(Routes.DISTRACTION) },
+                        onHabits = { push(Routes.HABITS) },
                     )
                     else -> HomeScreen(
                         onEdit = { id -> push(Routes.EDIT + id) },
@@ -264,6 +266,7 @@ private fun BedtimeNavigation(pendingRoute: String?, onRouteConsumed: () -> Unit
                         onStats = { push(Routes.STATS) },
                         onNotes = { push(Routes.NOTES) },
                         onDistraction = { push(Routes.DISTRACTION) },
+                        onHabits = { push(Routes.HABITS) },
                     )
                 }
             }
@@ -282,6 +285,7 @@ private fun BedtimeNavigation(pendingRoute: String?, onRouteConsumed: () -> Unit
             top == Routes.STYLE_GESTURES -> HomeStyleScreen(onBack = ::pop, page = StylePage.GESTURES)
             top == Routes.SEARCH -> SearchSettingsScreen(onBack = ::pop)
             top == Routes.DISTRACTION -> DistractionScreen(onBack = ::pop)
+            top == Routes.HABITS -> app.bedtime.ui.habits.HabitsScreen(onBack = ::pop)
             top == Routes.GROUPS -> GroupsScreen(onBack = ::pop)
             top == Routes.ALWAYS_AVAILABLE -> AlwaysAvailableScreen(onBack = ::pop)
             top == Routes.ONBOARDING -> OnboardingScreen(onDone = ::pop)

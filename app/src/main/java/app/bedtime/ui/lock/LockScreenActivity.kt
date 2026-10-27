@@ -1,5 +1,10 @@
 package app.bedtime.ui.lock
 
+import app.bedtime.ui.components.rememberNowPlaying
+import app.bedtime.ui.components.NowPlayingWidget
+import app.bedtime.data.Habits
+import app.bedtime.ui.habits.rememberHabits
+import app.bedtime.ui.habits.HabitsWidget
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -122,6 +127,9 @@ class LockScreenActivity : ComponentActivity() {
         override fun onReceive(context: Context, intent: Intent) = finish()
     }
 
+    /** Black and at the lowest brightness, for phones that won't turn the screen off while locked. */
+    private val blackout = mutableStateOf(false)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
@@ -153,7 +161,17 @@ class LockScreenActivity : ComponentActivity() {
                         onAct = ::act,
                         onFinish = ::finish,
                         onLightBackground = ::useLightSystemBars,
+                        onScreenOff = ::screenOff,
+                        onConfirmed = ::unlockActLock,
                     )
+                    if (blackout.value) {
+                        Box(
+                            Modifier
+                                .fillMaxSize()
+                                .background(androidx.compose.ui.graphics.Color.Black)
+                                .pointerInput(Unit) { detectTapGestures { wake() } },
+                        )
+                    }
                 }
             }
         }
@@ -240,6 +258,33 @@ class LockScreenActivity : ComponentActivity() {
         if (action.needsUnlock) unlockActLock(send) else send()
     }
 
+    /**
+     * The screen off, as Android's own lock does. Some phones ignore that while already locked, so if the
+     * screen is still on a moment later it goes black at the lowest brightness until it sleeps as usual;
+     * a touch brings it back.
+     */
+    private fun screenOff() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) BlockingState.service?.performGlobalAction(AccessibilityService.GLOBAL_ACTION_LOCK_SCREEN)
+        lifecycleScope.launch {
+            delay(600)
+            if (getSystemService(PowerManager::class.java).isInteractive) {
+                blackout.value = true
+                window.attributes = window.attributes.apply { screenBrightness = 0f }
+            }
+        }
+    }
+
+    private fun wake() {
+        blackout.value = false
+        window.attributes = window.attributes.apply { screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE }
+    }
+
+    override fun onStop() {
+        // Asleep now, so the next wake shows the lock screen as it was.
+        if (blackout.value) wake()
+        super.onStop()
+    }
+
     /** Asks for the usual unlock, does [action], then locks the phone again; the lock screen returns with the screen. */
     private fun unlockActLock(action: () -> Unit) {
         val keyguard = getSystemService(KeyguardManager::class.java)
@@ -312,6 +357,9 @@ private fun LockScreen(
     onAct: (LockNotification, NoteAction, String?) -> Unit,
     onFinish: () -> Unit,
     onLightBackground: (Boolean) -> Unit,
+    onScreenOff: () -> Unit = {},
+    /** Asks for the usual unlock, does it, and locks the phone again: for ticking a habit from here. */
+    onConfirmed: (() -> Unit) -> Unit = { it() },
 ) {
     val context = LocalContext.current
     val repo = remember { Repository.get(context) }
@@ -323,6 +371,8 @@ private fun LockScreen(
     val scope = rememberCoroutineScope()
     val breezy = remember { Weather.APPS.firstOrNull { AppCatalog.isLaunchable(context, it) } }
     val todayHours = rememberTodayHours()
+    val (habitList, habitMarks) = rememberHabits()
+    val nowPlaying = if (Modules.isOn(settings.homeStyle, Screen.LOCK, Module.NOW_PLAYING)) rememberNowPlaying() else null
     var quickNote by remember { mutableStateOf(false) }
     // A gesture's action: a quick note or the notification shade right here, otherwise an app (the camera
     // straight away, any other once unlocked).
@@ -330,16 +380,14 @@ private fun LockScreen(
         when (action) {
             HomeActions.NOTE -> quickNote = true
             HomeActions.NOTIFICATIONS -> BlockingState.globalAction(context, AccessibilityService.GLOBAL_ACTION_NOTIFICATIONS)
-            HomeActions.LOCK -> if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
-                BlockingState.globalAction(context, AccessibilityService.GLOBAL_ACTION_LOCK_SCREEN)
-            }
+            HomeActions.LOCK -> onScreenOff()
             else -> onOpenApp(action)
         }
     }
     if (quickNote) {
         QuickNoteDialog(
             settings.homeStyle,
-            settings.noteTargets,
+            settings.quickTargets,
             onSave = { words, target -> scope.launch { Toast.makeText(context, Notes.save(context, repo, words, target), Toast.LENGTH_SHORT).show() } },
             onDismiss = { quickNote = false },
         )
@@ -378,6 +426,19 @@ private fun LockScreen(
         now = now,
         scheduleName = occurrence?.schedule?.name,
         scheduleIcon = occurrence?.schedule?.icon,
+        nowPlaying = nowPlaying?.let { playing -> { NowPlayingWidget(playing, style.palette().text, style.palette().faint, Modifier.padding(top = 12.dp)) } },
+        // Ticking from here asks for the usual unlock first, then locks again, as a reply does.
+        habits = habitList.takeIf { it.isNotEmpty() && Modules.isOn(style, Screen.LOCK, Module.HABITS) }?.let { list ->
+            {
+                val today = HourlyUse.today()
+                HabitsWidget(
+                    list, habitMarks, today, style.palette().text, style.palette().faint, style.palette().accent,
+                    Modifier.padding(top = 14.dp),
+                    onTap = { h -> onConfirmed { scope.launch { repo.markHabit(h.id, today, Habits.tapped(h, habitMarks[h.id]?.get(today) ?: 0)) } } },
+                    onOpen = {},
+                )
+            }
+        },
         until = occurrence?.let { formatTime(context, it.end) },
         style = style,
         onOpen = onOpen,
@@ -391,14 +452,14 @@ private fun LockScreen(
         onWeather = breezy?.let { app -> { onOpenApp(app) } },
         hours = todayHours.takeIf { Modules.isOn(style, Screen.LOCK, Module.HOURS) && HourlyUse.counting(settings) }
             ?.let { HourlyUse.states(it, now.hour, HourlyUse.rule(settings)) },
-        notifications = if (style.lockNotifications) {
-            val nowMs = System.currentTimeMillis()
-            notifications.filter {
-                LockNotifications.wanted(it, style.lockNotificationApps, style.lockNotificationPeople) && !LockNotifications.isQuiet(it, quiet, nowMs)
+        // A session can show its own apps and people here, or none at all.
+        notifications = LockNotifications.chosen(style.lockNotificationApps, style.lockNotificationPeople, state?.active?.map { it.schedule }.orEmpty())
+            ?.takeIf { style.lockNotifications }
+            ?.let { (apps, people) ->
+                val nowMs = System.currentTimeMillis()
+                notifications.filter { LockNotifications.wanted(it, apps, people) && !LockNotifications.isQuiet(it, quiet, nowMs) }
             }
-        } else {
-            emptyList()
-        },
+            .orEmpty(),
         listOpen = listOpen,
         onListOpen = { listOpen = it },
         quickReplies = style.quickReplies,
@@ -449,6 +510,9 @@ internal fun LockScreenContent(
     initialReplying: String? = null,
     /** The session's mark on its pill. */
     scheduleIcon: String? = null,
+    /** The habits and now-playing widgets, drawn by the screen, when they're on. */
+    habits: (@Composable () -> Unit)? = null,
+    nowPlaying: (@Composable () -> Unit)? = null,
 ) {
     var expanded by remember { mutableStateOf(initialExpanded) }
     var replying by remember { mutableStateOf(initialReplying) }
@@ -499,6 +563,8 @@ internal fun LockScreenContent(
                 now, scheduleName, until, style, calendar, weather = weather, onWeather = onWeather,
                 modules = modules,
                 scheduleIcon = scheduleIcon,
+                habits = habits,
+                nowPlaying = nowPlaying,
                 hours = hours?.let { states ->
                     {
                         HourDots(

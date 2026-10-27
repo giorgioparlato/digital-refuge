@@ -1,5 +1,7 @@
 package app.bedtime.ui.homestyle
 
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.filled.Person
 import app.bedtime.ui.settings.PeoplePickerScreen
 import app.bedtime.data.ContactSearch
@@ -622,21 +624,77 @@ private fun HomeGesture.label(): String = when (this) {
 /** What a home-screen gesture does: nothing, one of the app's own actions, or opening any app. */
 @Composable
 private fun HomeGestureDialog(gesture: HomeGesture, apps: List<AppEntry>, onDismiss: () -> Unit, onPick: (String?) -> Unit) {
+    GestureDialog(
+        title = "${gesture.label()} does",
+        actions = listOf<Pair<String?, String>>(null to "Nothing") + HomeActions.all.map { (action, label) -> action to label },
+        appsTitle = "Open an app",
+        apps = apps,
+        onDismiss = onDismiss,
+        onPick = onPick,
+    )
+}
+
+/**
+ * What a gesture does: a short list of actions, and "open an app", which turns into a search of your
+ * apps rather than a list of all of them.
+ */
+@Composable
+private fun GestureDialog(
+    title: String,
+    actions: List<Pair<String?, String>>,
+    appsTitle: String,
+    apps: List<AppEntry>,
+    onDismiss: () -> Unit,
+    onPick: (String?) -> Unit,
+) {
     val c = Obsidian.colors
+    var choosingApp by remember { mutableStateOf(false) }
+    var query by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = c.bgSecondary,
-        title = { Text("${gesture.label()} does") },
+        title = { Text(if (choosingApp) appsTitle else title) },
         text = {
-            LazyColumn(Modifier.heightIn(max = 460.dp)) {
-                item { DialogChoice("Nothing") { onPick(null) } }
-                HomeActions.all.forEach { (action, label) -> item { DialogChoice(label) { onPick(action) } } }
-                item { Text("Or open an app", style = MaterialTheme.typography.labelLarge, color = c.accentText, modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)) }
-                items(apps.size) { i -> DialogChoice(apps[i].label) { onPick(apps[i].packageName) } }
+            if (!choosingApp) {
+                Column {
+                    actions.forEach { (action, label) -> DialogChoice(label) { onPick(action) } }
+                    Row(
+                        Modifier.fillMaxWidth().clickable { choosingApp = true }.padding(vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text("$appsTitle…", style = MaterialTheme.typography.bodyLarge, color = c.accentText, modifier = Modifier.weight(1f))
+                        Chevron()
+                    }
+                }
+            } else {
+                Column {
+                    BasicTextField(
+                        value = query,
+                        onValueChange = { query = it },
+                        singleLine = true,
+                        textStyle = MaterialTheme.typography.bodyLarge.copy(color = c.textNormal),
+                        cursorBrush = SolidColor(c.accent),
+                        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).border(1.dp, c.border, RoundedCornerShape(12.dp)).padding(12.dp),
+                        decorationBox = { field ->
+                            Box {
+                                if (query.isEmpty()) Text("Search your apps", style = MaterialTheme.typography.bodyLarge, color = c.textFaint)
+                                field()
+                            }
+                        },
+                    )
+                    val shown = apps.filter { it.label.contains(query.trim(), ignoreCase = true) }
+                    LazyColumn(Modifier.heightIn(max = 380.dp).padding(top = 8.dp)) {
+                        items(shown.size) { i -> DialogChoice(shown[i].label) { onPick(shown[i].packageName) } }
+                    }
+                }
             }
         },
         confirmButton = {},
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = c.textMuted) } },
+        dismissButton = {
+            TextButton(onClick = { if (choosingApp) choosingApp = false else onDismiss() }) {
+                Text(if (choosingApp) "Back" else "Cancel", color = c.textMuted)
+            }
+        },
     )
 }
 
@@ -650,27 +708,22 @@ private fun Swipe.icon(): ImageVector = when (this) {
     Swipe.RIGHT -> Icons.AutoMirrored.Filled.KeyboardArrowRight
 }
 
-/** What a swipe opens: nothing (it just unlocks), the camera, or any app on the phone. */
+/** What a lock-screen gesture does: nothing (a swipe just unlocks), an action right here, or an app once unlocked. */
 @Composable
 private fun SwipeTargetDialog(swipe: Swipe, apps: List<AppEntry>, onDismiss: () -> Unit, onPick: (String?) -> Unit) {
-    val c = Obsidian.colors
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = c.bgSecondary,
-        title = { Text("${swipe.label()} does") },
-        text = {
-            LazyColumn(Modifier.heightIn(max = 460.dp)) {
-                item { DialogChoice(if (swipe == Swipe.DOUBLE_TAP) "Nothing" else "Nothing, it just unlocks") { onPick(null) } }
-                item { DialogChoice("Camera, without unlocking") { onPick(GESTURE_CAMERA) } }
-                item { DialogChoice("Write a quick note, without unlocking") { onPick(HomeActions.NOTE) } }
-                item { DialogChoice("Show notifications") { onPick(HomeActions.NOTIFICATIONS) } }
-                item { DialogChoice("Turn the screen off") { onPick(HomeActions.LOCK) } }
-                item { Text("Or open an app, once unlocked", style = MaterialTheme.typography.labelLarge, color = c.accentText, modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)) }
-                items(apps.size) { i -> DialogChoice(apps[i].label) { onPick(apps[i].packageName) } }
-            }
-        },
-        confirmButton = {},
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = c.textMuted) } },
+    GestureDialog(
+        title = "${swipe.label()} does",
+        actions = listOf(
+            null to if (swipe == Swipe.DOUBLE_TAP) "Nothing" else "Nothing, it just unlocks",
+            GESTURE_CAMERA to "Camera, without unlocking",
+            HomeActions.NOTE to "Write a quick note, without unlocking",
+            HomeActions.NOTIFICATIONS to "Show notifications",
+            HomeActions.LOCK to "Turn the screen off",
+        ),
+        appsTitle = "Open an app, once unlocked",
+        apps = apps,
+        onDismiss = onDismiss,
+        onPick = onPick,
     )
 }
 
@@ -735,8 +788,26 @@ internal fun SwatchRow(presets: List<Pair<String, Long>>, selected: Long, onPick
     }
 }
 
+/**
+ * A colour from a set, or your own: an optional [automatic] choice (null), the swatches, and "Custom",
+ * which opens a field for any colour as #RRGGBB.
+ */
 @Composable
-private fun HexField(value: Long, onPick: (Long) -> Unit) {
+internal fun ColourChoice(presets: List<Pair<String, Long>>, selected: Long?, onPick: (Long?) -> Unit, automatic: String? = null) {
+    var custom by remember { mutableStateOf(selected != null && presets.none { it.second == selected }) }
+    Column {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (automatic != null) QuickChip(automatic, selected == null && !custom) { custom = false; onPick(null) }
+            QuickChip("Custom", custom) { custom = !custom }
+        }
+        Spacer(Modifier.height(10.dp))
+        SwatchRow(presets, if (custom) -1L else selected ?: -1L) { custom = false; onPick(it) }
+        if (custom) HexField(selected ?: presets.first().second) { onPick(it) }
+    }
+}
+
+@Composable
+internal fun HexField(value: Long, onPick: (Long) -> Unit) {
     var text by remember(value) { mutableStateOf(value.toHexColor()) }
     ObsidianTextField(
         value = text,

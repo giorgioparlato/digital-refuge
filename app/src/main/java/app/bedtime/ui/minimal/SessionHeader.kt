@@ -75,6 +75,8 @@ internal fun SessionHeader(
     /** Today by the hour and the quote, drawn by the screen itself, in their places. */
     hours: (@Composable () -> Unit)? = null,
     quote: (@Composable () -> Unit)? = null,
+    habits: (@Composable () -> Unit)? = null,
+    nowPlaying: (@Composable () -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val p = style.palette()
@@ -86,7 +88,7 @@ internal fun SessionHeader(
     val detailOnDate = detail && weatherAt > 0 && modules[weatherAt - 1] == Module.DATE
     // The pill follows the last of the clock's neighbours (greeting, clock, date, weather, next event),
     // before the hours and the quote, as it always has.
-    val pillAfter = modules.indexOfLast { it != Module.HOURS && it != Module.QUOTE }
+    val pillAfter = modules.indexOfLast { it in Modules.CLOCK_GROUP }
     Column {
         if (pillAfter < 0) SessionPill(scheduleName, until, scheduleIcon, style)
         modules.forEachIndexed { at, module ->
@@ -142,6 +144,8 @@ internal fun SessionHeader(
                 }
                 Module.HOURS -> hours?.invoke()
                 Module.QUOTE -> quote?.invoke()
+                Module.HABITS -> habits?.invoke()
+                Module.NOW_PLAYING -> nowPlaying?.invoke()
             }
             if (at == pillAfter) SessionPill(scheduleName, until, scheduleIcon, style)
         }

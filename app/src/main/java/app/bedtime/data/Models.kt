@@ -44,6 +44,10 @@ data class Schedule(
     val dnd: DndMode = DndMode.OFF,
     /** Hide filtered notifications until the session ends (uses Do Not Disturb's visual suppression). */
     val hideNotifications: Boolean = false,
+    /** What refuge's lock screen shows while this runs: your usual choice, its own apps and people, or none. */
+    val lockNotes: LockNotes = LockNotes.USUAL,
+    val lockNoteApps: Set<String> = emptySet(),
+    val lockNotePeople: Set<String> = emptySet(),
     val unlock: UnlockConfig = UnlockConfig(),
     val unlockAction: UnlockAction = UnlockAction(),
     /** Offer a short break for apps that won't run while blocking is on. Off means no way out but unlocking. */
@@ -100,6 +104,10 @@ data class UnlockConfig(
 /** What a typing challenge asks you to copy out. */
 @Serializable
 enum class TextSource { LETTERS, WORDS, PASSAGES }
+
+/** Notifications on refuge's lock screen during a session: as usual, from its own apps and people, or none. */
+@Serializable
+enum class LockNotes { USUAL, OWN, NONE }
 
 /** What a limit's pause before opening asks: a wait, or typing a little. */
 @Serializable
@@ -277,7 +285,7 @@ object HomeActions {
     /** In the order they're offered, with how each reads. */
     val all: List<Pair<String, String>> = listOf(
         NOTIFICATIONS to "Show notifications",
-        LOCK to "Lock the phone",
+        LOCK to "Turn the screen off",
         NOTE to "Write a quick note",
         SEARCH to "Search",
         NOTES to "Your notes",
@@ -320,6 +328,8 @@ data class AppSettings(
     /** Keywords for the search's choices and for apps ("app:" + package); the suggested ones until [keywordsCustom]. */
     val keywords: Map<String, String> = emptyMap(),
     val keywordsCustom: Boolean = false,
+    /** Your habits, in your order. */
+    val habits: List<Habit> = emptyList(),
     /** The messaging apps beside a contact in the search, by [ChatApp.key], in order, at most three. */
     val contactApps: List<String> = ChatApp.DEFAULT,
     /** Your Obsidian vault's folder (a tree URI), whose notes' titles the search finds; null until chosen. */
@@ -352,6 +362,9 @@ data class AppSettings(
     /** Which calendar the search adds events to; null for the first one that can take them. */
     val eventCalendarId: Long? = null,
 ) {
+    /** Where quick notes and the search can add: the to-do note first, then your files. */
+    val quickTargets: List<NoteTarget> get() = listOf(Notes.TODO) + noteTargets
+
     /** The folders the search finds files in, including the single one chosen before there could be several. */
     val fileFolders: List<String> get() = (listOfNotNull(filesFolder) + filesFolders).distinct()
 }

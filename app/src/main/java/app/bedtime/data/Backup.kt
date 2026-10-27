@@ -3,7 +3,7 @@ package app.bedtime.data
 import kotlinx.serialization.Serializable
 
 /**
- * Everything worth keeping across a reinstall, as one JSON file: schedules, settings, history and notes.
+ * Everything worth keeping across a reinstall, as one JSON file: schedules, settings, history, notes and habits.
  * Running sessions ([RuntimeState]) are left out on purpose; they're momentary.
  */
 @Serializable
@@ -14,6 +14,7 @@ data class Backup(
     val settings: AppSettings = AppSettings(),
     val history: List<SessionLog> = emptyList(),
     val notes: List<Note> = emptyList(),
+    val habitMarks: List<HabitMark> = emptyList(),
 ) {
     companion object {
         /** Raised only if a future file can no longer be read by this code. */

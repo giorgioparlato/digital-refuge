@@ -924,6 +924,19 @@ class ScreenshotTest {
         }
     }
 
+    @Test
+    fun calendarEvent() = shot {
+        Screen {
+            val zone = java.time.ZoneId.systemDefault()
+            val start = java.time.LocalDate.of(2026, 10, 26).atTime(9, 0).atZone(zone).toInstant().toEpochMilli()
+            val dentist = app.bedtime.ui.minimal.CalendarEvent(
+                "Dentist", start, start + 3_600_000L, id = 7,
+                location = "Folktandvården, Götgatan 12", description = "Bring the referral letter.\nCheck-up and cleaning.", calendar = "Personal",
+            )
+            app.bedtime.ui.minimal.CalendarWeekContent(app.bedtime.ui.minimal.calendarWeek(listOf(dentist), java.time.LocalDate.of(2026, 10, 25), zone), HomeStyle(), initial = dentist)
+        }
+    }
+
     private val drawerApps = listOf("Signal", "Maps", "Calendar", "Camera", "Clock", "Phone", "Messages", "Bank", "Authenticator", "Notes", "Weather", "Wikipedia")
         .map { app.bedtime.apps.AppEntry("pkg.$it", it) }
 
@@ -968,6 +981,59 @@ class ScreenshotTest {
                 app.bedtime.ui.minimal.DrawerResult.Search(app.bedtime.data.SearchTarget(app.bedtime.data.SearchTarget.Kind.SPOTIFY, "s", "Spotify")),
             ),
             onLaunch = {}, onResult = {}, preview = true,
+        )
+    }
+
+    private val habitToday = 20_390L
+    private val sampleHabits = listOf(
+        app.bedtime.data.Habit(id = "walk", name = "Walk outside"),
+        app.bedtime.data.Habit(id = "gym", name = "Gym", times = 3, days = 7),
+        app.bedtime.data.Habit(id = "read", name = "Read", kind = app.bedtime.data.HabitKind.COUNT, target = 20, unit = "pages"),
+    )
+    private val sampleMarks = mapOf(
+        "walk" to (habitToday - 40..habitToday - 1).filter { it % 5 != 0L }.associateWith { 1 },
+        "gym" to listOf(habitToday - 6, habitToday - 4, habitToday - 1).associateWith { 1 },
+        "read" to mapOf(habitToday - 2 to 20, habitToday - 1 to 25, habitToday to 8),
+    )
+
+    @Test
+    fun habits() = shot {
+        app.bedtime.ui.habits.HabitsContent(sampleHabits, sampleMarks, habitToday, onBack = {})
+    }
+
+    @Test
+    fun habitDetail() = shot {
+        val c = app.bedtime.ui.theme.Obsidian.colors
+        Box(Modifier.padding(16.dp)) {
+            app.bedtime.ui.habits.HabitDetailContent(sampleHabits[0], sampleMarks.getValue("walk"), habitToday, c.bgSecondary, c.textNormal, c.textMuted, c.accent, onSet = { _, _ -> })
+        }
+    }
+
+    @Test
+    fun homeHabitsAndMusic() = shot {
+        val home = app.bedtime.data.Screen.HOME
+        val style = app.bedtime.data.Modules.switched(
+            app.bedtime.data.Modules.switched(HomeStyle(), home, app.bedtime.data.Module.HABITS, true),
+            home, app.bedtime.data.Module.NOW_PLAYING, true,
+        )
+        MinimalHomeContent(
+            now = Samples.lateEvening,
+            scheduleName = null,
+            until = null,
+            apps = Samples.minimalApps,
+            style = style,
+            onLaunch = {},
+            onUnlock = null,
+            habits = {
+                app.bedtime.ui.habits.HabitsWidget(sampleHabits, sampleMarks, habitToday, androidx.compose.ui.graphics.Color(0xFFE8DCC8), androidx.compose.ui.graphics.Color(0xFF8C8478), androidx.compose.ui.graphics.Color(0xFF7FBF9A), Modifier.padding(top = 14.dp), onTap = {}, onOpen = {})
+            },
+            nowPlaying = {
+                app.bedtime.ui.components.NowPlayingWidget(
+                    app.bedtime.ui.components.NowPlaying("Holocene", "Bon Iver", playing = true),
+                    androidx.compose.ui.graphics.Color(0xFFE8DCC8), androidx.compose.ui.graphics.Color(0xFF8C8478), Modifier.padding(top = 12.dp),
+                )
+            },
+            quote = Samples.shortQuote,
         )
     }
 
