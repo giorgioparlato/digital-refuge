@@ -1,5 +1,6 @@
 package app.bedtime.ui.notes
 
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -60,8 +61,8 @@ import app.bedtime.ui.components.VerbatimText
 @Composable
 fun NoteWidgetView(
     note: Note?,
-    text: Color,
-    faint: Color,
+    screenText: Color,
+    screenFaint: Color,
     accent: Color,
     modifier: Modifier = Modifier,
     maxLines: Int = 6,
@@ -71,7 +72,13 @@ fun NoteWidgetView(
     onHold: (() -> Unit)? = null,
     /** Small, beside the clock: fewer lines and a smaller type. */
     compact: Boolean = false,
+    /** A card colour of its own; null sits it on the screen's background. */
+    card: Color? = null,
 ) {
+    // On a card of its own, words in ink or cream to suit it.
+    val onCard = card?.let { if (it.luminance() > 0.5f) Color(0xFF2B2620) else Color(0xFFEDE6DA) }
+    val text = onCard ?: screenText
+    val faint = onCard?.copy(alpha = 0.6f) ?: screenFaint
     val holdOnly = Modifier.combinedClickable(onClickLabel = "choose a note", onLongClick = onHold, onClick = { onHold?.invoke() })
     var typing by remember(note?.id) { mutableStateOf(false) }
     var value by remember(note?.id) { mutableStateOf(TextFieldValue(note?.text.orEmpty())) }
@@ -101,7 +108,11 @@ fun NoteWidgetView(
         }
         if (!typing) keyboardSeen = false
     }
-    Column(modifier.fillMaxWidth()) {
+    Column(
+        modifier
+            .fillMaxWidth()
+            .then(if (card != null) Modifier.clip(RoundedCornerShape(18.dp)).background(card).padding(horizontal = 16.dp, vertical = 12.dp) else Modifier),
+    ) {
         if (note == null) {
             Text("hold here to choose a note to show", style = MaterialTheme.typography.bodyMedium, color = faint, modifier = Modifier.clip(RoundedCornerShape(8.dp)).then(holdOnly))
             return@Column

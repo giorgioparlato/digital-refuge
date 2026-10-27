@@ -264,6 +264,8 @@ data class HomeStyle(
     val noteWidgetId: String? = null,
     /** How many of the note's lines the note widget shows. */
     val noteLines: Int = 6,
+    /** The note widget's own card colour, ARGB; null leaves it on the screen's background. */
+    val noteBackground: Long? = null,
     /** The note beside the clock rather than in the list, on the home screen and on the lock screen; only with a small clock and no weather beside it. */
     val noteBesideClock: Boolean = false,
     val lockNoteBesideClock: Boolean = false,

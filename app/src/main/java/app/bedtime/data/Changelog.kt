@@ -20,6 +20,7 @@ object Changelog {
                 "To-do boxes look like boxes: soft squares, filled with a tick when done, as you write and on your screens.",
                 "Hold an empty spot on your home or lock screen to switch its widgets on or off, or go to its settings.",
                 "The note beside the clock has a column of its own on the right.",
+                "The note widget can have a background colour of its own.",
                 "The weather's style, and which habits the widget shows, can differ between the home and lock screen.",
                 "The home tab's line shows your time in distracting apps this week.",
             ),

@@ -485,6 +485,13 @@ internal fun HomeStyleContent(
                         selected = lineChoices.indexOf(style.noteLines).coerceAtLeast(0),
                         onSelect = { onChange(style.copy(noteLines = lineChoices[it])) },
                     )
+                    SizeLabel("Its background", Modifier.padding(top = 16.dp, bottom = 8.dp))
+                    ColourChoice(
+                        BackgroundPresets + AccentPresets,
+                        style.noteBackground,
+                        { onChange(style.copy(noteBackground = it)) },
+                        automatic = "The screen's own",
+                    )
                     val fits = style.noteFitsBesideClock(widgetScreen)
                     OptionRow(
                         Icons.Default.DateRange,

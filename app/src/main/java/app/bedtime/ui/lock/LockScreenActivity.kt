@@ -531,6 +531,7 @@ private fun LockScreen(
                     style.palette().text, style.palette().faint, style.palette().accent,
                     Modifier.padding(top = 22.dp),
                     maxLines = style.noteLines,
+                    card = style.noteBackground?.let { androidx.compose.ui.graphics.Color(it) },
                     onToggle = { i -> widgetNote?.let { n -> scope.launch { repo.editNote(n.id, NoteWidget.toggled(n.text, i)) } } },
                     onSave = { written -> widgetNote?.let { n -> scope.launch { repo.editNote(n.id, written) } } },
                     onHold = { holding = Module.NOTE },
