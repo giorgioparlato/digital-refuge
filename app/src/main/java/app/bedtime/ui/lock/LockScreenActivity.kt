@@ -20,7 +20,10 @@ import app.bedtime.data.HomeActions
 import app.bedtime.ui.components.StatusBarVisibility
 import app.bedtime.ui.components.rememberTodayHours
 import app.bedtime.data.HourlyUse
+import app.bedtime.data.Timers
 import app.bedtime.ui.components.HourDots
+import app.bedtime.ui.components.rememberUseToday
+import app.bedtime.ui.components.useWidgetSlot
 import app.bedtime.data.HourState
 import app.bedtime.data.Weather
 import app.bedtime.data.WeatherView
@@ -382,7 +385,7 @@ private fun LockScreen(
     val quiet by repo.lockQuiet.collectAsStateWithLifecycle(initialValue = emptyMap())
     val scope = rememberCoroutineScope()
     val breezy = remember { Weather.APPS.firstOrNull { AppCatalog.isLaunchable(context, it) } }
-    val todayHours = rememberTodayHours()
+    val (todayHours, useToday) = rememberUseToday()
     val (habitList, habitMarks) = rememberHabits()
     // A session can bring its own widgets.
     val sessionStyle = Modules.during(settings.homeStyle, state?.active.orEmpty().map { it.start to it.schedule })
@@ -465,7 +468,7 @@ private fun LockScreen(
                 },
                 change = { changed ->
                     onConfirmed {
-                        scope.launch { repo.updateSettings { s -> s.copy(homeStyle = s.homeStyle.copy(weatherStyle = changed.weatherStyle, lockWeatherStyle = changed.lockWeatherStyle, clockSize = changed.clockSize, quoteRefresh = changed.quoteRefresh, noteWidgetId = changed.noteWidgetId, noteLines = changed.noteLines, noteBesideClock = changed.noteBesideClock, lockNoteBesideClock = changed.lockNoteBesideClock, calendarIconWhenEmpty = changed.calendarIconWhenEmpty, lockCalendarIconWhenEmpty = changed.lockCalendarIconWhenEmpty)) } }
+                        scope.launch { repo.updateSettings { s -> s.copy(homeStyle = s.homeStyle.copy(weatherStyle = changed.weatherStyle, lockWeatherStyle = changed.lockWeatherStyle, clockSize = changed.clockSize, quoteRefresh = changed.quoteRefresh, noteWidgetId = changed.noteWidgetId, noteLines = changed.noteLines, noteTextSize = changed.noteTextSize, noteBesideClock = changed.noteBesideClock, lockNoteBesideClock = changed.lockNoteBesideClock, calendarIconWhenEmpty = changed.calendarIconWhenEmpty, lockCalendarIconWhenEmpty = changed.lockCalendarIconWhenEmpty, calendarTomorrow = changed.calendarTomorrow, useWidget = changed.useWidget, lockUseWidget = changed.lockUseWidget, noteDarkText = changed.noteDarkText)) } }
                     }
                 },
                 open = onOpenRoute,
@@ -483,6 +486,7 @@ private fun LockScreen(
             settings.quickTargets,
             onSave = { words, target -> scope.launch { Toast.makeText(context, Notes.save(context, repo, words, target), Toast.LENGTH_SHORT).show() } },
             onDismiss = { quickNote = false },
+            vault = settings.obsidianVault,
         )
     }
     // The list folds back to its summary line whenever the screen goes off.
@@ -507,6 +511,10 @@ private fun LockScreen(
             delay(1_000)
         }
     }
+    // Timers counting down: those set from the search, and the clock app's own.
+    val refugeTimers by repo.timers.collectAsStateWithLifecycle(initialValue = emptyList())
+    val clockTimers by app.bedtime.data.Timers.clock.collectAsStateWithLifecycle()
+    val hiddenTimers by app.bedtime.data.Timers.hidden.collectAsStateWithLifecycle()
 
     if (loadedSettings == null || (occurrence == null && !always)) {
         Box(Modifier.fillMaxSize().background(style.palette().background))
@@ -517,6 +525,8 @@ private fun LockScreen(
     val quietUntil = occurrence?.end ?: nextMorning(now)
     LockScreenContent(
         now = now,
+        timers = app.bedtime.data.Timers.running(refugeTimers, clockTimers, System.currentTimeMillis(), hiddenTimers),
+        onHideTimer = app.bedtime.data.Timers::hide,
         scheduleName = occurrence?.schedule?.name,
         scheduleIcon = occurrence?.schedule?.icon,
         nowPlaying = nowPlaying?.let { playing -> { NowPlayingWidget(playing, style.palette().text, style.palette().faint, Modifier.padding(top = 20.dp), onOpen = onOpenApp) } },
@@ -532,6 +542,8 @@ private fun LockScreen(
                     Modifier.padding(top = 22.dp),
                     maxLines = style.noteLines,
                     card = style.noteBackground?.let { androidx.compose.ui.graphics.Color(it) },
+                    darkText = style.noteDarkText,
+                    textScale = style.noteTextSize.scale,
                     onToggle = { i -> widgetNote?.let { n -> scope.launch { repo.editNote(n.id, NoteWidget.toggled(n.text, i)) } } },
                     onSave = { written -> widgetNote?.let { n -> scope.launch { repo.editNote(n.id, written) } } },
                     onHold = { holding = Module.NOTE },
@@ -545,7 +557,8 @@ private fun LockScreen(
                 NoteWidgetView(
                     widgetNote,
                     style.palette().text, style.palette().faint, style.palette().accent,
-                    maxLines = 3,
+                    maxLines = style.noteLines.coerceAtMost(3),
+                    textScale = style.noteTextSize.scale,
                     compact = true,
                     onToggle = { i -> widgetNote?.let { n -> scope.launch { repo.editNote(n.id, NoteWidget.toggled(n.text, i)) } } },
                     onSave = { written -> widgetNote?.let { n -> scope.launch { repo.editNote(n.id, written) } } },
@@ -584,6 +597,7 @@ private fun LockScreen(
         onWeather = breezy?.let { app -> { onOpenApp(app) } },
         hours = todayHours.takeIf { Modules.isOn(style, Screen.LOCK, Module.HOURS) && HourlyUse.counting(settings) }
             ?.let { HourlyUse.states(it, now.hour, HourlyUse.rule(settings)) },
+        useToday = useToday.takeIf { Modules.isOn(style, Screen.LOCK, Module.HOURS) },
         // A session can show its own apps and people here, or none at all.
         notifications = LockNotifications.chosen(style.lockNotificationApps, style.lockNotificationPeople, state?.active?.map { it.schedule }.orEmpty())
             ?.takeIf { style.lockNotifications }
@@ -614,6 +628,9 @@ private fun LockScreen(
 @Composable
 internal fun LockScreenContent(
     now: LocalDateTime,
+    /** Running timers' ends, soonest first: each a line counting down, swiped away with [onHideTimer]. */
+    timers: List<Long> = emptyList(),
+    onHideTimer: (Long) -> Unit = {},
     /** The session in the pill; null outside sessions, and there's no pill. */
     scheduleName: String?,
     until: String?,
@@ -629,6 +646,8 @@ internal fun LockScreenContent(
     onWeather: (() -> Unit)? = null,
     /** Today by the hour, when it's shown here. */
     hours: List<HourState>? = null,
+    /** Today's figures, for the tracker's looks other than the dots and the line under them. */
+    useToday: app.bedtime.data.UseToday? = null,
     /** A double tap anywhere, when you've set one; a single tap then waits a moment to be sure. */
     onDoubleTap: (() -> Unit)? = null,
     /** A pull down from the very top: the notification shade. */
@@ -695,43 +714,39 @@ internal fun LockScreenContent(
                 .padding(horizontal = 28.dp)
                 .padding(bottom = 24.dp),
         ) {
-            Spacer(Modifier.height(if (preview) 12.dp else (style.lockTopSpace ?: style.topSpace).dp.dp))
             // The quote keeps its place at the foot when it's the last widget, as it always has; anywhere else it's in line.
             val modules = Modules.shown(style, Screen.LOCK)
             val quoteAtFoot = modules.lastOrNull() == Module.QUOTE
-            SessionHeader(
-                now, scheduleName, until, style, calendar, onCalendar, weather = weather, onWeather = onWeather,
-                modules = modules,
-                scheduleIcon = scheduleIcon,
-                habits = habits,
-                nowPlaying = nowPlaying,
-                note = note,
-                noteBeside = noteBeside,
-                onHold = onWidgetHold,
-                screen = Screen.LOCK,
-                hours = hours?.let { states ->
-                    {
-                        HourDots(
-                            states,
-                            text = style.palette().text,
-                            accent = style.palette().accent,
-                            modifier = Modifier.padding(top = 12.dp),
-                            calmColor = style.hourCalmColor,
-                            distractedColor = style.hourDistractedColor,
-                            onClick = onHours,
-                            onLongClick = onWidgetHold?.let { { it(Module.HOURS) } },
-                        )
-                    }
-                },
-                quote = quote?.takeIf { !quoteAtFoot }?.let { q ->
-                    {
-                        Spacer(Modifier.height(24.dp))
-                        QuoteBlock(q, style)
-                    }
-                },
-            )
+            // While a reply is being written, the widgets step aside: the conversation and the box get the
+            // room above the keyboard, with only the time left at the top.
+            if (replying != null) {
+                Spacer(Modifier.height(12.dp))
+                Text(app.bedtime.ui.timeFormatter(LocalContext.current).format(now), style = MaterialTheme.typography.titleMedium, color = p.faint)
+            } else {
+                Spacer(Modifier.height(if (preview) 12.dp else (style.lockTopSpace ?: style.topSpace).dp.dp))
+                SessionHeader(
+                    now, scheduleName, until, style, calendar, onCalendar, weather = weather, onWeather = onWeather,
+                    modules = modules,
+                    scheduleIcon = scheduleIcon,
+                    habits = habits,
+                    nowPlaying = nowPlaying,
+                    note = note,
+                    noteBeside = noteBeside,
+                    onHold = onWidgetHold,
+                    screen = Screen.LOCK,
+                    hours = useWidgetSlot(style.useWidgetFor(Screen.LOCK), hours, useToday, style, onHours, onWidgetHold?.let { { it(Module.HOURS) } }),
+                    quote = quote?.takeIf { !quoteAtFoot }?.let { q ->
+                        {
+                            Spacer(Modifier.height(24.dp))
+                            QuoteBlock(q, style)
+                        }
+                    },
+                )
+                val nowMillis = now.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+                timers.forEach { end -> key(end) { TimerLine(end, nowMillis, style) { onHideTimer(end) } } }
+            }
             if (notifications.isNotEmpty()) {
-                Spacer(Modifier.height(28.dp))
+                Spacer(Modifier.height(if (replying != null) 16.dp else 28.dp))
                 NotificationArea(
                     notes = notifications,
                     style = style,
@@ -744,10 +759,10 @@ internal fun LockScreenContent(
                     replying = replying,
                     onReply = { replying = it },
                     // Open, the list takes the free space and scrolls in it; the quote and "tap to open" stay at the foot.
-                    modifier = if (listOpen) Modifier.weight(1f) else Modifier,
+                    modifier = if (listOpen || replying != null) Modifier.weight(1f) else Modifier,
                 )
             }
-            if (notifications.isEmpty() || !listOpen) Spacer(Modifier.weight(1f)) else Spacer(Modifier.height(24.dp))
+            if (notifications.isEmpty() || !(listOpen || replying != null)) Spacer(Modifier.weight(1f)) else Spacer(Modifier.height(if (replying != null) 8.dp else 24.dp))
             // Notifications get the room: with any showing, the quote at the foot gives way.
             if (quote != null && quoteAtFoot && replying == null && notifications.isEmpty()) {
                 QuoteBlock(quote, style)
@@ -772,4 +787,26 @@ private fun nextMorning(now: LocalDateTime): Long {
     val today = now.toLocalDate().atTime(7, 0)
     val morning = if (now.isBefore(today)) today else today.plusDays(1)
     return morning.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+}
+
+/** A timer counting down, under the widgets; a swipe either way hides it until it ends. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TimerLine(end: Long, now: Long, style: HomeStyle, onHide: () -> Unit) {
+    val p = style.palette()
+    val swipe = rememberSwipeToDismissBoxState(confirmValueChange = { value ->
+        if (value != SwipeToDismissBoxValue.Settled) onHide()
+        true
+    })
+    SwipeToDismissBox(swipe, backgroundContent = {}, modifier = Modifier.padding(top = 20.dp)) {
+        Row(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(p.text.copy(alpha = 0.06f)).padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("timer", style = MaterialTheme.typography.labelLarge, color = p.faint, modifier = Modifier.weight(1f))
+            Text(Timers.left(end, now), style = MaterialTheme.typography.titleMedium.copy(fontFeatureSettings = "tnum"), color = p.text)
+            Spacer(Modifier.width(6.dp))
+            Text("left", style = MaterialTheme.typography.labelLarge, color = p.faint)
+        }
+    }
 }

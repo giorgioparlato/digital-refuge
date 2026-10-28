@@ -35,6 +35,7 @@ import app.bedtime.data.ClockSize
 import app.bedtime.data.HomeStyle
 import app.bedtime.data.Module
 import app.bedtime.data.QuoteRefresh
+import app.bedtime.data.UseLook
 import app.bedtime.data.WeatherStyle
 import app.bedtime.ui.components.Text
 import app.bedtime.ui.homestyle.HomePalette
@@ -135,16 +136,53 @@ internal fun WidgetSheetContent(
                 Action(Icons.AutoMirrored.Filled.KeyboardArrowRight, "Open your habits: add, change or remove", p) { handlers.open(app.bedtime.Routes.HABITS); onDone() }
             }
             Module.HOURS -> {
+                val use = style.useWidgetFor(screen)
+                fun set(changed: app.bedtime.data.UseWidget) = handlers.change(style.withUseWidget(screen, changed))
+                choices(
+                    "Look",
+                    listOf("Dots" to UseLook.DOTS, "Line" to UseLook.LINE, "Budget" to UseLook.BUDGET, "Apps" to UseLook.APPS, "Apps in a line" to UseLook.APPS_LINE),
+                    use.look,
+                ) { look -> set(if (look == UseLook.LINE && !use.total && !use.distracting) use.copy(look = look, total = true, distracting = true) else use.copy(look = look)) }
+                Text("Show", style = MaterialTheme.typography.labelLarge, color = p.faint, modifier = Modifier.padding(horizontal = 22.dp, vertical = 6.dp))
+                FlowRow(Modifier.padding(horizontal = 22.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (use.look == UseLook.DOTS || use.look == UseLook.LINE) {
+                        Chip("Time on the phone", use.total, p) { set(use.copy(total = !use.total)) }
+                        Chip("Distracting time", use.distracting, p) { set(use.copy(distracting = !use.distracting)) }
+                    }
+                    Chip("Unlocks", use.unlocks, p) { set(use.copy(unlocks = !use.unlocks)) }
+                }
+                Spacer(Modifier.padding(top = 8.dp))
+                if (use.look == UseLook.BUDGET) {
+                    choices("The budget counts", listOf("Distracting apps" to false, "The whole phone" to true), use.budgetWholePhone) { set(use.copy(budgetWholePhone = it)) }
+                    val minutes = if (use.budgetWholePhone) listOf(60, 120, 180, 240, 300, 360) else listOf(15, 30, 45, 60, 90, 120)
+                    choices(
+                        "A day's allowance",
+                        minutes.map { app.bedtime.data.UseWords.short(it * 60L) to it },
+                        if (use.budgetWholePhone) use.phoneBudgetMinutes else use.budgetMinutes,
+                    ) { set(if (use.budgetWholePhone) use.copy(phoneBudgetMinutes = it) else use.copy(budgetMinutes = it)) }
+                }
                 Action(Icons.AutoMirrored.Filled.KeyboardArrowRight, "Open your statistics", p) { handlers.open(app.bedtime.Routes.STATS); onDone() }
                 Action(Icons.AutoMirrored.Filled.KeyboardArrowRight, "Choose your distracting apps", p) { handlers.open(app.bedtime.Routes.DISTRACTION); onDone() }
             }
-            Module.EVENT -> Action(
-                Icons.Default.DateRange,
-                if (style.calendarIcon(screen)) "No calendar icon when nothing's coming" else "A calendar icon when nothing's coming",
-                p,
-            ) { handlers.change(style.withCalendarIcon(screen, !style.calendarIcon(screen))); onDone() }
+            Module.EVENT -> {
+                Action(
+                    Icons.Default.DateRange,
+                    if (style.calendarIcon(screen)) "No calendar icon when nothing's coming" else "A calendar icon when nothing's coming",
+                    p,
+                ) { handlers.change(style.withCalendarIcon(screen, !style.calendarIcon(screen))); onDone() }
+                Action(
+                    Icons.Default.DateRange,
+                    if (style.calendarTomorrow) "Only today's events" else "Tomorrow's first event, once today's are done",
+                    p,
+                ) { handlers.change(style.copy(calendarTomorrow = !style.calendarTomorrow)); onDone() }
+            }
             Module.NOTE -> {
-                choices("Lines", listOf("3" to 3, "6" to 6, "10" to 10), style.noteLines) { handlers.change(style.copy(noteLines = it)) }
+                val chosen = style.noteWidgetId ?: app.bedtime.data.Notes.TODO_ID
+                if (notes.any { it.id == chosen }) {
+                    Action(Icons.AutoMirrored.Filled.KeyboardArrowRight, "Open this note in full", p) { handlers.open(app.bedtime.Routes.note(chosen)); onDone() }
+                }
+                choices("Lines", listOf(1, 2, 3, 6, 10).map { it.toString() to it }, style.noteLines) { handlers.change(style.copy(noteLines = it)) }
+                choices("Text", listOf("Small" to app.bedtime.data.TextSize.SMALL, "Medium" to app.bedtime.data.TextSize.MEDIUM, "Large" to app.bedtime.data.TextSize.LARGE), style.noteTextSize) { handlers.change(style.copy(noteTextSize = it)) }
                 val fits = style.noteFitsBesideClock(screen)
                 Action(
                     Icons.Default.DateRange,
@@ -157,7 +195,6 @@ internal fun WidgetSheetContent(
                     enabled = fits || style.noteBeside(screen),
                 ) { handlers.change(style.withNoteBeside(screen, !style.noteBeside(screen))); onDone() }
                 Text("Show", style = MaterialTheme.typography.labelLarge, color = p.faint, modifier = Modifier.padding(horizontal = 22.dp, vertical = 6.dp))
-                val chosen = style.noteWidgetId ?: app.bedtime.data.Notes.TODO_ID
                 Column(Modifier.heightIn(max = 280.dp).verticalScroll(rememberScrollState())) {
                     notes.sortedBy { it.id != app.bedtime.data.Notes.TODO_ID }.forEach { note ->
                         val name = app.bedtime.data.NoteWidget.title(note.text).ifBlank { "A note" }

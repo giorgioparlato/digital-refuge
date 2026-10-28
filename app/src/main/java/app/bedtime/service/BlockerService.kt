@@ -18,10 +18,17 @@ import app.bedtime.R
 import app.bedtime.apps.AppCatalog
 import app.bedtime.data.AppSettings
 import app.bedtime.data.DndMode
+import app.bedtime.data.HourlyUse
 import app.bedtime.data.Repository
 import app.bedtime.engine.ActiveState
 import app.bedtime.engine.Engine
 import app.bedtime.ui.blocked.BlockedActivity
+import android.app.KeyguardManager
+import android.media.AudioManager
+import android.os.PowerManager
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import app.bedtime.ui.blocked.NudgeActivity
 import app.bedtime.ui.lock.LockScreenActivity
 import app.bedtime.ui.minimal.MinimalHomeActivity
 import app.bedtime.ui.widget.BlockWidget
@@ -48,6 +55,10 @@ class BlockerService : AccessibilityService() {
 
     /** The app we believe is in front: the last window that was a move to somewhere else, not a float. */
     private var lastPackage: String? = null
+
+    /** Time on the phone in a row, for the nudge, and the nudge waiting for its moment. */
+    private val runClock = RunClock()
+    private var nudgeJob: Job? = null
 
     /** Whether the screen in front is the recent-apps view, which minimal mode lets through. */
     private var recentsInFront = false
@@ -115,11 +126,19 @@ class BlockerService : AccessibilityService() {
                 limitTracker.moveTo(null)
                 limitTracker.flush()
                 distractionClock.moveTo(null)
+                runClock.stop()
+                nudgeJob?.cancel()
                 showLockScreen()
                 return
             }
             // Back in, so whatever is in front starts counting again (and may be due its pause).
-            if (intent.action == Intent.ACTION_USER_PRESENT) lastPackage?.let(::settle)
+            if (intent.action == Intent.ACTION_USER_PRESENT) {
+                lastPackage?.let(::settle)
+                runClock.start(System.currentTimeMillis())
+                scheduleNudge()
+                // Counted here too, so the tracker can show unlocks without usage access.
+                releaseScope.launch { Repository.get(this@BlockerService).addUnlock(HourlyUse.today()) }
+            }
             Engine.refresh()
             refreshSystemPackages()
             // Re-assert greyscale in case it was switched off from quick settings.
@@ -129,6 +148,10 @@ class BlockerService : AccessibilityService() {
 
     override fun onServiceConnected() {
         BlockingState.service = this
+        // Already unlocked as blocking comes on: the run counts from now.
+        if (getSystemService(PowerManager::class.java)?.isInteractive == true && getSystemService(KeyguardManager::class.java)?.isKeyguardLocked == false) {
+            runClock.start(System.currentTimeMillis())
+        }
         BlockingState.clearBreak()
         // Just switched back on, probably from our own Settings page: let the user finish there.
         SettingsGuard.graceUntil = System.currentTimeMillis() + SettingsGuard.GRACE_MS
@@ -165,7 +188,9 @@ class BlockerService : AccessibilityService() {
         scope.launch { repo.schedules.collect { BlockShortcuts.update(this@BlockerService, it) } }
         scope.launch {
             repo.settings.collect {
+                val nudgeChanged = it.runNudgeMinutes != settings.runNudgeMinutes
                 settings = it
+                if (nudgeChanged) scheduleNudge()
                 limitTracker.limits = it.limits
                 distractionClock.distracting = it.distractingApps
                 applyGreyscale()
@@ -358,6 +383,31 @@ class BlockerService : AccessibilityService() {
         }
 
     override fun onInterrupt() = Unit
+
+    /**
+     * The nudge for this run, if you've asked for one: after its minutes in a row, never during a call
+     * (it waits a minute at a time). Shown, the count begins again, so the next comes as long after.
+     */
+    private fun scheduleNudge() {
+        nudgeJob?.cancel()
+        val minutes = settings.runNudgeMinutes ?: return
+        val due = runClock.dueAt(minutes) ?: return
+        nudgeJob = scope.launch {
+            delay((due - System.currentTimeMillis()).coerceAtLeast(0))
+            while (inCall()) delay(60_000)
+            runCatching { startActivity(NudgeActivity.intent(this@BlockerService, minutes)) }
+            restartRun()
+        }
+    }
+
+    /** Carrying on past the nudge: the count begins again from now. */
+    internal fun restartRun() {
+        runClock.restart(System.currentTimeMillis())
+        scheduleNudge()
+    }
+
+    private fun inCall(): Boolean =
+        getSystemService(AudioManager::class.java)?.mode.let { it == AudioManager.MODE_IN_CALL || it == AudioManager.MODE_IN_COMMUNICATION }
 
     /**
      * Switched off. Outside a session, give the phone its normal colours and sounds back. Mid-session,

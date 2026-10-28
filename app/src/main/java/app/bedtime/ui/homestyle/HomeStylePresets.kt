@@ -24,6 +24,15 @@ internal val TextPresets: List<Pair<String, Long>> = listOf(
     "Brown" to 0xFF593E22,
 )
 
+/** A few calm cards for the note widget, dark and light; anything else is a custom colour. */
+internal val NotePresets: List<Pair<String, Long>> = listOf(
+    "Paper" to 0xFFF8F5F1,
+    "Sand" to 0xFFEFE6D8,
+    "Graphite" to 0xFF363636,
+    "Forest" to 0xFF2C3A32,
+    "Night" to 0xFF22304A,
+)
+
 internal val AccentPresets: List<Pair<String, Long>> = listOf(
     "Sage" to 0xFF86BC9F,
     "Bright green" to 0xFF4EC68E,

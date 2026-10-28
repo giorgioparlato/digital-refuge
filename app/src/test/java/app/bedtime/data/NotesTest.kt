@@ -2,6 +2,8 @@ package app.bedtime.data
 
 import app.bedtime.ui.notes.Markdown
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.LocalDateTime
 
@@ -124,5 +126,14 @@ class NotesTest {
         // Ticking the first box, then unticking the second.
         assertEquals("# Groceries\n- [x] oat milk\n  - [x] bread\n\n- lemons\nplain words", NoteWidget.toggled(text, 1))
         assertEquals("# Groceries\n- [ ] oat milk\n  - [ ] bread\n\n- lemons\nplain words", NoteWidget.toggled(text, 2))
+    }
+
+    @Test
+    fun aTargetIsInTheVaultByItsPath() {
+        val vault = "content://com.android.externalstorage.documents/tree/primary%3ANotes%2FVault"
+        assertTrue(Notes.inFolder("$vault/document/primary%3ANotes%2FVault%2FInbox.md", vault))
+        assertTrue(Notes.inFolder("content://com.android.externalstorage.documents/tree/primary%3ANotes%2FVault%2FDaily", vault))
+        assertFalse(Notes.inFolder("$vault/document/primary%3ANotes%2FVault2%2FInbox.md", vault))
+        assertFalse(Notes.inFolder("content://com.android.externalstorage.documents/tree/primary%3ADocuments/document/primary%3ADocuments%2Ftodo.md", vault))
     }
 }

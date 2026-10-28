@@ -142,15 +142,20 @@ object CalendarSource {
 /**
  * The line under the date: what's on now, or what's next, today — or null with nothing to come, so the
  * line simply isn't there. With [showNames] off (the lock screen, unless you said otherwise) it says
- * when, not what.
+ * when, not what. Given tonight's [midnight], events from then on are tomorrow's: the first of them shows
+ * only once nothing's left today.
  */
-fun calendarLine(events: List<CalendarEvent>, now: Long, showNames: Boolean, time: (Long) -> String): String? {
+fun calendarLine(events: List<CalendarEvent>, now: Long, showNames: Boolean, time: (Long) -> String, midnight: Long? = null): String? {
     val current = events.firstOrNull { it.begin <= now && it.end > now }
     if (current != null) {
         return if (showNames && current.title.isNotBlank()) "now · ${current.title} until ${time(current.end)}" else "an event until ${time(current.end)}"
     }
     val next = events.firstOrNull { it.begin > now } ?: return null
-    return if (showNames && next.title.isNotBlank()) "next · ${next.title} at ${time(next.begin)}" else "next event at ${time(next.begin)}"
+    val named = showNames && next.title.isNotBlank()
+    if (midnight != null && next.begin >= midnight) {
+        return if (named) "tomorrow · ${next.title} at ${time(next.begin)}" else "tomorrow, first event at ${time(next.begin)}"
+    }
+    return if (named) "next · ${next.title} at ${time(next.begin)}" else "next event at ${time(next.begin)}"
 }
 
 /** A day of the week ahead: its label ("today", "tomorrow", "wed 28 oct") and its events, all-day ones first. */
@@ -200,7 +205,7 @@ fun rememberCalendarLine(style: HomeStyle, now: LocalDateTime, onLockScreen: Boo
     var line by remember { mutableStateOf<String?>(null) }
     val minute = now.withSecond(0).withNano(0)
     val shown = Modules.isOn(style, if (onLockScreen) Screen.LOCK else Screen.HOME, Module.EVENT)
-    LaunchedEffect(shown, style.calendarNamesOnLock, onLockScreen, minute) {
+    LaunchedEffect(shown, style.calendarNamesOnLock, style.calendarTomorrow, onLockScreen, minute) {
         if (!shown || !CalendarSource.hasPermission(context)) {
             line = null
             return@LaunchedEffect
@@ -208,8 +213,10 @@ fun rememberCalendarLine(style: HomeStyle, now: LocalDateTime, onLockScreen: Boo
         val zone = ZoneId.systemDefault()
         val start = now.atZone(zone).toInstant().toEpochMilli()
         val midnight = now.toLocalDate().plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
-        val events = withContext(Dispatchers.IO) { CalendarSource.upcoming(context, start, midnight) }
-        line = calendarLine(events, start, showNames = !onLockScreen || style.calendarNamesOnLock) { formatTime(context, it) }
+        // With tomorrow asked for, read on to the end of it; the line still puts today first.
+        val until = if (style.calendarTomorrow) now.toLocalDate().plusDays(2).atStartOfDay(zone).toInstant().toEpochMilli() else midnight
+        val events = withContext(Dispatchers.IO) { CalendarSource.upcoming(context, start, until) }
+        line = calendarLine(events, start, showNames = !onLockScreen || style.calendarNamesOnLock, time = { formatTime(context, it) }, midnight = midnight.takeIf { style.calendarTomorrow })
     }
     return if (shown) line else null
 }

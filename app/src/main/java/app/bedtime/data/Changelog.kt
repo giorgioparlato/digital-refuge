@@ -13,6 +13,21 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            64,
+            "0.9.18",
+            listOf(
+                "Replying from the lock screen, the widgets step aside: you see the conversation and what you type.",
+                "The distraction tracker can be a line, a daily budget (for distracting apps or the whole phone), or your top apps, and can show your unlocks. refuge counts them itself.",
+                "A running timer counts down on the lock screen, from the search or the Clock app; swipe it away.",
+                "Statistics go month by month too.",
+                "An optional nudge after so many minutes in a row on the phone.",
+                "The note widget: text size, as few as 1 line, fewer card colours, dark or light text, and \"Open this note in full\" from a long press.",
+                "The next event can show tomorrow's first one once today's are done.",
+                "Quick notes show where they go: refuge, Obsidian or a file.",
+                "Emergency is on your everyday home too while a session runs.",
+            ),
+        ),
+        ChangelogEntry(
             63,
             "0.9.17",
             listOf(

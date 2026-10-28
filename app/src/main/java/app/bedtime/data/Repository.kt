@@ -80,6 +80,13 @@ class Repository private constructor(context: Context) {
 
     suspend fun saveWeather(weather: WeatherNow) = update(WEATHER, WeatherNow.serializer().nullable, null) { weather }
 
+    /** When the timers set from the search end, for the lock screen's countdown. */
+    val timers: Flow<List<Long>> = observe(TIMERS, timersSerializer, emptyList())
+
+    /** A timer set from the search, ending at [end]; those already over are dropped. */
+    suspend fun addTimer(end: Long, now: Long = System.currentTimeMillis()) =
+        update(TIMERS, timersSerializer, emptyList()) { ends -> ends.filter { it > now } + end }
+
     /** Apps and conversations quieted on the lock screen, each until its session ends. */
     val lockQuiet: Flow<Map<String, Long>> = observe(LOCK_QUIET, quietSerializer, emptyMap())
 
@@ -203,12 +210,27 @@ class Repository private constructor(context: Context) {
         settings.copy(limits = Limits.settle(limits, today))
     }
 
-    /** Changes [day]'s usage, creating it if needed, and keeps only the last [USAGE_DAYS] days. */
-    suspend fun updateUsage(day: Long, transform: (UsageDay) -> UsageDay) =
-        update(USAGE, usageSerializer, emptyList()) { days ->
+    /**
+     * Changes [day]'s usage, creating it if needed, and keeps only the last [USAGE_DAYS] days; a day that
+     * leaves goes into its month's totals, so months last.
+     */
+    suspend fun updateUsage(day: Long, transform: (UsageDay) -> UsageDay) {
+        store.edit { prefs ->
+            val days = decode(prefs[USAGE], usageSerializer, emptyList())
             val today = days.lastOrNull { it.day == day } ?: UsageDay(day)
-            (days.filterNot { it.day == day } + transform(today)).sortedBy { it.day }.takeLast(USAGE_DAYS)
+            val all = (days.filterNot { it.day == day } + transform(today)).sortedBy { it.day }
+            val gone = all.dropLast(USAGE_DAYS)
+            prefs[USAGE] = AppJson.encodeToString(usageSerializer, all.takeLast(USAGE_DAYS))
+            if (gone.isNotEmpty()) {
+                val months = decode(prefs[USAGE_MONTHS], monthsSerializer, emptyList())
+                val kept = PhoneUsage.fromRecords(gone).values.sortedBy { it.day }.fold(months) { m, d -> UseMonths.add(m, d) }
+                prefs[USAGE_MONTHS] = AppJson.encodeToString(monthsSerializer, kept.takeLast(MONTHS_KEPT))
+            }
         }
+    }
+
+    /** Months from days no longer kept one by one: what refuge counted itself. */
+    val usageMonths: Flow<List<UsageMonth>> = observe(USAGE_MONTHS, monthsSerializer, emptyList())
 
     /** Quiets [key] on the lock screen until [until], dropping entries already over. */
     suspend fun quiet(key: String, until: Long) = update(LOCK_QUIET, quietSerializer, emptyMap()) { quiet ->
@@ -220,6 +242,9 @@ class Repository private constructor(context: Context) {
     suspend fun addUsage(day: Long, seconds: Map<String, Long>) = updateUsage(day) { usage ->
         usage.copy(seconds = usage.seconds + seconds.map { (pkg, s) -> pkg to (usage.seconds[pkg] ?: 0L) + s })
     }
+
+    /** One more unlock on [day]. */
+    suspend fun addUnlock(day: Long) = updateUsage(day) { it.copy(unlocks = (it.unlocks ?: 0) + 1) }
 
     /** Adds time to [day], by hour: in distracting apps, and in any app; and to [app] if it's a distracting one. */
     suspend fun addHourly(day: Long, distracting: Map<Int, Long>, all: Map<Int, Long>, app: String? = null) = updateUsage(day) { usage ->
@@ -327,12 +352,17 @@ class Repository private constructor(context: Context) {
         private val HISTORY = stringPreferencesKey("history")
         private val USAGE = stringPreferencesKey("usage")
         private val LOCK_QUIET = stringPreferencesKey("lockQuiet")
+        private val TIMERS = stringPreferencesKey("timers")
+        private val USAGE_MONTHS = stringPreferencesKey("usageMonths")
+        private val monthsSerializer = ListSerializer(UsageMonth.serializer())
+        private const val MONTHS_KEPT = 24
         private val NOTES = stringPreferencesKey("notes")
         private val WEATHER = stringPreferencesKey("weather")
         private val notesSerializer = ListSerializer(Note.serializer())
         private val HABIT_MARKS = stringPreferencesKey("habit_marks")
         private val habitMarksSerializer = ListSerializer(HabitMark.serializer())
         private val quietSerializer = MapSerializer(String.serializer(), Long.serializer())
+        private val timersSerializer = ListSerializer(Long.serializer())
         /** About three years of nightly sessions, or several months of a busy mix: still a small file. */
         private const val MAX_HISTORY = 1000
         /** Five weeks, enough for the week's figures and the strip of days on the limits tab. */

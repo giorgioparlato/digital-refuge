@@ -333,7 +333,7 @@ internal fun SettingsContent(
                             onAlwaysAvailable,
                         ),
                     )
-                    add(Entry("staying focused", Icons.Default.DateRange, "Distraction tracker", "Your distracting apps, and today by the hour", "distraction distracting tracker hours dots colours", onDistraction))
+                    add(Entry("staying focused", Icons.Default.DateRange, "Distraction tracker", "Your distracting apps, today by the hour, a nudge after time in a row", "distraction distracting tracker hours dots colours nudge break in a row continuous scrolling", onDistraction))
                     add(Entry("look & feel", Icons.Default.Edit, "Look", "Colours, sizes and fonts", "colour color theme background accent text font size clock size top space", onHomeStyle))
                     add(
                         Entry(

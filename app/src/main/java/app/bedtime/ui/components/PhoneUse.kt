@@ -12,12 +12,15 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.bedtime.data.PhoneUsage
 import app.bedtime.data.Repository
 import app.bedtime.data.UseDay
+import app.bedtime.data.UseMonths
+import app.bedtime.data.UsageMonth
 import app.bedtime.service.UsageReader
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.LocalDate
+import java.time.YearMonth
 import java.time.ZoneId
 
 /** Recent days on the phone, and whether they're Android's record (usage access granted) or refuge's own count. */
@@ -66,4 +69,30 @@ private fun readAndroid(context: android.content.Context, count: Int, excluded: 
     val earliest = events.minOfOrNull { it.at } ?: return null
     val earliestDay = Instant.ofEpochMilli(earliest).atZone(zone).toLocalDate().toEpochDay()
     return PhoneUsage.fromEvents(events, from, now, zone, excluded, distracting) to minOf(earliestDay, firstDay - 1)
+}
+
+/**
+ * The last six months on the phone, this one included: Android's monthly record with usage access,
+ * refuge's own count otherwise (from when it began keeping months).
+ */
+@Composable
+fun rememberUseMonths(): List<UsageMonth> {
+    val context = LocalContext.current
+    val repo = remember { Repository.get(context.applicationContext) }
+    val usage by repo.usage.collectAsStateWithLifecycle(initialValue = emptyList())
+    val kept by repo.usageMonths.collectAsStateWithLifecycle(initialValue = emptyList())
+    val settings by repo.settings.collectAsStateWithLifecycle(initialValue = null)
+    val distracting = settings?.distractingApps.orEmpty()
+    val access = remember { UsageReader.hasAccess(context) }
+    val android by produceState(emptyMap<String, UsageMonth>(), access, distracting) {
+        if (!access) return@produceState
+        value = withContext(Dispatchers.IO) {
+            val zone = ZoneId.systemDefault()
+            val today = LocalDate.now(zone)
+            val from = today.minusMonths(6).withDayOfMonth(1).atStartOfDay(zone).toInstant().toEpochMilli()
+            UseMonths.fromBuckets(UsageReader.monthBuckets(context, from, System.currentTimeMillis()), zone, UsageReader.excluded(context), distracting, today)
+        }
+    }
+    val own = UseMonths.own(kept, PhoneUsage.fromRecords(usage).values)
+    return UseMonths.last(UseMonths.merge(android, own), YearMonth.now())
 }

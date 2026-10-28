@@ -34,6 +34,7 @@ import app.bedtime.data.HourRule
 import app.bedtime.data.HourlyUse
 import app.bedtime.data.PhoneUsage
 import app.bedtime.data.UseDay
+import app.bedtime.data.UsageMonth
 import app.bedtime.ui.components.Chevron
 import app.bedtime.ui.components.HourDetailContent
 import app.bedtime.ui.components.HourDots
@@ -62,6 +63,7 @@ internal fun PhoneUseSections(
     rule: HourRule,
     labels: Map<String, String>,
     onAllowAccess: (() -> Unit)?,
+    months: List<UsageMonth> = emptyList(),
 ) {
     val c = Obsidian.colors
     val days = PhoneUsage.range(use.days, today - 13, today)
@@ -159,6 +161,43 @@ internal fun PhoneUseSections(
             trend.unlocks?.let { (now, then) -> TrendRow("Unlocks", now.toLong(), then.toLong()) { "${it / 7} a day" } }
         }
     }
+
+    if (months.any { it.total > 0 }) {
+        SectionCard(title = "Month by month", subtitle = "The last six months: all of it, and the part in distracting apps. This month against last, as a daily average") {
+            MonthBars(months)
+            val (then, now) = months.takeLast(2)
+            if (now.perDay != null && then.perDay != null) {
+                TrendRow("On the phone", now.perDay!!, then.perDay!!, period = "month") { time(it) + " a day" }
+                TrendRow("In distracting apps", now.distractingPerDay!!, then.distractingPerDay!!, period = "month") { time(it) + " a day" }
+            }
+        }
+    }
+}
+
+/** A column a month, as tall as its daily average on the phone, the distracting part in the accent. */
+@Composable
+private fun MonthBars(months: List<UsageMonth>) {
+    val c = Obsidian.colors
+    val most = months.maxOf { it.perDay ?: 0L }.coerceAtLeast(1)
+    Row(Modifier.fillMaxWidth().height(120.dp).padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Bottom) {
+        months.forEachIndexed { i, month ->
+            val current = i == months.lastIndex
+            Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.Bottom, horizontalAlignment = Alignment.CenterHorizontally) {
+                val all = month.perDay ?: 0L
+                val bar = (92 * all.toFloat() / most).dp
+                Box(Modifier.fillMaxWidth().height(bar).clip(RoundedCornerShape(3.dp)).background(c.textNormal.copy(alpha = if (current) 0.3f else 0.16f))) {
+                    val part = if (all > 0) (month.distractingPerDay ?: 0L).toFloat() / all else 0f
+                    Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(bar * part).background(c.accent.copy(alpha = if (current) 1f else 0.7f)))
+                }
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    java.time.YearMonth.parse(month.month).month.getDisplayName(java.time.format.TextStyle.SHORT, Locale.getDefault()),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (current) c.textNormal else c.textFaint,
+                )
+            }
+        }
+    }
 }
 
 /** A column a day, as tall as the time on the phone, the distracting part in the accent from the foot. */
@@ -237,7 +276,7 @@ private fun AppRows(apps: List<AppUse>, labels: Map<String, String>) {
 
 /** A figure this week and last, and which way it went. */
 @Composable
-private fun TrendRow(label: String, now: Long, then: Long, format: (Long) -> String) {
+private fun TrendRow(label: String, now: Long, then: Long, period: String = "week", format: (Long) -> String) {
     val c = Obsidian.colors
     val change = if (then > 0) ((now - then) * 100 / then).toInt() else null
     Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -246,10 +285,10 @@ private fun TrendRow(label: String, now: Long, then: Long, format: (Long) -> Str
             Text(format(now), style = MaterialTheme.typography.bodyMedium, color = c.textNormal)
             Text(
                 when {
-                    change == null -> "nothing last week"
-                    change == 0 -> "the same as last week"
-                    change < 0 -> "${-change}% less than last week"
-                    else -> "$change% more than last week"
+                    change == null -> "nothing last $period"
+                    change == 0 -> "the same as last $period"
+                    change < 0 -> "${-change}% less than last $period"
+                    else -> "$change% more than last $period"
                 },
                 style = MaterialTheme.typography.labelSmall,
                 color = if (change != null && change > 0) c.accentText else c.textFaint,

@@ -11,6 +11,7 @@ import android.os.Build
 import android.os.Process
 import android.provider.Settings
 import app.bedtime.data.UseEvent
+import app.bedtime.data.UseMonths
 
 /**
  * Android's own record of which app was in front and when, the one Digital Wellbeing reads. Only with
@@ -42,6 +43,16 @@ object UsageReader {
     }
 
     /** The events from [from] to [to], as far back as Android keeps them; empty without access. */
+    /** Each app's time in Android's monthly records between [from] and [to]; empty without access. */
+    fun monthBuckets(context: Context, from: Long, to: Long): List<UseMonths.Bucket> {
+        if (!hasAccess(context)) return emptyList()
+        val manager = context.getSystemService(UsageStatsManager::class.java) ?: return emptyList()
+        return runCatching {
+            manager.queryUsageStats(UsageStatsManager.INTERVAL_MONTHLY, from, to).orEmpty()
+                .map { UseMonths.Bucket(it.packageName, it.firstTimeStamp, it.lastTimeStamp, it.totalTimeInForeground / 1000) }
+        }.getOrDefault(emptyList())
+    }
+
     fun events(context: Context, from: Long, to: Long): List<UseEvent> {
         if (!hasAccess(context)) return emptyList()
         val manager = context.getSystemService(UsageStatsManager::class.java) ?: return emptyList()

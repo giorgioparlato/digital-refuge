@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -106,7 +107,15 @@ internal fun NotificationArea(
     modifier: Modifier = Modifier,
 ) {
     val p = style.palette()
-    Column(modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    val scroll = rememberScrollState()
+    // Replying, the list holds only that conversation: its foot, the latest messages and the box, stays in view.
+    LaunchedEffect(replying) {
+        if (replying != null) {
+            delay(120)
+            scroll.animateScrollTo(scroll.maxValue)
+        }
+    }
+    Column(modifier.verticalScroll(scroll), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         if (!listOpen) {
             SummaryLine(LockNotifications.summary(notes), p) { onListOpen(true) }
             return@Column
@@ -259,13 +268,16 @@ private fun NotificationRow(
 }
 
 /** A reply typed on the lock screen, or one of yours with a tap. Sending asks for the unlock, then locks again. */
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
 @Composable
 private fun ReplyBox(p: HomePalette, quickReplies: List<String>, onSend: (String) -> Unit, onCancel: () -> Unit) {
     var text by remember { mutableStateOf("") }
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    // As the reply grows a line, the box keeps itself above the keyboard.
+    val reveal = remember { BringIntoViewRequester() }
+    LaunchedEffect(text.count { it == '\n' }, text.length / 40) { reveal.bringIntoView() }
+    Column(Modifier.bringIntoViewRequester(reveal), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             quickReplies.forEach { quick -> NoteChip(quick, p) { onSend(quick) } }
         }
@@ -279,6 +291,7 @@ private fun ReplyBox(p: HomePalette, quickReplies: List<String>, onSend: (String
             keyboardActions = KeyboardActions(onSend = { if (text.isNotBlank()) onSend(text.trim()) }),
             modifier = Modifier
                 .fillMaxWidth()
+                .heightIn(min = 44.dp, max = 140.dp)
                 .focusRequester(focus)
                 .border(1.dp, p.faint.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
                 .padding(horizontal = 12.dp, vertical = 10.dp),

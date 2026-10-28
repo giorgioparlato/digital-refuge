@@ -54,6 +54,14 @@ object Notes {
 
     private val stamp = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
 
+    /** Whether a note target's file or folder [uri] lies in [folder] (your Obsidian vault), by the paths the two uris name. */
+    fun inFolder(uri: String, folder: String): Boolean {
+        fun path(u: String) = java.net.URLDecoder.decode(u.substringAfterLast('/'), "UTF-8").trimEnd('/')
+        val inside = path(uri)
+        val root = path(folder)
+        return root.isNotEmpty() && (inside == root || inside.startsWith("$root/"))
+    }
+
     /**
      * A quick note as one Markdown line: "- 2026-10-25 22:41 your words" by default, or a to-do
      * ("- [ ] …") or plain words, with or without the date and time.

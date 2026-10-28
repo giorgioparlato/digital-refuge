@@ -6,7 +6,8 @@ import java.time.ZoneId
 /**
  * One day on the phone: seconds by hour in any app and in your distracting ones, seconds and opens by
  * app, and unlocks. From Android's usage records [complete] is true and every app is there; from
- * refuge's own count only distracting apps are named, and opens and unlocks aren't known.
+ * refuge's own count only distracting apps are named, opens aren't known, and unlocks only from when it
+ * began counting them.
  */
 data class UseDay(
     val day: Long,
@@ -99,7 +100,7 @@ object PhoneUsage {
 
     /** Days as refuge counted them itself, from the window changes blocking sees. */
     fun fromRecords(usage: List<UsageDay>): Map<Long, UseDay> =
-        usage.associate { it.day to UseDay(it.day, it.hourlyAll, it.hourly, it.distractingSeconds) }
+        usage.associate { it.day to UseDay(it.day, it.hourlyAll, it.hourly, it.distractingSeconds, unlocks = it.unlocks) }
 
     /**
      * Android's days where it has them whole (after the first day its records reach back to, which is
@@ -149,4 +150,54 @@ object PhoneUsage {
             if (now != null && then != null) now to then else null,
         )
     }
+}
+
+/** A month on the phone: seconds in any app and in distracting ones, over the [days] that had any use. "2026-10". */
+@kotlinx.serialization.Serializable
+data class UsageMonth(val month: String, val total: Long = 0, val distracting: Long = 0, val days: Int = 0) {
+    /** Seconds a day on average, over the days that had any use. */
+    val perDay: Long? get() = if (days > 0) total / days else null
+    val distractingPerDay: Long? get() = if (days > 0) distracting / days else null
+}
+
+object UseMonths {
+    fun key(day: Long): String = java.time.LocalDate.ofEpochDay(day).let { "%04d-%02d".format(it.year, it.monthValue) }
+
+    /** [months] with [day] added to its month, if it had any use. */
+    fun add(months: List<UsageMonth>, day: UseDay): List<UsageMonth> {
+        if (day.total <= 0) return months
+        val key = key(day.day)
+        val month = months.firstOrNull { it.month == key } ?: UsageMonth(key)
+        val added = month.copy(total = month.total + day.total, distracting = month.distracting + day.distractingTotal, days = month.days + 1)
+        return (months.filterNot { it.month == key } + added).sortedBy { it.month }
+    }
+
+    /** refuge's own months: those [kept] from days gone by, and the [days] it still has. */
+    fun own(kept: List<UsageMonth>, days: Collection<UseDay>): Map<String, UsageMonth> =
+        days.sortedBy { it.day }.fold(kept) { months, day -> add(months, day) }.associateBy { it.month }
+
+    /** One app's time in one of Android's monthly records, which run from [start] to [end]. */
+    data class Bucket(val pkg: String, val start: Long, val end: Long, val seconds: Long)
+
+    /**
+     * Months from Android's monthly records, each counted in the month of its middle; [excluded] apps
+     * left out, [distracting] ones summed apart. A month's days are those passed of it by [today].
+     */
+    fun fromBuckets(buckets: List<Bucket>, zone: java.time.ZoneId, excluded: Set<String>, distracting: Set<String>, today: java.time.LocalDate): Map<String, UsageMonth> =
+        buckets.filter { it.pkg !in excluded && it.seconds > 0 }
+            .groupBy { java.time.Instant.ofEpochMilli(it.start + (it.end - it.start) / 2).atZone(zone).toLocalDate() }
+            .entries.groupBy({ java.time.YearMonth.from(it.key) }, { it.value }).mapValues { (_, lists) -> lists.flatten() }
+            .entries.associate { (month, list) ->
+                val key = "%04d-%02d".format(month.year, month.monthValue)
+                val days = if (month == java.time.YearMonth.from(today)) today.dayOfMonth else month.lengthOfMonth()
+                key to UsageMonth(key, list.sumOf { it.seconds }, list.filter { it.pkg in distracting }.sumOf { it.seconds }, days)
+            }
+
+    /** Android's months where it has them, refuge's own for the rest. */
+    fun merge(fromAndroid: Map<String, UsageMonth>, own: Map<String, UsageMonth>): Map<String, UsageMonth> = own + fromAndroid
+
+    /** The [count] months up to [current], oldest first, an empty one for any missing. */
+    fun last(months: Map<String, UsageMonth>, current: java.time.YearMonth, count: Int = 6): List<UsageMonth> =
+        (count - 1 downTo 0).map { back -> current.minusMonths(back.toLong()).let { "%04d-%02d".format(it.year, it.monthValue) } }
+            .map { months[it] ?: UsageMonth(it) }
 }

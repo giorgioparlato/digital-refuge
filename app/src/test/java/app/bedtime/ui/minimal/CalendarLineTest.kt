@@ -33,4 +33,15 @@ class CalendarLineTest {
     fun anUntitledEventIsDescribedByItsTime() {
         assertEquals("next event at t${now + 5}", calendarLine(listOf(CalendarEvent("", now + 5, now + 9)), now, true, time))
     }
+
+    @Test
+    fun tomorrowsFirstEventOnceTodayIsDone() {
+        val midnight = now + 1_000
+        val events = listOf(CalendarEvent("dentist", now + 500, now + 900), CalendarEvent("standup", midnight + 300, midnight + 600))
+        // Today's still to come, so it comes first.
+        assertEquals("next · dentist at t${now + 500}", calendarLine(events, now, true, time, midnight))
+        val evening = now + 950
+        assertEquals("tomorrow · standup at t${midnight + 300}", calendarLine(events, evening, true, time, midnight))
+        assertEquals("tomorrow, first event at t${midnight + 300}", calendarLine(events, evening, false, time, midnight))
+    }
 }

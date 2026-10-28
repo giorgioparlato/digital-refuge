@@ -31,6 +31,8 @@ import app.bedtime.ui.components.rememberTodayHours
 import app.bedtime.ui.components.HourDetailDialog
 import app.bedtime.data.HourlyUse
 import app.bedtime.ui.components.HourDots
+import app.bedtime.ui.components.rememberUseToday
+import app.bedtime.ui.components.useWidgetSlot
 import app.bedtime.data.HourState
 import app.bedtime.data.SearchOrder
 import app.bedtime.data.NoteTarget
@@ -248,7 +250,7 @@ private fun MinimalHomeScreen(
     var notesOpen by rememberSaveable { mutableStateOf(false) }
     var quickNote by rememberSaveable { mutableStateOf(false) }
     var hoursDetail by remember { mutableStateOf(false) }
-    val todayHours = rememberTodayHours()
+    val (todayHours, useToday) = rememberUseToday()
     val (habitList, habitMarks) = rememberHabits()
     // Your blocks, to start from the refuge mark, a gesture or the search.
     val allSchedules by repo.schedules.collectAsStateWithLifecycle(initialValue = emptyList())
@@ -481,6 +483,10 @@ private fun MinimalHomeScreen(
                 .onSuccess {
                     Toast.makeText(context, if (result.action is app.bedtime.data.ClockAction.Alarm) "alarm set" else "timer started", Toast.LENGTH_SHORT).show()
                     query = ""
+                    // Remembered, so the lock screen can count it down.
+                    (result.action as? app.bedtime.data.ClockAction.Timer)?.let { timer ->
+                        scope.launch { repo.addTimer(System.currentTimeMillis() + timer.seconds * 1000L) }
+                    }
                 }
                 .onFailure { Toast.makeText(context, "no clock app took it", Toast.LENGTH_SHORT).show() }
             is DrawerResult.Setting -> open(SettingsPages.intent(result.page))
@@ -523,18 +529,19 @@ private fun MinimalHomeScreen(
                 onLongPress = { actionsFor = it },
             )
         }
-        emergency && occurrence != null -> {
+        // Any running session, with the minimal screen or without it, has its emergency way out.
+        emergency && session != null -> {
             BackHandler { emergency = false }
             EmergencyContent(
                 onBack = { emergency = false },
                 onCall = { SystemApps.dialerPackage(context)?.let { AppCatalog.launch(context, it) } },
                 onOpenRefuge = { AppCatalog.launch(context, context.packageName) },
                 onPauseBlocking = {
-                    if (!BlockingState.pause(occurrence.schedule.breakMinutes)) context.startActivity(BlockingState.accessibilityIntent())
+                    if (!BlockingState.pause(session.schedule.breakMinutes)) context.startActivity(BlockingState.accessibilityIntent())
                     emergency = false
                 },
-                breakMinutes = occurrence.schedule.breakMinutes,
-                pauseEnabled = occurrence.schedule.pauseEnabled,
+                breakMinutes = session.schedule.breakMinutes,
+                pauseEnabled = session.schedule.pauseEnabled,
             )
         }
         unlocking && occurrence != null -> Surface(Modifier.fillMaxSize(), color = c.bgPrimary) {
@@ -560,7 +567,7 @@ private fun MinimalHomeScreen(
             onLaunch = { AppCatalog.launch(context, it) },
             // Unlocking and emergencies belong to minimal sessions; your everyday home has a way into the app.
             onUnlock = if (occurrence != null) ({ unlocking = true }) else null,
-            onEmergency = { emergency = true },
+            onEmergency = if (session != null) ({ emergency = true }) else null,
             onAppLongPress = { actionsFor = it },
             emptyHint = if (occurrence == null) "Hold an app in the full list to add it here." else null,
             // Re-read every second with the clock, so it goes back to "unlock" once the moment passes.
@@ -589,6 +596,8 @@ private fun MinimalHomeScreen(
                         Modifier.padding(top = 22.dp),
                         maxLines = style.noteLines,
                         card = style.noteBackground?.let { androidx.compose.ui.graphics.Color(it) },
+                        darkText = style.noteDarkText,
+                        textScale = style.noteTextSize.scale,
                         onToggle = { i -> widgetNote?.let { n -> scope.launch { repo.editNote(n.id, NoteWidget.toggled(n.text, i)) } } },
                         onSave = { written -> widgetNote?.let { n -> scope.launch { repo.editNote(n.id, written) } } },
                         onHold = { holding = Module.NOTE },
@@ -603,7 +612,8 @@ private fun MinimalHomeScreen(
                     NoteWidgetView(
                         widgetNote,
                         style.palette().text, style.palette().faint, style.palette().accent,
-                        maxLines = 3,
+                        maxLines = style.noteLines.coerceAtMost(3),
+                        textScale = style.noteTextSize.scale,
                         compact = true,
                         onToggle = { i -> widgetNote?.let { n -> scope.launch { repo.editNote(n.id, NoteWidget.toggled(n.text, i)) } } },
                         onSave = { written -> widgetNote?.let { n -> scope.launch { repo.editNote(n.id, written) } } },
@@ -631,6 +641,7 @@ private fun MinimalHomeScreen(
             onGesture = onGesture,
             hours = todayHours.takeIf { Modules.isOn(style, Screen.HOME, Module.HOURS) && HourlyUse.counting(settings) }
                 ?.let { HourlyUse.states(it, now.hour, HourlyUse.rule(settings)) },
+            useToday = useToday.takeIf { Modules.isOn(style, Screen.HOME, Module.HOURS) },
             onHours = { hoursDetail = true },
             weather = rememberWeather(style, now),
             onWeather = breezy?.let { app -> { AppCatalog.launch(context, app) } },
@@ -674,7 +685,7 @@ private fun MinimalHomeScreen(
                     }
                 },
                 change = { changed ->
-                    scope.launch { repo.updateSettings { s -> s.copy(homeStyle = s.homeStyle.copy(weatherStyle = changed.weatherStyle, lockWeatherStyle = changed.lockWeatherStyle, clockSize = changed.clockSize, quoteRefresh = changed.quoteRefresh, noteWidgetId = changed.noteWidgetId, noteLines = changed.noteLines, noteBesideClock = changed.noteBesideClock, lockNoteBesideClock = changed.lockNoteBesideClock, calendarIconWhenEmpty = changed.calendarIconWhenEmpty, lockCalendarIconWhenEmpty = changed.lockCalendarIconWhenEmpty)) } }
+                    scope.launch { repo.updateSettings { s -> s.copy(homeStyle = s.homeStyle.copy(weatherStyle = changed.weatherStyle, lockWeatherStyle = changed.lockWeatherStyle, clockSize = changed.clockSize, quoteRefresh = changed.quoteRefresh, noteWidgetId = changed.noteWidgetId, noteLines = changed.noteLines, noteTextSize = changed.noteTextSize, noteBesideClock = changed.noteBesideClock, lockNoteBesideClock = changed.lockNoteBesideClock, calendarIconWhenEmpty = changed.calendarIconWhenEmpty, lockCalendarIconWhenEmpty = changed.lockCalendarIconWhenEmpty, calendarTomorrow = changed.calendarTomorrow, useWidget = changed.useWidget, lockUseWidget = changed.lockUseWidget, noteDarkText = changed.noteDarkText)) } }
                 },
                 open = { route -> runCatching { context.startActivity(app.bedtime.MainActivity.intent(context, route)) } },
                 habitShown = { id, shown -> scope.launch { repo.updateSettings { s -> s.copy(habits = s.habits.map { if (it.id == id) it.withShownOn(Screen.HOME, shown) else it }) } } },
@@ -712,7 +723,7 @@ private fun MinimalHomeScreen(
             blocksOpen = false
         }, onDismiss = { blocksOpen = false })
     }
-    if (quickNote) QuickNoteDialog(style, settings.quickTargets, onSave = saveNote, onDismiss = { quickNote = false })
+    if (quickNote) QuickNoteDialog(style, settings.quickTargets, onSave = saveNote, onDismiss = { quickNote = false }, vault = settings.obsidianVault)
     if (hoursDetail) {
         val p = style.palette()
         HourDetailDialog(todayHours, HourlyUse.rule(settings), p.background, p.text, p.faint, p.accent, onDismiss = { hoursDetail = false }, onStats = {
@@ -781,7 +792,8 @@ internal fun MinimalHomeContent(
     onLaunch: (String) -> Unit,
     /** Unlocking, in a minimal session; null outside one, when the foot has only the way to all apps. */
     onUnlock: (() -> Unit)?,
-    onEmergency: () -> Unit = {},
+    /** The way to the emergency page; null outside sessions, and it isn't shown. */
+    onEmergency: (() -> Unit)? = null,
     /** A long press on an app: its actions. */
     onAppLongPress: ((AppEntry) -> Unit)? = null,
     /** What an empty list says; the session's words when null. */
@@ -802,6 +814,8 @@ internal fun MinimalHomeContent(
     onGesture: (HomeGesture) -> Unit = {},
     /** Today by the hour, when it's shown here, and a tap for the minutes. */
     hours: List<HourState>? = null,
+    /** Today's figures, for the tracker's looks other than the dots and the line under them. */
+    useToday: app.bedtime.data.UseToday? = null,
     onHours: (() -> Unit)? = null,
     quote: Quote? = null,
     /** Whether [quote] is one of your favourites, and the long-press menu's two choices for it. */
@@ -889,20 +903,7 @@ internal fun MinimalHomeContent(
                 now, scheduleName, until, style, calendar, onCalendar, weather, onWeather,
                 modules = Modules.shown(style, Screen.HOME),
                 scheduleIcon = scheduleIcon,
-                hours = hours?.let { states ->
-                    {
-                        HourDots(
-                            states,
-                            text = style.palette().text,
-                            accent = style.palette().accent,
-                            modifier = Modifier.padding(top = 12.dp),
-                            calmColor = style.hourCalmColor,
-                            distractedColor = style.hourDistractedColor,
-                            onClick = onHours,
-                            onLongClick = onWidgetHold?.let { { it(Module.HOURS) } },
-                        )
-                    }
-                },
+                hours = useWidgetSlot(style.useWidgetFor(Screen.HOME), hours, useToday, style, onHours, onWidgetHold?.let { { it(Module.HOURS) } }),
                 quote = quote?.let { q -> { HomeQuote(q, style, preview, quoteFavourite, onQuoteFavourite, onQuoteHide, onNextQuote, onWidgetHold?.let { { it(Module.QUOTE) } }) } },
                 habits = habits,
                 nowPlaying = nowPlaying,
@@ -958,11 +959,22 @@ internal fun MinimalHomeContent(
                     Icon(Icons.Default.Edit, contentDescription = "refuge notes", tint = p.faint, modifier = Modifier.size(22.dp))
                 }
             }
+            val emergencyButton = @Composable { onClick: () -> Unit ->
+                TextButton(onClick = onClick) {
+                    Icon(Icons.Default.Warning, contentDescription = null, tint = p.faint, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("emergency", color = p.faint)
+                }
+            }
             if (onUnlock == null) {
                 // Your everyday home: the way to all apps (digital refuge itself is among them), and its mark if you like.
-                if (style.showLogo || style.showSwipeArrow || style.showNotesButton) Box(Modifier.fillMaxWidth()) {
+                // A session without the minimal screen still has its emergency way out, at the right.
+                if (style.showLogo || style.showSwipeArrow || style.showNotesButton || onEmergency != null) Box(Modifier.fillMaxWidth()) {
                     if (style.showLogo) Box(Modifier.align(Alignment.CenterStart)) { logo() }
-                    if (style.showNotesButton) Box(Modifier.align(Alignment.CenterEnd)) { notesButton() }
+                    Row(Modifier.align(Alignment.CenterEnd), verticalAlignment = Alignment.CenterVertically) {
+                        if (style.showNotesButton) notesButton()
+                        onEmergency?.let { emergencyButton(it) }
+                    }
                     if (style.showSwipeArrow) {
                         IconButton(onClick = onOpenDrawer, modifier = Modifier.align(Alignment.Center)) {
                             Icon(Icons.Default.KeyboardArrowUp, contentDescription = "all apps and search", tint = p.faint)
@@ -988,11 +1000,7 @@ internal fun MinimalHomeContent(
                     Spacer(Modifier.weight(1f))
                 }
                 if (style.showNotesButton) notesButton()
-                TextButton(onClick = onEmergency) {
-                    Icon(Icons.Default.Warning, contentDescription = null, tint = p.faint, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("emergency", color = p.faint)
-                }
+                onEmergency?.let { emergencyButton(it) }
             }
         }
     }

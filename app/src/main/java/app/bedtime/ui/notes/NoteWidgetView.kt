@@ -7,6 +7,7 @@ import androidx.compose.foundation.verticalScroll
 import kotlinx.coroutines.delay
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.FocusRequester
@@ -74,9 +75,14 @@ fun NoteWidgetView(
     compact: Boolean = false,
     /** A card colour of its own; null sits it on the screen's background. */
     card: Color? = null,
+    /** On a card: dark words, light ones, or null to suit the card. */
+    darkText: Boolean? = null,
+    /** The size of its words, from [app.bedtime.data.TextSize]. */
+    textScale: Float = 1f,
 ) {
-    // On a card of its own, words in ink or cream to suit it.
-    val onCard = card?.let { if (it.luminance() > 0.5f) Color(0xFF2B2620) else Color(0xFFEDE6DA) }
+    // On a card of its own, words in ink or cream: as chosen, or to suit it.
+    val onCard = card?.let { if (inkOnCard(it, darkText)) Color(0xFF2B2620) else Color(0xFFEDE6DA) }
+    fun TextStyle.sized() = copy(fontSize = fontSize * textScale, lineHeight = lineHeight * textScale)
     val text = onCard ?: screenText
     val faint = onCard?.copy(alpha = 0.6f) ?: screenFaint
     val holdOnly = Modifier.combinedClickable(onClickLabel = "choose a note", onLongClick = onHold, onClick = { onHold?.invoke() })
@@ -124,7 +130,7 @@ fun NoteWidgetView(
                 BasicTextField(
                     value = value,
                     onValueChange = { value = Markdown.tickOnTap(value, it) ?: Markdown.continueList(value, it) },
-                    textStyle = MaterialTheme.typography.bodyLarge.copy(color = text),
+                    textStyle = MaterialTheme.typography.bodyLarge.sized().copy(color = text),
                     cursorBrush = SolidColor(accent),
                     visualTransformation = remember(faint, accent) { MarkdownTransformation(faint, accent) },
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
@@ -140,27 +146,27 @@ fun NoteWidgetView(
         }
         VerbatimText(
             NoteWidget.title(note.text).ifBlank { "Note" },
-            style = MaterialTheme.typography.labelLarge,
+            style = MaterialTheme.typography.labelLarge.sized(),
             color = faint,
             modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).then(startTyping).padding(vertical = 2.dp),
         )
-        val body = if (compact) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodyLarge
+        val body = (if (compact) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodyLarge).sized()
         NoteWidget.lines(note.text, maxLines).forEach { line ->
             Row(Modifier.fillMaxWidth().padding(start = (16 * line.indent).dp, top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 when (line.box) {
-                    null -> if (line.bullet) Text("•", style = MaterialTheme.typography.bodyLarge, color = faint, modifier = Modifier.width(18.dp))
+                    null -> if (line.bullet) Text("•", style = body, color = faint, modifier = Modifier.width((18 * textScale).dp))
                     else -> Box(
                         Modifier
-                            .size(28.dp)
+                            .size((28 * textScale).dp)
                             .clip(RoundedCornerShape(6.dp))
                             .clickable(onClickLabel = if (line.box) "untick" else "tick") { onToggle(line.index) },
                         contentAlignment = Alignment.Center,
                     ) {
                         Box(
-                            Modifier.size(19.dp).clip(RoundedCornerShape(5.dp)).background(if (line.box) accent else text.copy(alpha = 0.18f)),
+                            Modifier.size((19 * textScale).dp).clip(RoundedCornerShape(5.dp)).background(if (line.box) accent else text.copy(alpha = 0.18f)),
                             contentAlignment = Alignment.Center,
                         ) {
-                            if (line.box) androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                            if (line.box) androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size((14 * textScale).dp))
                         }
                     }
                 }
@@ -178,3 +184,6 @@ fun NoteWidgetView(
         }
     }
 }
+
+/** Whether words on a card of colour [card] are dark: as [dark] says, or, left to suit it, on a light card. */
+internal fun inkOnCard(card: Color, dark: Boolean?): Boolean = dark ?: (card.luminance() > 0.5f)

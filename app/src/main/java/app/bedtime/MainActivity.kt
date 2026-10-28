@@ -122,9 +122,13 @@ object Routes {
     const val STATS = "stats"
     const val QUOTES = "quotes"
     const val NOTES = "notes"
+    /** One of your notes, open to edit: "note/<id>". */
+    const val NOTE = "note/"
     const val QUICK_NOTES = "quicknotes"
 
     fun unlock(scheduleId: String) = UNLOCK + scheduleId
+
+    fun note(id: String) = NOTE + id
 }
 
 class MainActivity : ComponentActivity() {
@@ -318,6 +322,7 @@ private fun BedtimeNavigation(pendingRoute: String?, onRouteConsumed: () -> Unit
                 onSetup = { push(Routes.SETUP) },
                 onHowItWorks = { push(Routes.ONBOARDING) },
             )
+            top.startsWith(Routes.NOTE) -> NotesScreen(onBack = ::pop, initialOpen = top.removePrefix(Routes.NOTE))
             top.startsWith(Routes.UNLOCK) -> UnlockScreen(top.removePrefix(Routes.UNLOCK), onBack = ::pop)
             top.startsWith(Routes.LIMIT) -> LimitEditScreen(top.removePrefix(Routes.LIMIT).ifEmpty { null }, onBack = ::pop)
         }

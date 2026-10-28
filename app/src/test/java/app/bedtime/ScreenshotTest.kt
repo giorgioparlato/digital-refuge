@@ -740,6 +740,7 @@ class ScreenshotTest {
             style = HomeStyle(),
             onLaunch = {},
             onUnlock = {},
+            onEmergency = {},
             quote = Samples.shortQuote,
         )
     }
@@ -793,6 +794,7 @@ class ScreenshotTest {
             style = style,
             onLaunch = {},
             onUnlock = {},
+            onEmergency = {},
             quote = Samples.shortQuote,
             weather = app.bedtime.data.Weather.view(app.bedtime.data.Weather.SAMPLE, app.bedtime.data.Weather.SAMPLE.at + 1, false, app.bedtime.data.WeatherStyle.FIVE_DAYS),
         )
@@ -869,6 +871,7 @@ class ScreenshotTest {
             style = HomeStyle(quoteFont = app.bedtime.data.AppFont.LITERATA),
             onLaunch = {},
             onUnlock = {},
+            onEmergency = {},
             quote = Samples.shortQuote,
         )
     }
@@ -883,6 +886,7 @@ class ScreenshotTest {
             style = HomeStyle(showCalendar = true, clockSize = app.bedtime.data.ClockSize.VERY_SMALL, textColor = 0xFFFFFFFF),
             onLaunch = {},
             onUnlock = {},
+            onEmergency = {},
             quote = Samples.shortQuote,
             calendar = "next · dentist at 9:30 am",
         )
@@ -898,6 +902,7 @@ class ScreenshotTest {
             style = HomeStyle(font = app.bedtime.data.AppFont.FRAUNCES, quoteFont = app.bedtime.data.AppFont.FRAUNCES),
             onLaunch = {},
             onUnlock = {},
+            onEmergency = {},
             quote = Samples.shortQuote,
         )
     }
@@ -912,6 +917,7 @@ class ScreenshotTest {
             style = HomeStyle(background = 0xFFF8F5F1, accent = 0xFFE0B243, textSize = TextSize.LARGE, showIcons = true),
             onLaunch = {},
             onUnlock = {},
+            onEmergency = {},
             quote = Samples.mediumQuote,
         )
     }
@@ -926,6 +932,7 @@ class ScreenshotTest {
             style = HomeStyle(appNameSize = app.bedtime.data.AppNameSize.VERY_SMALL, showIcons = true),
             onLaunch = {},
             onUnlock = {},
+            onEmergency = {},
             quote = Samples.mediumQuote,
         )
     }

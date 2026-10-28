@@ -99,9 +99,18 @@ fun rememberDayHours(day: Long, live: Boolean = false): DayHours? {
     return use.days[day]?.hours(use.distractingApps)
 }
 
-/** Today's unlocks, when Android's record says. */
+/** Today for the distraction tracker, kept current: the hours for the dots, and the figures its other looks show. */
 @Composable
-fun rememberTodayUnlocks(): Int? = rememberUseDays(2, live = false).days[HourlyUse.today()]?.unlocks
+fun rememberUseToday(): Pair<DayHours, app.bedtime.data.UseToday> {
+    val use = rememberUseDays(2, live = true)
+    val day = use.days[HourlyUse.today()]
+    val hours = day?.hours(use.distractingApps) ?: DayHours()
+    return hours to app.bedtime.data.UseToday(hours.all.values.sum(), hours.apps.values.sum(), day?.unlocks, hours.byApp)
+}
+
+/** Today's unlocks, kept current: Android's record with usage access, refuge's own count without it. */
+@Composable
+fun rememberTodayUnlocks(): Int? = rememberUseDays(2, live = true).days[HourlyUse.today()]?.unlocks
 
 /**
  * What's behind the dots: today's time in distracting apps and on the phone at all, against yesterday;

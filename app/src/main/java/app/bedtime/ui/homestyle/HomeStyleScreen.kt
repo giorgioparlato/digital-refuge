@@ -103,6 +103,11 @@ import app.bedtime.data.Quotes
 import app.bedtime.data.Repository
 import app.bedtime.data.QuoteRefresh
 import app.bedtime.data.TextSize
+import app.bedtime.data.UseWords
+import app.bedtime.data.UseWidget
+import app.bedtime.data.UseLook
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.Phone
 import app.bedtime.ui.components.BedtimeIcons
 import app.bedtime.ui.components.DragList
 import app.bedtime.data.Module
@@ -479,19 +484,34 @@ internal fun HomeStyleContent(
                 }
                 if (Modules.onAnywhere(style, Module.NOTE)) SectionCard(title = "Note", subtitle = "Hold it on your screen to choose which note it shows") {
                     SizeLabel("Lines shown", Modifier.padding(bottom = 8.dp))
-                    val lineChoices = listOf(3, 6, 10)
+                    val lineChoices = listOf(1, 2, 3, 6, 10)
                     SegmentedChoice(
-                        options = listOf("3", "6", "10"),
+                        options = lineChoices.map { it.toString() },
                         selected = lineChoices.indexOf(style.noteLines).coerceAtLeast(0),
                         onSelect = { onChange(style.copy(noteLines = lineChoices[it])) },
                     )
+                    SizeLabel("Text size", Modifier.padding(top = 16.dp, bottom = 8.dp))
+                    SegmentedChoice(
+                        options = listOf("Small", "Medium", "Large"),
+                        selected = style.noteTextSize.ordinal,
+                        onSelect = { onChange(style.copy(noteTextSize = TextSize.entries[it])) },
+                    )
                     SizeLabel("Its background", Modifier.padding(top = 16.dp, bottom = 8.dp))
                     ColourChoice(
-                        BackgroundPresets + AccentPresets,
+                        NotePresets,
                         style.noteBackground,
                         { onChange(style.copy(noteBackground = it)) },
                         automatic = "The screen's own",
                     )
+                    if (style.noteBackground != null) {
+                        SizeLabel("Its text", Modifier.padding(top = 16.dp, bottom = 8.dp))
+                        val textChoices = listOf(null, true, false)
+                        SegmentedChoice(
+                            options = listOf("To suit it", "Dark", "Light"),
+                            selected = textChoices.indexOf(style.noteDarkText),
+                            onSelect = { onChange(style.copy(noteDarkText = textChoices[it])) },
+                        )
+                    }
                     val fits = style.noteFitsBesideClock(widgetScreen)
                     OptionRow(
                         Icons.Default.DateRange,
@@ -519,6 +539,12 @@ internal fun HomeStyleContent(
                             onClick = onQuotes,
                         ) { Chevron() }
                     }
+                }
+                if (Modules.isOn(style, widgetScreen, Module.HOURS)) SectionCard(
+                    title = "Distraction tracker",
+                    subtitle = if (widgetScreen == Screen.HOME) "Its look on the home screen" else "Its look on the lock screen",
+                ) {
+                    UseWidgetOptions(style.useWidgetFor(widgetScreen)) { onChange(style.withUseWidget(widgetScreen, it)) }
                 }
                 if (Modules.onAnywhere(style, Module.WEATHER)) SectionCard(title = "Weather", subtitle = "From Breezy Weather, a free app that does the fetching; this one never goes online") {
                     OptionRow(
@@ -557,6 +583,11 @@ internal fun HomeStyleContent(
                         if (widgetScreen == Screen.HOME) "A calendar icon when nothing's coming" else "A calendar icon on the lock screen when nothing's coming",
                         description = "A tap shows the week ahead",
                     ) { ObsidianToggle(style.calendarIcon(widgetScreen), { onChange(style.withCalendarIcon(widgetScreen, it)) }) }
+                    OptionRow(
+                        Icons.Default.DateRange,
+                        "Tomorrow's first event, once today's are done",
+                        description = "In the evening, what the morning starts with",
+                    ) { ObsidianToggle(style.calendarTomorrow, { onChange(style.copy(calendarTomorrow = it)) }) }
                     if (Modules.isOn(style, Screen.LOCK, Module.EVENT)) {
                         OptionRow(
                             Icons.Default.Lock,
@@ -918,5 +949,48 @@ internal fun ModuleListEditor(
             val updated = list.map { if (it.module == choice.module) it.copy(on = on) else it }
             if (on) onSwitchedOn(updated, choice.module) else onChange(updated)
         }, enabled = enabled)
+    }
+}
+
+/** The distraction tracker's look on one screen: dots, a line, a budget bar or the top apps; its figures; the budget. */
+@Composable
+private fun UseWidgetOptions(use: UseWidget, onChange: (UseWidget) -> Unit) {
+    SegmentedChoice(
+        options = listOf("Dots", "Line", "Budget", "Apps", "Apps line"),
+        selected = use.look.ordinal,
+        onSelect = { i ->
+            val look = UseLook.entries[i]
+            // A line with nothing chosen would only say the distracting time; start it with both.
+            onChange(if (look == UseLook.LINE && !use.total && !use.distracting) use.copy(look = look, total = true, distracting = true) else use.copy(look = look))
+        },
+    )
+    Spacer(Modifier.height(8.dp))
+    if (use.look == UseLook.DOTS || use.look == UseLook.LINE) {
+        val under = if (use.look == UseLook.DOTS) " in a small line under the dots" else ""
+        OptionRow(Icons.Default.Phone, "Time on the phone", description = "All of today, in any app$under") {
+            ObsidianToggle(use.total, { onChange(use.copy(total = it)) })
+        }
+        OptionRow(Icons.Default.Warning, "Time in distracting apps", description = "Today so far$under") {
+            ObsidianToggle(use.distracting, { onChange(use.copy(distracting = it)) })
+        }
+    }
+    OptionRow(Icons.Default.Lock, "Unlocks", description = "How many times today; refuge counts them itself, so nothing more is asked") {
+        ObsidianToggle(use.unlocks, { onChange(use.copy(unlocks = it)) })
+    }
+    if (use.look == UseLook.BUDGET) {
+        SizeLabel("The budget counts", Modifier.padding(top = 12.dp, bottom = 8.dp))
+        SegmentedChoice(
+            options = listOf("Distracting apps", "The whole phone"),
+            selected = if (use.budgetWholePhone) 1 else 0,
+            onSelect = { onChange(use.copy(budgetWholePhone = it == 1)) },
+        )
+        SizeLabel("A day's allowance", Modifier.padding(top = 16.dp, bottom = 8.dp))
+        val minutes = if (use.budgetWholePhone) listOf(60, 120, 180, 240, 300, 360) else listOf(15, 30, 45, 60, 90, 120)
+        val chosen = if (use.budgetWholePhone) use.phoneBudgetMinutes else use.budgetMinutes
+        SegmentedChoice(
+            options = minutes.map { UseWords.short(it * 60L).replace(" min", "m") },
+            selected = minutes.indexOf(chosen).coerceAtLeast(0),
+            onSelect = { i -> onChange(if (use.budgetWholePhone) use.copy(phoneBudgetMinutes = minutes[i]) else use.copy(budgetMinutes = minutes[i])) },
+        )
     }
 }

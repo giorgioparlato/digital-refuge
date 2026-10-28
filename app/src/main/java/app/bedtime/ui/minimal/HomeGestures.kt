@@ -28,6 +28,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.alpha
+import app.bedtime.data.FolderIndex
+import app.bedtime.data.Notes
+import app.bedtime.ui.components.AppIcon
+import app.bedtime.ui.components.BedtimeIcons
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
@@ -63,12 +68,12 @@ fun readHomeDrag(dx: Float, dy: Float, minDistance: Float): HomeDrag = when {
  * the app's own notes, or one of your files.
  */
 @Composable
-internal fun QuickNoteDialog(style: HomeStyle, targets: List<NoteTarget>, onSave: (String, NoteTarget?) -> Unit, onDismiss: () -> Unit) {
-    Dialog(onDismissRequest = onDismiss) { QuickNoteContent(style, targets, onSave = { words, target -> onSave(words, target); onDismiss() }) }
+internal fun QuickNoteDialog(style: HomeStyle, targets: List<NoteTarget>, onSave: (String, NoteTarget?) -> Unit, onDismiss: () -> Unit, vault: String? = null) {
+    Dialog(onDismissRequest = onDismiss) { QuickNoteContent(style, targets, onSave = { words, target -> onSave(words, target); onDismiss() }, vault = vault) }
 }
 
 @Composable
-internal fun QuickNoteContent(style: HomeStyle, targets: List<NoteTarget>, onSave: (String, NoteTarget?) -> Unit, initial: String = "", focus: Boolean = true) {
+internal fun QuickNoteContent(style: HomeStyle, targets: List<NoteTarget>, onSave: (String, NoteTarget?) -> Unit, initial: String = "", focus: Boolean = true, vault: String? = null) {
     val p = style.palette()
     var words by remember { mutableStateOf(initial) }
     val focusRequester = remember { FocusRequester() }
@@ -112,15 +117,18 @@ internal fun QuickNoteContent(style: HomeStyle, targets: List<NoteTarget>, onSav
                     .padding(vertical = 10.dp, horizontal = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(
-                    if (target?.daily == true) Icons.Default.DateRange else Icons.Default.Edit,
-                    contentDescription = null,
-                    tint = if (ready) p.accent else p.faint,
-                    modifier = Modifier.size(20.dp),
-                )
+                // Where it goes, at a glance: refuge's mark, Obsidian's own icon for your vault, or a file.
+                Box(Modifier.size(22.dp).alpha(if (ready) 1f else 0.5f), contentAlignment = Alignment.Center) {
+                    when {
+                        target == null || target.uri.startsWith("refuge:") ->
+                            Icon(BedtimeIcons.Refuge, contentDescription = "refuge notes", tint = p.accent, modifier = Modifier.size(22.dp))
+                        vault != null && Notes.inFolder(target.uri, vault) -> AppIcon(FolderIndex.OBSIDIAN, "Obsidian", 22.dp)
+                        else -> Icon(if (target.daily) Icons.Default.DateRange else Icons.Default.Edit, contentDescription = null, tint = p.accent, modifier = Modifier.size(20.dp))
+                    }
+                }
                 Spacer(Modifier.width(14.dp))
                 Text(
-                    target?.let { "Add to ${it.name}" } ?: "Save in refuge notes",
+                    target?.let { if (it.daily) "Add to today's note in ${it.name}" else "Add to ${it.name}" } ?: "Save in refuge notes",
                     style = MaterialTheme.typography.bodyLarge,
                     color = if (ready) p.text else p.faint,
                 )

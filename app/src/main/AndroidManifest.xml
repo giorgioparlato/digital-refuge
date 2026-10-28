@@ -120,6 +120,13 @@
             android:windowSoftInputMode="adjustResize" />
 
         <activity
+            android:name=".ui.blocked.NudgeActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity="app.bedtime.nudge" />
+
+        <activity
             android:name=".ui.minimal.MinimalHomeActivity"
             android:excludeFromRecents="true"
             android:exported="false"

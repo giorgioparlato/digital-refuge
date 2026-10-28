@@ -80,6 +80,8 @@ fun DistractionScreen(onBack: () -> Unit) {
         onMinutes = { m -> scope.launch { repo.updateSettings { it.copy(distractionMinutes = m) } } },
         totalMinutes = current.distractionTotalMinutes,
         onTotalMinutes = { m -> scope.launch { repo.updateSettings { it.copy(distractionTotalMinutes = m) } } },
+        runNudge = current.runNudgeMinutes,
+        onRunNudge = { m -> scope.launch { repo.updateSettings { it.copy(runNudgeMinutes = m) } } },
         calmColor = current.homeStyle.hourCalmColor,
         distractedColor = current.homeStyle.hourDistractedColor,
         onCalmColor = { v -> scope.launch { repo.updateSettings { it.copy(homeStyle = it.homeStyle.copy(hourCalmColor = v)) } } },
@@ -99,6 +101,8 @@ internal fun DistractionContent(
     distractedColor: Long? = null,
     totalMinutes: Int? = null,
     onTotalMinutes: (Int?) -> Unit = {},
+    runNudge: Int? = null,
+    onRunNudge: (Int?) -> Unit = {},
     onCalmColor: (Long?) -> Unit = {},
     onDistractedColor: (Long?) -> Unit = {},
 ) {
@@ -135,6 +139,15 @@ internal fun DistractionContent(
                     selected = totals.indexOf(totalMinutes).coerceAtLeast(0),
                     onSelect = { onTotalMinutes(totals[it]) },
                 )
+            }
+            SectionCard(title = "A nudge after time in a row", subtitle = "After so long on the phone without the screen going off, in any app, a full screen asks if it's still what you meant to do. Never during a call") {
+                val nudges = listOf<Int?>(null, 5, 10, 15, 20, 30, 45)
+                SegmentedChoice(
+                    options = nudges.map { it?.let { m -> "$m" } ?: "Off" },
+                    selected = nudges.indexOf(runNudge).coerceAtLeast(0),
+                    onSelect = { onRunNudge(nudges[it]) },
+                )
+                Text("Minutes", style = MaterialTheme.typography.labelMedium, color = c.textMuted, modifier = Modifier.padding(top = 8.dp))
             }
             SectionCard(title = "Colours") {
                 // How they'll look: a few calm hours, two distracted ones, this one, and some to come.

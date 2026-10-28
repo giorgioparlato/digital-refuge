@@ -99,6 +99,7 @@ fun StatsScreen(onBack: () -> Unit) {
         zone = ZoneId.systemDefault(),
         onBack = onBack,
         use = use,
+        months = app.bedtime.ui.components.rememberUseMonths(),
         rule = settings?.let { HourlyUse.rule(it) } ?: HourRule(5),
         labels = labels,
         onAllowAccess = { runCatching { context.startActivity(UsageReader.accessIntent(context)) } },
@@ -115,6 +116,8 @@ internal fun StatsContent(
     onBack: () -> Unit,
     /** Phone use, and what makes an hour a distracted one; no phone sections without it. */
     use: UseDays? = null,
+    /** The last six months, for "Month by month". */
+    months: List<app.bedtime.data.UsageMonth> = emptyList(),
     rule: HourRule = HourRule(5),
     labels: Map<String, String> = emptyMap(),
     onAllowAccess: (() -> Unit)? = null,
@@ -134,7 +137,7 @@ internal fun StatsContent(
             Spacer(Modifier.height(2.dp))
             if (use != null) {
                 val nowHour = java.time.Instant.ofEpochMilli(now).atZone(zone).hour
-                PhoneUseSections(use, today, nowHour, rule, labels, onAllowAccess)
+                PhoneUseSections(use, today, nowHour, rule, labels, onAllowAccess, months)
                 SectionLabel("Time in refuge")
             }
             SectionCard {

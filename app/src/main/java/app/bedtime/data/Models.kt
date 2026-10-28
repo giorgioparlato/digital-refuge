@@ -266,6 +266,10 @@ data class HomeStyle(
     val noteLines: Int = 6,
     /** The note widget's own card colour, ARGB; null leaves it on the screen's background. */
     val noteBackground: Long? = null,
+    /** On that card, dark words or light ones; null suits them to the card. */
+    val noteDarkText: Boolean? = null,
+    /** The size of the note widget's words; beside the clock, a step smaller still. */
+    val noteTextSize: TextSize = TextSize.MEDIUM,
     /** The note beside the clock rather than in the list, on the home screen and on the lock screen; only with a small clock and no weather beside it. */
     val noteBesideClock: Boolean = false,
     val lockNoteBesideClock: Boolean = false,
@@ -274,9 +278,18 @@ data class HomeStyle(
     /** With nothing coming today, a small calendar icon where the next event would be, opening the week ahead; on each screen. */
     val calendarIconWhenEmpty: Boolean = true,
     val lockCalendarIconWhenEmpty: Boolean = true,
+    /** Once today's events are done, tomorrow's first one in their place, to get ready for the morning. */
+    val calendarTomorrow: Boolean = false,
     /** Room above the lock screen's clock; null takes the home screen's [topSpace]. */
     val lockTopSpace: TopSpace? = null,
+    /** How the distraction tracker looks on the home screen, and on the lock screen (null: as on home). */
+    val useWidget: UseWidget = UseWidget(),
+    val lockUseWidget: UseWidget? = null,
 ) {
+    fun useWidgetFor(screen: Screen): UseWidget = if (screen == Screen.HOME) useWidget else lockUseWidget ?: useWidget
+
+    fun withUseWidget(screen: Screen, widget: UseWidget): HomeStyle = if (screen == Screen.HOME) copy(useWidget = widget) else copy(lockUseWidget = widget)
+
     fun weatherStyleFor(screen: Screen): WeatherStyle = if (screen == Screen.HOME) weatherStyle else lockWeatherStyle ?: weatherStyle
 
     fun withWeatherStyle(screen: Screen, ws: WeatherStyle): HomeStyle = if (screen == Screen.HOME) copy(weatherStyle = ws) else copy(lockWeatherStyle = ws)
@@ -365,6 +378,8 @@ data class AppSettings(
     val distractionMinutes: Int = 5,
     /** Minutes in any app that make an hour a distracted one too; null leaves it to the distracting apps. */
     val distractionTotalMinutes: Int? = null,
+    /** A nudge after this many minutes in a row on the phone, in any app; null for none. */
+    val runNudgeMinutes: Int? = null,
     /** Keywords for the search's choices and for apps ("app:" + package); the suggested ones until [keywordsCustom]. */
     val keywords: Map<String, String> = emptyMap(),
     val keywordsCustom: Boolean = false,
@@ -519,6 +534,8 @@ data class UsageDay(
     val extraMinutes: Map<String, List<Int>> = emptyMap(),
     /** Limits lifted for the rest of this day. */
     val lifted: Set<String> = emptySet(),
+    /** Unlocks counted by refuge itself; null on days from before it counted them. */
+    val unlocks: Int? = null,
 )
 
 /** A named set of apps for ticking many at once in the app picker. Copied into schedules, never linked. */
