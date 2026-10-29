@@ -44,6 +44,10 @@ data class LockNotification(
     val missedCall: Boolean = false,
     /** The names it's about (sender, conversation, people it lists), only for choosing which show. */
     val people: List<String> = emptyList(),
+    /** A group chat's name, when it's from one. */
+    val group: String? = null,
+    /** One of refuge's own (the rain alert, the week's note), which shows whatever apps are chosen. */
+    val ours: Boolean = false,
 )
 
 /**
@@ -130,22 +134,51 @@ object LockNotifications {
         return parts.take(3).joinToString(" · ") + if (parts.size > 3) " · and more" else ""
     }
 
+    /** What the lock screen shows: from these apps, these people in any app, and these circles. */
+    data class Chosen(val apps: Set<String>, val people: Set<String>, val circles: List<Circle>)
+
     /**
-     * The apps and people whose notifications the lock screen shows while [sessions] run, the strictest
-     * winning: none if any says none (null), else the first with its own choice, else your usual ones.
+     * What the lock screen shows while [sessions] run, the strictest winning: nothing if any says none
+     * (null), else the first with its own choice, else your usual apps and all your circles.
      */
-    fun chosen(usualApps: Set<String>, usualPeople: Set<String>, sessions: List<Schedule>): Pair<Set<String>, Set<String>>? {
+    fun chosen(usualApps: Set<String>, circles: List<Circle>, sessions: List<Schedule>): Chosen? {
         if (sessions.any { it.lockNotes == LockNotes.NONE }) return null
-        return sessions.firstOrNull { it.lockNotes == LockNotes.OWN }?.let { it.lockNoteApps to it.lockNotePeople } ?: (usualApps to usualPeople)
+        return sessions.firstOrNull { it.lockNotes == LockNotes.OWN }
+            ?.let { own -> Chosen(own.lockNoteApps, own.lockNotePeople, circles.filter { it.id in own.lockNoteCircles }) }
+            ?: Chosen(usualApps, emptySet(), circles)
     }
 
-    /** Whether [note] is one you asked for: from one of [apps], or from one of [people] in any app. */
-    fun wanted(note: LockNotification, apps: Set<String>, people: Set<String>): Boolean =
-        note.packageName in apps || note.people.any { name -> people.any { it.equals(name.trim(), ignoreCase = true) } }
+    private fun same(a: String, b: String) = a.trim().equals(b.trim(), ignoreCase = true)
 
-    /** Worth a line at all: not ours, not ongoing (music, navigation), not a group's summary, not minimal. */
-    fun worthShowing(packageName: String, ownPackage: String, clearable: Boolean, groupSummary: Boolean, importance: Int): Boolean =
-        packageName != ownPackage && clearable && !groupSummary && importance > NotificationManager.IMPORTANCE_MIN
+    /**
+     * The first of [circles] [note] belongs to: a group chat by its name; anything else by a person it's
+     * about. A person in a circle doesn't bring in every group they write in.
+     */
+    fun circleOf(note: LockNotification, circles: List<Circle>): Circle? = circles.firstOrNull { circle ->
+        val group = note.group
+        if (group != null) circle.groups.any { same(it, group) } else note.people.any { name -> circle.people.any { same(it, name) } }
+    }
+
+    /** Whether [note] is one you asked for: from one of the apps, one of the people, or one of the circles. */
+    fun wanted(note: LockNotification, chosen: Chosen): Boolean =
+        note.ours ||
+            note.packageName in chosen.apps ||
+            note.people.any { name -> chosen.people.any { same(it, name) } } ||
+            circleOf(note, chosen.circles) != null
+
+    /** Your circles first, in their order, then the rest; newest first within each. */
+    fun sorted(notes: List<LockNotification>, circles: List<Circle>): List<LockNotification> =
+        notes.sortedWith(compareBy<LockNotification> { note -> circleOf(note, circles)?.let(circles::indexOf) ?: circles.size }.thenByDescending { it.postedAt })
+
+    /** refuge's own notifications that belong on its lock screen: the rain alert and the week's note. */
+    val OUR_CHANNELS = setOf("rain", "look_back")
+
+    /**
+     * Worth a line at all: not ongoing (music, navigation), not a group's summary, not minimal; and of
+     * our own, only those on [OUR_CHANNELS] ([channel]), not the session's.
+     */
+    fun worthShowing(packageName: String, ownPackage: String, clearable: Boolean, groupSummary: Boolean, importance: Int, channel: String? = null): Boolean =
+        (packageName != ownPackage || channel in OUR_CHANNELS) && clearable && !groupSummary && importance > NotificationManager.IMPORTANCE_MIN
 
     /**
      * Whether Android's own shade would show it now: a session's "hide notifications" takes it out of

@@ -8,6 +8,7 @@ import android.os.SystemClock
 import android.widget.Toast
 import app.bedtime.apps.AppCatalog
 import app.bedtime.data.AppLimit
+import app.bedtime.data.Problems
 import app.bedtime.data.Repository
 import app.bedtime.data.UsageDay
 import app.bedtime.engine.Limits
@@ -266,6 +267,6 @@ internal class LimitTracker(
 
     private fun cover(intent: android.content.Intent) {
         handler.removeCallbacks(tick)
-        runCatching { context.startActivity(intent) }
+        Problems.attempt("covering a limited app") { context.startActivity(intent) }
     }
 }

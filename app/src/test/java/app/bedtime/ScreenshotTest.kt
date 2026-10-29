@@ -275,19 +275,6 @@ class ScreenshotTest {
     fun homeWhatsNew() = shot(tall = true) { Home(Samples.home().copy(whatsNew = app.bedtime.data.Changelog.entries.last())) }
 
     @Test
-    fun schedules() = shot(tall = true) {
-        val ui = Samples.home()
-        app.bedtime.ui.schedules.SchedulesContent(
-            schedules = ui.schedules.filterNot { it.isBlock },
-            active = ui.active,
-            now = ui.now,
-            onEdit = {},
-            onCreate = {},
-            onToggle = { _, _ -> },
-        )
-    }
-
-    @Test
     fun limits() = shot(tall = true) {
         val ui = Samples.home()
         val today = LocalDate.now().toEpochDay()

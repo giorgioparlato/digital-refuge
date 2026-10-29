@@ -1,17 +1,14 @@
 package app.bedtime.ui.minimal
 
+import app.bedtime.ui.components.rememberNow
 import androidx.compose.material.icons.filled.Edit
-import app.bedtime.data.NoteWidget
-import app.bedtime.ui.notes.NoteWidgetView
 import app.bedtime.ui.minimal.WidgetSheet
 import androidx.compose.foundation.shape.CircleShape
 import app.bedtime.data.Schedule
 import app.bedtime.ui.components.rememberNowPlaying
 import app.bedtime.ui.components.NowPlayingWidget
-import app.bedtime.data.Habits
 import app.bedtime.ui.habits.rememberHabits
 import app.bedtime.ui.habits.HabitDetailContent
-import app.bedtime.ui.habits.HabitsWidget
 import app.bedtime.data.Keywords
 import app.bedtime.data.Module
 import app.bedtime.data.Modules
@@ -144,7 +141,6 @@ import app.bedtime.ui.theme.BedtimeTheme
 import app.bedtime.ui.theme.Obsidian
 import app.bedtime.unlock.UnlockFlow
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.time.LocalDateTime
 
@@ -341,13 +337,8 @@ private fun MinimalHomeScreen(
         dialer = dialer,
     )
     val apps = lists.home.mapNotNull(byPackage::get).let { home -> if (occurrence != null) home.sortedBy { it.label.lowercase() } else home }
-    var now by remember { mutableStateOf(LocalDateTime.now()) }
-    LaunchedEffect(Unit) {
-        while (true) {
-            now = LocalDateTime.now()
-            delay(1_000)
-        }
-    }
+    // Each second only while a block just started can still be undone; otherwise each minute.
+    val now = rememberNow(everySecond = occurrence?.schedule?.isBlock == true && Repository.canUndo(occurrence.start, System.currentTimeMillis()))
 
     if (loadedSettings == null || (occurrence == null && !asHome)) {
         Surface(Modifier.fillMaxSize(), color = style.palette().background) { }
@@ -491,6 +482,7 @@ private fun MinimalHomeScreen(
             is DrawerResult.File -> open(FolderIndex.openIntent(result.file))
         }
     }
+    val homeNote = noteSlots(style, Screen.HOME, widgetNote, onWrite = { n, text -> scope.launch { repo.editNote(n.id, text) } }, onHold = { holding = Module.NOTE })
     when {
         notesOpen -> {
             BackHandler { notesOpen = false }
@@ -586,56 +578,18 @@ private fun MinimalHomeScreen(
             onOpenNotes = { notesOpen = true },
             onWidgetHold = { holding = it },
             onScreenHold = { screenSheet = true },
-            note = if (Modules.isOn(style, Screen.HOME, Module.NOTE)) {
-                {
-                    NoteWidgetView(
-                        widgetNote,
-                        style.palette().text, style.palette().faint, style.palette().accent,
-                        Modifier.padding(top = 22.dp),
-                        maxLines = style.noteLines,
-                        card = style.noteBackground?.let { androidx.compose.ui.graphics.Color(it) },
-                        darkText = style.noteDarkText,
-                        textScale = style.noteTextSize.scale,
-                        onToggle = { i -> widgetNote?.let { n -> scope.launch { repo.editNote(n.id, NoteWidget.toggled(n.text, i)) } } },
-                        onSave = { written -> widgetNote?.let { n -> scope.launch { repo.editNote(n.id, written) } } },
-                        onHold = { holding = Module.NOTE },
-                    )
-                }
-            } else {
-                null
-            },
+            note = homeNote.inList,
             // Small, beside the clock, where you've asked and it fits.
-            noteBeside = if (Modules.isOn(style, Screen.HOME, Module.NOTE) && style.noteBeside(Screen.HOME) && style.noteFitsBesideClock(Screen.HOME)) {
-                {
-                    NoteWidgetView(
-                        widgetNote,
-                        style.palette().text, style.palette().faint, style.palette().accent,
-                        maxLines = style.noteLines.coerceAtMost(3),
-                        textScale = style.noteTextSize.scale,
-                        compact = true,
-                        onToggle = { i -> widgetNote?.let { n -> scope.launch { repo.editNote(n.id, NoteWidget.toggled(n.text, i)) } } },
-                        onSave = { written -> widgetNote?.let { n -> scope.launch { repo.editNote(n.id, written) } } },
-                        onHold = { holding = Module.NOTE },
-                    )
-                }
-            } else {
-                null
-            },
+            noteBeside = homeNote.beside,
             nowPlaying = nowPlaying?.takeIf { Modules.isOn(style, Screen.HOME, Module.NOW_PLAYING) }?.let { playing ->
                 { NowPlayingWidget(playing, style.palette().text, style.palette().faint, Modifier.padding(top = 20.dp), onOpen = { AppCatalog.launch(context, it) }) }
             },
-            habits = habitList.filter { it.shownOn(Screen.HOME) }.takeIf { it.isNotEmpty() && Modules.isOn(style, Screen.HOME, Module.HABITS) }?.let { list ->
-                {
-                    val today = HourlyUse.today()
-                    HabitsWidget(
-                        list, habitMarks, today, style.palette().text, style.palette().faint, style.palette().accent,
-                        Modifier.padding(top = 22.dp),
-                        onTap = { h -> scope.launch { repo.markHabit(h.id, today, Habits.tapped(h, habitMarks[h.id]?.get(today) ?: 0)) } },
-                        onOpen = { openHabit = it.id },
-                        onHold = { holding = Module.HABITS },
-                    )
-                }
-            },
+            habits = habitsSlot(
+                style, Screen.HOME, habitList, habitMarks,
+                onMark = { h, day, value -> scope.launch { repo.markHabit(h.id, day, value) } },
+                onOpen = { openHabit = it.id },
+                onHold = { holding = Module.HABITS },
+            ),
             onGesture = onGesture,
             hours = todayHours.takeIf { Modules.isOn(style, Screen.HOME, Module.HOURS) && HourlyUse.counting(settings) }
                 ?.let { HourlyUse.states(it, now.hour, HourlyUse.rule(settings)) },

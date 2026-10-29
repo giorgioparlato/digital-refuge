@@ -12,10 +12,12 @@ class WeatherTest {
 
     @Test
     fun readsGadgetbridgesWeatherSpec() {
-        val w = Weather.parse(spec, receivedAt = 0L)!!
+        val w = Weather.parse(spec, receivedAt = 1_761_420_060_000L)!!
         assertEquals(285.4, w.kelvin, 0.001)
         assertEquals("light rain", w.condition)
         assertEquals(1_761_420_000_000L, w.at)
+        // Sent as if from the future, it counts from when it came, so it can't stay fresh for good.
+        assertEquals(1_000L, Weather.parse(spec, receivedAt = 1_000L)!!.at)
         // A list of locations: the first is yours.
         assertEquals("Stockholm", Weather.parse("[$spec, ${spec.replace("Stockholm", "Rome")}]", 0L)!!.location)
     }

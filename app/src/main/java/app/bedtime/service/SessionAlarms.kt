@@ -1,5 +1,7 @@
 package app.bedtime.service
 
+import app.bedtime.data.Problems
+
 import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
@@ -66,7 +68,7 @@ object SessionAlarms {
         }
         // A second past the boundary, so the engine already counts the session as started, or the pause as over.
         val at = next + 1_000
-        runCatching {
+        Problems.attempt("setting the next session's alarm") {
             if (canBeExact(manager)) {
                 manager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, intent)
             } else {
@@ -108,6 +110,7 @@ class BootReceiver : BroadcastReceiver() {
         async {
             Repository.get(context).migrateHomeGreen()
             SessionAlarms.schedule(context)
+            RainAlarm.schedule(context, Repository.get(context).settings.first().homeStyle)
         }
     }
 }

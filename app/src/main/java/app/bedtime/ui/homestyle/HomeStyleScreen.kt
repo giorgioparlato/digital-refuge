@@ -1,5 +1,12 @@
 package app.bedtime.ui.homestyle
 
+import app.bedtime.ui.settings.CircleScreen
+
+import app.bedtime.data.Circles
+
+import app.bedtime.data.Circle
+import app.bedtime.data.RainAlert
+
 import app.bedtime.data.ModuleChoice
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.foundation.text.BasicTextField
@@ -155,11 +162,8 @@ fun HomeStyleScreen(
     var notificationAccess by remember { mutableStateOf(LockNotificationListener.hasAccess(context)) }
     var askedForNotifications by rememberSaveable { mutableStateOf(false) }
     var pickingNotificationApps by rememberSaveable { mutableStateOf(false) }
-    var pickingPeople by rememberSaveable { mutableStateOf(false) }
-    // Choosing people reads your contacts: asked for the first time here.
-    val askContacts = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) pickingPeople = true else Toast.makeText(context, "contacts access wasn't allowed", Toast.LENGTH_SHORT).show()
-    }
+    /** The circle open to change, by id. */
+    var editingCircle by rememberSaveable { mutableStateOf<String?>(null) }
     val switchOnNotifications = {
         scope.launch { repo.updateSettings { it.copy(homeStyle = it.homeStyle.copy(lockNotifications = true)) } }
         // Nothing shows until you choose whose notifications to see, so the choice comes straight away.
@@ -190,15 +194,20 @@ fun HomeStyleScreen(
         }
     }
     val current = settings ?: return
-    if (pickingPeople) {
-        PeoplePickerScreen(
-            "Notifications from",
-            current.homeStyle.lockNotificationPeople,
-            onDone = { people ->
-                scope.launch { repo.updateSettings { it.copy(homeStyle = it.homeStyle.copy(lockNotificationPeople = people)) } }
-                pickingPeople = false
+    // Circles are saved whole, as a list, the first time any of them changes.
+    fun saveCircles(change: (List<Circle>) -> List<Circle>) {
+        scope.launch { repo.updateSettings { it.copy(homeStyle = it.homeStyle.copy(circles = change(Circles.of(it.homeStyle)))) } }
+    }
+    val circles = Circles.of(current.homeStyle)
+    circles.firstOrNull { it.id == editingCircle }?.let { circle ->
+        CircleScreen(
+            circle,
+            onChange = { changed -> saveCircles { list -> list.map { if (it.id == changed.id) changed else it } } },
+            onDelete = {
+                saveCircles { list -> list.filterNot { it.id == circle.id } }
+                editingCircle = null
             },
-            onBack = { pickingPeople = false },
+            onBack = { editingCircle = null },
         )
         return
     }
@@ -249,7 +258,13 @@ fun HomeStyleScreen(
         },
         notificationAccess = notificationAccess,
         onPickNotificationApps = { pickingNotificationApps = true },
-        onPickPeople = { if (ContactSearch.canRead(context)) pickingPeople = true else askContacts.launch(Manifest.permission.READ_CONTACTS) },
+        circles = circles,
+        onEditCircle = { id -> editingCircle = id },
+        onAddCircle = {
+            val added = Circle(name = "Circle ${circles.size + 1}")
+            saveCircles { it + added }
+            editingCircle = added.id
+        },
         weatherHeardAt = weather?.at,
         page = page,
         initialScreen = screen,
@@ -278,6 +293,7 @@ fun HomeStyleScreen(
     )
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun HomeStyleContent(
     style: HomeStyle,
@@ -297,8 +313,10 @@ internal fun HomeStyleContent(
     notificationAccess: Boolean = false,
     /** Opens the choice of apps whose notifications the lock screen shows. */
     onPickNotificationApps: () -> Unit = {},
-    /** And of people, from any app. */
-    onPickPeople: () -> Unit = {},
+    /** Your circles of people and group chats: each opens to change; another can be added, up to [Circles.MAX]. */
+    circles: List<Circle> = emptyList(),
+    onEditCircle: (String) -> Unit = {},
+    onAddCircle: () -> Unit = {},
     /** When Breezy Weather last sent the weather, if ever. */
     weatherHeardAt: Long? = null,
     /** The weather as the preview shows it, and as it would be in another style. */
@@ -515,23 +533,61 @@ internal fun HomeStyleContent(
                             },
                             onClick = onPickNotificationApps,
                         ) { Chevron() }
-                        val people = style.lockNotificationPeople.sorted()
-                        OptionRow(
-                            Icons.Default.Person,
-                            "And from these people",
-                            description = when (people.size) {
-                                0 -> "From any app: messages, calls, mail from them"
-                                in 1..3 -> people.joinToString(", ")
-                                else -> people.take(2).joinToString(", ") + " and ${people.size - 2} more"
-                            },
-                            onClick = onPickPeople,
-                        ) { Chevron() }
                         OptionRow(
                             Icons.Default.Edit,
                             "Quick replies",
                             description = "${style.quickReplies.size} ready to send with a tap. Typing your own works too",
                             onClick = { editingReplies = true },
                         ) { Chevron() }
+                    }
+                }
+                SectionCard(title = "Rain today", subtitle = "From Breezy Weather's forecast (see the weather widget's options to set it up)") {
+                    OptionRow(Icons.Default.Notifications, "A rain alert", description = "In the morning, when rain is likely today: how likely, and when") {
+                        ObsidianToggle(style.rainAlert, { onChange(style.copy(rainAlert = it)) })
+                    }
+                    if (style.rainAlert) {
+                        SizeLabel("At", Modifier.padding(top = 12.dp, bottom = 8.dp))
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            RainAlert.TIMES.forEach { minute ->
+                                QuickChip(formatMinuteOfDay(context, minute), style.rainAlertMinute == minute) { onChange(style.copy(rainAlertMinute = minute)) }
+                            }
+                        }
+                        SizeLabel("When the chance is at least", Modifier.padding(top = 16.dp, bottom = 8.dp))
+                        SegmentedChoice(
+                            options = RainAlert.THRESHOLDS.map { "$it%" },
+                            selected = RainAlert.THRESHOLDS.indexOf(style.rainAlertFrom).coerceAtLeast(0),
+                            onSelect = { onChange(style.copy(rainAlertFrom = RainAlert.THRESHOLDS[it])) },
+                        )
+                    }
+                }
+                if (style.lockNotifications && notificationAccess) {
+                    SectionCard(title = "Circles", subtitle = "People and group chats whose notifications show from any app, first, in their colour") {
+                        circles.forEach { circle ->
+                            val parts = listOfNotNull(
+                                circle.people.sorted().takeIf { it.isNotEmpty() }?.let { if (it.size <= 2) it.joinToString(", ") else "${it.size} people" },
+                                circle.groups.size.takeIf { it > 0 }?.let { if (it == 1) "1 group" else "$it groups" },
+                            )
+                            Row(
+                                Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { onEditCircle(circle.id) }.padding(vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Box(Modifier.size(14.dp).clip(CircleShape).background(circle.colour?.let { Color(it) } ?: Color(style.accent)))
+                                Column(Modifier.weight(1f).padding(start = 14.dp)) {
+                                    Text(circle.name, style = MaterialTheme.typography.bodyLarge, color = c.textNormal)
+                                    Text(parts.joinToString(" · ").ifEmpty { "Nobody yet" }, style = MaterialTheme.typography.bodySmall, color = c.textFaint)
+                                }
+                                Chevron()
+                            }
+                        }
+                        if (circles.size < Circles.MAX) {
+                            Row(
+                                Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable(onClick = onAddCircle).padding(vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = null, tint = c.accent, modifier = Modifier.size(18.dp))
+                                Text("Add a circle", style = MaterialTheme.typography.bodyLarge, color = c.accentText, modifier = Modifier.padding(start = 10.dp))
+                            }
+                        }
                     }
                 }
             }

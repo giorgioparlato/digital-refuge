@@ -9,25 +9,18 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,115 +28,28 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import app.bedtime.ui.components.AddCircleButton
 import app.bedtime.ui.components.CardRadius
 import app.bedtime.data.DndMode
 import app.bedtime.data.EditWindow
-import app.bedtime.data.Repository
 import app.bedtime.data.Schedule
 import app.bedtime.data.SessionLog
 import app.bedtime.engine.ActiveState
 import app.bedtime.engine.EditWindows
-import app.bedtime.engine.Engine
 import app.bedtime.engine.ScheduleEvaluator
 import app.bedtime.engine.Stats
-import app.bedtime.ui.components.CtaButton
 import app.bedtime.ui.components.ObsidianToggle
 import app.bedtime.ui.components.SwipeToDelete
 import app.bedtime.ui.components.Tag
 import app.bedtime.ui.components.Text
-import app.bedtime.ui.components.ObsidianTopBar
-import app.bedtime.ui.components.PageGutter
 import app.bedtime.ui.formatDays
 import app.bedtime.ui.formatMinuteOfDay
 import app.bedtime.ui.formatRelative
 import app.bedtime.ui.formatTime
 import app.bedtime.ui.pluralApps
 import app.bedtime.ui.theme.Obsidian
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import java.time.Instant
 import java.time.ZoneId
 
 /** The schedules tab: the hours that look after themselves. */
-@Composable
-fun SchedulesScreen(onEdit: (String) -> Unit, onCreate: () -> Unit) {
-    val context = LocalContext.current
-    val repo = remember { Repository.get(context) }
-    val scope = rememberCoroutineScope()
-    val schedules: List<Schedule>? by repo.schedules.collectAsStateWithLifecycle(initialValue = null)
-    val active by Engine.state(context).collectAsStateWithLifecycle()
-    val history by repo.history.collectAsStateWithLifecycle(initialValue = emptyList())
-    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
-    LaunchedEffect(Unit) {
-        while (true) {
-            delay(30_000)
-            now = System.currentTimeMillis()
-        }
-    }
-    val loaded = schedules ?: return
-    SchedulesContent(
-        schedules = loaded.filterNot { it.isBlock },
-        active = active,
-        history = history,
-        now = now,
-        onEdit = onEdit,
-        onCreate = onCreate,
-        onToggle = { schedule, on -> scope.launch { repo.upsert(schedule.copy(enabled = on)) } },
-        onDelete = { schedule -> scope.launch { repo.delete(schedule.id) } },
-    )
-}
-
-@Composable
-internal fun SchedulesContent(
-    schedules: List<Schedule>,
-    active: ActiveState?,
-    history: List<SessionLog> = emptyList(),
-    now: Long,
-    onEdit: (String) -> Unit,
-    onCreate: () -> Unit,
-    onToggle: (Schedule, Boolean) -> Unit,
-    onDelete: (Schedule) -> Unit = {},
-) {
-    val c = Obsidian.colors
-    val minuteOfDay = remember(now) {
-        Instant.ofEpochMilli(now).atZone(ZoneId.systemDefault()).toLocalTime().let { it.hour * 60 + it.minute }
-    }
-    Scaffold(
-        containerColor = c.bgPrimary,
-        topBar = { ObsidianTopBar("schedules", subtitle = "hours that look after themselves") },
-        floatingActionButton = {
-            if (schedules.isNotEmpty()) {
-                AddCircleButton("new schedule", onClick = onCreate)
-            }
-        },
-    ) { padding ->
-        LazyColumn(
-            Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(start = PageGutter, end = PageGutter, top = 4.dp, bottom = 110.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            if (schedules.isEmpty()) {
-                item(key = "empty") {
-                    Column(Modifier.fillMaxWidth().padding(top = 16.dp)) {
-                        Text(
-                            "No schedules yet. A schedule keeps the same hours every week — bedtime, a working morning, a quiet weekend.",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = c.textMuted,
-                        )
-                        Spacer(Modifier.height(16.dp))
-                        CtaButton("Create a schedule", onClick = onCreate, modifier = Modifier.fillMaxWidth())
-                    }
-                }
-            }
-            items(schedules.size, key = { schedules[it].id }) { index ->
-                ScheduleItem(schedules[index], active, history, now, minuteOfDay, onEdit, onToggle, onDelete)
-            }
-        }
-    }
-}
-
 /** A schedule as a card that opens it, with its switch, and a swipe to delete it when that's allowed. */
 @Composable
 internal fun ScheduleItem(

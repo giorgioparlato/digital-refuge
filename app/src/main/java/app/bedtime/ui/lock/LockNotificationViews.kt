@@ -1,5 +1,9 @@
 package app.bedtime.ui.lock
 
+import androidx.compose.ui.draw.drawBehind
+
+import androidx.compose.ui.graphics.Color
+
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.ImeAction
@@ -96,6 +100,7 @@ private const val MAX_NOTIFICATIONS = 4
 internal fun NotificationArea(
     notes: List<LockNotification>,
     style: HomeStyle,
+    circles: List<app.bedtime.data.Circle> = emptyList(),
     listOpen: Boolean,
     onListOpen: (Boolean) -> Unit,
     handlers: NoteHandlers,
@@ -133,6 +138,8 @@ internal fun NotificationArea(
                     NotificationRow(
                         note = note,
                         p = p,
+                        // A circle's colour down its left edge; the screen's accent if the circle has none.
+                        mark = LockNotifications.circleOf(note, circles)?.let { circle -> circle.colour?.let { Color(it) } ?: p.accent },
                         expanded = expanded == note.key,
                         onExpand = { open -> onExpand(if (open) note.key else null) },
                         handlers = handlers,
@@ -186,6 +193,7 @@ private fun SummaryLine(summary: String, p: HomePalette, onOpen: () -> Unit) {
 private fun NotificationRow(
     note: LockNotification,
     p: HomePalette,
+    mark: Color? = null,
     expanded: Boolean,
     onExpand: (Boolean) -> Unit,
     handlers: NoteHandlers,
@@ -209,7 +217,8 @@ private fun NotificationRow(
             .clip(RoundedCornerShape(14.dp))
             // Opaque underneath, so a quote it passes over doesn't show through.
             .background(p.background)
-            .background(p.text.copy(alpha = 0.06f)),
+            .background(p.text.copy(alpha = 0.06f))
+            .then(if (mark != null) Modifier.drawBehind { drawRect(mark, size = size.copy(width = 4.dp.toPx())) } else Modifier),
     ) {
         Row(
             Modifier

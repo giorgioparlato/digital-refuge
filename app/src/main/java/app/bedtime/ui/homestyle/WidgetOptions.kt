@@ -119,7 +119,7 @@ object WidgetOptions {
                 change(style.copy(weatherUnit = it))
             },
             WidgetOption.Hint(
-                "Install Breezy Weather (it's on F-Droid). In its settings, under widgets, open “Send Gadgetbridge data” and tick digital refuge. " +
+                "Install Breezy Weather (it's on F-Droid). In its settings, under External modules, open “Send Gadgetbridge data” and tick digital refuge. " +
                     "It sends the weather each time it updates.",
             ),
         )

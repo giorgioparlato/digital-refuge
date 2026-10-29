@@ -26,14 +26,15 @@ settings
 ├── lock screen
 │   ├── in sessions · outside sessions too
 │   ├── look · widgets (as on the home screen, its own)
-│   ├── notifications: from these apps · and these people · quick replies
+│   ├── notifications: from these apps · quick replies · circles ── a circle: name · colour · people · groups
 │   └── gestures
 ├── search: what it offers · keywords · beside each contact · adding to your calendar · folders · try it
 ├── apps: app groups · always-available apps · distracting apps
 ├── notes: refuge notes · your files · today's daily note
 ├── cover messages: yours · the app's own
 ├── shortcuts: home-screen widget · quick-settings tile
-└── about & backup: how it works · the intro again · export · import · weekly backup · back up now
+└── about & backup: how it works · the intro again · export · import · recent problems · weekly backup ·
+                    back up now
 ```
 
 ## settings, and the pages it opens
@@ -95,7 +96,7 @@ Home screen, lock screen, apps, shortcuts and about & backup are lists of rows f
 - lock screen always launcher
 - Notifications
 - From the apps and people you choose
-- notifications messages reply replies people contacts lock screen
+- notifications messages reply replies people contacts circles groups lock screen rain alert weather
 - App groups
 - Tick many apps at once when choosing
 - 1 group
@@ -112,7 +113,7 @@ Home screen, lock screen, apps, shortcuts and about & backup are lists of rows f
 -  · what counts as a distracted hour
 - distraction distracting tracker hours dots
 - Export settings
-- Save schedules, blocks, groups and stats to a file
+- Everything you set, with your history, notes, habits and phone use, in one file
 - export backup save file
 - Import settings
 - Replace everything with a saved file
@@ -193,10 +194,10 @@ One file serves the look, widgets, gestures and notifications pages, for both sc
 <sub>[HomeStyleScreen.kt](../../app/src/main/java/app/bedtime/ui/homestyle/HomeStyleScreen.kt)</sub>
 
 - calendar access wasn't allowed
-- contacts access wasn't allowed
 - that file isn't a font this phone can read
 - Notifications from
 - allow notification access for digital refuge
+- Circle …
 - Home screen
 - Lock screen
 - Bedtime
@@ -238,10 +239,21 @@ One file serves the look, widgets, gestures and notifications pages, for both sc
 - From these apps
 - None yet. Pick the apps you want to hear from
 -  and … more
-- And from these people
-- From any app: messages, calls, mail from them
 - Quick replies
 - … ready to send with a tap. Typing your own works too
+- Rain today
+- From Breezy Weather's forecast (see the weather widget's options to set it up)
+- A rain alert
+- In the morning, when rain is likely today: how likely, and when
+- At
+- When the chance is at least
+- Circles
+- People and group chats whose notifications show from any app, first, in their colour
+- … people
+- 1 group
+- {it} groups
+- Nobody yet
+- Add a circle
 - Swipe up
 - All apps and search
 - Open {it}
@@ -318,7 +330,7 @@ One file serves the look, widgets, gestures and notifications pages, for both sc
 - 5 days
 - In
 - Automatic
-- Install Breezy Weather (it's on F-Droid). In its settings, under widgets, open “Send Gadgetbridge data” and tick digital refuge. It sends the weather each time it updates.
+- Install Breezy Weather (it's on F-Droid). In its settings, under External modules, open “Send Gadgetbridge data” and tick digital refuge. It sends the weather each time it updates.
 - Read from the calendar already on this phone. Nothing is fetched.
 - Tomorrow's first event, once today's are done
 - In the evening, what the morning starts with
@@ -367,6 +379,26 @@ One file serves the look, widgets, gestures and notifications pages, for both sc
 - Accent
 - Tap it for today's detail.
 - No habits yet.
+
+<sub>[CircleScreen.kt](../../app/src/main/java/app/bedtime/ui/settings/CircleScreen.kt)</sub>
+
+- contacts access wasn't allowed
+- A circle
+- Their notifications show on the lock screen whatever app they come from, above the rest, marked in the circle's colour.
+- Its name
+- Its colour
+- Accent
+- People
+- From your contacts, in any app: messages, calls, mail
+- Choose people
+- Tap to change
+- Group chats
+- By the group's name, as the app shows it. Someone in this circle writing in another group doesn't bring that group in
+- On your lock screen now
+- + {it}
+- A group's name
+- Add
+- Delete this circle
 
 <sub>[PeoplePickerScreen.kt](../../app/src/main/java/app/bedtime/ui/settings/PeoplePickerScreen.kt)</sub>
 
@@ -612,6 +644,17 @@ One file serves the look, widgets, gestures and notifications pages, for both sc
 - Add
 - The app's own
 - Always in the mix
+
+## recent problems
+
+<sub>[ProblemsScreen.kt](../../app/src/main/java/app/bedtime/ui/settings/ProblemsScreen.kt)</sub>
+
+- digital refuge problems
+- Recent problems
+- What failed lately and where, newest first: the last …. Only what went wrong is noted, never what was on the screen. Copy it into a message if something isn't working.
+- Nothing has gone wrong.
+- Copy all
+- Clear
 
 ## how it works and the intro
 

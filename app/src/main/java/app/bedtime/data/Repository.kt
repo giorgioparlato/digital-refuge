@@ -2,6 +2,7 @@ package app.bedtime.data
 
 import java.time.LocalDateTime
 import android.content.Context
+import androidx.datastore.core.DataMigration
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
@@ -22,9 +23,37 @@ import java.util.UUID
 
 private val Context.store: DataStore<Preferences> by preferencesDataStore(name = "bedtime")
 
-/** Schedules, runtime state, settings and history, each stored as JSON under its own DataStore key. */
+/**
+ * What changes all day — usage, notes, habit marks, weather, timers — in a file of its own, so that
+ * writing it doesn't rewrite the settings and schedules, or make everything reading those read again.
+ * Moved over from [store] once, the first time it's opened.
+ */
+private val Context.days: DataStore<Preferences> by preferencesDataStore(
+    name = "bedtime_days",
+    produceMigrations = { context -> listOf(MoveToDays(context.store)) },
+)
+
+/** Carries the day-to-day keys from the old single file into [days], then takes them out of it. */
+internal class MoveToDays(private val old: DataStore<Preferences>) : DataMigration<Preferences> {
+    override suspend fun shouldMigrate(currentData: Preferences): Boolean =
+        Repository.DAY_KEYS.none { it in currentData } && old.data.first().let { prefs -> Repository.DAY_KEYS.any { it in prefs } }
+
+    override suspend fun migrate(currentData: Preferences): Preferences {
+        val from = old.data.first()
+        return currentData.toMutablePreferences().apply { Repository.DAY_KEYS.forEach { key -> from[key]?.let { this[key] = it } } }.toPreferences()
+    }
+
+    override suspend fun cleanUp() {
+        old.edit { prefs -> Repository.DAY_KEYS.forEach { prefs.remove(it) } }
+    }
+}
+
+/** Schedules, runtime state, settings and history, each stored as JSON under its own DataStore key; the rest in [days]. */
 class Repository private constructor(context: Context) {
     private val store = context.store
+    private val days = context.days
+
+    private fun storeFor(key: Preferences.Key<String>): DataStore<Preferences> = if (key in DAY_KEYS) days else store
 
     val schedules: Flow<List<Schedule>> = observe(SCHEDULES, schedulesSerializer, emptyList())
     val runtime: Flow<RuntimeState> = observe(RUNTIME, RuntimeState.serializer(), RuntimeState())
@@ -215,17 +244,15 @@ class Repository private constructor(context: Context) {
      * leaves goes into its month's totals, so months last.
      */
     suspend fun updateUsage(day: Long, transform: (UsageDay) -> UsageDay) {
-        store.edit { prefs ->
-            val days = decode(prefs[USAGE], usageSerializer, emptyList())
-            val today = days.lastOrNull { it.day == day } ?: UsageDay(day)
-            val all = (days.filterNot { it.day == day } + transform(today)).sortedBy { it.day }
-            val gone = all.dropLast(USAGE_DAYS)
-            prefs[USAGE] = AppJson.encodeToString(usageSerializer, all.takeLast(USAGE_DAYS))
-            if (gone.isNotEmpty()) {
-                val months = decode(prefs[USAGE_MONTHS], monthsSerializer, emptyList())
-                val kept = PhoneUsage.fromRecords(gone).values.sortedBy { it.day }.fold(months) { m, d -> UseMonths.add(m, d) }
-                prefs[USAGE_MONTHS] = AppJson.encodeToString(monthsSerializer, kept.takeLast(MONTHS_KEPT))
-            }
+        days.edit { prefs ->
+            val (kept, months) = rolled(
+                decode(prefs[USAGE], usageSerializer, emptyList()),
+                { decode(prefs[USAGE_MONTHS], monthsSerializer, emptyList()) },
+                day,
+                transform,
+            )
+            prefs[USAGE] = AppJson.encodeToString(usageSerializer, kept)
+            if (months != null) prefs[USAGE_MONTHS] = AppJson.encodeToString(monthsSerializer, months)
         }
     }
 
@@ -321,11 +348,13 @@ class Repository private constructor(context: Context) {
         history = history.first(),
         notes = notes.first(),
         habitMarks = habitMarks.first(),
+        usage = usage.first(),
+        usageMonths = usageMonths.first(),
     )
 
     /**
-     * Replaces schedules, settings and history with [backup], and the notes too when it has some (an
-     * older backup has none, and shouldn't wipe yours). Runtime state is left alone.
+     * Replaces schedules, settings and history with [backup], and the notes, habit marks and phone use
+     * too when it has them (an older backup hasn't, and shouldn't wipe yours). Runtime state is left alone.
      */
     suspend fun restore(backup: Backup) {
         // Where this phone writes its weekly backups is this phone's, not the file's.
@@ -335,22 +364,33 @@ class Repository private constructor(context: Context) {
             prefs[SCHEDULES] = AppJson.encodeToString(schedulesSerializer, backup.schedules)
             prefs[SETTINGS] = AppJson.encodeToString(AppSettings.serializer(), restored)
             prefs[HISTORY] = AppJson.encodeToString(historySerializer, backup.history)
+        }
+        days.edit { prefs ->
             if (backup.notes.isNotEmpty()) prefs[NOTES] = AppJson.encodeToString(notesSerializer, backup.notes)
             if (backup.habitMarks.isNotEmpty()) prefs[HABIT_MARKS] = AppJson.encodeToString(habitMarksSerializer, backup.habitMarks)
+            // Phone use, only from files that have it, joined with what this phone has counted since.
+            if (backup.usage.isNotEmpty()) {
+                val here = decode(prefs[USAGE], usageSerializer, emptyList())
+                prefs[USAGE] = AppJson.encodeToString(usageSerializer, merged(backup.usage, here))
+            }
+            if (backup.usageMonths.isNotEmpty()) {
+                val here = decode(prefs[USAGE_MONTHS], monthsSerializer, emptyList())
+                prefs[USAGE_MONTHS] = AppJson.encodeToString(monthsSerializer, (backup.usageMonths.associateBy { it.month } + here.associateBy { it.month }).values.sortedBy { it.month }.takeLast(MONTHS_KEPT))
+            }
         }
     }
 
     private fun <T> observe(key: Preferences.Key<String>, serializer: KSerializer<T>, default: T): Flow<T> =
-        store.data.map { decode(it[key], serializer, default) }.distinctUntilChanged()
+        storeFor(key).data.map { decode(it[key], serializer, default) }.distinctUntilChanged()
 
     private suspend fun <T> update(key: Preferences.Key<String>, serializer: KSerializer<T>, default: T, transform: (T) -> T) {
-        store.edit { prefs ->
+        storeFor(key).edit { prefs ->
             prefs[key] = AppJson.encodeToString(serializer, transform(decode(prefs[key], serializer, default)))
         }
     }
 
     private fun <T> decode(raw: String?, serializer: KSerializer<T>, default: T): T =
-        raw?.let { runCatching { AppJson.decodeFromString(serializer, it) }.getOrNull() } ?: default
+        raw?.let { Problems.attempt("reading ${serializer.descriptor.serialName}") { AppJson.decodeFromString(serializer, it) } } ?: default
 
     companion object {
         private val SCHEDULES = stringPreferencesKey("schedules")
@@ -368,14 +408,32 @@ class Repository private constructor(context: Context) {
         private val notesSerializer = ListSerializer(Note.serializer())
         private val HABIT_MARKS = stringPreferencesKey("habit_marks")
         private val habitMarksSerializer = ListSerializer(HabitMark.serializer())
+
+        /** The keys kept in the day-to-day file rather than with the settings. */
+        internal val DAY_KEYS: Set<Preferences.Key<String>> by lazy { setOf(USAGE, USAGE_MONTHS, NOTES, HABIT_MARKS, WEATHER, TIMERS, LOCK_QUIET) }
         private val quietSerializer = MapSerializer(String.serializer(), Long.serializer())
         private val timersSerializer = ListSerializer(Long.serializer())
         /** About three years of nightly sessions, or several months of a busy mix: still a small file. */
         private const val MAX_HISTORY = 1000
-        /** Five weeks, enough for the week's figures and the strip of days on the limits tab. */
-        // Nine weeks: enough for a week against the usual of the four before, and the last eight weeks.
+        /** Nine weeks: enough for a week against the usual of the four before, and the last eight weeks. */
         private const val USAGE_DAYS = 63
         private val usageSerializer = ListSerializer(UsageDay.serializer())
+
+        /**
+         * [days] with [day] changed by [transform] (made if it isn't there), the last [USAGE_DAYS] kept;
+         * and if any fell out, [months] with them added, the last [MONTHS_KEPT] kept, else null.
+         */
+        internal fun rolled(days: List<UsageDay>, months: () -> List<UsageMonth>, day: Long, transform: (UsageDay) -> UsageDay): Pair<List<UsageDay>, List<UsageMonth>?> {
+            val today = days.lastOrNull { it.day == day } ?: UsageDay(day)
+            val all = (days.filterNot { it.day == day } + transform(today)).sortedBy { it.day }
+            val gone = all.dropLast(USAGE_DAYS)
+            val kept = if (gone.isEmpty()) null else PhoneUsage.fromRecords(gone).values.sortedBy { it.day }.fold(months()) { m, d -> UseMonths.add(m, d) }.takeLast(MONTHS_KEPT)
+            return all.takeLast(USAGE_DAYS) to kept
+        }
+
+        /** The file's days and this phone's together; a day in both keeps this phone's, which counted it live. */
+        internal fun merged(fromFile: List<UsageDay>, here: List<UsageDay>): List<UsageDay> =
+            (fromFile.associateBy { it.day } + here.associateBy { it.day }).values.sortedBy { it.day }.takeLast(USAGE_DAYS)
 
         /** How long after starting a block it can still be taken back with "undo". */
         const val UNDO_MS = 10_000L

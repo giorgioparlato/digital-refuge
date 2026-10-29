@@ -2,6 +2,7 @@ package app.bedtime.service
 
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.os.SystemClock
 import android.net.Uri
 import android.provider.Settings
@@ -19,6 +20,26 @@ object BlockingState {
     /** When the current break ends (elapsed-realtime millis); 0 means no break. */
     @Volatile
     private var breakUntil = 0L
+
+    /** Where the break's end is kept, so a restart of the app mid-break doesn't end it. */
+    @Volatile
+    private var prefs: SharedPreferences? = null
+
+    /** Picks up a break still running from before the app was restarted. */
+    fun init(context: Context) {
+        val stored = context.getSharedPreferences("blocking", Context.MODE_PRIVATE).also { prefs = it }
+        val left = stored.getLong(BREAK_END, 0L) - System.currentTimeMillis()
+        breakUntil = if (left > 0) SystemClock.elapsedRealtime() + left else 0L
+    }
+
+    /** Kept by the wall clock, which a reboot doesn't reset as it does elapsed time. */
+    private fun keepBreak(until: Long) {
+        breakUntil = until
+        val end = if (until == 0L) 0L else System.currentTimeMillis() + (until - SystemClock.elapsedRealtime())
+        prefs?.edit()?.putLong(BREAK_END, end)?.apply()
+    }
+
+    private const val BREAK_END = "breakEnd"
 
     /** Until when the takeover wall stays down, e.g. while the user is on the accessibility screen. */
     @Volatile
@@ -49,19 +70,19 @@ object BlockingState {
      */
     fun pause(minutes: Int): Boolean {
         val running = service ?: return false
-        breakUntil = SystemClock.elapsedRealtime() + minutes.coerceAtLeast(1) * 60_000L
+        keepBreak(SystemClock.elapsedRealtime() + minutes.coerceAtLeast(1) * 60_000L)
         running.disableSelf()
         return true
     }
 
     /** Extends the break by [minutes] (the "take X more minutes" button on the takeover). */
     fun snooze(minutes: Int) {
-        breakUntil = SystemClock.elapsedRealtime() + minutes.coerceAtLeast(1) * 60_000L
+        keepBreak(SystemClock.elapsedRealtime() + minutes.coerceAtLeast(1) * 60_000L)
     }
 
     /** Cleared when blocking comes back on, so the next switch-off isn't treated as still on break. */
     fun clearBreak() {
-        breakUntil = 0L
+        keepBreak(0L)
         overlaySuppressUntil = 0L
     }
 

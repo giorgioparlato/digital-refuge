@@ -1,5 +1,7 @@
 package app.bedtime.service
 
+import app.bedtime.data.Problems
+
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.PixelFormat
@@ -38,7 +40,7 @@ object TakeoverOverlay {
                 WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
                 PixelFormat.OPAQUE,
             )
-            runCatching { wm.addView(v, params) }.onSuccess { view = v }
+            Problems.attempt("drawing the full-screen reminder") { wm.addView(v, params) }?.let { view = v }
         }
         val v = view ?: return
         v.findViewById<TextView>(R.id.takeover_subtitle).text =

@@ -48,6 +48,8 @@ data class Schedule(
     val lockNotes: LockNotes = LockNotes.USUAL,
     val lockNoteApps: Set<String> = emptySet(),
     val lockNotePeople: Set<String> = emptySet(),
+    /** With [LockNotes.OWN], the circles ([Circle.id]) whose notifications show too. */
+    val lockNoteCircles: Set<String> = emptySet(),
     /** Its own widgets on the minimal and lock screens while it runs, in order; null keeps your usual ones. */
     val homeModules: List<ModuleChoice>? = null,
     val lockModules: List<ModuleChoice>? = null,
@@ -236,8 +238,10 @@ data class HomeStyle(
     val lockNotifications: Boolean = false,
     /** The apps whose notifications that lock screen may show; none until you pick them. */
     val lockNotificationApps: Set<String> = emptySet(),
-    /** People whose notifications show too, from any app, by their name in your contacts. */
+    /** People whose notifications show too, from any app; from 0.9.21 only the start of the first circle. */
     val lockNotificationPeople: Set<String> = emptySet(),
+    /** The people and group chats that matter most, first circle first; null until changed (see [Circles]). */
+    val circles: List<Circle>? = null,
     /** Ready-made replies to a message from the lock screen; typing your own works too. */
     val quickReplies: List<String> = DEFAULT_QUICK_REPLIES,
     /** The weather after the date, as Breezy Weather sends it. */
@@ -254,6 +258,10 @@ data class HomeStyle(
     val lockWeatherStyle: WeatherStyle? = null,
     /** Celsius, Fahrenheit, or the usual one where the phone is set. */
     val weatherUnit: TempUnit = TempUnit.AUTO,
+    /** A notification at [rainAlertMinute] when today's chance of rain reaches [rainAlertFrom] percent. */
+    val rainAlert: Boolean = false,
+    val rainAlertMinute: Int = 7 * 60 + 30,
+    val rainAlertFrom: Int = 10,
     /** The clock, date and app names. */
     val font: AppFont = AppFont.INTER,
     /** The quote, chosen apart from the rest: Inter as it always was, or a serif in italics. */
@@ -425,6 +433,35 @@ data class HomeStyle(
         val look = copy(background = d.background, accent = d.accent, textColor = d.textColor, textSize = d.textSize, font = d.font, quoteFont = d.quoteFont)
         return if (screen == Screen.HOME) look.copy(topSpace = d.topSpace) else look.copy(lockTopSpace = d.topSpace)
     }
+}
+
+/**
+ * People and group chats whose notifications come first on the lock screen, in its colour: say, "close"
+ * and "known". [people] are names as your contacts have them; [groups] are group chats by their name.
+ */
+@Serializable
+data class Circle(
+    val id: String = UUID.randomUUID().toString(),
+    val name: String,
+    /** ARGB; null takes the screen's accent. */
+    val colour: Long? = null,
+    val people: Set<String> = emptySet(),
+    val groups: Set<String> = emptySet(),
+)
+
+object Circles {
+    const val MAX = 3
+    const val CLOSE = "close"
+    const val KNOWN = "known"
+
+    /**
+     * Your circles: as saved, or until then "close" (with the people you'd chosen before circles) and
+     * "known", empty.
+     */
+    fun of(style: HomeStyle): List<Circle> = style.circles ?: listOf(
+        Circle(CLOSE, "Close", people = style.lockNotificationPeople),
+        Circle(KNOWN, "Known"),
+    )
 }
 
 /** The lock screen's gestures: four swipes starting around the clock, and a double tap anywhere. */

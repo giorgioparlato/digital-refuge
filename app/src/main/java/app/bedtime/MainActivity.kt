@@ -135,6 +135,7 @@ object Routes {
     const val SETTINGS_ABOUT = "settings/about"
     const val APP_LIST = "settings/applist"
     const val COVER_MESSAGES = "settings/messages"
+    const val PROBLEMS = "settings/problems"
 
     fun unlock(scheduleId: String) = UNLOCK + scheduleId
 
@@ -285,6 +286,7 @@ private fun BedtimeNavigation(pendingRoute: String?, onRouteConsumed: () -> Unit
             top == Routes.SEARCH -> SearchSettingsScreen(onBack = ::pop)
             top == Routes.APP_LIST -> app.bedtime.ui.settings.AppListScreen(onBack = ::pop)
             top == Routes.COVER_MESSAGES -> app.bedtime.ui.settings.CoverMessagesScreen(onBack = ::pop)
+            top == Routes.PROBLEMS -> app.bedtime.ui.settings.ProblemsScreen(onBack = ::pop)
             SettingsPlace.entries.any { it.route == top } -> SettingsScreen(SettingsPlace.entries.first { it.route == top }, onBack = ::pop, onOpen = ::push)
             top == Routes.DISTRACTION -> DistractionScreen(onBack = ::pop)
             top == Routes.HABITS -> app.bedtime.ui.habits.HabitsScreen(onBack = ::pop)

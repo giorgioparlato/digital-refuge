@@ -457,7 +457,7 @@ private fun settingsEntries(
                 Icons.Default.Notifications,
                 "Notifications",
                 if (style.lockNotifications) "From the apps and people you choose" else "Off",
-                "notifications messages reply replies people contacts lock screen",
+                "notifications messages reply replies people contacts circles groups lock screen rain alert weather",
                 go(Routes.STYLE_NOTIFICATIONS),
             ),
         )
@@ -513,8 +513,9 @@ private fun settingsEntries(
         val about = SettingsPlace.ABOUT
         add(Entry(about, Icons.Default.Info, "How it works", "What a session locks, and your ways out", "how it works help", go(Routes.ONBOARDING)))
         add(Entry(about, BedtimeIcons.Leaf, "The intro again", "The walk-through from the first launch", "intro walkthrough", go(Routes.WALKTHROUGH)))
-        add(Entry(about, Icons.Default.Share, "Export settings", "Save schedules, blocks, groups and stats to a file", "export backup save file", onExport))
+        add(Entry(about, Icons.Default.Share, "Export settings", "Everything you set, with your history, notes, habits and phone use, in one file", "export backup save file", onExport))
         add(Entry(about, BedtimeIcons.Refuge, "Import settings", "Replace everything with a saved file", "import restore backup file", onImport))
+        add(Entry(about, Icons.Default.Warning, "Recent problems", "What failed lately, to copy into a message", "problems errors log crash bug", go(Routes.PROBLEMS)))
         val folder = s.backupFolder
         add(
             Entry(

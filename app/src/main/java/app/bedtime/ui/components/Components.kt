@@ -1,5 +1,15 @@
 package app.bedtime.ui.components
 
+import androidx.compose.runtime.setValue
+
+import androidx.compose.runtime.getValue
+
+import androidx.compose.runtime.LaunchedEffect
+
+import androidx.compose.runtime.mutableStateOf
+
+import androidx.compose.runtime.remember
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -734,4 +744,20 @@ fun DaySelector(days: Set<Int>, onChange: (Set<Int>) -> Unit, enabled: Boolean =
             }
         }
     }
+}
+
+/**
+ * The time now, read again each second while [everySecond] (a timer, a moment to undo), otherwise
+ * on each new minute, which is all a clock needs. A whole screen redrawn every second costs battery.
+ */
+@Composable
+fun rememberNow(everySecond: Boolean): java.time.LocalDateTime {
+    var now by remember { mutableStateOf(java.time.LocalDateTime.now()) }
+    LaunchedEffect(everySecond) {
+        while (true) {
+            now = java.time.LocalDateTime.now()
+            kotlinx.coroutines.delay(if (everySecond) 1_000L else 60_000L - System.currentTimeMillis() % 60_000L)
+        }
+    }
+    return now
 }

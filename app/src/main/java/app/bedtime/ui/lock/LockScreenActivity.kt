@@ -1,5 +1,10 @@
 package app.bedtime.ui.lock
 
+import app.bedtime.ui.minimal.habitsSlot
+import app.bedtime.ui.minimal.noteSlots
+
+import app.bedtime.ui.components.rememberNow
+
 import app.bedtime.ui.components.HourDetailDialog
 import app.bedtime.ui.minimal.loadCalendarWeek
 import app.bedtime.data.NoteWidget
@@ -148,11 +153,15 @@ class LockScreenActivity : ComponentActivity() {
         // Android's lock-screen privacy may have changed since the notifications were last read.
         LockNotifications.refresh()
         ContextCompat.registerReceiver(this, unlocked, IntentFilter(Intent.ACTION_USER_PRESENT), ContextCompat.RECEIVER_NOT_EXPORTED)
+        // Android 14 says when the phone unlocks; a slow look stays as a safety net. Before that, only looking works.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            getSystemService(KeyguardManager::class.java).addKeyguardLockedStateListener(mainExecutor, keyguardListener)
+        }
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.RESUMED) {
                 while (true) {
                     leaveIfUnlocked()
-                    delay(300)
+                    delay(if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) 2_000 else 300)
                 }
             }
         }
@@ -195,7 +204,12 @@ class LockScreenActivity : ComponentActivity() {
         if (!getSystemService(KeyguardManager::class.java).isKeyguardLocked) finish()
     }
 
+    private val keyguardListener = KeyguardManager.KeyguardLockedStateListener { locked -> if (!locked) leaveIfUnlocked() }
+
     override fun onDestroy() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            getSystemService(KeyguardManager::class.java).removeKeyguardLockedStateListener(keyguardListener)
+        }
         unregisterReceiver(unlocked)
         super.onDestroy()
     }
@@ -386,6 +400,7 @@ private fun LockScreen(
     // A session can bring its own widgets.
     // The lock screen's own look and widget options, over the home screen's.
     val lockStyle = settings.homeStyle.on(Screen.LOCK)
+    val circles = app.bedtime.data.Circles.of(settings.homeStyle)
     val sessionStyle = Modules.during(lockStyle, state?.active.orEmpty().map { it.start to it.schedule })
     val nowPlaying = if (Modules.isOn(sessionStyle, Screen.LOCK, Module.NOW_PLAYING)) rememberNowPlaying() else null
     var quickNote by remember { mutableStateOf(false) }
@@ -506,16 +521,11 @@ private fun LockScreen(
     }
     LaunchedEffect(light) { onLightBackground(light) }
     StatusBarVisibility(hidden = style.hideStatusBar)
-    var now by remember { mutableStateOf(LocalDateTime.now()) }
-    LaunchedEffect(Unit) {
-        while (true) {
-            now = LocalDateTime.now()
-            delay(1_000)
-        }
-    }
     // Timers counting down: those set from the search, and the clock app's own.
     val refugeTimers by repo.timers.collectAsStateWithLifecycle(initialValue = emptyList())
     val clockTimers by app.bedtime.data.Timers.clock.collectAsStateWithLifecycle()
+    // Each second only while a timer counts down; otherwise each minute.
+    val now = rememberNow(everySecond = refugeTimers.isNotEmpty() || clockTimers.isNotEmpty())
     val hiddenTimers by app.bedtime.data.Timers.hidden.collectAsStateWithLifecycle()
 
     if (loadedSettings == null || (occurrence == null && !always)) {
@@ -525,6 +535,8 @@ private fun LockScreen(
     // "Later" and "quiet" last until the session ends; outside one, an hour, and the morning.
     val laterUntil = occurrence?.end ?: (System.currentTimeMillis() + 60 * 60_000L)
     val quietUntil = occurrence?.end ?: nextMorning(now)
+    // Like a quick note, writing in it here saves as you go.
+    val lockNote = noteSlots(style, Screen.LOCK, widgetNote, onWrite = { n, text -> scope.launch { repo.editNote(n.id, text) } }, onHold = { holding = Module.NOTE })
     LockScreenContent(
         now = now,
         timers = app.bedtime.data.Timers.running(refugeTimers, clockTimers, System.currentTimeMillis(), hiddenTimers),
@@ -536,53 +548,15 @@ private fun LockScreen(
         onScreenHold = { screenSheet = true },
         // Ticking, or saving what was typed, asks for the usual unlock, then locks again; a tap on the title opens it after unlocking.
         // Like a quick note, writing in it here saves as you go.
-        note = if (Modules.isOn(style, Screen.LOCK, Module.NOTE)) {
-            {
-                NoteWidgetView(
-                    widgetNote,
-                    style.palette().text, style.palette().faint, style.palette().accent,
-                    Modifier.padding(top = 22.dp),
-                    maxLines = style.noteLines,
-                    card = style.noteBackground?.let { androidx.compose.ui.graphics.Color(it) },
-                    darkText = style.noteDarkText,
-                    textScale = style.noteTextSize.scale,
-                    onToggle = { i -> widgetNote?.let { n -> scope.launch { repo.editNote(n.id, NoteWidget.toggled(n.text, i)) } } },
-                    onSave = { written -> widgetNote?.let { n -> scope.launch { repo.editNote(n.id, written) } } },
-                    onHold = { holding = Module.NOTE },
-                )
-            }
-        } else {
-            null
-        },
-        noteBeside = if (Modules.isOn(style, Screen.LOCK, Module.NOTE) && style.noteBeside(Screen.LOCK) && style.noteFitsBesideClock(Screen.LOCK)) {
-            {
-                NoteWidgetView(
-                    widgetNote,
-                    style.palette().text, style.palette().faint, style.palette().accent,
-                    maxLines = style.noteLines.coerceAtMost(3),
-                    textScale = style.noteTextSize.scale,
-                    compact = true,
-                    onToggle = { i -> widgetNote?.let { n -> scope.launch { repo.editNote(n.id, NoteWidget.toggled(n.text, i)) } } },
-                    onSave = { written -> widgetNote?.let { n -> scope.launch { repo.editNote(n.id, written) } } },
-                    onHold = { holding = Module.NOTE },
-                )
-            }
-        } else {
-            null
-        },
+        note = lockNote.inList,
+        noteBeside = lockNote.beside,
         // Ticking from here asks for the usual unlock first, then locks again, as a reply does.
-        habits = habitList.filter { it.shownOn(Screen.LOCK) }.takeIf { it.isNotEmpty() && Modules.isOn(style, Screen.LOCK, Module.HABITS) }?.let { list ->
-            {
-                val today = HourlyUse.today()
-                HabitsWidget(
-                    list, habitMarks, today, style.palette().text, style.palette().faint, style.palette().accent,
-                    Modifier.padding(top = 22.dp),
-                    onTap = { h -> onConfirmed { scope.launch { repo.markHabit(h.id, today, Habits.tapped(h, habitMarks[h.id]?.get(today) ?: 0)) } } },
-                    onOpen = {},
-                    onHold = { holding = Module.HABITS },
-                )
-            }
-        },
+        habits = habitsSlot(
+            style, Screen.LOCK, habitList, habitMarks,
+            onMark = { h, day, value -> onConfirmed { scope.launch { repo.markHabit(h.id, day, value) } } },
+            onOpen = {},
+            onHold = { holding = Module.HABITS },
+        ),
         until = occurrence?.let { formatTime(context, it.end) },
         style = style,
         onOpen = onOpen,
@@ -601,14 +575,15 @@ private fun LockScreen(
         hours = todayHours.takeIf { Modules.isOn(style, Screen.LOCK, Module.HOURS) && HourlyUse.counting(settings) }
             ?.let { HourlyUse.states(it, now.hour, HourlyUse.rule(settings)) },
         useToday = useToday.takeIf { Modules.isOn(style, Screen.LOCK, Module.HOURS) },
-        // A session can show its own apps and people here, or none at all.
-        notifications = LockNotifications.chosen(style.lockNotificationApps, style.lockNotificationPeople, state?.active?.map { it.schedule }.orEmpty())
+        // A session can show its own apps, people and circles here, or none at all. Your circles come first.
+        notifications = LockNotifications.chosen(style.lockNotificationApps, circles, state?.active?.map { it.schedule }.orEmpty())
             ?.takeIf { style.lockNotifications }
-            ?.let { (apps, people) ->
+            ?.let { chosen ->
                 val nowMs = System.currentTimeMillis()
-                notifications.filter { LockNotifications.wanted(it, apps, people) && !LockNotifications.isQuiet(it, quiet, nowMs) }
+                LockNotifications.sorted(notifications.filter { LockNotifications.wanted(it, chosen) && !LockNotifications.isQuiet(it, quiet, nowMs) }, circles)
             }
             .orEmpty(),
+        circles = circles,
         listOpen = listOpen,
         onListOpen = { listOpen = it },
         quickReplies = style.quickReplies,
@@ -658,6 +633,8 @@ internal fun LockScreenContent(
     onHours: (() -> Unit)? = null,
     preview: Boolean = false,
     notifications: List<LockNotification> = emptyList(),
+    /** Your circles, for each notification's colour. */
+    circles: List<app.bedtime.data.Circle> = emptyList(),
     listOpen: Boolean = false,
     onListOpen: (Boolean) -> Unit = {},
     quickReplies: List<String> = emptyList(),
@@ -761,6 +738,7 @@ internal fun LockScreenContent(
                     NotificationArea(
                         notes = notifications,
                         style = style,
+                        circles = circles,
                         listOpen = listOpen,
                         onListOpen = onListOpen,
                         handlers = handlers,

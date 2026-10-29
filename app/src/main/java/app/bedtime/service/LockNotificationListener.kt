@@ -8,6 +8,8 @@ import android.app.Notification
 import android.content.ComponentName
 import android.content.Context
 import android.os.Build
+import android.os.Handler
+import android.os.HandlerThread
 import android.provider.Settings
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
@@ -23,6 +25,19 @@ import app.bedtime.data.NoteDetail
  * session is still Do Not Disturb's job.
  */
 class LockNotificationListener : NotificationListenerService(), LockNotifications.Listener {
+    /** The list is rebuilt here, off the main thread; a burst of changes is rebuilt once. */
+    private val worker = HandlerThread("lock-notifications").apply { start() }
+    private val handler = Handler(worker.looper)
+    private val rebuild = Runnable { read() }
+
+    /** App names, looked up once each. */
+    private val labels = ConcurrentHashMap<String, String>()
+
+    override fun onDestroy() {
+        worker.quitSafely()
+        super.onDestroy()
+    }
+
     override fun onListenerConnected() {
         LockNotifications.listener = this
         refresh()
@@ -54,6 +69,11 @@ class LockNotificationListener : NotificationListenerService(), LockNotification
     private val held = ConcurrentHashMap<String, Notification>()
 
     override fun refresh() {
+        handler.removeCallbacks(rebuild)
+        handler.postDelayed(rebuild, COALESCE_MS)
+    }
+
+    private fun read() {
         val active = runCatching { activeNotifications }.getOrNull() ?: return
         // A clock app's running timer, read before anything is filtered: it's ongoing, so it never shows as a notification here.
         // refuge's own countdown, to a session's end, is no timer.
@@ -70,7 +90,7 @@ class LockNotificationListener : NotificationListenerService(), LockNotification
         val list = active.mapNotNull { sbn ->
             val n = sbn.notification
             val rank = Ranking().takeIf { ranking?.getRanking(sbn.key, it) == true } ?: return@mapNotNull null
-            if (!LockNotifications.worthShowing(sbn.packageName, packageName, sbn.isClearable, n.flags and Notification.FLAG_GROUP_SUMMARY != 0, rank.importance)) {
+            if (!LockNotifications.worthShowing(sbn.packageName, packageName, sbn.isClearable, n.flags and Notification.FLAG_GROUP_SUMMARY != 0, rank.importance, n.channelId)) {
                 return@mapNotNull null
             }
             if (!LockNotifications.getsThrough(rank.suppressedVisualEffects, rank.matchesInterruptionFilter(), Build.VERSION.SDK_INT)) {
@@ -103,7 +123,9 @@ class LockNotificationListener : NotificationListenerService(), LockNotification
                 who = if (full && style != null) style.conversationTitle?.toString() ?: lines.lastOrNull()?.sender ?: title else null,
                 count = lines.size.coerceAtLeast(1),
                 missedCall = n.category == CATEGORY_MISSED_CALL,
-                people = peopleIn(n),
+                people = peopleIn(n, style ?: NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(n)),
+                ours = sbn.packageName == packageName,
+                group = style?.takeIf { it.isGroupConversation }?.conversationTitle?.toString()?.takeIf { it.isNotBlank() },
             )
         }
         held.keys.retainAll(active.map { it.key }.toSet())
@@ -114,7 +136,7 @@ class LockNotificationListener : NotificationListenerService(), LockNotification
      * The names a notification is about, read only to choose which show: the people it lists, a
      * conversation's name and writers, its title, and a missed call's caller.
      */
-    private fun peopleIn(n: Notification): List<String> {
+    private fun peopleIn(n: Notification, style: NotificationCompat.MessagingStyle?): List<String> {
         val extras = n.extras ?: return emptyList()
         val listed = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             @Suppress("DEPRECATION")
@@ -122,7 +144,6 @@ class LockNotificationListener : NotificationListenerService(), LockNotification
         } else {
             emptyList()
         }
-        val style = NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(n)
         val writers = style?.messages.orEmpty().mapNotNull { it.person?.name?.toString() }
         val call = if (n.category == CATEGORY_MISSED_CALL) listOfNotNull(extras.getCharSequence(Notification.EXTRA_TEXT)?.toString()) else emptyList()
         return (listed + writers + listOfNotNull(style?.conversationTitle?.toString(), extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()) + call)
@@ -145,12 +166,16 @@ class LockNotificationListener : NotificationListenerService(), LockNotification
     private fun readSecure(name: String): Boolean? =
         runCatching { Settings.Secure.getInt(contentResolver, name, 1) != 0 }.getOrNull()
 
-    private fun appLabel(pkg: String): String =
+    private fun appLabel(pkg: String): String = labels.getOrPut(pkg) {
         runCatching { packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString() }.getOrDefault(pkg)
+    }
 
     companion object {
         /** `Notification.CATEGORY_MISSED_CALL`, only named from Android 12. */
         private const val CATEGORY_MISSED_CALL = "missed_call"
+
+        /** Changes closer together than this are read as one. */
+        private const val COALESCE_MS = 80L
 
         fun hasAccess(context: Context): Boolean =
             context.packageName in NotificationManagerCompat.getEnabledListenerPackages(context)

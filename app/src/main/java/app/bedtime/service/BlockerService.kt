@@ -1,5 +1,7 @@
 package app.bedtime.service
 
+import android.os.SystemClock
+
 import android.accessibilityservice.AccessibilityService
 import android.app.NotificationManager
 import android.os.Build
@@ -20,6 +22,9 @@ import app.bedtime.data.AppSettings
 import app.bedtime.data.DndMode
 import app.bedtime.data.HourlyUse
 import app.bedtime.data.AutoBackup
+import app.bedtime.data.Problems
+import app.bedtime.engine.Enforcement
+import app.bedtime.engine.Verdict
 import app.bedtime.data.Repository
 import app.bedtime.engine.ActiveState
 import app.bedtime.engine.Engine
@@ -82,6 +87,14 @@ class BlockerService : AccessibilityService() {
     private val activityClasses = mutableMapOf<String, Boolean>()
     private val guardNames by lazy { setOf(getString(R.string.accessibility_label), getString(R.string.app_name)) }
     private var receiverRegistered = false
+    private var packagesRegistered = false
+
+    private val packagesChanged = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) = refreshSystemPackages(force = true)
+    }
+
+    /** When the system packages were last read (elapsed realtime). */
+    private var packagesReadAt = 0L
     private var watchersRegistered = false
 
     /** Our screens that stay in colour while greyscale is on (if the home style says so). */
@@ -162,7 +175,20 @@ class BlockerService : AccessibilityService() {
         BlockingState.clearBreak()
         // Just switched back on, probably from our own Settings page: let the user finish there.
         SettingsGuard.graceUntil = System.currentTimeMillis() + SettingsGuard.GRACE_MS
-        refreshSystemPackages()
+        refreshSystemPackages(force = true)
+        // An app installed, removed or updated: what's launchable, a home or a keyboard may have changed.
+        ContextCompat.registerReceiver(
+            this,
+            packagesChanged,
+            IntentFilter().apply {
+                addAction(Intent.ACTION_PACKAGE_ADDED)
+                addAction(Intent.ACTION_PACKAGE_REMOVED)
+                addAction(Intent.ACTION_PACKAGE_CHANGED)
+                addDataScheme("package")
+            },
+            ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
+        packagesRegistered = true
         val filter = IntentFilter().apply {
             addAction(Intent.ACTION_SCREEN_ON)
             addAction(Intent.ACTION_SCREEN_OFF)
@@ -196,8 +222,10 @@ class BlockerService : AccessibilityService() {
         scope.launch {
             repo.settings.collect {
                 val nudgeChanged = it.runNudgeMinutes != settings.runNudgeMinutes
+                val rainChanged = it.homeStyle.rainAlert != settings.homeStyle.rainAlert || it.homeStyle.rainAlertMinute != settings.homeStyle.rainAlertMinute
                 settings = it
                 if (nudgeChanged) scheduleNudge()
+                if (rainChanged) RainAlarm.schedule(this@BlockerService, it.homeStyle)
                 limitTracker.limits = it.limits
                 distractionClock.distracting = it.distractingApps
                 applyGreyscale()
@@ -290,7 +318,7 @@ class BlockerService : AccessibilityService() {
             event.contentDescription?.let(::add)
         }
         if (!SettingsGuard.matches(pkg, texts, guardedPackages, guardNames)) return false
-        runCatching { startActivity(BlockedActivity.settingsIntent(this)) }
+        Problems.attempt("covering a settings screen") { startActivity(BlockedActivity.settingsIntent(this)) }
         return true
     }
 
@@ -309,14 +337,26 @@ class BlockerService : AccessibilityService() {
         val inSession = state?.isActive == true && settings.homeStyle.lockScreen
         val always = settings.homeScreen && settings.homeStyle.lockAlways
         if (!inSession && !always) return
-        runCatching { startActivity(LockScreenActivity.intent(this)) }
+        Problems.attempt("showing the lock screen") { startActivity(LockScreenActivity.intent(this)) }
     }
 
     private fun notice(message: String) {
         Toast.makeText(this, message.lowercase(), Toast.LENGTH_SHORT).show()
     }
 
-    private fun refreshSystemPackages() {
+    /**
+     * Reads which packages are the system's own: always allowed, keyboards and overlays, homes, and
+     * those to guard. With [force] (an app came or went) it also forgets what it knew of each app;
+     * otherwise it reads again at most every ten minutes, for a keyboard or home chosen in Settings.
+     */
+    private fun refreshSystemPackages(force: Boolean = false) {
+        val now = SystemClock.elapsedRealtime()
+        if (!force && now - packagesReadAt < PACKAGES_EVERY_MS) return
+        packagesReadAt = now
+        if (force) {
+            launchable.clear()
+            activityClasses.clear()
+        }
         alwaysAllowed = SystemApps.alwaysAllowed(this)
         overlays = SystemApps.keyboards(this) + "com.android.systemui"
         homePackages = runCatching {
@@ -325,8 +365,6 @@ class BlockerService : AccessibilityService() {
                 .map { it.activityInfo.packageName }
                 .toSet()
         }.getOrDefault(emptySet())
-        launchable.clear()
-        activityClasses.clear()
         // Settings (accessibility toggle, App info) plus whichever app handles uninstalling this one.
         val uninstaller = runCatching {
             packageManager.resolveActivity(
@@ -345,28 +383,15 @@ class BlockerService : AccessibilityService() {
         // Counted first, before anything below can return: our own covers stop the clock too.
         val arrived = limitTracker.moveTo(pkg)
         distractionClock.moveTo(pkg)
-        val current = state ?: return
-        if (pkg == null || pkg == packageName || pkg in alwaysAllowed) return
-        // Always-available apps (maps, rides, authenticators…) are never blocked by any session or limit.
-        if (pkg in settings.alwaysAvailable) return
-        if (current.isActive) {
-            val minimal = current.minimalAllowlist
-            when {
-                pkg in current.blocked -> {
-                    startActivity(BlockedActivity.intent(this, pkg))
-                    return
-                }
-                // In minimal mode the stock launcher and recents are "not allowed" too, so Home lands here.
-                // The recent-apps view is let through: closing apps there is harmless, and whatever is
-                // opened from it is judged as itself.
-                minimal != null && pkg !in minimal && !recentsInFront && opensAsApp(pkg) -> {
-                    startActivity(MinimalHomeActivity.intent(this))
-                    return
-                }
-            }
+        if (pkg == null) return
+        when (Enforcement.decide(pkg, packageName, state, alwaysAllowed, settings.alwaysAvailable, recentsInFront, ::opensAsApp)) {
+            Verdict.LET_THROUGH -> Unit
+            Verdict.COVER -> Problems.attempt("covering a blocked app") { startActivity(BlockedActivity.intent(this, pkg)) }
+            // In minimal mode the stock launcher and recents are "not allowed" too, so Home lands here.
+            Verdict.MINIMAL_HOME -> Problems.attempt("going to the minimal home") { startActivity(MinimalHomeActivity.intent(this)) }
+            // Limits hold every day, and inside a session for the apps it lets through.
+            Verdict.CHECK_LIMITS -> limitTracker.check(pkg, arrived)
         }
-        // Limits hold every day, and inside a session for the apps it lets through.
-        limitTracker.check(pkg, arrived)
     }
 
     /**
@@ -456,6 +481,7 @@ class BlockerService : AccessibilityService() {
         limitTracker.stop()
         distractionClock.moveTo(null)
         if (receiverRegistered) unregisterReceiver(receiver)
+        if (packagesRegistered) unregisterReceiver(packagesChanged)
         if (watchersRegistered) unregisterReceiver(zenReceiver)
         if (modeReceiverRegistered) unregisterReceiver(modeReceiver)
         scope.cancel()
@@ -465,5 +491,8 @@ class BlockerService : AccessibilityService() {
     private companion object {
         /** Long enough to let a flashed window be replaced by the app underneath, short enough not to be seen. */
         const val SETTLE_MS = 250L
+
+        /** How often, at most, the system's packages are read again without an app having changed. */
+        const val PACKAGES_EVERY_MS = 10 * 60_000L
     }
 }

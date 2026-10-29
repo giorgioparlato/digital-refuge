@@ -13,6 +13,18 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            67,
+            "0.9.21",
+            listOf(
+                "Circles on the lock screen: up to three, like close and known, each with its people, its group chats and a colour. Theirs come first, from any app, and a schedule can let just one circle through.",
+                "A rain alert in the morning, under lock-screen notifications: how likely rain is today, and when it's likeliest, from Breezy Weather.",
+                "Backups now keep your phone use too.",
+                "Recent problems, under about & backup: what went wrong lately, to copy into a message.",
+                "Easier on the battery: the home and lock screens redraw once a minute, the lock screen notices unlocking without checking all the time, and day-to-day data is kept apart from your settings.",
+                "An emergency break carries on if the app is restarted.",
+            ),
+        ),
+        ChangelogEntry(
             66,
             "0.9.20",
             listOf(

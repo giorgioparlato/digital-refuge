@@ -58,6 +58,7 @@ object AutoBackup {
             repo.updateSettings { it.copy(lastBackupAt = now) }
             true
         } catch (e: Exception) {
+            Problems.note("writing the weekly backup", e)
             false
         } finally {
             writing = false

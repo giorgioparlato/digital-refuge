@@ -98,26 +98,65 @@ class LockNotificationsTest {
         assertEquals(60_000L, LockNotifications.snoozeFor(now = 10_000L, until = 20_000L))
     }
 
+    private val close = Circle("close", "Close", people = setOf("anna"), groups = setOf("Family"))
+    private val known = Circle("known", "Known", people = setOf("Bo"))
+
     @Test
-    fun fromYourAppsOrFromYourPeople() {
-        val fromAnna = LockNotification("k", "com.whatsapp", "WhatsApp", "Anna", null, 0L, NoteDetail.FULL, people = listOf("Anna", "Family"))
-        val fromBo = fromAnna.copy(key = "b", people = listOf("Bo"))
-        // Not a chosen app, but a chosen person: shows.
-        assertTrue(LockNotifications.wanted(fromAnna, apps = setOf("com.signal"), people = setOf("anna")))
-        assertFalse(LockNotifications.wanted(fromBo, apps = setOf("com.signal"), people = setOf("Anna")))
-        // A chosen app shows whoever it's from.
-        assertTrue(LockNotifications.wanted(fromBo, apps = setOf("com.whatsapp"), people = emptySet()))
+    fun fromYourAppsOrFromYourCircles() {
+        val fromAnna = LockNotification("k", "com.whatsapp", "WhatsApp", "Anna", null, 0L, NoteDetail.FULL, people = listOf("Anna"))
+        val fromCy = fromAnna.copy(key = "c", people = listOf("Cy"))
+        // Not a chosen app, but someone in a circle: shows.
+        assertTrue(LockNotifications.wanted(fromAnna, LockNotifications.Chosen(setOf("com.signal"), emptySet(), listOf(close))))
+        assertFalse(LockNotifications.wanted(fromCy, LockNotifications.Chosen(setOf("com.signal"), emptySet(), listOf(close))))
+        // A chosen app shows whoever it's from; a session's own people count too.
+        assertTrue(LockNotifications.wanted(fromCy, LockNotifications.Chosen(setOf("com.whatsapp"), emptySet(), emptyList())))
+        assertTrue(LockNotifications.wanted(fromCy, LockNotifications.Chosen(emptySet(), setOf("cy"), emptyList())))
+    }
+
+    @Test
+    fun aGroupBelongsByItsNameNotByWhoWritesInIt() {
+        val family = LockNotification("f", "com.whatsapp", "WhatsApp", "Family", null, 0L, NoteDetail.FULL, people = listOf("Bo"), group = "family")
+        val football = family.copy(key = "g", people = listOf("Anna"), group = "Football")
+        assertEquals(close, LockNotifications.circleOf(family, listOf(known, close)))
+        // Anna is close, but her football group isn't.
+        assertEquals(null, LockNotifications.circleOf(football, listOf(close)))
+    }
+
+    @Test
+    fun circlesComeFirstInTheirOrder() {
+        val fromBo = LockNotification("b", "x", "X", null, null, 300L, NoteDetail.FULL, people = listOf("Bo"))
+        val fromAnna = fromBo.copy(key = "a", postedAt = 100L, people = listOf("Anna"))
+        val other = fromBo.copy(key = "o", postedAt = 900L, people = emptyList())
+        assertEquals(listOf("a", "b", "o"), LockNotifications.sorted(listOf(other, fromBo, fromAnna), listOf(close, known)).map { it.key })
+    }
+
+    @Test
+    fun theFirstCircleStartsWithThePeopleChosenBefore() {
+        assertEquals(setOf("Anna"), Circles.of(HomeStyle(lockNotificationPeople = setOf("Anna"))).first().people)
+        assertEquals(listOf(known), Circles.of(HomeStyle(circles = listOf(known))))
     }
 
     @Test
     fun aSessionCanChooseItsOwnOrNone() {
-        val usual = setOf("signal") to setOf("Anna")
-        val own = Schedule(name = "Work", lockNotes = LockNotes.OWN, lockNoteApps = setOf("slack"), lockNotePeople = emptySet())
+        val circles = listOf(close, known)
+        val own = Schedule(name = "Work", lockNotes = LockNotes.OWN, lockNoteApps = setOf("slack"), lockNoteCircles = setOf("known"))
         val none = Schedule(name = "Bed", lockNotes = LockNotes.NONE)
-        assertEquals(usual, LockNotifications.chosen(usual.first, usual.second, emptyList()))
-        assertEquals(usual, LockNotifications.chosen(usual.first, usual.second, listOf(Schedule())))
-        assertEquals(setOf("slack") to emptySet<String>(), LockNotifications.chosen(usual.first, usual.second, listOf(Schedule(), own)))
+        val usual = LockNotifications.Chosen(setOf("signal"), emptySet(), circles)
+        assertEquals(usual, LockNotifications.chosen(setOf("signal"), circles, emptyList()))
+        assertEquals(usual, LockNotifications.chosen(setOf("signal"), circles, listOf(Schedule())))
+        assertEquals(LockNotifications.Chosen(setOf("slack"), emptySet(), listOf(known)), LockNotifications.chosen(setOf("signal"), circles, listOf(Schedule(), own)))
         // The strictest wins.
-        assertEquals(null, LockNotifications.chosen(usual.first, usual.second, listOf(own, none)))
+        assertEquals(null, LockNotifications.chosen(setOf("signal"), circles, listOf(own, none)))
+    }
+
+    @Test
+    fun ourRainAlertAndWeekShowButNotTheSession() {
+        val default = NotificationManager.IMPORTANCE_DEFAULT
+        assertTrue(LockNotifications.worthShowing("app.bedtime", "app.bedtime", true, false, default, channel = "rain"))
+        assertTrue(LockNotifications.worthShowing("app.bedtime", "app.bedtime", true, false, default, channel = "look_back"))
+        assertFalse(LockNotifications.worthShowing("app.bedtime", "app.bedtime", true, false, default, channel = "session_running"))
+        // And whatever apps are chosen.
+        val rain = LockNotification("r", "app.bedtime", "digital refuge", "rain today", null, 0L, NoteDetail.FULL, ours = true)
+        assertTrue(LockNotifications.wanted(rain, LockNotifications.Chosen(emptySet(), emptySet(), emptyList())))
     }
 }

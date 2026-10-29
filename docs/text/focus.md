@@ -82,12 +82,8 @@ focus
 - Create your own
 - Or start from a template
 
-<sub>[SchedulesScreen.kt](../../app/src/main/java/app/bedtime/ui/schedules/SchedulesScreen.kt)</sub>
+<sub>[ScheduleItem.kt](../../app/src/main/java/app/bedtime/ui/schedules/ScheduleItem.kt)</sub>
 
-- hours that look after themselves
-- new schedule
-- No schedules yet. A schedule keeps the same hours every week — bedtime, a working morning, a quiet weekend.
-- Create a schedule
 - on now
 - minimal mode
 - … blocked
@@ -244,7 +240,8 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 - None yet
 - And these people
 - Nobody yet
-- The apps and people you chose for the lock screen.
+- And these circles
+- The apps and circles you chose for the lock screen.
 - Only these while it runs, whatever the lock screen usually shows.
 - Nothing on refuge's lock screen while it runs.
 - Needs Do Not Disturb access
@@ -617,6 +614,7 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 
 <sub>[TakeoverOverlay.kt](../../app/src/main/java/app/bedtime/service/TakeoverOverlay.kt)</sub>
 
+- drawing the full-screen reminder
 - {scheduleName} is still running. switch blocking back on to carry on.
 - take {breakMinutes} more …
 

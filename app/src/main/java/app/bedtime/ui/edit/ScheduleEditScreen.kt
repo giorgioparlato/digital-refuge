@@ -365,6 +365,7 @@ fun ScheduleEditScreen(
     }
 
     ScheduleEditContent(
+        circles = appSettings?.homeStyle?.let(app.bedtime.data.Circles::of).orEmpty(),
         draft = draft,
         onDraftChange = {
             draft = it
@@ -479,6 +480,8 @@ internal fun ScheduleEditContent(
     usualLock: List<ModuleChoice> = emptyList(),
     onHowItWorks: () -> Unit = {},
     appLabel: (String) -> String = { it },
+    /** Your circles, which "only these" can let through. */
+    circles: List<app.bedtime.data.Circle> = emptyList(),
     /** Pre-filled as allowed apps when minimal mode is switched on with none chosen yet. */
     essentials: Set<String> = emptySet(),
 ) {
@@ -721,11 +724,22 @@ internal fun ScheduleEditContent(
                                 enabled = editable,
                                 onClick = onPickNotePeople,
                             ) { Chevron() }
+                            if (circles.isNotEmpty()) {
+                                Text("And these circles", style = MaterialTheme.typography.bodyMedium, color = c.textMuted, modifier = Modifier.padding(top = 8.dp, bottom = 8.dp))
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    circles.forEach { circle ->
+                                        val on = circle.id in draft.lockNoteCircles
+                                        QuickChip(circle.name, on, editable) {
+                                            onDraftChange(draft.copy(lockNoteCircles = if (on) draft.lockNoteCircles - circle.id else draft.lockNoteCircles + circle.id))
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                     Text(
                         when (draft.lockNotes) {
-                            LockNotes.USUAL -> "The apps and people you chose for the lock screen."
+                            LockNotes.USUAL -> "The apps and circles you chose for the lock screen."
                             LockNotes.OWN -> "Only these while it runs, whatever the lock screen usually shows."
                             LockNotes.NONE -> "Nothing on refuge's lock screen while it runs."
                         },

@@ -24,7 +24,15 @@ data class WeatherNow(
     val high: Double? = null,
     /** Tomorrow first. */
     val days: List<WeatherDay> = emptyList(),
+    /** Today's chance of rain, in percent, when Breezy says. */
+    val rainChance: Int? = null,
+    /** The chance of rain hour by hour, from the hour it was sent, when Breezy says. */
+    val rainHours: List<RainHour> = emptyList(),
 )
+
+/** One hour's chance of rain: the hour's start (epoch millis) and the chance, in percent. */
+@Serializable
+data class RainHour(val at: Long, val chance: Int)
 
 /**
  * How much weather to show: today's low and high; three days with their skies; or five days, on a
@@ -69,7 +77,13 @@ private data class WeatherSpec(
     val todayMinTemp: Double? = null,
     val todayMaxTemp: Double? = null,
     val forecasts: List<ForecastSpec> = emptyList(),
+    /** Percent; a number, read leniently, as apps send it as whole or not. */
+    val precipProbability: Double? = null,
+    val hourly: List<HourlySpec> = emptyList(),
 )
+
+@Serializable
+private data class HourlySpec(val timestamp: Long? = null, val precipProbability: Double? = null)
 
 @Serializable
 private data class ForecastSpec(val conditionCode: Int? = null, val minTemp: Double? = null, val maxTemp: Double? = null)
@@ -99,6 +113,12 @@ object Weather {
     /** After this long without news, the line goes rather than show a stale sky. */
     const val FRESH_MS = 3 * 60 * 60 * 1000L
 
+    /** The most of a place's name or the sky's words kept: anything longer isn't Breezy's. */
+    private const val MAX_WORDS = 60
+
+    /** The most of the sent weather read: Breezy's is a few kilobytes. */
+    const val MAX_BYTES = 256 * 1024
+
     /** The first location in [json], a WeatherSpec or a list of them; null if it isn't one, or is absurd. */
     fun parse(json: String, receivedAt: Long): WeatherNow? {
         val spec = runCatching { AppJson.decodeFromString(WeatherSpec.serializer(), json) }.getOrNull()
@@ -107,16 +127,22 @@ object Weather {
         val kelvin = spec.currentTemp ?: return null
         // Between about -90 °C and 60 °C: anything else isn't weather.
         if (kelvin !in 180.0..335.0) return null
-        val at = spec.timestamp?.takeIf { it > 0 }?.let { it * 1000 } ?: receivedAt
+        // Never later than it arrived: a time in the future would keep it looking fresh for good.
+        val at = spec.timestamp?.takeIf { it > 0 }?.let { it * 1000 }?.coerceAtMost(receivedAt) ?: receivedAt
         return WeatherNow(
             kelvin = kelvin,
-            condition = spec.currentCondition?.takeIf { it.isNotBlank() },
-            location = spec.location,
+            condition = spec.currentCondition?.takeIf { it.isNotBlank() }?.take(MAX_WORDS),
+            location = spec.location?.take(MAX_WORDS),
             at = at,
             code = spec.currentConditionCode,
             low = spec.todayMinTemp?.takeIf { it in 180.0..335.0 },
             high = spec.todayMaxTemp?.takeIf { it in 180.0..335.0 },
-            days = spec.forecasts.take(4).map { WeatherDay(it.conditionCode, it.minTemp, it.maxTemp) },
+            rainChance = spec.precipProbability?.roundToInt()?.takeIf { it in 0..100 },
+            rainHours = spec.hourly.take(48).mapNotNull { h ->
+                val at = h.timestamp?.takeIf { it > 0 } ?: return@mapNotNull null
+                h.precipProbability?.roundToInt()?.takeIf { it in 0..100 }?.let { RainHour(at * 1000, it) }
+            },
+            days = spec.forecasts.take(4).map { WeatherDay(it.conditionCode, it.minTemp?.takeIf { t -> t in 180.0..335.0 }, it.maxTemp?.takeIf { t -> t in 180.0..335.0 }) },
         )
     }
 

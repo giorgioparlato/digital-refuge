@@ -92,6 +92,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 
     <application
+        android:name=".RefugeApp"
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:icon="@mipmap/ic_launcher"
@@ -196,6 +197,10 @@
 
         <receiver
             android:name=".service.SessionAlarmReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".service.RainAlarmReceiver"
             android:exported="false" />
 
         <receiver

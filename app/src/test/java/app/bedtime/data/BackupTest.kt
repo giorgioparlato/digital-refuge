@@ -19,6 +19,8 @@ class BackupTest {
             widgetBlocks = mapOf("7" to "focus"),
         ),
         history = listOf(SessionLog("bedtime", "Bedtime", 1L, 2L, unlockTimes = listOf(3L))),
+        usage = listOf(UsageDay(20_000L, hourlyAll = mapOf(9 to 600L), unlocks = 12)),
+        usageMonths = listOf(UsageMonth("2026-08", total = 36_000L, days = 31)),
     )
 
     @Test
@@ -42,5 +44,12 @@ class BackupTest {
     @Test
     fun brokenFileIsRefused() {
         assertNull(Backup.decode("this is not a backup"))
+    }
+
+    @Test
+    fun aRestoredDayGivesWayToTheOneCountedHere() {
+        val file = listOf(UsageDay(1L, unlocks = 3), UsageDay(2L, unlocks = 5))
+        val here = listOf(UsageDay(2L, unlocks = 9), UsageDay(3L, unlocks = 1))
+        assertEquals(listOf(3, 9, 1), Repository.merged(file, here).map { it.unlocks })
     }
 }

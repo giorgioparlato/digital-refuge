@@ -109,7 +109,7 @@ focus
     ├── refuge's lock screen: notifications · replies · gestures
     └── the status-bar notification · the full-screen reminder · the quick-settings tile · the widget
 """, [
-    ("focus", ["ui/home/HomeScreen.kt", "ui/schedules/SchedulesScreen.kt"]),
+    ("focus", ["ui/home/HomeScreen.kt", "ui/schedules/ScheduleItem.kt"]),
     ("what's new", [], "Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/data/Changelog.kt), newest first."),
     ("notes", ["ui/notes/NotesScreen.kt", "ui/notes/Markdown.kt"]),
     ("new: templates", ["ui/create/CreateScreen.kt", "data/Templates.kt"]),
@@ -173,23 +173,25 @@ settings
 ├── lock screen
 │   ├── in sessions · outside sessions too
 │   ├── look · widgets (as on the home screen, its own)
-│   ├── notifications: from these apps · and these people · quick replies
+│   ├── notifications: from these apps · quick replies · circles ── a circle: name · colour · people · groups
 │   └── gestures
 ├── search: what it offers · keywords · beside each contact · adding to your calendar · folders · try it
 ├── apps: app groups · always-available apps · distracting apps
 ├── notes: refuge notes · your files · today's daily note
 ├── cover messages: yours · the app's own
 ├── shortcuts: home-screen widget · quick-settings tile
-└── about & backup: how it works · the intro again · export · import · weekly backup · back up now
+└── about & backup: how it works · the intro again · export · import · recent problems · weekly backup ·
+                    back up now
 """, [
     ("settings, and the pages it opens", ["ui/settings/SettingsScreen.kt"], "Home screen, lock screen, apps, shortcuts and about & backup are lists of rows from this one file."),
     ("permissions & setup", ["ui/setup/SetupScreen.kt"]),
-    ("look, widgets, gestures and lock-screen notifications", ["ui/homestyle/HomeStyleScreen.kt", "ui/homestyle/WidgetOptions.kt", "ui/settings/PeoplePickerScreen.kt"], "One file serves the look, widgets, gestures and notifications pages, for both screens."),
+    ("look, widgets, gestures and lock-screen notifications", ["ui/homestyle/HomeStyleScreen.kt", "ui/homestyle/WidgetOptions.kt", "ui/settings/CircleScreen.kt", "ui/settings/PeoplePickerScreen.kt"], "One file serves the look, widgets, gestures and notifications pages, for both screens."),
     ("quotes (from the quote widget)", ["ui/quotes/QuotesScreen.kt"]),
     ("the app list", ["ui/settings/AppListScreen.kt", "ui/apps/AppPickerScreen.kt"]),
     ("search", ["ui/settings/SearchSettingsScreen.kt"]),
     ("apps", ["ui/groups/GroupsScreen.kt", "ui/settings/AlwaysAvailableScreen.kt", "ui/settings/DistractionScreen.kt"]),
     ("notes", ["ui/notes/NoteTargetsScreen.kt"]),
     ("cover messages", ["ui/settings/CoverMessagesScreen.kt"]),
+    ("recent problems", ["ui/settings/ProblemsScreen.kt"]),
     ("how it works and the intro", [], "Their text is in [onboarding.md](onboarding.md)."),
 ])
