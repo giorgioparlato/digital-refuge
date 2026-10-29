@@ -24,6 +24,9 @@ internal val TextPresets: List<Pair<String, Long>> = listOf(
     "Brown" to 0xFF593E22,
 )
 
+/** A warmer colour for distracted hours, besides the accents (amber is already among them). */
+internal val DistractedPresets: List<Pair<String, Long>> = listOf("Ember" to 0xFFD9604AL)
+
 /** A few calm cards for the note widget, dark and light; anything else is a custom colour. */
 internal val NotePresets: List<Pair<String, Long>> = listOf(
     "Paper" to 0xFFF8F5F1,

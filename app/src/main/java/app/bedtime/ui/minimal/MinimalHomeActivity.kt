@@ -250,6 +250,7 @@ private fun MinimalHomeScreen(
     var notesOpen by rememberSaveable { mutableStateOf(false) }
     var quickNote by rememberSaveable { mutableStateOf(false) }
     var hoursDetail by remember { mutableStateOf(false) }
+    var appsDetail by remember { mutableStateOf(false) }
     val (todayHours, useToday) = rememberUseToday()
     val (habitList, habitMarks) = rememberHabits()
     // Your blocks, to start from the refuge mark, a gesture or the search.
@@ -391,12 +392,15 @@ private fun MinimalHomeScreen(
         }
     }
     val searchChoices = SearchOrder.arrange(SearchOrder.defaults(searchTargets, settings.quickTargets, obsidian), settings.searchChoices)
-    // A keyword first ("m cafe") sends the words after it straight to one place.
-    val keywords = Keywords.effective(settings.keywords, settings.keywordsCustom, Keywords.defaults(searchChoices, settings.quickTargets))
+    val allKeywords = Keywords.effective(settings.keywords, settings.keywordsCustom, Keywords.defaults(searchChoices, settings.quickTargets))
+    // What the search may use: each action in every search, only by its keyword, or off; kinds switched off whole.
+    val usable = SearchOrder.usable(SearchOrder.withModes(searchChoices, allKeywords, settings.searchModesSet), settings.searchOff)
+    // A keyword first ("m cafe") sends the words after it straight to one place, if that place isn't off.
+    val keywords = allKeywords.filterKeys { key -> key.startsWith(Keywords.APP) || usable.any { it.key == key } }
     val keyword = Keywords.match(query, keywords)
     val words = keyword?.words ?: query.trim()
     // Contacts are looked up as you type, only when you've switched them on in the search or used their keyword.
-    val contactsOn = searchChoices.any { it.key == SearchOrder.CONTACTS && it.on } || keyword?.key == SearchOrder.CONTACTS
+    val contactsOn = usable.any { it.key == SearchOrder.CONTACTS && !it.keywordOnly } || keyword?.key == SearchOrder.CONTACTS
     // Words that start with someone's name and go on are a message for them: "@anna running late".
     val contactsFound by produceState(emptyList<ContactHit>() to "", words, contactsOn) {
         value = if (contactsOn && words.length >= 2) withContext(Dispatchers.IO) {
@@ -512,7 +516,8 @@ private fun MinimalHomeScreen(
                     SearchTargets.offered(searchTargets, openablePackages),
                     settings.quickTargets,
                     EventParser.parse(words, LocalDateTime.now()),
-                    searchChoices,
+                    // Ordinary results: only those in every search; a keyword reaches the rest.
+                    usable.map { if (it.keywordOnly) it.copy(on = false) else it },
                     contacts,
                     keyword,
                     found,
@@ -642,7 +647,8 @@ private fun MinimalHomeScreen(
             hours = todayHours.takeIf { Modules.isOn(style, Screen.HOME, Module.HOURS) && HourlyUse.counting(settings) }
                 ?.let { HourlyUse.states(it, now.hour, HourlyUse.rule(settings)) },
             useToday = useToday.takeIf { Modules.isOn(style, Screen.HOME, Module.HOURS) },
-            onHours = { hoursDetail = true },
+            // The dots open today by the hour; the other looks, today by app.
+            onHours = { if (style.useWidgetFor(Screen.HOME).look == app.bedtime.data.UseLook.DOTS) hoursDetail = true else appsDetail = true },
             weather = rememberWeather(style, now),
             onWeather = breezy?.let { app -> { AppCatalog.launch(context, app) } },
             onNextQuote = { quoteOffset++ },
@@ -685,7 +691,7 @@ private fun MinimalHomeScreen(
                     }
                 },
                 change = { changed ->
-                    scope.launch { repo.updateSettings { s -> s.copy(homeStyle = s.homeStyle.copy(weatherStyle = changed.weatherStyle, lockWeatherStyle = changed.lockWeatherStyle, clockSize = changed.clockSize, quoteRefresh = changed.quoteRefresh, noteWidgetId = changed.noteWidgetId, noteLines = changed.noteLines, noteTextSize = changed.noteTextSize, noteBesideClock = changed.noteBesideClock, lockNoteBesideClock = changed.lockNoteBesideClock, calendarIconWhenEmpty = changed.calendarIconWhenEmpty, lockCalendarIconWhenEmpty = changed.lockCalendarIconWhenEmpty, calendarTomorrow = changed.calendarTomorrow, useWidget = changed.useWidget, lockUseWidget = changed.lockUseWidget, noteDarkText = changed.noteDarkText)) } }
+                    scope.launch { repo.updateSettings { s -> s.copy(homeStyle = s.homeStyle.edit(Screen.HOME) { it.sheetFields(changed) }) } }
                 },
                 open = { route -> runCatching { context.startActivity(app.bedtime.MainActivity.intent(context, route)) } },
                 habitShown = { id, shown -> scope.launch { repo.updateSettings { s -> s.copy(habits = s.habits.map { if (it.id == id) it.withShownOn(Screen.HOME, shown) else it }) } } },
@@ -724,6 +730,9 @@ private fun MinimalHomeScreen(
         }, onDismiss = { blocksOpen = false })
     }
     if (quickNote) QuickNoteDialog(style, settings.quickTargets, onSave = saveNote, onDismiss = { quickNote = false }, vault = settings.obsidianVault)
+    if (appsDetail) {
+        app.bedtime.ui.components.UseAppsDialog(useToday, style, onDismiss = { appsDetail = false }, onStats = { runCatching { context.startActivity(app.bedtime.MainActivity.intent(context, app.bedtime.Routes.STATS)) } })
+    }
     if (hoursDetail) {
         val p = style.palette()
         HourDetailDialog(todayHours, HourlyUse.rule(settings), p.background, p.text, p.faint, p.accent, onDismiss = { hoursDetail = false }, onStats = {

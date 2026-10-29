@@ -44,6 +44,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Face
 import androidx.compose.material3.Icon
@@ -308,6 +310,15 @@ internal fun HomeStyleContent(
     val c = Obsidian.colors
     var pickingSwipe by rememberSaveable { mutableStateOf<Swipe?>(null) }
     var widgetScreen by rememberSaveable { mutableStateOf(Screen.HOME) }
+    // Look and widgets are each screen's own: the lock screen's choices sit over the home screen's, so
+    // these pages show the screen picked, and what's changed here changes for that screen.
+    val screen = if (page == StylePage.LOOK || page == StylePage.SHOWN) widgetScreen else Screen.HOME
+    val base = style
+    val saveBase = onChange
+    @Suppress("NAME_SHADOWING")
+    val style = base.on(screen)
+    @Suppress("NAME_SHADOWING")
+    val onChange: (HomeStyle) -> Unit = { changed -> saveBase(base.edit(screen) { changed }) }
     var pickingGesture by rememberSaveable { mutableStateOf<HomeGesture?>(null) }
     pickingGesture?.let { gesture ->
         HomeGestureDialog(
@@ -345,8 +356,8 @@ internal fun HomeStyleContent(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(page.intro, style = MaterialTheme.typography.bodyMedium, color = c.textMuted)
-            // Which screen's widgets: first, so the lock screen's are easy to find; the preview follows it.
-            if (page == StylePage.SHOWN) {
+            // Which screen: first, so the lock screen's own are easy to find; the preview follows it.
+            if (page == StylePage.SHOWN || page == StylePage.LOOK) {
                 SegmentedChoice(
                     options = listOf("Home screen", "Lock screen"),
                     selected = widgetScreen.ordinal,
@@ -361,8 +372,8 @@ internal fun HomeStyleContent(
                     .clip(previewShape)
                     .border(1.dp, c.border, previewShape),
             ) {
-                // The lock screen while its widgets are being set; otherwise the minimal home.
-                if (page == StylePage.SHOWN && widgetScreen == Screen.LOCK) {
+                // The lock screen while it's the one being set; otherwise the minimal home.
+                if (screen == Screen.LOCK) {
                     LockScreenContent(
                         now = now,
                         scheduleName = "Bedtime",
@@ -404,19 +415,13 @@ internal fun HomeStyleContent(
                     HexField(style.textColor ?: style.palette().text.toArgb().toLong() and 0xFFFFFFFFL) { onChange(style.copy(textColor = it)) }
                 }
                 SectionCard(title = "Sizes") {
-                    SizeLabel("Space at the top of the home screen", Modifier.padding(bottom = 8.dp))
+                    SizeLabel("Space at the top", Modifier.padding(bottom = 8.dp))
                     SegmentedChoice(
                         options = listOf("None", "Small", "Medium", "Large"),
-                        selected = style.topSpace.ordinal,
-                        onSelect = { onChange(style.copy(topSpace = TopSpace.entries[it])) },
+                        selected = (if (screen == Screen.LOCK) style.lockTopSpace ?: style.topSpace else style.topSpace).ordinal,
+                        onSelect = { onChange(if (screen == Screen.LOCK) style.copy(lockTopSpace = TopSpace.entries[it]) else style.copy(topSpace = TopSpace.entries[it])) },
                     )
-                    SizeLabel("And of the lock screen", Modifier.padding(top = 16.dp, bottom = 8.dp))
-                    SegmentedChoice(
-                        options = listOf("None", "Small", "Medium", "Large"),
-                        selected = (style.lockTopSpace ?: style.topSpace).ordinal,
-                        onSelect = { onChange(style.copy(lockTopSpace = TopSpace.entries[it])) },
-                    )
-                SizeLabel("Clock", Modifier.padding(top = 16.dp, bottom = 8.dp))
+                    SizeLabel("Clock", Modifier.padding(top = 16.dp, bottom = 8.dp))
                     SegmentedChoice(
                         options = listOf("Very small", "Small", "Medium", "Large"),
                         selected = style.clockSize.ordinal,
@@ -476,13 +481,19 @@ internal fun HomeStyleContent(
                 }
             }
             if (page == StylePage.SHOWN) {
-                SectionCard(
-                    title = if (widgetScreen == Screen.HOME) "On the home screen" else "On the lock screen",
-                    subtitle = "Drag by the handle to change the order",
-                ) {
-                    WidgetList(style, widgetScreen, onChange, onShowCalendar)
-                }
-                if (Modules.onAnywhere(style, Module.NOTE)) SectionCard(title = "Note", subtitle = "Hold it on your screen to choose which note it shows") {
+                // Each widget's options, opened in place from its row.
+                val moduleOptions: @Composable (Module) -> Unit = { module ->
+                    when (module) {
+                    Module.CLOCK -> Column {
+                        SizeLabel("Size", Modifier.padding(bottom = 8.dp))
+                        SegmentedChoice(
+                            options = listOf("Very small", "Small", "Medium", "Large"),
+                            selected = style.clockSize.ordinal,
+                            onSelect = { onChange(style.copy(clockSize = ClockSize.entries[it])) },
+                        )
+                    }
+                    Module.NOTE -> Column {
+                    OptionsHint("Hold it on your screen to choose which note it shows")
                     SizeLabel("Lines shown", Modifier.padding(bottom = 8.dp))
                     val lineChoices = listOf(1, 2, 3, 6, 10)
                     SegmentedChoice(
@@ -515,7 +526,7 @@ internal fun HomeStyleContent(
                     val fits = style.noteFitsBesideClock(widgetScreen)
                     OptionRow(
                         Icons.Default.DateRange,
-                        if (widgetScreen == Screen.HOME) "Beside the clock" else "Beside the clock on the lock screen",
+                        "Beside the clock",
                         description = if (fits) {
                             "Small, at the top right: its title and first lines"
                         } else {
@@ -524,7 +535,8 @@ internal fun HomeStyleContent(
                         enabled = fits,
                     ) { ObsidianToggle(style.noteBeside(widgetScreen) && fits, { onChange(style.withNoteBeside(widgetScreen, it)) }, enabled = fits) }
                 }
-                if (Modules.onAnywhere(style, Module.QUOTE)) SectionCard(title = "Quote", subtitle = "Tap it for another, hold it to favourite or hide it") {
+                    Module.QUOTE -> Column {
+                    OptionsHint("Tap it for another, hold it to favourite or hide it")
                     run {
                         SizeLabel("A new one every", Modifier.padding(bottom = 8.dp))
                         SegmentedChoice(
@@ -540,13 +552,16 @@ internal fun HomeStyleContent(
                         ) { Chevron() }
                     }
                 }
-                if (Modules.isOn(style, widgetScreen, Module.HOURS)) SectionCard(
-                    title = "Distraction tracker",
-                    subtitle = if (widgetScreen == Screen.HOME) "Its look on the home screen" else "Its look on the lock screen",
-                ) {
+                    Module.HOURS -> Column {
                     UseWidgetOptions(style.useWidgetFor(widgetScreen)) { onChange(style.withUseWidget(widgetScreen, it)) }
+                    // Its colours, the same on both screens: the dots, the budget bar and the apps' bars.
+                    SizeLabel("Calm hours", Modifier.padding(top = 16.dp, bottom = 8.dp))
+                    ColourChoice(TextPresets, style.hourCalmColor, { onChange(style.copy(hourCalmColor = it)) }, automatic = "Automatic")
+                    SizeLabel("Distracted hours", Modifier.padding(top = 16.dp, bottom = 8.dp))
+                    ColourChoice(AccentPresets + DistractedPresets, style.hourDistractedColor, { onChange(style.copy(hourDistractedColor = it)) }, automatic = "Accent")
                 }
-                if (Modules.onAnywhere(style, Module.WEATHER)) SectionCard(title = "Weather", subtitle = "From Breezy Weather, a free app that does the fetching; this one never goes online") {
+                    Module.WEATHER -> Column {
+                    OptionsHint("From Breezy Weather, a free app that does the fetching; this one never goes online")
                     OptionRow(
                         Icons.Default.Info,
                         "Last heard",
@@ -556,7 +571,7 @@ internal fun HomeStyleContent(
                         },
                     )
                     run {
-                        SizeLabel(if (widgetScreen == Screen.HOME) "Show on the home screen" else "Show on the lock screen", Modifier.padding(top = 12.dp, bottom = 8.dp))
+                        SizeLabel("Show", Modifier.padding(top = 12.dp, bottom = 8.dp))
                         val styles = listOf(WeatherStyle.TODAY, WeatherStyle.DAYS, WeatherStyle.WEEK, WeatherStyle.FIVE_DAYS)
                         SegmentedChoice(
                             options = listOf("Today", "3 days", "Now + 5", "5 days"),
@@ -577,10 +592,11 @@ internal fun HomeStyleContent(
                         )
                     }
                 }
-                if (Modules.onAnywhere(style, Module.EVENT)) SectionCard(title = "Next event", subtitle = "Read from the calendar already on this phone. Nothing is fetched") {
+                    Module.EVENT -> Column {
+                    OptionsHint("Read from the calendar already on this phone. Nothing is fetched")
                     OptionRow(
                         Icons.Default.DateRange,
-                        if (widgetScreen == Screen.HOME) "A calendar icon when nothing's coming" else "A calendar icon on the lock screen when nothing's coming",
+                        "A calendar icon when nothing's coming",
                         description = "A tap shows the week ahead",
                     ) { ObsidianToggle(style.calendarIcon(widgetScreen), { onChange(style.withCalendarIcon(widgetScreen, it)) }) }
                     OptionRow(
@@ -588,13 +604,22 @@ internal fun HomeStyleContent(
                         "Tomorrow's first event, once today's are done",
                         description = "In the evening, what the morning starts with",
                     ) { ObsidianToggle(style.calendarTomorrow, { onChange(style.copy(calendarTomorrow = it)) }) }
-                    if (Modules.isOn(style, Screen.LOCK, Module.EVENT)) {
+                    if (widgetScreen == Screen.LOCK) {
                         OptionRow(
                             Icons.Default.Lock,
-                            "Event names on the lock screen",
+                            "Event names",
                             description = "Off, the lock screen only says when the next one is",
                         ) { ObsidianToggle(style.calendarNamesOnLock, { onChange(style.copy(calendarNamesOnLock = it)) }) }
                     }
+                }
+                    else -> Unit
+                    }
+                }
+                SectionCard(
+                    title = if (widgetScreen == Screen.HOME) "On the home screen" else "On the lock screen",
+                    subtitle = "Tap one for its options; drag by the handle to change the order",
+                ) {
+                    WidgetList(style, widgetScreen, onChange, onShowCalendar, OPTIONED, moduleOptions)
                 }
             }
             if (page == StylePage.NOTIFICATIONS) {
@@ -680,7 +705,7 @@ internal fun HomeStyleContent(
 
 /** The pages the home and lock screen's choices are split into, each reached from settings. */
 enum class StylePage(val title: String, val intro: String) {
-    LOOK("Look", "Colours, sizes and fonts, for your home screen, the minimal one in sessions, and the lock screen. Changes save as you go."),
+    LOOK("Look", "Colours, sizes and fonts, each screen its own. Changes save as you go."),
     SHOWN("Widgets", "What your home screen and lock screen show, each its own, in the order you like. Pick the screen here first. Changes save as you go."),
     SWIPES(
         "Lock-screen gestures",
@@ -922,11 +947,68 @@ private fun formatRelativePast(millis: Long): String {
  * first time it's switched on.
  */
 @Composable
-private fun WidgetList(style: HomeStyle, screen: Screen, onChange: (HomeStyle) -> Unit, onShowCalendar: (HomeStyle) -> Unit) {
-    ModuleListEditor(Modules.of(style, screen), onChange = { list -> onChange(Modules.with(style, screen, list)) }) { list, module ->
-        val updated = Modules.with(style, screen, list)
-        if (module == Module.EVENT) onShowCalendar(updated) else onChange(updated)
+private fun WidgetList(
+    style: HomeStyle,
+    screen: Screen,
+    onChange: (HomeStyle) -> Unit,
+    onShowCalendar: (HomeStyle) -> Unit,
+    withOptions: Set<Module>,
+    options: @Composable (Module) -> Unit,
+) {
+    val c = Obsidian.colors
+    val list = Modules.of(style, screen)
+    val shown = list.filter { it.on }
+    val hidden = list.filterNot { it.on }
+    var open by rememberSaveable(screen) { mutableStateOf<Module?>(null) }
+    fun switch(module: Module, on: Boolean) {
+        val updated = Modules.with(style, screen, list.map { if (it.module == module) it.copy(on = on) else it })
+        if (on && module == Module.EVENT) onShowCalendar(updated) else onChange(updated)
     }
+    // Those shown, in their order: a tap opens a widget's options right here, the − hides it.
+    DragList(shown, key = { it.module.name }, onMoved = { moved -> onChange(Modules.with(style, screen, moved + hidden)) }) { choice ->
+        val module = choice.module
+        val opened = open == module && module in withOptions
+        Column(Modifier.weight(1f)) {
+            Row(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
+                    .then(if (module in withOptions) Modifier.clickable(onClickLabel = if (opened) "close its options" else "its options") { open = if (opened) null else module } else Modifier)
+                    .padding(start = 8.dp, top = 6.dp, bottom = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(module.label, style = MaterialTheme.typography.bodyLarge, color = c.textNormal, modifier = Modifier.weight(1f))
+                if (module in withOptions) {
+                    Icon(if (opened) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown, contentDescription = null, tint = c.textFaint, modifier = Modifier.size(20.dp))
+                }
+                Box(Modifier.size(40.dp).clip(CircleShape).clickable(onClickLabel = "hide ${module.label}") { switch(module, false) }, contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.Clear, contentDescription = "hide", tint = c.textFaint, modifier = Modifier.size(18.dp))
+                }
+            }
+            if (opened) Column(Modifier.padding(start = 8.dp, end = 8.dp, top = 4.dp, bottom = 12.dp)) { options(module) }
+        }
+    }
+    if (shown.isEmpty()) Text("Nothing shown yet; add one below.", style = MaterialTheme.typography.bodyMedium, color = c.textFaint, modifier = Modifier.padding(vertical = 8.dp))
+    // The rest, apart: each a tap away from showing.
+    if (hidden.isNotEmpty()) {
+        SizeLabel("Not shown", Modifier.padding(top = 16.dp, bottom = 4.dp))
+        hidden.forEach { choice ->
+            Row(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable(onClickLabel = "show ${choice.module.label}") { switch(choice.module, true) }.padding(horizontal = 8.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(choice.module.label, style = MaterialTheme.typography.bodyLarge, color = c.textMuted, modifier = Modifier.weight(1f))
+                Icon(Icons.Default.Add, contentDescription = "show", tint = c.accent, modifier = Modifier.size(20.dp))
+            }
+        }
+    }
+}
+
+/** The widgets with options of their own on this page. */
+private val OPTIONED = setOf(Module.CLOCK, Module.NOTE, Module.QUOTE, Module.HOURS, Module.WEATHER, Module.EVENT)
+
+/** A line saying how a widget behaves, at the top of its options. */
+@Composable
+private fun OptionsHint(text: String) {
+    Text(text, style = MaterialTheme.typography.bodySmall, color = Obsidian.colors.textFaint, modifier = Modifier.padding(bottom = 8.dp))
 }
 
 /** A list of widgets to drag into order and switch on or off; [onSwitchedOn] when one is switched on, [onChange] otherwise. */
@@ -985,10 +1067,10 @@ private fun UseWidgetOptions(use: UseWidget, onChange: (UseWidget) -> Unit) {
             onSelect = { onChange(use.copy(budgetWholePhone = it == 1)) },
         )
         SizeLabel("A day's allowance", Modifier.padding(top = 16.dp, bottom = 8.dp))
-        val minutes = if (use.budgetWholePhone) listOf(60, 120, 180, 240, 300, 360) else listOf(15, 30, 45, 60, 90, 120)
+        val minutes = if (use.budgetWholePhone) UseWords.PHONE_BUDGETS else UseWords.DISTRACTING_BUDGETS
         val chosen = if (use.budgetWholePhone) use.phoneBudgetMinutes else use.budgetMinutes
         SegmentedChoice(
-            options = minutes.map { UseWords.short(it * 60L).replace(" min", "m") },
+            options = minutes.map(UseWords::compact),
             selected = minutes.indexOf(chosen).coerceAtLeast(0),
             onSelect = { i -> onChange(if (use.budgetWholePhone) use.copy(phoneBudgetMinutes = minutes[i]) else use.copy(budgetMinutes = minutes[i])) },
         )

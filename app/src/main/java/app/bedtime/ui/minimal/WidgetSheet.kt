@@ -154,10 +154,10 @@ internal fun WidgetSheetContent(
                 Spacer(Modifier.padding(top = 8.dp))
                 if (use.look == UseLook.BUDGET) {
                     choices("The budget counts", listOf("Distracting apps" to false, "The whole phone" to true), use.budgetWholePhone) { set(use.copy(budgetWholePhone = it)) }
-                    val minutes = if (use.budgetWholePhone) listOf(60, 120, 180, 240, 300, 360) else listOf(15, 30, 45, 60, 90, 120)
+                    val minutes = if (use.budgetWholePhone) app.bedtime.data.UseWords.PHONE_BUDGETS else app.bedtime.data.UseWords.DISTRACTING_BUDGETS
                     choices(
                         "A day's allowance",
-                        minutes.map { app.bedtime.data.UseWords.short(it * 60L) to it },
+                        minutes.map { app.bedtime.data.UseWords.compact(it) to it },
                         if (use.budgetWholePhone) use.phoneBudgetMinutes else use.budgetMinutes,
                     ) { set(if (use.budgetWholePhone) use.copy(phoneBudgetMinutes = it) else use.copy(budgetMinutes = it)) }
                 }

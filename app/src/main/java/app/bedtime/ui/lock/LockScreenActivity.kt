@@ -79,6 +79,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -88,6 +89,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -388,7 +392,9 @@ private fun LockScreen(
     val (todayHours, useToday) = rememberUseToday()
     val (habitList, habitMarks) = rememberHabits()
     // A session can bring its own widgets.
-    val sessionStyle = Modules.during(settings.homeStyle, state?.active.orEmpty().map { it.start to it.schedule })
+    // The lock screen's own look and widget options, over the home screen's.
+    val lockStyle = settings.homeStyle.on(Screen.LOCK)
+    val sessionStyle = Modules.during(lockStyle, state?.active.orEmpty().map { it.start to it.schedule })
     val nowPlaying = if (Modules.isOn(sessionStyle, Screen.LOCK, Module.NOW_PLAYING)) rememberNowPlaying() else null
     var quickNote by remember { mutableStateOf(false) }
     // A gesture's action: a quick note or the notification shade right here, otherwise an app (the camera
@@ -407,7 +413,7 @@ private fun LockScreen(
         // Switching a widget from here asks for the usual unlock first, then locks again.
         val sessions = state?.active.orEmpty().map { it.start to it.schedule }
         val owner = Modules.owner(sessions, Screen.LOCK)
-        val shown = Modules.during(settings.homeStyle, sessions)
+        val shown = Modules.during(lockStyle, sessions)
         app.bedtime.ui.minimal.ScreenSheet(
             Screen.LOCK,
             shown,
@@ -429,8 +435,12 @@ private fun LockScreen(
         )
     }
     var hoursDetail by remember { mutableStateOf(false) }
+    var appsDetail by remember { mutableStateOf(false) }
+    if (appsDetail) {
+        app.bedtime.ui.components.UseAppsDialog(useToday, lockStyle, onDismiss = { appsDetail = false }, onStats = { onOpenRoute(app.bedtime.Routes.STATS) })
+    }
     if (hoursDetail) {
-        val p = settings.homeStyle.palette()
+        val p = lockStyle.palette()
         HourDetailDialog(todayHours, HourlyUse.rule(settings), p.background, p.text, p.faint, p.accent, onDismiss = { hoursDetail = false }, onStats = {
             onOpenRoute(app.bedtime.Routes.STATS)
         })
@@ -438,21 +448,21 @@ private fun LockScreen(
     // The week ahead, as on the home screen; names only if you show them on the lock screen.
     var week by remember { mutableStateOf<List<app.bedtime.ui.minimal.CalendarDay>?>(null) }
     week?.let { days ->
-        val shown = if (settings.homeStyle.calendarNamesOnLock) days else days.map { d -> d.copy(events = d.events.map { it.copy(title = "", location = "", description = "") }) }
-        app.bedtime.ui.minimal.CalendarWeekDialog(shown, settings.homeStyle, onDismiss = { week = null }, onOpenEvent = { event ->
+        val shown = if (lockStyle.calendarNamesOnLock) days else days.map { d -> d.copy(events = d.events.map { it.copy(title = "", location = "", description = "") }) }
+        app.bedtime.ui.minimal.CalendarWeekDialog(shown, lockStyle, onDismiss = { week = null }, onOpenEvent = { event ->
             onOpenIntent(app.bedtime.ui.minimal.CalendarSource.openIntent(event))
             week = null
         })
     }
     val allNotes by repo.notes.collectAsStateWithLifecycle(initialValue = emptyList())
-    val widgetNote = allNotes.firstOrNull { it.id == (settings.homeStyle.noteWidgetId ?: Notes.TODO_ID) }
+    val widgetNote = allNotes.firstOrNull { it.id == (lockStyle.noteWidgetId ?: Notes.TODO_ID) }
     holding?.let { module ->
         // Changes from here ask for the usual unlock first, then lock again, as ticking a habit does.
         val sessions = state?.active.orEmpty().map { it.start to it.schedule }
         val owner = Modules.owner(sessions, Screen.LOCK)
         WidgetSheet(
             module,
-            Modules.during(settings.homeStyle, sessions),
+            Modules.during(lockStyle, sessions),
             sessionOwned = owner != null,
             handlers = WidgetHandlers(
                 hide = {
@@ -468,7 +478,7 @@ private fun LockScreen(
                 },
                 change = { changed ->
                     onConfirmed {
-                        scope.launch { repo.updateSettings { s -> s.copy(homeStyle = s.homeStyle.copy(weatherStyle = changed.weatherStyle, lockWeatherStyle = changed.lockWeatherStyle, clockSize = changed.clockSize, quoteRefresh = changed.quoteRefresh, noteWidgetId = changed.noteWidgetId, noteLines = changed.noteLines, noteTextSize = changed.noteTextSize, noteBesideClock = changed.noteBesideClock, lockNoteBesideClock = changed.lockNoteBesideClock, calendarIconWhenEmpty = changed.calendarIconWhenEmpty, lockCalendarIconWhenEmpty = changed.lockCalendarIconWhenEmpty, calendarTomorrow = changed.calendarTomorrow, useWidget = changed.useWidget, lockUseWidget = changed.lockUseWidget, noteDarkText = changed.noteDarkText)) } }
+                        scope.launch { repo.updateSettings { s -> s.copy(homeStyle = s.homeStyle.edit(Screen.LOCK) { it.sheetFields(changed) }) } }
                     }
                 },
                 open = onOpenRoute,
@@ -482,7 +492,7 @@ private fun LockScreen(
     }
     if (quickNote) {
         QuickNoteDialog(
-            settings.homeStyle,
+            lockStyle,
             settings.quickTargets,
             onSave = { words, target -> scope.launch { Toast.makeText(context, Notes.save(context, repo, words, target), Toast.LENGTH_SHORT).show() } },
             onDismiss = { quickNote = false },
@@ -592,7 +602,8 @@ private fun LockScreen(
         calendar = rememberCalendarLine(style, now, onLockScreen = true),
         onCalendar = { scope.launch { week = loadCalendarWeek(context, LocalDateTime.now()) } },
         // The distraction tracker's tap: today's detail right here, as at home; only the statistics ask for the unlock.
-        onHours = { hoursDetail = true },
+        // The dots open today by the hour; the other looks, today by app.
+        onHours = { if (style.useWidgetFor(Screen.LOCK).look == app.bedtime.data.UseLook.DOTS) hoursDetail = true else appsDetail = true },
         weather = rememberWeather(style, now, Screen.LOCK),
         onWeather = breezy?.let { app -> { onOpenApp(app) } },
         hours = todayHours.takeIf { Modules.isOn(style, Screen.LOCK, Module.HOURS) && HourlyUse.counting(settings) }
@@ -745,28 +756,32 @@ internal fun LockScreenContent(
                 val nowMillis = now.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
                 timers.forEach { end -> key(end) { TimerLine(end, nowMillis, style) { onHideTimer(end) } } }
             }
-            if (notifications.isNotEmpty()) {
-                Spacer(Modifier.height(if (replying != null) 16.dp else 28.dp))
-                NotificationArea(
-                    notes = notifications,
-                    style = style,
-                    listOpen = listOpen,
-                    onListOpen = onListOpen,
-                    handlers = handlers,
-                    quickReplies = quickReplies,
-                    expanded = expanded,
-                    onExpand = { expanded = it },
-                    replying = replying,
-                    onReply = { replying = it },
-                    // Open, the list takes the free space and scrolls in it; the quote and "tap to open" stay at the foot.
-                    modifier = if (listOpen || replying != null) Modifier.weight(1f) else Modifier,
-                )
-            }
-            if (notifications.isEmpty() || !(listOpen || replying != null)) Spacer(Modifier.weight(1f)) else Spacer(Modifier.height(if (replying != null) 8.dp else 24.dp))
-            // Notifications get the room: with any showing, the quote at the foot gives way.
-            if (quote != null && quoteAtFoot && replying == null && notifications.isEmpty()) {
-                QuoteBlock(quote, style)
-                Spacer(Modifier.height(40.dp))
+            // The free space below the widgets: the quote keeps its place at the foot, and the notifications,
+            // from the top, take as much as they need, going over the quote when there are many.
+            Box(Modifier.weight(1f).fillMaxWidth()) {
+                if (quote != null && quoteAtFoot && replying == null) {
+                    Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
+                        QuoteBlock(quote, style)
+                        Spacer(Modifier.height(40.dp))
+                    }
+                }
+                if (notifications.isNotEmpty()) {
+                    NotificationArea(
+                        notes = notifications,
+                        style = style,
+                        listOpen = listOpen,
+                        onListOpen = onListOpen,
+                        handlers = handlers,
+                        quickReplies = quickReplies,
+                        expanded = expanded,
+                        onExpand = { expanded = it },
+                        replying = replying,
+                        onReply = { replying = it },
+                        modifier = Modifier
+                            .padding(top = if (replying != null) 16.dp else 28.dp, bottom = if (replying != null) 8.dp else 24.dp)
+                            .then(if (listOpen || replying != null) Modifier.fillMaxHeight() else Modifier),
+                    )
+                }
             }
             // While a reply is being written, the keyboard has the foot of the screen: the mark stays out
             // of the way instead of riding up above it and taking the room the reply needs.
@@ -807,6 +822,10 @@ private fun TimerLine(end: Long, now: Long, style: HomeStyle, onHide: () -> Unit
             Text(Timers.left(end, now), style = MaterialTheme.typography.titleMedium.copy(fontFeatureSettings = "tnum"), color = p.text)
             Spacer(Modifier.width(6.dp))
             Text("left", style = MaterialTheme.typography.labelLarge, color = p.faint)
+            Spacer(Modifier.width(4.dp))
+            Box(Modifier.size(32.dp).clip(CircleShape).clickable(onClickLabel = "hide this timer", onClick = onHide), contentAlignment = Alignment.Center) {
+                Icon(Icons.Default.Close, contentDescription = null, tint = p.faint, modifier = Modifier.size(16.dp))
+            }
         }
     }
 }

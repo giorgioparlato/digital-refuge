@@ -74,6 +74,11 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.bedtime.ui.components.PageGutter
 import app.bedtime.ui.components.SectionLabel
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.HorizontalDivider
+import app.bedtime.ui.schedules.ScheduleItem
+import app.bedtime.ui.components.ScheduleIcons
+import app.bedtime.ui.components.AddCircleButton
 import app.bedtime.ui.components.CardRadius
 import app.bedtime.apps.AppCatalog
 import app.bedtime.data.AppSettings
@@ -165,10 +170,6 @@ fun HomeScreen(
 ) {
     val context = LocalContext.current
     val repo = remember { Repository.get(context) }
-    val (habits, habitMarks) = rememberHabits()
-    val use = rememberUseDays(7, live = false)
-    val notes by repo.notes.collectAsStateWithLifecycle(initialValue = emptyList())
-    val hourly = rememberTodayHours()
     val scope = rememberCoroutineScope()
     val schedules: List<Schedule>? by repo.schedules.collectAsStateWithLifecycle(initialValue = null)
     val runtime by repo.runtime.collectAsStateWithLifecycle(initialValue = RuntimeState())
@@ -203,43 +204,16 @@ fun HomeScreen(
             delay(fresh.start + Repository.UNDO_MS - at)
         }
     }
-    var quoteOffset by rememberSaveable { mutableIntStateOf(0) }
-    val quoteActions = rememberQuoteActions()
     // Show nothing for the split second before schedules load, rather than flashing the empty state.
     val loaded = schedules ?: return
     val style = settings.homeStyle
     val installed = remember { Changelog.installedVersion(context) }
     // Before the walk-through there's nothing to compare with; it marks the version as seen itself.
     val whatsNew = if (settings.onboarded) Changelog.unseen(settings.lastSeenVersion, installed) else null
-    val quote = if (Modules.onAnywhere(style, Module.QUOTE)) {
-        Quotes.forPeriod(Instant.ofEpochMilli(now).atZone(ZoneId.systemDefault()).toLocalDateTime(), style.quoteRefresh, quoteOffset, settings.quotes)
-    } else {
-        null
-    }
     HomeContent(
         ui = HomeUiState(
-            loaded, active, runtime, history, serviceOn, greyscaleOk, dndOk, now, quote, undoBlockId, whatsNew, style.quoteFont,
-            quoteFavourite = quote != null && quote.text in settings.quotes.favourites,
-            noteCount = notes.size,
-            hourly = hourly.takeIf { HourlyUse.counting(settings) },
-            hourRule = HourlyUse.rule(settings),
-            hourCalmColor = settings.homeStyle.hourCalmColor,
-            hourDistractedColor = settings.homeStyle.hourDistractedColor,
-            habits = habits,
-            habitMarks = habitMarks,
-            weekDistracting = settings.distractingApps.takeIf { it.isNotEmpty() }?.let {
-                val today = HourlyUse.today()
-                PhoneUsage.range(use.days, today - 6, today).sumOf { d -> d.distractingTotal }
-            },
+            loaded, active, runtime, history, serviceOn, greyscaleOk, dndOk, now, undoBlockId = undoBlockId, whatsNew = whatsNew,
         ),
-        onHabits = onHabits,
-        onTickHabit = { habit ->
-            val today = HourlyUse.today()
-            scope.launch { repo.markHabit(habit.id, today, Habits.tapped(habit, habitMarks[habit.id]?.get(today) ?: 0)) }
-        },
-        onQuoteFavourite = { quote?.let(quoteActions.favourite) },
-        onQuoteHide = { quote?.let(quoteActions.hide) },
-        onQuoteAnother = { quoteOffset++ },
         onEdit = onEdit,
         onCreate = onCreate,
         onTemplate = onTemplate,
@@ -253,6 +227,8 @@ fun HomeScreen(
         onNotes = onNotes,
         onDistraction = onDistraction,
         isInstalled = { AppCatalog.isLaunchable(context, it) },
+        onToggle = { schedule, on -> scope.launch { repo.upsert(schedule.copy(enabled = on)) } },
+        onDelete = { schedule -> scope.launch { repo.delete(schedule.id) } },
     )
 }
 
@@ -277,6 +253,8 @@ internal fun HomeContent(
     onQuoteHide: () -> Unit = {},
     onQuoteAnother: () -> Unit = {},
     isInstalled: (String) -> Boolean = { false },
+    onToggle: (Schedule, Boolean) -> Unit = { _, _ -> },
+    onDelete: (Schedule) -> Unit = {},
 ) {
     val c = Obsidian.colors
     var editingLength by remember { mutableStateOf<Schedule?>(null) }
@@ -295,102 +273,76 @@ internal fun HomeContent(
     val needsSetup = !ui.serviceOn || (usesDnd && !ui.dndOk)
     val blocks = ui.schedules.filter { it.isBlock }
 
-    LazyColumn(
-        Modifier.fillMaxSize().background(c.bgPrimary),
-        contentPadding = PaddingValues(bottom = 28.dp),
-    ) {
-        item(key = "header") { HomeHeader(ui, onUnlock, onUndo) }
-        if (needsSetup) {
-            item(key = "setup") {
-                Box(Modifier.padding(horizontal = PageGutter, vertical = 8.dp)) {
-                    SetupChecklist(ui.serviceOn, ui.greyscaleOk, if (usesDnd) ui.dndOk else null, onSetup)
+    val schedulesOnly = ui.schedules.filterNot { it.isBlock }
+    val minuteOfDay = Instant.ofEpochMilli(ui.now).atZone(ZoneId.systemDefault()).toLocalTime().let { it.hour * 60 + it.minute }
+    Box(Modifier.fillMaxSize().background(c.bgPrimary)) {
+        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 110.dp)) {
+            item(key = "header") { HomeHeader(ui, onUnlock, onUndo, onNotes) }
+            if (needsSetup) {
+                item(key = "setup") {
+                    Box(Modifier.padding(horizontal = PageGutter, vertical = 8.dp)) {
+                        SetupChecklist(ui.serviceOn, ui.greyscaleOk, if (usesDnd) ui.dndOk else null, onSetup)
+                    }
                 }
             }
-        }
-        if (ui.whatsNew != null) {
-            item(key = "whats-new") {
-                Box(Modifier.padding(horizontal = PageGutter, vertical = 8.dp)) { WhatsNewCard(ui.whatsNew, onDismissWhatsNew) }
-            }
-        }
-        if (ui.schedules.isEmpty()) {
-            item(key = "empty") {
-                Box(Modifier.padding(horizontal = PageGutter)) {
-                    EmptyState(onCreate = onCreate, onTemplate = onTemplate, isInstalled = isInstalled)
+            if (ui.whatsNew != null) {
+                item(key = "whats-new") {
+                    Box(Modifier.padding(horizontal = PageGutter, vertical = 8.dp)) { WhatsNewCard(ui.whatsNew, onDismissWhatsNew) }
                 }
             }
-        } else {
-            item(key = "blocks-heading") {
-                SectionLabel(if (blocks.isEmpty()) "blocks" else "start a block", Modifier.padding(start = PageGutter))
-            }
-            // Two to a row, with "new block" always closing the grid.
-            val cells = blocks.map<Schedule, Schedule?> { it } + listOf(null)
-            val rows = cells.chunked(2)
-            items(rows.size, key = { rows[it].first()?.id ?: "new-block" }) { index ->
-                Row(
-                    Modifier.fillMaxWidth().padding(horizontal = PageGutter).height(84.dp).padding(bottom = 12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    rows[index].forEach { block ->
-                        if (block == null) {
-                            NewBlockTile(onCreate, Modifier.weight(1f).fillMaxHeight())
-                        } else {
-                            BlockTile(
+            if (ui.schedules.isEmpty()) {
+                item(key = "empty") {
+                    Box(Modifier.padding(horizontal = PageGutter)) {
+                        EmptyState(onCreate = onCreate, onTemplate = onTemplate, isInstalled = isInstalled)
+                    }
+                }
+            } else {
+                // Blocks first, all of them: starting one is what you come here for most.
+                item(key = "blocks-heading") { SectionLabel("blocks", Modifier.padding(start = PageGutter)) }
+                item(key = "blocks") {
+                    val shape = RoundedCornerShape(CardRadius)
+                    Column(Modifier.padding(horizontal = PageGutter).fillMaxWidth().clip(shape).background(c.bgSecondary).border(1.dp, c.border, shape)) {
+                        blocks.forEachIndexed { i, block ->
+                            BlockRow(
                                 block = block,
                                 running = ui.active?.occurrenceOf(block.id),
                                 onStart = { onStartBlock(block, block.durationMinutes) },
                                 onEdit = { onEdit(block.id) },
                                 onLength = { editingLength = block },
-                                modifier = Modifier.weight(1f).fillMaxHeight(),
+                            )
+                            if (i < blocks.lastIndex) HorizontalDivider(color = c.border.copy(alpha = 0.6f))
+                        }
+                        if (blocks.isEmpty()) {
+                            Text(
+                                "No blocks yet · add one",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = c.textMuted,
+                                modifier = Modifier.fillMaxWidth().clickable(onClick = onCreate).padding(16.dp),
                             )
                         }
                     }
-                    repeat(2 - rows[index].size) { Spacer(Modifier.weight(1f)) }
                 }
-            }
-            if (ui.quote != null) {
-                item(key = "quote") {
-                    QuoteFooter(ui.quote, ui.quoteFont, ui.quoteFavourite, onQuoteFavourite, onQuoteHide, onQuoteAnother)
-                }
-            }
-            item(key = "hours") {
-                HoursSection(ui.hourly, ui.hourRule, Instant.ofEpochMilli(ui.now).atZone(ZoneId.systemDefault()).hour, ui.hourCalmColor, ui.hourDistractedColor, onDistraction, onStats)
-            }
-            // Habits here once you have some; otherwise they're only in settings.
-            if (ui.habits.isNotEmpty()) {
-                item(key = "habits") {
-                    val c = Obsidian.colors
-                    Column(Modifier.padding(horizontal = PageGutter).padding(top = 22.dp)) {
-                        Row(
-                            Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable(onClickLabel = "open habits", onClick = onHabits).padding(vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text("habits", style = MaterialTheme.typography.bodyMedium, color = c.textMuted, modifier = Modifier.weight(1f))
-                            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = c.textFaint, modifier = Modifier.size(20.dp))
-                        }
-                        HabitsWidget(
-                            ui.habits, ui.habitMarks, HourlyUse.today(Instant.ofEpochMilli(ui.now).atZone(ZoneId.systemDefault()).zone),
-                            c.textNormal, c.textMuted, c.accent,
-                            onTap = onTickHabit,
-                            onOpen = { onHabits() },
+                item(key = "schedules-heading") { SectionLabel("schedules", Modifier.padding(start = PageGutter, top = 12.dp)) }
+                if (schedulesOnly.isEmpty()) {
+                    item(key = "no-schedules") {
+                        Text(
+                            "No schedules yet · add one",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = c.textMuted,
+                            modifier = Modifier.padding(horizontal = PageGutter).fillMaxWidth().clip(RoundedCornerShape(CardRadius))
+                                .background(c.bgSecondary).clickable(onClick = onCreate).padding(16.dp),
                         )
                     }
                 }
+                items(schedulesOnly.size, key = { schedulesOnly[it].id }) { index ->
+                    Box(Modifier.padding(horizontal = PageGutter).padding(bottom = 12.dp)) {
+                        ScheduleItem(schedulesOnly[index], ui.active, ui.history, ui.now, minuteOfDay, onEdit, onToggle, onDelete)
+                    }
+                }
             }
-            // The week in one quiet line at the very foot: your time in distracting apps; the full figures are a tap away.
-            ui.weekDistracting?.let { seconds ->
-                item(key = "stats") { StatsLine("${formatMinutes(seconds / 60)} in distracting apps this week", onStats, label = "Open your statistics") }
-            }
-            item(key = "notes") {
-                StatsLine(
-                    when (ui.noteCount) {
-                        0 -> "your notes · write one"
-                        1 -> "your notes · 1"
-                        else -> "your notes · ${ui.noteCount}"
-                    },
-                    onNotes,
-                    label = "open your notes",
-                )
-            }
+        }
+        if (ui.schedules.isNotEmpty()) {
+            AddCircleButton("new block or schedule", onClick = onCreate, modifier = Modifier.align(Alignment.BottomEnd).padding(20.dp))
         }
     }
 }
@@ -398,7 +350,7 @@ internal fun HomeContent(
 /** The calm top of the screen: what is happening, in as few words as possible. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun HomeHeader(ui: HomeUiState, onUnlock: (String) -> Unit, onUndo: (String) -> Unit) {
+private fun HomeHeader(ui: HomeUiState, onUnlock: (String) -> Unit, onUndo: (String) -> Unit, onNotes: () -> Unit) {
     val context = LocalContext.current
     val c = Obsidian.colors
     val state = ui.active
@@ -413,7 +365,11 @@ private fun HomeHeader(ui: HomeUiState, onUnlock: (String) -> Unit, onUndo: (Str
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(BedtimeIcons.Refuge, contentDescription = null, tint = c.accent, modifier = Modifier.size(28.dp))
                 Spacer(Modifier.width(10.dp))
-                Text("digital refuge", style = MaterialTheme.typography.labelLarge, color = c.textFaint)
+                Text("digital refuge", style = MaterialTheme.typography.labelLarge, color = c.textFaint, modifier = Modifier.weight(1f))
+                // Your notes, always a tap away.
+                Box(Modifier.size(40.dp).clip(CircleShape).clickable(onClickLabel = "open your notes", onClick = onNotes), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.Edit, contentDescription = "your notes", tint = c.textMuted, modifier = Modifier.size(20.dp))
+                }
             }
             Spacer(Modifier.height(24.dp))
 
@@ -484,27 +440,26 @@ private fun HomeHeader(ui: HomeUiState, onUnlock: (String) -> Unit, onUndo: (Str
     }
 }
 
-/** A block: the tile opens it, the circle starts it. While it runs, it says so instead. */
+/** A block as a row: the row opens it, the circle starts it, its length changes with a tap. While it runs, it says so instead. */
 @Composable
-private fun BlockTile(
+private fun BlockRow(
     block: Schedule,
     running: Occurrence?,
     onStart: () -> Unit,
     onEdit: () -> Unit,
     onLength: () -> Unit,
-    modifier: Modifier,
 ) {
     val context = LocalContext.current
     val c = Obsidian.colors
-    val shape = RoundedCornerShape(CardRadius)
     Row(
-        modifier.clip(shape)
+        Modifier.fillMaxWidth()
             .background(if (running != null) c.accent.copy(alpha = 0.12f) else c.bgSecondary)
-            .border(1.dp, if (running != null) c.accent.copy(alpha = 0.5f) else c.border, shape)
             .clickable(onClickLabel = "Edit ${block.name}", onClick = onEdit)
-            .padding(horizontal = 14.dp),
+            .padding(start = 16.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        Icon(ScheduleIcons.of(block.icon), contentDescription = null, tint = c.accent, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(block.name, style = MaterialTheme.typography.titleSmall, color = c.textNormal, maxLines = 1)
             Spacer(Modifier.height(3.dp))
@@ -532,7 +487,7 @@ private fun BlockTile(
         }
         if (running == null) {
             Box(
-                Modifier.size(34.dp).clip(CircleShape).background(c.accent.copy(alpha = 0.18f))
+                Modifier.size(36.dp).clip(CircleShape).background(c.accent.copy(alpha = 0.18f))
                     .clickable(onClickLabel = "Start ${block.name}", onClick = onStart),
                 contentAlignment = Alignment.Center,
             ) { Icon(Icons.Default.PlayArrow, contentDescription = null, tint = c.accent, modifier = Modifier.size(18.dp)) }
@@ -573,81 +528,6 @@ private fun BlockLengthDialog(block: Schedule, onDismiss: () -> Unit, onDone: (I
                     CtaButton("Save", onClick = { onDone(minutes) }, compact = true)
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun NewBlockTile(onCreate: () -> Unit, modifier: Modifier) {
-    val c = Obsidian.colors
-    val shape = RoundedCornerShape(CardRadius)
-    Row(
-        modifier.clip(shape).border(1.dp, c.border, shape)
-            .clickable(onClickLabel = "New block", onClick = onCreate)
-            .padding(horizontal = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
-            Modifier.size(34.dp).clip(CircleShape).background(c.bgSecondary),
-            contentAlignment = Alignment.Center,
-        ) { Icon(Icons.Default.Add, contentDescription = null, tint = c.textMuted, modifier = Modifier.size(18.dp)) }
-        Spacer(Modifier.width(12.dp))
-        Text("new block", style = MaterialTheme.typography.titleSmall, color = c.textMuted, maxLines = 1)
-    }
-}
-
-@Composable
-@OptIn(ExperimentalFoundationApi::class)
-private fun QuoteFooter(
-    quote: Quote,
-    font: AppFont,
-    favourite: Boolean,
-    onFavourite: () -> Unit,
-    onHide: () -> Unit,
-    onAnother: () -> Unit,
-) {
-    val c = Obsidian.colors
-    val serif = AppFonts.quoteStyle(font) == FontStyle.Italic
-    var menu by remember { mutableStateOf(false) }
-    Column(Modifier.padding(horizontal = PageGutter).padding(top = 26.dp)) {
-        Box(Modifier.fillMaxWidth().height(1.dp).background(c.border.copy(alpha = 0.6f)))
-        Spacer(Modifier.height(22.dp))
-        QuoteMenu(menu, onDismiss = { menu = false }, favourite = favourite, onFavourite = onFavourite, onHide = onHide, onAnother = onAnother)
-        Text(
-            "“${quote.text}”",
-            style = MaterialTheme.typography.bodyLarge.copy(
-                fontSize = if (serif) 17.sp else 16.sp,
-                lineHeight = if (serif) 26.sp else 25.sp,
-                fontFamily = AppFonts.family(LocalContext.current, font),
-                fontStyle = AppFonts.quoteStyle(font),
-            ),
-            color = c.textMuted,
-            modifier = Modifier.combinedClickable(
-                onLongClickLabel = "favourite or hide this quote",
-                onLongClick = { menu = true },
-                onClick = {},
-            ),
-        )
-        quote.credit()?.let { credit ->
-            Spacer(Modifier.height(8.dp))
-            Text("— $credit", style = MaterialTheme.typography.labelMedium, color = c.textFaint)
-        }
-    }
-}
-
-@Composable
-private fun StatsLine(summary: String, onClick: () -> Unit, label: String = "Open your refuge") {
-    val c = Obsidian.colors
-    Column(Modifier.padding(horizontal = PageGutter).padding(top = 26.dp)) {
-        Box(Modifier.fillMaxWidth().height(1.dp).background(c.border.copy(alpha = 0.6f)))
-        Row(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
-                .clickable(onClickLabel = label, onClick = onClick)
-                .padding(vertical = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(summary, style = MaterialTheme.typography.bodyMedium, color = c.textMuted, modifier = Modifier.weight(1f))
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = c.textFaint, modifier = Modifier.size(20.dp))
         }
     }
 }
@@ -722,40 +602,5 @@ private fun EmptyState(onCreate: () -> Unit, onTemplate: (String) -> Unit, isIns
             modifier = Modifier.fillMaxWidth().padding(top = 12.dp, start = 4.dp),
         )
         TemplateGallery(onPick = onTemplate, isInstalled = isInstalled)
-    }
-}
-
-/**
- * Today by the hour: a dot for each, the distracted ones lit, and a tap for the minutes. Before any
- * distracting apps are chosen, a line inviting you to choose them.
- */
-@Composable
-private fun HoursSection(hourly: DayHours?, rule: HourRule, nowHour: Int, calmColor: Long?, distractedColor: Long?, onChoose: () -> Unit, onStats: () -> Unit = {}) {
-    val c = Obsidian.colors
-    var detail by remember { mutableStateOf(false) }
-    Column(Modifier.padding(horizontal = PageGutter).padding(top = 26.dp)) {
-        Box(Modifier.fillMaxWidth().height(1.dp).background(c.border.copy(alpha = 0.6f)))
-        if (hourly == null) {
-            Row(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable(onClickLabel = "choose distracting apps", onClick = onChoose).padding(vertical = 16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text("choose your distracting apps to see today by the hour", style = MaterialTheme.typography.bodyMedium, color = c.textMuted, modifier = Modifier.weight(1f))
-                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = c.textFaint, modifier = Modifier.size(20.dp))
-            }
-            return@Column
-        }
-        val states = HourlyUse.states(hourly, nowHour, rule)
-        Text(HourlyUse.summary(states, rule), style = MaterialTheme.typography.bodyMedium, color = c.textMuted, modifier = Modifier.padding(top = 16.dp))
-        HourDots(
-            states,
-            text = c.textNormal,
-            accent = c.accent,
-            modifier = Modifier.padding(top = 6.dp),
-            calmColor = calmColor,
-            distractedColor = distractedColor,
-            onClick = { detail = true },
-        )
-        if (detail) HourDetailDialog(hourly, rule, c.bgSecondary, c.textNormal, c.textFaint, c.accent, onDismiss = { detail = false }, onStats = onStats)
     }
 }

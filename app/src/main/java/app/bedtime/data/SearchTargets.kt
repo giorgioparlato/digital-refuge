@@ -123,6 +123,41 @@ object SearchOrder {
 
     fun noteKey(target: NoteTarget) = "note:${target.uri}"
 
+    /** Which kind of action [key] is: something to find, something to do, or somewhere to look words up. */
+    fun category(key: String): SearchCategory = when {
+        listOf("web:", "wikipedia:", "maps:", "lookup:", "spotify:").any { key.startsWith(it) } -> SearchCategory.LOOK_UP
+        key in setOf(ALARM, TIMER, CALCULATOR, CALENDAR, BLOCKS) || key.startsWith("note:") -> SearchCategory.DO
+        else -> SearchCategory.FIND
+    }
+
+    /**
+     * Choices saved before "only with its keyword" was a state of its own: one switched off but with a
+     * keyword still answered to it, so it becomes keyword-only, and nothing works differently.
+     */
+    fun withModes(choices: List<SearchChoice>, keywords: Map<String, String>, alreadySet: Boolean): List<SearchChoice> =
+        if (alreadySet) choices else choices.map { if (!it.on && keywords[it.key].orEmpty().isNotEmpty()) it.copy(on = true, keywordOnly = true) else it }
+
+    /** What the search may use, kinds of action in their order: neither off, nor in a kind switched off. */
+    fun usable(choices: List<SearchChoice>, off: Set<SearchCategory>): List<SearchChoice> =
+        choices.filter { it.on && category(it.key) !in off }.sortedBy { category(it.key).ordinal }
+
+    /** [key] set to [mode]: switched on or off as [switched] does, and kept in or out of ordinary results. */
+    fun setMode(choices: List<SearchChoice>, key: String, mode: SearchMode): List<SearchChoice> {
+        val now = choices.firstOrNull { it.key == key } ?: return choices
+        val placed = if ((mode == SearchMode.OFF) != (now.mode == SearchMode.OFF)) switched(choices, key, mode != SearchMode.OFF) else choices
+        return placed.map { if (it.key == key) it.copy(keywordOnly = mode == SearchMode.KEYWORD) else it }
+    }
+
+    /** "6 in every search · 5 by keyword · 3 off". */
+    fun summary(choices: List<SearchChoice>): String {
+        val by = choices.groupingBy { it.mode }.eachCount()
+        return listOf(
+            "${by[SearchMode.EVERY] ?: 0} in every search",
+            "${by[SearchMode.KEYWORD] ?: 0} by keyword",
+            "${by[SearchMode.OFF] ?: 0} off",
+        ).joinToString(" · ")
+    }
+
     /** [obsidian]: whether Obsidian is on the phone, so its notes can be offered. */
     fun defaults(targets: List<SearchTarget>, notes: List<NoteTarget>, obsidian: Boolean = false): List<SearchChoice> {
         val ordered = SearchTarget.Kind.entries.flatMap { kind -> targets.filter { it.kind == kind }.distinctBy { it.packageName } }

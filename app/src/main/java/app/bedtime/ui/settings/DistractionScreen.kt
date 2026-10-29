@@ -107,7 +107,7 @@ internal fun DistractionContent(
     onDistractedColor: (Long?) -> Unit = {},
 ) {
     val c = Obsidian.colors
-    Scaffold(containerColor = c.bgPrimary, topBar = { ObsidianTopBar("Distraction tracker", onBack = onBack) }) { padding ->
+    Scaffold(containerColor = c.bgPrimary, topBar = { ObsidianTopBar("Distracting apps", onBack = onBack) }) { padding ->
         Column(
             Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = PageGutter, vertical = 4.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -149,22 +149,8 @@ internal fun DistractionContent(
                 )
                 Text("Minutes", style = MaterialTheme.typography.labelMedium, color = c.textMuted, modifier = Modifier.padding(top = 8.dp))
             }
-            SectionCard(title = "Colours") {
-                // How they'll look: a few calm hours, two distracted ones, this one, and some to come.
-                HourDots(
-                    List(9) { HourState.CALM } + HourState.DISTRACTED + HourState.CALM + HourState.DISTRACTED + HourState.NOW + List(11) { HourState.AHEAD },
-                    text = c.textNormal,
-                    accent = c.accent,
-                    calmColor = calmColor,
-                    distractedColor = distractedColor,
-                )
-                Text("Calm hours", style = MaterialTheme.typography.labelMedium, color = c.textMuted, modifier = Modifier.padding(top = 8.dp, bottom = 8.dp))
-                ColourChoice(TextPresets, calmColor, onCalmColor, automatic = "Automatic")
-                Text("Distracted hours", style = MaterialTheme.typography.labelMedium, color = c.textMuted, modifier = Modifier.padding(top = 16.dp, bottom = 8.dp))
-                ColourChoice(AccentPresets + DistractedPresets, distractedColor, onDistractedColor, automatic = "Accent")
-            }
             Text(
-                "To see it on your home or lock screen, switch on the distraction tracker in Widgets.",
+                "To see it on your home or lock screen, switch on the distraction tracker in Widgets; its look and colours are there too.",
                 style = MaterialTheme.typography.bodySmall,
                 color = c.textMuted,
                 modifier = Modifier.padding(horizontal = 4.dp),
@@ -174,5 +160,3 @@ internal fun DistractionContent(
     }
 }
 
-/** A warmer colour for distracted hours, besides the accents (amber is already among them). */
-private val DistractedPresets: List<Pair<String, Long>> = listOf("Ember" to 0xFFD9604AL)

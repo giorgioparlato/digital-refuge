@@ -77,6 +77,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.bedtime.data.SearchChoice
+import app.bedtime.ui.components.ObsidianTextField
+import app.bedtime.data.SearchMode
+import app.bedtime.data.SearchCategory
 import app.bedtime.data.SearchOrder
 import app.bedtime.data.SearchTarget
 import app.bedtime.data.SearchTargets
@@ -103,7 +106,10 @@ fun SearchSettingsScreen(onBack: () -> Unit) {
     val current = settings ?: return
     val targets = found ?: return
     val obsidian = remember { AppCatalog.isLaunchable(context, FolderIndex.OBSIDIAN) }
-    val choices = SearchOrder.arrange(SearchOrder.defaults(targets, current.quickTargets, obsidian), current.searchChoices)
+    val arranged = SearchOrder.arrange(SearchOrder.defaults(targets, current.quickTargets, obsidian), current.searchChoices)
+    val keywords = Keywords.effective(current.keywords, current.keywordsCustom, Keywords.defaults(arranged, current.quickTargets))
+    // Each in every search, only by its keyword, or off; saved before that was so, an off one with a keyword is keyword-only.
+    val choices = SearchOrder.withModes(arranged, keywords, current.searchModesSet)
     val vaultName by produceState<String?>(null, current.obsidianVault) {
         value = current.obsidianVault?.let { withContext(Dispatchers.IO) { FolderIndex.folderName(context, Uri.parse(it)) } }
     }
@@ -124,7 +130,7 @@ fun SearchSettingsScreen(onBack: () -> Unit) {
             SearchOrder.OBSIDIAN to "Obsidian notes, by title",
             SearchOrder.FILES to "Files in your folders, by name",
         )
-    val save = { updated: List<SearchChoice> -> scope.launch { repo.updateSettings { it.copy(searchChoices = updated) } } }
+    val save = { updated: List<SearchChoice> -> scope.launch { repo.updateSettings { it.copy(searchChoices = updated, searchModesSet = true) } } }
     // Obsidian notes and files need their folder first: switching them on without one asks for it.
     var picking by remember { mutableStateOf<String?>(null) }
     var waitingFolder by remember { mutableStateOf<List<SearchChoice>?>(null) }
@@ -143,7 +149,7 @@ fun SearchSettingsScreen(onBack: () -> Unit) {
                     it.copy(filesFolders = (it.fileFolders + uri.toString()).distinct(), filesFolder = null)
                 }
                 // Chosen from the toggle, it's switched on too; chosen from the folder row, it stays as it was.
-                if (updated != null) withFolder.copy(searchChoices = updated) else withFolder
+                if (updated != null) withFolder.copy(searchChoices = updated, searchModesSet = true) else withFolder
             }
         }
     }
@@ -159,7 +165,6 @@ fun SearchSettingsScreen(onBack: () -> Unit) {
         waitingContacts?.let { updated -> if (granted) save(updated) }
         waitingContacts = null
     }
-    val keywords = Keywords.effective(current.keywords, current.keywordsCustom, Keywords.defaults(choices, current.quickTargets))
     val chatApps = remember { ContactSearch.chatApps(context) }
     SearchSettingsContent(
         choices = choices.map { it to (labels[it.key] ?: it.key) },
@@ -195,6 +200,8 @@ fun SearchSettingsScreen(onBack: () -> Unit) {
         chatApps = chatApps,
         chosenChats = ChatApp.chosen(current.contactApps, chatApps),
         onChats = { chosen -> scope.launch { repo.updateSettings { it.copy(contactApps = chosen.map { app -> app.key }) } } },
+        categoriesOff = current.searchOff,
+        onCategory = { category, on -> scope.launch { repo.updateSettings { it.copy(searchOff = if (on) it.searchOff - category else it.searchOff + category) } } },
         onRemoveFolder = { key ->
             val at = key.substringAfter(':').toIntOrNull()
             if (at != null) scope.launch {
@@ -229,13 +236,13 @@ internal fun SearchSettingsContent(
     chatApps: List<ChatApp> = emptyList(),
     chosenChats: List<ChatApp> = emptyList(),
     onChats: (List<ChatApp>) -> Unit = {},
+    /** Kinds of action switched off whole, and the switch for each. */
+    categoriesOff: Set<SearchCategory> = emptySet(),
+    onCategory: (SearchCategory, Boolean) -> Unit = { _, _ -> },
 ) {
     val c = Obsidian.colors
     val list = choices.map { it.first }
     val labels = choices.associate { (choice, label) -> choice.key to label }
-    val added = list.filter { it.on }
-    val left = list.filterNot { it.on }
-    var adding by remember { mutableStateOf(false) }
     var conflict by remember { mutableStateOf<Pair<String, String>?>(null) }
     conflict?.let { (keyword, owner) ->
         AlertDialog(
@@ -252,32 +259,60 @@ internal fun SearchSettingsContent(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(
-                "Matching apps always come first. Then what you've added here, in this order; drag a row by its handle to move it. Only apps a session allows are offered during it.\n\nA keyword sends straight to one of them: type it, a space, then your words (\"m cafe\"). A sign like @ needs no space.",
+                "Matching apps always come first; then what's found, what you can do, and where to look your words up, in that order. Each action is in every search, only with its keyword (type it, a space, then your words: \"m cafe\"), or off. Only apps a session allows are offered during it.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = c.textMuted,
             )
-            SectionCard {
-                DragList(added, key = { it.key }, onMoved = { moved -> onChange(moved + left) }) { choice ->
-                    Text(
-                        labels[choice.key] ?: choice.key,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = c.textNormal,
-                        modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
-                    )
-                    KeywordBox(keywords[choice.key].orEmpty()) { typed -> onKeyword(choice.key, typed)?.let { owner -> conflict = Keywords.clean(typed) to owner } }
-                    Icon(
-                        Icons.Default.Clear,
-                        contentDescription = "take it out of the search",
-                        tint = c.textFaint,
-                        modifier = Modifier.size(40.dp).clip(RoundedCornerShape(50)).clickable { onChange(SearchOrder.switched(list, choice.key, false)) }.padding(10.dp),
-                    )
-                }
-                if (added.isEmpty()) Text("Only apps, for now.", style = MaterialTheme.typography.bodyMedium, color = c.textFaint, modifier = Modifier.padding(8.dp))
-                if (left.isNotEmpty()) {
-                    OptionRow(Icons.Default.Add, "Add to the search", description = "${left.size} more to choose from", onClick = { adding = true }, trailing = { Chevron() })
+            Text(SearchOrder.summary(list), style = MaterialTheme.typography.labelLarge, color = c.accentText)
+            TryIt(list, labels, keywords, categoriesOff)
+            SearchCategory.entries.forEach { category ->
+                val inCategory = list.filter { SearchOrder.category(it.key) == category }
+                if (inCategory.isEmpty()) return@forEach
+                val on = category !in categoriesOff
+                SectionCard {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(category.title, style = MaterialTheme.typography.titleMedium, color = if (on) c.textNormal else c.textFaint)
+                            Text(category.hint, style = MaterialTheme.typography.bodySmall, color = c.textFaint)
+                        }
+                        ObsidianToggle(on, { onCategory(category, it) })
+                    }
+                    if (!on) {
+                        Text(
+                            "Switched off: none of these show, not even by keyword. Each keeps its own setting for when it's back.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = c.textFaint,
+                            modifier = Modifier.padding(top = 8.dp),
+                        )
+                    } else {
+                        Spacer(Modifier.height(8.dp))
+                        DragList(inCategory, key = { it.key }, onMoved = { moved -> onChange(list.filterNot { SearchOrder.category(it.key) == category } + moved) }) { choice ->
+                            Column(Modifier.weight(1f).padding(horizontal = 8.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        labels[choice.key] ?: choice.key,
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = if (choice.mode == SearchMode.OFF) c.textFaint else c.textNormal,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    if (choice.mode != SearchMode.OFF) {
+                                        KeywordBox(keywords[choice.key].orEmpty()) { typed -> onKeyword(choice.key, typed)?.let { owner -> conflict = Keywords.clean(typed) to owner } }
+                                    }
+                                }
+                                Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    listOf(SearchMode.EVERY to "Every search", SearchMode.KEYWORD to "Keyword only", SearchMode.OFF to "Off").forEach { (mode, label) ->
+                                        ModeChip(label, choice.mode == mode) { if (choice.mode != mode) onChange(SearchOrder.setMode(list, choice.key, mode)) }
+                                    }
+                                }
+                                if (choice.mode == SearchMode.KEYWORD && keywords[choice.key].isNullOrEmpty()) {
+                                    Text("Give it a keyword, or nothing reaches it", style = MaterialTheme.typography.labelSmall, color = c.accentText, modifier = Modifier.padding(top = 4.dp))
+                                }
+                            }
+                        }
+                    }
                 }
             }
-            if (added.any { it.key == SearchOrder.CONTACTS } && chatApps.size > 1) {
+            if (list.any { it.key == SearchOrder.CONTACTS && it.on } && SearchCategory.FIND !in categoriesOff && chatApps.size > 1) {
                 SectionCard(title = "Beside each contact", subtitle = "Up to ${ChatApp.MAX} ways to message them, in the order you pick them") {
                     chatApps.forEach { app ->
                         val on = app in chosenChats
@@ -318,43 +353,50 @@ internal fun SearchSettingsContent(
             Spacer(Modifier.height(24.dp))
         }
     }
-    if (adding) {
-        Dialog(onDismissRequest = { adding = false }) {
-            AddToSearchContent(left.map { it.key to (labels[it.key] ?: it.key) }) { key ->
-                adding = false
-                onChange(SearchOrder.switched(list, key, true))
-            }
-        }
-    }
 }
 
-/** What could still be added to the search, under its heading; a tap adds it at the end of the list. */
+/** One of an action's three states, as a small chip; the chosen one filled. */
 @Composable
-internal fun AddToSearchContent(choices: List<Pair<String, String>>, onAdd: (String) -> Unit) {
+private fun ModeChip(label: String, chosen: Boolean, onClick: () -> Unit) {
     val c = Obsidian.colors
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .heightIn(max = 560.dp)
-            .clip(RoundedCornerShape(CardRadius))
-            .background(c.bgSecondary)
-            .verticalScroll(rememberScrollState())
-            .padding(20.dp),
-    ) {
-        Text("Add to the search", style = MaterialTheme.typography.titleMedium, color = c.textNormal)
-        val grouped = choices.groupBy { (key, _) -> SearchOrder.group(key) }
-        SearchOrder.GROUPS.filter { it in grouped }.forEach { group ->
-            SectionLabel(group)
-            grouped.getValue(group).forEach { (key, label) ->
-                Row(
-                    Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable { onAdd(key) }.padding(vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = null, tint = c.accent, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(12.dp))
-                    Text(label, style = MaterialTheme.typography.bodyLarge, color = c.textNormal)
-                }
+    val shape = RoundedCornerShape(50)
+    Text(
+        label,
+        style = MaterialTheme.typography.labelMedium,
+        color = if (chosen) c.bgPrimary else c.textMuted,
+        maxLines = 1,
+        modifier = Modifier
+            .clip(shape)
+            .background(if (chosen) c.accent else Color.Transparent)
+            .border(1.dp, if (chosen) c.accent else c.border, shape)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 5.dp),
+    )
+}
+
+/**
+ * Type as you would in the search and see what it would offer: the one place a keyword sends it, or,
+ * after matching apps, the actions in every search, where they have something for it.
+ */
+@Composable
+private fun TryIt(list: List<SearchChoice>, labels: Map<String, String>, keywords: Map<String, String>, off: Set<SearchCategory>) {
+    val c = Obsidian.colors
+    var text by remember { mutableStateOf("") }
+    SectionCard(title = "Try it") {
+        ObsidianTextField(value = text, onValueChange = { text = it }, placeholder = "anna, t 10, m cafe…")
+        if (text.isBlank()) return@SectionCard
+        val usable = SearchOrder.usable(list, off)
+        val hit = Keywords.match(text, keywords.filterKeys { key -> usable.any { it.key == key } })
+        Spacer(Modifier.height(10.dp))
+        if (hit != null) {
+            Text("By its keyword, only: ${labels[hit.key] ?: hit.key}, with “${hit.words}”", style = MaterialTheme.typography.bodyMedium, color = c.textNormal)
+        } else {
+            val every = usable.filterNot { it.keywordOnly }
+            Text("Apps whose name matches “${text.trim()}”, then, where they have something for it:", style = MaterialTheme.typography.bodyMedium, color = c.textMuted)
+            every.forEach { choice ->
+                Text("· ${labels[choice.key] ?: choice.key}", style = MaterialTheme.typography.bodyMedium, color = c.textNormal, modifier = Modifier.padding(top = 2.dp))
             }
+            if (every.isEmpty()) Text("· nothing else", style = MaterialTheme.typography.bodyMedium, color = c.textFaint)
         }
     }
 }

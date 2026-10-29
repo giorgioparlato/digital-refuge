@@ -185,6 +185,27 @@ const val OLD_HOME_ACCENT = 0xFF4EC68E
 
 fun HomeStyle.withCurrentGreen(): HomeStyle = if (accent == OLD_HOME_ACCENT) copy(accent = DEFAULT_HOME_ACCENT) else this
 
+/**
+ * The lock screen's own choices where it differs from the home screen: its look, and the options of
+ * widgets both screens share. Each null follows the home screen's.
+ */
+@Serializable
+data class LockLook(
+    val background: Long? = null,
+    val accent: Long? = null,
+    val textColor: Long? = null,
+    val textSize: TextSize? = null,
+    val font: AppFont? = null,
+    val quoteFont: AppFont? = null,
+    val clockSize: ClockSize? = null,
+    val quoteRefresh: QuoteRefresh? = null,
+    val noteLines: Int? = null,
+    val noteTextSize: TextSize? = null,
+    val noteBackground: Long? = null,
+    val noteDarkText: Boolean? = null,
+    val calendarTomorrow: Boolean? = null,
+)
+
 /** Look of the minimal home screen. Colours are ARGB. */
 @Serializable
 data class HomeStyle(
@@ -285,7 +306,92 @@ data class HomeStyle(
     /** How the distraction tracker looks on the home screen, and on the lock screen (null: as on home). */
     val useWidget: UseWidget = UseWidget(),
     val lockUseWidget: UseWidget? = null,
+    /** The lock screen's own look and widget options, over these. */
+    val lock: LockLook = LockLook(),
 ) {
+    /** This style as [screen] shows it: on the lock screen, its own choices over the home screen's. */
+    fun on(screen: Screen): HomeStyle = if (screen == Screen.HOME) this else copy(
+        background = lock.background ?: background,
+        accent = lock.accent ?: accent,
+        textColor = lock.textColor ?: textColor,
+        textSize = lock.textSize ?: textSize,
+        font = lock.font ?: font,
+        quoteFont = lock.quoteFont ?: quoteFont,
+        clockSize = lock.clockSize ?: clockSize,
+        quoteRefresh = lock.quoteRefresh ?: quoteRefresh,
+        noteLines = lock.noteLines ?: noteLines,
+        noteTextSize = lock.noteTextSize ?: noteTextSize,
+        noteBackground = lock.noteBackground ?: noteBackground,
+        noteDarkText = lock.noteDarkText ?: noteDarkText,
+        calendarTomorrow = lock.calendarTomorrow ?: calendarTomorrow,
+    )
+
+    /**
+     * [change], made to the style as [screen] shows it. The lock screen's look and widget options are
+     * always its own: changed there, they leave the home screen as it was; changed on the home screen,
+     * the lock screen keeps what it had. Anything else changes for both, as it always has.
+     */
+    fun edit(screen: Screen, change: (HomeStyle) -> HomeStyle): HomeStyle {
+        if (screen == Screen.HOME) {
+            val after = change(this)
+            val lockNow = on(Screen.LOCK)
+            fun <T> kept(get: (HomeStyle) -> T, own: T?): T? = own ?: get(lockNow).takeIf { get(after) != get(this) }
+            return after.copy(
+                lock = LockLook(
+                    background = kept({ it.background }, lock.background),
+                    accent = kept({ it.accent }, lock.accent),
+                    textColor = kept({ it.textColor }, lock.textColor),
+                    textSize = kept({ it.textSize }, lock.textSize),
+                    font = kept({ it.font }, lock.font),
+                    quoteFont = kept({ it.quoteFont }, lock.quoteFont),
+                    clockSize = kept({ it.clockSize }, lock.clockSize),
+                    quoteRefresh = kept({ it.quoteRefresh }, lock.quoteRefresh),
+                    noteLines = kept({ it.noteLines }, lock.noteLines),
+                    noteTextSize = kept({ it.noteTextSize }, lock.noteTextSize),
+                    noteBackground = kept({ it.noteBackground }, lock.noteBackground),
+                    noteDarkText = kept({ it.noteDarkText }, lock.noteDarkText),
+                    calendarTomorrow = kept({ it.calendarTomorrow }, lock.calendarTomorrow),
+                ),
+                lockWeatherStyle = lockWeatherStyle ?: weatherStyle.takeIf { after.weatherStyle != weatherStyle },
+                lockTopSpace = lockTopSpace ?: topSpace.takeIf { after.topSpace != topSpace },
+                lockUseWidget = lockUseWidget ?: useWidget.takeIf { after.useWidget != useWidget },
+            )
+        }
+        val before = on(Screen.LOCK)
+        val after = change(before)
+        fun <T> own(get: (HomeStyle) -> T, kept: T?): T? = if (get(after) != get(before)) get(after) else kept
+        val own = LockLook(
+            background = own({ it.background }, lock.background),
+            accent = own({ it.accent }, lock.accent),
+            textColor = own({ it.textColor }, lock.textColor),
+            textSize = own({ it.textSize }, lock.textSize),
+            font = own({ it.font }, lock.font),
+            quoteFont = own({ it.quoteFont }, lock.quoteFont),
+            clockSize = own({ it.clockSize }, lock.clockSize),
+            quoteRefresh = own({ it.quoteRefresh }, lock.quoteRefresh),
+            noteLines = own({ it.noteLines }, lock.noteLines),
+            noteTextSize = own({ it.noteTextSize }, lock.noteTextSize),
+            noteBackground = own({ it.noteBackground }, lock.noteBackground),
+            noteDarkText = own({ it.noteDarkText }, lock.noteDarkText),
+            calendarTomorrow = own({ it.calendarTomorrow }, lock.calendarTomorrow),
+        )
+        return after.copy(
+            background = background, accent = accent, textColor = textColor, textSize = textSize, font = font, quoteFont = quoteFont,
+            clockSize = clockSize, quoteRefresh = quoteRefresh, noteLines = noteLines, noteTextSize = noteTextSize,
+            noteBackground = noteBackground, noteDarkText = noteDarkText, calendarTomorrow = calendarTomorrow,
+            lock = own,
+        )
+    }
+
+    /** What a widget's long-press sheet can change, taken from [from]; the rest stays as it is here. */
+    fun sheetFields(from: HomeStyle): HomeStyle = copy(
+        weatherStyle = from.weatherStyle, lockWeatherStyle = from.lockWeatherStyle, clockSize = from.clockSize, quoteRefresh = from.quoteRefresh,
+        noteWidgetId = from.noteWidgetId, noteLines = from.noteLines, noteTextSize = from.noteTextSize, noteBackground = from.noteBackground,
+        noteDarkText = from.noteDarkText, noteBesideClock = from.noteBesideClock, lockNoteBesideClock = from.lockNoteBesideClock,
+        calendarIconWhenEmpty = from.calendarIconWhenEmpty, lockCalendarIconWhenEmpty = from.lockCalendarIconWhenEmpty,
+        calendarTomorrow = from.calendarTomorrow, useWidget = from.useWidget, lockUseWidget = from.lockUseWidget,
+    )
+
     fun useWidgetFor(screen: Screen): UseWidget = if (screen == Screen.HOME) useWidget else lockUseWidget ?: useWidget
 
     fun withUseWidget(screen: Screen, widget: UseWidget): HomeStyle = if (screen == Screen.HOME) copy(useWidget = widget) else copy(lockUseWidget = widget)
@@ -317,7 +423,29 @@ const val GESTURE_CAMERA = "camera"
 
 /** One thing the search can offer, by [SearchOrder] key, and whether it does. */
 @Serializable
-data class SearchChoice(val key: String, val on: Boolean)
+data class SearchChoice(
+    val key: String,
+    val on: Boolean,
+    /** Kept out of ordinary results: only its keyword reaches it. */
+    val keywordOnly: Boolean = false,
+) {
+    val mode: SearchMode get() = when {
+        !on -> SearchMode.OFF
+        keywordOnly -> SearchMode.KEYWORD
+        else -> SearchMode.EVERY
+    }
+}
+
+/** How the search reaches an action: in every search, only with its keyword, or not at all. */
+enum class SearchMode { EVERY, KEYWORD, OFF }
+
+/** The search's three kinds of action, in the order results show them; each can be switched off whole. */
+@Serializable
+enum class SearchCategory(val title: String, val hint: String) {
+    FIND("Find", "Things on the phone, by their name"),
+    DO("Do", "Set, save, start or work something out"),
+    LOOK_UP("Look up", "Your words sent to an app or the web"),
+}
 
 /** The home screen's gestures; a swipe up always opens every app. */
 @Serializable
@@ -378,6 +506,8 @@ data class AppSettings(
     val distractionMinutes: Int = 5,
     /** Minutes in any app that make an hour a distracted one too; null leaves it to the distracting apps. */
     val distractionTotalMinutes: Int? = null,
+    /** What the statistics compare a period with, as last chosen. */
+    val statsVersus: Versus = Versus.LAST,
     /** A nudge after this many minutes in a row on the phone, in any app; null for none. */
     val runNudgeMinutes: Int? = null,
     /** Keywords for the search's choices and for apps ("app:" + package); the suggested ones until [keywordsCustom]. */
@@ -395,6 +525,10 @@ data class AppSettings(
     val filesFolders: List<String> = emptyList(),
     /** What the search offers after apps, in your order, each on or off; empty until you change it. */
     val searchChoices: List<SearchChoice> = emptyList(),
+    /** Whether [searchChoices] have been saved since "only with its keyword" became a state of its own. */
+    val searchModesSet: Boolean = false,
+    /** Kinds of action switched off whole; each action keeps its own state for when it's back. */
+    val searchOff: Set<SearchCategory> = emptySet(),
     /** Which block each home-screen widget starts, by widget id; missing means the tile's block, then the first. */
     val widgetBlocks: Map<String, String> = emptyMap(),
     // Both of these used to live here and now belong to each schedule, since how firmly a session
@@ -536,6 +670,8 @@ data class UsageDay(
     val lifted: Set<String> = emptySet(),
     /** Unlocks counted by refuge itself; null on days from before it counted them. */
     val unlocks: Int? = null,
+    /** The same, by hour of the day. */
+    val unlockHours: Map<Int, Int> = emptyMap(),
 )
 
 /** A named set of apps for ticking many at once in the app picker. Copied into schedules, never linked. */

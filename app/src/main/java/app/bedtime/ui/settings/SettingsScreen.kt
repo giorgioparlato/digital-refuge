@@ -305,9 +305,33 @@ internal fun SettingsContent(
                 // Every setting by what it's for; the search finds one by its name or a word in it.
                 val lockShown = lockScreen || (homeScreen && lockAlways)
                 val entries = buildList {
+                    // Each screen in its own group; then what's on them, the search, your apps and your notes.
                     add(
                         Entry(
-                            "staying focused",
+                            "home screen",
+                            Icons.Default.Home,
+                            "Everyday launcher",
+                            if (homeScreen) "On · refuge's home screen all the time" else "Off · only in minimal sessions",
+                            "launcher home screen default home app everyday minimal",
+                            onSetup,
+                        ),
+                    )
+                    add(Entry("home screen", Icons.Default.Edit, "Look", "Colours, sizes and fonts", "colour color theme background accent text font size clock size top space look", onHomeStyle))
+                    add(Entry("home screen", Icons.Default.Refresh, "Gestures", "An app, a note, your blocks…", "gesture gestures swipe double tap home blocks", onGestures))
+                    add(Entry("lock screen", Icons.Default.Lock, "Lock screen in sessions", "The clock and your widgets over the lock screen", "lock screen sessions", trailing = { ObsidianToggle(lockScreen, onLockScreen) }))
+                    if (homeScreen) {
+                        add(Entry("lock screen", Icons.Default.Lock, "Lock screen outside sessions", "Refuge's lock screen all the time, as your launcher", "lock screen always launcher", trailing = { ObsidianToggle(lockAlways, onLockAlways) }))
+                    }
+                    if (lockShown) {
+                        add(Entry("lock screen", Icons.Default.Notifications, "Notifications", "From the apps and people you choose", "notifications messages reply people contacts lock screen", onLockNotifications))
+                        add(Entry("lock screen", Icons.Default.KeyboardArrowUp, "Gestures", "An app, the camera, screen off…", "gesture gestures swipe double tap lock camera screen off", onSwipes))
+                    }
+                    add(Entry("widgets", BedtimeIcons.Grid, "Widgets", "What each screen shows, and how", "widget widgets weather calendar event date greeting clock hours distraction tracker budget unlocks habits quote quotes now playing music note status bar logo mark arrow icons lock screen home screen colours", onShown))
+                    add(Entry("widgets", Icons.Default.FavoriteBorder, "Quotes", "Your own, favourites, hidden ones", "quote quotes favourite hide", onQuotes))
+                    add(Entry("search", Icons.Default.Search, "Search", "What it offers, keywords, and in what order", "search keyword keywords web maps contacts messaging whatsapp signal telegram alarm timer calculator settings pages files folder obsidian spotify blocks", onSearch))
+                    add(
+                        Entry(
+                            "apps",
                             BedtimeIcons.Grid,
                             "App groups",
                             when (groupCount) {
@@ -319,9 +343,10 @@ internal fun SettingsContent(
                             onGroups,
                         ),
                     )
+                    add(Entry("apps", Icons.Default.DateRange, "Distracting apps", "What the tracker counts, a distracted hour, a nudge after time in a row", "distraction distracting tracker hours dots nudge break in a row continuous scrolling", onDistraction))
                     add(
                         Entry(
-                            "staying focused",
+                            "apps",
                             Icons.Default.Warning,
                             "Always-available apps",
                             when (alwaysAvailableCount) {
@@ -333,35 +358,10 @@ internal fun SettingsContent(
                             onAlwaysAvailable,
                         ),
                     )
-                    add(Entry("staying focused", Icons.Default.DateRange, "Distraction tracker", "Your distracting apps, today by the hour, a nudge after time in a row", "distraction distracting tracker hours dots colours nudge break in a row continuous scrolling", onDistraction))
-                    add(Entry("look & feel", Icons.Default.Edit, "Look", "Colours, sizes and fonts", "colour color theme background accent text font size clock size top space", onHomeStyle))
-                    add(
-                        Entry(
-                            "what's on my screens",
-                            Icons.Default.Home,
-                            "Everyday launcher",
-                            if (homeScreen) "On · refuge's home screen all the time" else "Off · only in minimal sessions",
-                            "launcher home screen default home app everyday minimal",
-                            onSetup,
-                        ),
-                    )
-                    add(Entry("what's on my screens", Icons.Default.Lock, "Lock screen in sessions", "The clock and your widgets over the lock screen", "lock screen sessions", trailing = { ObsidianToggle(lockScreen, onLockScreen) }))
-                    if (homeScreen) {
-                        add(Entry("what's on my screens", Icons.Default.Lock, "Lock screen outside sessions", "Refuge's lock screen all the time, as your launcher", "lock screen always launcher", trailing = { ObsidianToggle(lockAlways, onLockAlways) }))
-                    }
-                    add(Entry("what's on my screens", BedtimeIcons.Grid, "Widgets", "Weather, habits, a quote… for each screen", "widget widgets weather calendar event date greeting clock hours distraction habits quote quotes now playing music status bar logo mark arrow icons lock screen home screen", onShown))
-                    if (lockShown) {
-                        add(Entry("what's on my screens", Icons.Default.Notifications, "Lock-screen notifications", "From the apps and people you choose", "notifications messages reply people contacts lock screen", onLockNotifications))
-                    }
-                    add(Entry("gestures", Icons.Default.Refresh, "Home-screen gestures", "An app, a note, your blocks…", "gesture gestures swipe double tap home blocks", onGestures))
-                    if (lockShown) {
-                        add(Entry("gestures", Icons.Default.KeyboardArrowUp, "Lock-screen gestures", "An app, the camera, screen off…", "gesture gestures swipe double tap lock camera screen off", onSwipes))
-                    }
-                    add(Entry("finding things", Icons.Default.Search, "Search", "What it offers, keywords, and in what order", "search keyword keywords web maps contacts messaging whatsapp signal telegram alarm timer calculator settings pages files folder obsidian spotify blocks", onSearch))
                     if (homeScreen) {
                         add(
                             Entry(
-                                "finding things",
+                                "apps",
                                 Icons.Default.Clear,
                                 "Hidden apps",
                                 when (hiddenCount) {
@@ -374,10 +374,9 @@ internal fun SettingsContent(
                             ),
                         )
                     }
-                    add(Entry("notes & habits", Icons.Default.Edit, "Notes & quick notes", "Your notes, the to-do, where quick notes go", "notes note quick to-do todo obsidian daily file", onQuickNotes))
-                    add(Entry("notes & habits", Icons.Default.CheckCircle, "Habits", "Tick them off, here or on your screens", "habits habit streak", onHabits))
-                    // Found by the search only: quotes live with the widgets, the rest under "setup & backup".
-                    add(Entry(SEARCH_ONLY, Icons.Default.FavoriteBorder, "Quotes", "Your own, favourites, hidden ones", "quote quotes favourite hide", onQuotes))
+                    add(Entry("notes", Icons.Default.Edit, "Notes & quick notes", "Where quick notes go, and the to-do", "notes note quick to-do todo obsidian daily file", onQuickNotes))
+                    // Found by the search only: habits live in insights, the rest under "setup & backup".
+                    add(Entry(SEARCH_ONLY, Icons.Default.CheckCircle, "Habits", "Tick them off, here or on your screens", "habits habit streak", onHabits))
                     add(Entry(SEARCH_ONLY, Icons.Default.Build, "Permissions & setup", "Blocking, Do Not Disturb, greyscale, your launcher", "permissions setup accessibility greyscale dnd do not disturb usage access", onSetup))
                     add(Entry(SEARCH_ONLY, Icons.Default.Share, "Export settings", "Save schedules, blocks, groups and stats to a file", "export backup save file", onExport))
                     add(Entry(SEARCH_ONLY, BedtimeIcons.Refuge, "Import settings", "Replace everything with a saved file", "import restore backup file", onImport))
@@ -395,9 +394,9 @@ internal fun SettingsContent(
                 }
                 entries.filter { it.group != SEARCH_ONLY }.groupBy { it.group }.forEach { (group, rows) ->
                     SectionLabel(group)
-                    if (group == "what's on my screens") {
+                    if (group == "home screen") {
                         Text(
-                            "Refuge's home screen takes over during sessions with minimal mode, and can be your everyday launcher too. Its lock screen is up to you. Both share the settings below.",
+                            "Refuge's home screen takes over during sessions with minimal mode, and can be your everyday launcher too. Its lock screen is up to you.",
                             style = MaterialTheme.typography.bodySmall,
                             color = c.textFaint,
                             modifier = Modifier.padding(start = 2.dp, bottom = 6.dp),

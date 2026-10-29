@@ -1,5 +1,13 @@
 package app.bedtime.ui.stats
 
+import androidx.compose.runtime.mutableStateOf
+import app.bedtime.data.Habit
+import app.bedtime.ui.habits.rememberHabits
+import app.bedtime.ui.habits.HabitsBody
+import app.bedtime.ui.components.AddCircleButton
+import app.bedtime.ui.components.SegmentedChoice
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -80,13 +88,21 @@ import kotlin.math.ceil
  * refuge and in limited apps.
  */
 @Composable
-fun StatsScreen(onBack: () -> Unit) {
+/**
+ * Insights: your phone use, how your sessions held, and your habits. As a tab it has no way back; opened
+ * from elsewhere (the hour dots' report, a widget) it has one. [initialSection]: 0 phone, 1 sessions, 2 habits.
+ */
+fun StatsScreen(onBack: (() -> Unit)?, initialSection: Int = 0) {
     val context = LocalContext.current
     val repo = remember { Repository.get(context) }
+    val scope = rememberCoroutineScope()
     val history by repo.history.collectAsStateWithLifecycle(initialValue = emptyList())
     val settings by repo.settings.collectAsStateWithLifecycle(initialValue = null)
     val usage by repo.usage.collectAsStateWithLifecycle(initialValue = emptyList())
-    val use = rememberUseDays(14, live = false)
+    val (habits, habitMarks) = rememberHabits()
+    var editingHabit by remember { mutableStateOf<Habit?>(null) }
+    // Nine weeks: a week against the four before it, and the last eight weeks.
+    val use = rememberUseDays(63, live = false)
     val packages = use.days.values.flatMap { it.apps.keys }.toSet()
     val labels by produceState(emptyMap<String, String>(), packages) {
         value = withContext(Dispatchers.IO) { packages.associateWith { AppCatalog.label(context, it) } }
@@ -103,6 +119,25 @@ fun StatsScreen(onBack: () -> Unit) {
         rule = settings?.let { HourlyUse.rule(it) } ?: HourRule(5),
         labels = labels,
         onAllowAccess = { runCatching { context.startActivity(UsageReader.accessIntent(context)) } },
+        versus = settings?.statsVersus ?: app.bedtime.data.Versus.LAST,
+        onVersus = { v -> scope.launch { repo.updateSettings { it.copy(statsVersus = v) } } },
+        habits = {
+            HabitsBody(
+                habits, habitMarks, HourlyUse.today(), editingHabit, { editingHabit = it },
+                onMark = { habit, day, value -> scope.launch { repo.markHabit(habit.id, day, value) } },
+                onSave = { habit ->
+                    scope.launch {
+                        repo.updateSettings { s ->
+                            s.copy(habits = if (s.habits.any { it.id == habit.id }) s.habits.map { if (it.id == habit.id) habit else it } else s.habits + habit)
+                        }
+                    }
+                },
+                onMove = { moved -> scope.launch { repo.updateSettings { it.copy(habits = moved) } } },
+                onDelete = { habit -> scope.launch { repo.deleteHabit(habit.id) } },
+            )
+        },
+        onAddHabit = { editingHabit = Habit() },
+        initialSection = initialSection,
     )
 }
 
@@ -113,14 +148,21 @@ internal fun StatsContent(
     usage: List<UsageDay>,
     now: Long,
     zone: ZoneId,
-    onBack: () -> Unit,
+    onBack: (() -> Unit)?,
     /** Phone use, and what makes an hour a distracted one; no phone sections without it. */
     use: UseDays? = null,
-    /** The last six months, for "Month by month". */
-    months: List<app.bedtime.data.UsageMonth> = emptyList(),
+    /** Every month known, for the month view. */
+    months: Map<String, app.bedtime.data.UsageMonth> = emptyMap(),
     rule: HourRule = HourRule(5),
     labels: Map<String, String> = emptyMap(),
     onAllowAccess: (() -> Unit)? = null,
+    versus: app.bedtime.data.Versus = app.bedtime.data.Versus.LAST,
+    onVersus: (app.bedtime.data.Versus) -> Unit = {},
+    /** Your habits, as their third section, and the round + that adds one there; without them, two sections. */
+    habits: (@Composable () -> Unit)? = null,
+    onAddHabit: (() -> Unit)? = null,
+    /** Phone use, sessions or habits first. */
+    initialSection: Int = 0,
 ) {
     val c = Obsidian.colors
     val week = Stats.week(history, now)
@@ -129,16 +171,42 @@ internal fun StatsContent(
     val bars = Stats.daily(history, now, zone)
     val bySchedule = Stats.bySchedule(history, now)
     val today = java.time.Instant.ofEpochMilli(now).atZone(zone).toLocalDate().toEpochDay()
-    Scaffold(containerColor = c.bgPrimary, topBar = { ObsidianTopBar("Your days", onBack = onBack) }) { padding ->
+    // Phone use, sessions and habits, one at a time: what the phone took, how your sessions held, what you kept.
+    val sections = listOfNotNull("Phone".takeIf { use != null }, "Sessions", "Habits".takeIf { habits != null })
+    var shown by rememberSaveable { mutableStateOf(sections.getOrElse(initialSection) { sections.first() }) }
+    val section = when (shown) {
+        "Phone" -> 0
+        "Habits" -> 2
+        else -> 1
+    }
+    Scaffold(
+        containerColor = c.bgPrimary,
+        topBar = { ObsidianTopBar("insights", onBack = onBack) },
+        floatingActionButton = { if (section == 2 && onAddHabit != null) AddCircleButton("add a habit", onClick = onAddHabit) },
+    ) { padding ->
         Column(
             Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = PageGutter),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Spacer(Modifier.height(2.dp))
-            if (use != null) {
+            if (sections.size > 1) {
+                SegmentedChoice(options = sections, selected = sections.indexOf(shown), onSelect = { shown = sections[it] })
+            }
+            if (section == 2 && habits != null) {
+                habits()
+                Spacer(Modifier.height(96.dp))
+                return@Column
+            }
+            if (use != null && section == 0) {
                 val nowHour = java.time.Instant.ofEpochMilli(now).atZone(zone).hour
-                PhoneUseSections(use, today, nowHour, rule, labels, onAllowAccess, months)
-                SectionLabel("Time in refuge")
+                PhoneStats(
+                    use, java.time.LocalDate.ofEpochDay(today), nowHour, labels, onAllowAccess, months,
+                    limitedApps = limits.flatMap { it.rules.apps }.toSet(),
+                    versus = versus,
+                    onVersus = onVersus,
+                )
+                Spacer(Modifier.height(16.dp))
+                return@Column
             }
             SectionCard {
                 Text(formatMinutes(week.protectedMinutes), fontSize = 32.sp, fontWeight = FontWeight.Light, color = c.textNormal)

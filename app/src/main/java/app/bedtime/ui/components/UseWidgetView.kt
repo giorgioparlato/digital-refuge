@@ -2,6 +2,10 @@ package app.bedtime.ui.components
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -129,4 +133,57 @@ fun useWidgetSlot(
 ): (@Composable () -> Unit)? {
     if (states == null && (widget.look == UseLook.DOTS || today == null)) return null
     return { UseWidgetView(widget, states, today, style, Modifier.padding(top = 12.dp), onClick, onLongClick) }
+}
+
+/**
+ * Today by app, from a tap on the tracker in any look but the dots: the figures, then every app (only
+ * the distracting ones without usage access), distracting ones in their colour, and the way to statistics.
+ */
+@Composable
+fun UseAppsDialog(today: UseToday, style: HomeStyle, onDismiss: () -> Unit, onStats: (() -> Unit)? = null) {
+    val p = style.palette()
+    val context = LocalContext.current
+    val ranked = UseWords.ranked(today)
+    val labels = remember(ranked.map { it.first }) { ranked.associate { (pkg, _) -> pkg to AppCatalog.label(context, pkg) } }
+    val distracted = style.hourDistractedColor?.let { Color(it) } ?: p.accent
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(p.background).padding(24.dp)) {
+            Text("Today by app", style = MaterialTheme.typography.titleMedium, color = p.text)
+            Spacer(Modifier.height(6.dp))
+            Text(
+                listOfNotNull("${UseWords.short(today.total)} on the phone", "${UseWords.short(today.distracting)} distracting", today.unlocks?.let(UseWords::unlocks)).joinToString(" · "),
+                style = MaterialTheme.typography.bodyMedium,
+                color = p.muted,
+            )
+            Spacer(Modifier.height(16.dp))
+            val most = ranked.firstOrNull()?.second?.coerceAtLeast(1) ?: 1
+            Column(Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                ranked.forEach { (pkg, seconds) ->
+                    val isDistracting = pkg in today.apps
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        AppIcon(pkg, labels[pkg] ?: pkg, 22.dp)
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Row {
+                                VerbatimText(labels[pkg] ?: pkg, style = MaterialTheme.typography.bodyMedium, color = p.text, modifier = Modifier.weight(1f))
+                                Text(UseWords.short(seconds), style = MaterialTheme.typography.bodyMedium, color = p.muted)
+                            }
+                            Spacer(Modifier.height(4.dp))
+                            Box(Modifier.fillMaxWidth(seconds.toFloat() / most).height(3.dp).clip(RoundedCornerShape(50)).background(if (isDistracting) distracted.copy(alpha = 0.8f) else p.text.copy(alpha = 0.25f)))
+                        }
+                    }
+                }
+                if (ranked.isEmpty()) Text("Nothing yet today.", style = MaterialTheme.typography.bodyMedium, color = p.faint)
+            }
+            if (onStats != null) {
+                Spacer(Modifier.height(16.dp))
+                Text(
+                    "Open your statistics",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = p.accent,
+                    modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { onDismiss(); onStats() }.padding(vertical = 6.dp),
+                )
+            }
+        }
+    }
 }

@@ -23,7 +23,14 @@ data class UseWidget(
 )
 
 /** Today so far, as the tracker tells it: seconds on the phone and in distracting apps, unlocks if known, and each distracting app's seconds. */
-data class UseToday(val total: Long, val distracting: Long, val unlocks: Int?, val apps: Map<String, Long> = emptyMap())
+data class UseToday(
+    val total: Long,
+    val distracting: Long,
+    val unlocks: Int?,
+    val apps: Map<String, Long> = emptyMap(),
+    /** Every app's seconds with usage access; only the distracting ones without it. */
+    val allApps: Map<String, Long> = apps,
+)
 
 /** The budget bar's words, its note at the right ("20 min left", "25m over"), and how full it is. */
 data class UseBudget(val line: String, val note: String, val filled: Float, val over: Boolean)
@@ -39,6 +46,18 @@ object UseWords {
             m == 0L -> "${h}h"
             else -> "${h}h ${m}m"
         }
+    }
+
+    /** The allowances to choose from: for distracting apps, and for the whole phone. */
+    val DISTRACTING_BUDGETS = listOf(15, 30, 45, 60, 90, 120)
+    val PHONE_BUDGETS = listOf(30, 60, 90, 120, 180, 240, 300)
+
+    /** An allowance on a narrow chip: "45m", "1h", "1½h". */
+    fun compact(minutes: Int): String = when {
+        minutes < 60 -> "${minutes}m"
+        minutes % 60 == 0 -> "${minutes / 60}h"
+        minutes % 60 == 30 -> "${minutes / 60}½h"
+        else -> "${minutes / 60}h ${minutes % 60}m"
     }
 
     fun unlocks(count: Int): String = if (count == 1) "1 unlock" else "$count unlocks"
@@ -71,6 +90,9 @@ object UseWords {
             over = over,
         )
     }
+
+    /** Every app today, most first, a minute or more each. */
+    fun ranked(today: UseToday): List<Pair<String, Long>> = today.allApps.filterValues { it >= 60 }.toList().sortedByDescending { it.second }
 
     /** The distracting apps that took the most today, a minute or more each. */
     fun top(today: UseToday, count: Int = 3): List<Pair<String, Long>> =

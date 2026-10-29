@@ -105,12 +105,9 @@ fun rememberUseToday(): Pair<DayHours, app.bedtime.data.UseToday> {
     val use = rememberUseDays(2, live = true)
     val day = use.days[HourlyUse.today()]
     val hours = day?.hours(use.distractingApps) ?: DayHours()
-    return hours to app.bedtime.data.UseToday(hours.all.values.sum(), hours.apps.values.sum(), day?.unlocks, hours.byApp)
+    return hours to app.bedtime.data.UseToday(hours.all.values.sum(), hours.apps.values.sum(), day?.unlocks, hours.byApp, day?.apps.orEmpty() + hours.byApp)
 }
 
-/** Today's unlocks, kept current: Android's record with usage access, refuge's own count without it. */
-@Composable
-fun rememberTodayUnlocks(): Int? = rememberUseDays(2, live = true).days[HourlyUse.today()]?.unlocks
 
 /**
  * What's behind the dots: today's time in distracting apps and on the phone at all, against yesterday;
@@ -123,9 +120,9 @@ fun HourDetailDialog(hours: DayHours, rule: HourRule, background: Color, text: C
     val nowHour = remember { java.time.LocalTime.now().hour }
     val report = HourlyUse.report(hours, yesterday, rule, nowHour)
     val labels = remember(report.topApps) { report.topApps.associate { (pkg, _) -> pkg to AppCatalog.label(context, pkg) } }
-    val unlocks = rememberTodayUnlocks()
+    val today = rememberUseDays(2, live = true).days[HourlyUse.today()]
     Dialog(onDismissRequest = onDismiss) {
-        HourDetailContent(report, hours, rule, labels, background, text, faint, accent, unlocks = unlocks, onStats = onStats?.let { { onDismiss(); it() } })
+        HourDetailContent(report, hours, rule, labels, background, text, faint, accent, unlocks = today?.unlocks, unlockHours = today?.unlockHours.orEmpty(), onStats = onStats?.let { { onDismiss(); it() } })
     }
 }
 
@@ -139,8 +136,9 @@ fun HourDetailContent(
     text: Color,
     faint: Color,
     accent: Color,
-    /** Today's unlocks, when known; the title, or none where the page already says it's today. */
+    /** Today's unlocks, when known, and by hour; the title, or none where the page already says it's today. */
     unlocks: Int? = null,
+    unlockHours: Map<Int, Int> = emptyMap(),
     title: String? = "Today so far",
     padding: androidx.compose.ui.unit.Dp = 24.dp,
     /** Opens the statistics, from a link at the foot. */
@@ -190,7 +188,12 @@ fun HourDetailContent(
                         val inAll = hours.all[hour] ?: 0L
                         val lit = HourlyUse.distracted(hours, hour, rule)
                         Row(Modifier.fillMaxWidth().padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text(formatMinuteOfDay(context, hour * 60), style = MaterialTheme.typography.bodySmall, color = faint, modifier = Modifier.width(64.dp))
+                            Column(Modifier.width(64.dp)) {
+                                Text(formatMinuteOfDay(context, hour * 60), style = MaterialTheme.typography.bodySmall, color = faint)
+                                unlockHours[hour]?.takeIf { it > 0 }?.let { n ->
+                                    Text(if (n == 1) "1 unlock" else "$n unlocks", style = MaterialTheme.typography.labelSmall, color = faint.copy(alpha = 0.8f))
+                                }
+                            }
                             // The whole hour on the phone, faint; the part in distracting apps over it.
                             Box(Modifier.weight(1f).height(8.dp)) {
                                 Box(Modifier.fillMaxWidth(inAll.toFloat() / most).height(8.dp).clip(RoundedCornerShape(4.dp)).background(text.copy(alpha = 0.14f)))

@@ -17,6 +17,8 @@ data class UseDay(
     val opens: Map<String, Int> = emptyMap(),
     val unlocks: Int? = null,
     val complete: Boolean = false,
+    /** Unlocks by hour of the day, where known. */
+    val unlockHours: Map<Int, Int> = emptyMap(),
 ) {
     val total: Long get() = all.values.sum()
     val distractingTotal: Long get() = distracting.values.sum()
@@ -49,6 +51,7 @@ object PhoneUsage {
         val apps = mutableMapOf<Long, MutableMap<String, Long>>()
         val opens = mutableMapOf<Long, MutableMap<String, Int>>()
         val unlocks = mutableMapOf<Long, Int>()
+        val unlockHours = mutableMapOf<Long, MutableMap<Int, Int>>()
         fun dayOf(at: Long) = Instant.ofEpochMilli(at).atZone(zone).toLocalDate().toEpochDay()
         fun add(pkg: String, start: Long, end: Long) {
             HourlyUse.split(maxOf(start, from), minOf(end, to), zone).forEach { (day, hours) ->
@@ -88,19 +91,24 @@ object PhoneUsage {
                     close(e.at)
                     last = null
                 }
-                UseEvent.Kind.UNLOCK -> if (e.at in from..to) dayOf(e.at).let { unlocks[it] = (unlocks[it] ?: 0) + 1 }
+                UseEvent.Kind.UNLOCK -> if (e.at in from..to) dayOf(e.at).let { day ->
+                    unlocks[day] = (unlocks[day] ?: 0) + 1
+                    val hour = Instant.ofEpochMilli(e.at).atZone(zone).hour
+                    val byHour = unlockHours.getOrPut(day) { mutableMapOf() }
+                    byHour[hour] = (byHour[hour] ?: 0) + 1
+                }
             }
         }
         close(to)
         val days = all.keys + opens.keys + unlocks.keys
         return days.associateWith { day ->
-            UseDay(day, all[day].orEmpty(), distracting[day].orEmpty(), apps[day].orEmpty(), opens[day].orEmpty(), unlocks[day] ?: 0, complete = true)
+            UseDay(day, all[day].orEmpty(), distracting[day].orEmpty(), apps[day].orEmpty(), opens[day].orEmpty(), unlocks[day] ?: 0, complete = true, unlockHours = unlockHours[day].orEmpty())
         }
     }
 
     /** Days as refuge counted them itself, from the window changes blocking sees. */
     fun fromRecords(usage: List<UsageDay>): Map<Long, UseDay> =
-        usage.associate { it.day to UseDay(it.day, it.hourlyAll, it.hourly, it.distractingSeconds, unlocks = it.unlocks) }
+        usage.associate { it.day to UseDay(it.day, it.hourlyAll, it.hourly, it.distractingSeconds, unlocks = it.unlocks, unlockHours = it.unlockHours) }
 
     /**
      * Android's days where it has them whole (after the first day its records reach back to, which is

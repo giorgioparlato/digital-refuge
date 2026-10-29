@@ -13,6 +13,22 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            65,
+            "0.9.19",
+            listOf(
+                "New tabs: focus (your blocks and schedules, and what's on now), limits, insights and settings. Your notes are a tap away at the top of focus.",
+                "Insights: your phone by day, week or month, against the period before, your usual, or a year back; unlocks by the hour; how your sessions held; and your habits.",
+                "Habits: hold one and drag it to reorder, add one with the round button, and see the week as plain figures.",
+                "Settings are sorted by screen: home screen, lock screen, widgets, search, apps and notes.",
+                "The lock screen has its own look and widget options: colours, fonts, sizes, the clock, the note, the quote.",
+                "Widgets open their options in place; the ones not shown sit apart, a tap from showing.",
+                "Search: each action is in every search, only with its keyword, or off, sorted into find, do and look up, each of which you can switch off. Try it right on the page.",
+                "The budget bar opens today by app, and the whole phone's budget can start at 30 minutes.",
+                "The quote stays on the lock screen; notifications slide over it. A running block no longer shows as a timer.",
+                "The nudge after time in a row should now start reliably, however you unlock.",
+            ),
+        ),
+        ChangelogEntry(
             64,
             "0.9.18",
             listOf(

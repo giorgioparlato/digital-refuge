@@ -35,6 +35,7 @@ class PhoneUsageTest {
         // Maps again after the screen was off is a second open.
         assertEquals(mapOf("insta" to 1, "maps" to 2), d.opens)
         assertEquals(1, d.unlocks)
+        assertEquals(mapOf(10 to 1), d.unlockHours)
     }
 
     @Test

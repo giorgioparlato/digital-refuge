@@ -144,7 +144,7 @@ internal fun NotificationArea(
             }
         }
         if (replying == null) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(p.background).padding(horizontal = 14.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
                 if (notes.size > MAX_NOTIFICATIONS) {
                     Text("and ${notes.size - MAX_NOTIFICATIONS} more", style = MaterialTheme.typography.labelMedium, color = p.faint)
                 }
@@ -169,6 +169,7 @@ private fun SummaryLine(summary: String, p: HomePalette, onOpen: () -> Unit) {
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
+            .background(p.background)
             .background(p.text.copy(alpha = 0.06f))
             .clickable(onClickLabel = "show the notifications", onClick = onOpen)
             .pullDown(enabled = true, onPull = onOpen)
@@ -206,6 +207,8 @@ private fun NotificationRow(
             .fillMaxWidth()
             .bringIntoViewRequester(reveal)
             .clip(RoundedCornerShape(14.dp))
+            // Opaque underneath, so a quote it passes over doesn't show through.
+            .background(p.background)
             .background(p.text.copy(alpha = 0.06f)),
     ) {
         Row(

@@ -131,13 +131,15 @@ class BlockerService : AccessibilityService() {
                 showLockScreen()
                 return
             }
+            // A phone without a lock: on is in.
+            if (intent.action == Intent.ACTION_SCREEN_ON) ensureRun()
             // Back in, so whatever is in front starts counting again (and may be due its pause).
             if (intent.action == Intent.ACTION_USER_PRESENT) {
                 lastPackage?.let(::settle)
                 runClock.start(System.currentTimeMillis())
                 scheduleNudge()
                 // Counted here too, so the tracker can show unlocks without usage access.
-                releaseScope.launch { Repository.get(this@BlockerService).addUnlock(HourlyUse.today()) }
+                releaseScope.launch { Repository.get(this@BlockerService).addUnlock(HourlyUse.today(), java.time.LocalTime.now().hour) }
             }
             Engine.refresh()
             refreshSystemPackages()
@@ -217,6 +219,7 @@ class BlockerService : AccessibilityService() {
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
         if (event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
+        ensureRun()
         val pkg = event.packageName?.toString() ?: return
         // A keyboard or the notification shade appearing is not a move to another app, so it must not
         // become what we think is in front: that both bounced people out of apps a session allows and
@@ -398,6 +401,19 @@ class BlockerService : AccessibilityService() {
             runCatching { startActivity(NudgeActivity.intent(this@BlockerService, minutes)) }
             restartRun()
         }
+    }
+
+    /**
+     * A run that should be counting but isn't: the screen is on and unlocked, yet Android's unlock notice
+     * never came (some ways of unlocking skip it). Checked at screen-on and on every app switch.
+     */
+    private fun ensureRun() {
+        if (runClock.since != null) return
+        val on = getSystemService(PowerManager::class.java)?.isInteractive == true
+        val unlocked = getSystemService(KeyguardManager::class.java)?.isKeyguardLocked == false
+        if (!on || !unlocked) return
+        runClock.start(System.currentTimeMillis())
+        scheduleNudge()
     }
 
     /** Carrying on past the nudge: the count begins again from now. */

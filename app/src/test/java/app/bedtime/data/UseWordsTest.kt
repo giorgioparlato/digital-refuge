@@ -44,4 +44,16 @@ class UseWordsTest {
         assertEquals("3h 40m · 34 unlocks · ig 38 min · yt 21 min · rd 13 min", UseWords.appsLine(UseWidget(UseLook.APPS_LINE, unlocks = true), today) { it })
         assertEquals("3h 40m · ig 38 min · yt 21 min · rd 13 min", UseWords.appsLine(UseWidget(UseLook.APPS_LINE), today) { it })
     }
+
+    @Test
+    fun allowancesFitOnAChip() {
+        assertEquals(listOf("30m", "1h", "1½h", "2h", "3h", "4h", "5h"), UseWords.PHONE_BUDGETS.map(UseWords::compact))
+        assertEquals("1h 15m", UseWords.compact(75))
+    }
+
+    @Test
+    fun everyAppTodayMostFirst() {
+        val withAll = today.copy(allApps = today.apps + ("maps" to 3_000L))
+        assertEquals(listOf("maps", "ig", "yt", "rd"), UseWords.ranked(withAll).map { it.first })
+    }
 }

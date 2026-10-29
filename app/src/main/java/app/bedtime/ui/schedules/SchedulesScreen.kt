@@ -144,26 +144,40 @@ internal fun SchedulesContent(
                 }
             }
             items(schedules.size, key = { schedules[it].id }) { index ->
-                val schedule = schedules[index]
-                val running = active?.occurrenceOf(schedule.id) != null
-                // The same lock the editor honours: switching a schedule off, or deleting it, would
-                // otherwise walk straight around the unlock steps.
-                val lockedUntil = if (schedule.editAfterUnlock) null else Stats.lockedUntil(history, schedule.id, now)
-                // And the hours it may be changed in, if it names any.
-                val shut = schedule.editWindow?.takeIf { !EditWindows.isOpen(it, minuteOfDay) }
-                SwipeToDelete(onDelete = { onDelete(schedule) }, enabled = !running && lockedUntil == null && shut == null) {
-                    ScheduleCard(
-                        schedule = schedule,
-                        running = running,
-                        lockedUntil = lockedUntil,
-                        shutWindow = shut,
-                        now = now,
-                        onClick = { onEdit(schedule.id) },
-                        onToggle = { onToggle(schedule, it) },
-                    )
-                }
+                ScheduleItem(schedules[index], active, history, now, minuteOfDay, onEdit, onToggle, onDelete)
             }
         }
+    }
+}
+
+/** A schedule as a card that opens it, with its switch, and a swipe to delete it when that's allowed. */
+@Composable
+internal fun ScheduleItem(
+    schedule: Schedule,
+    active: ActiveState?,
+    history: List<SessionLog>,
+    now: Long,
+    minuteOfDay: Int,
+    onEdit: (String) -> Unit,
+    onToggle: (Schedule, Boolean) -> Unit,
+    onDelete: (Schedule) -> Unit,
+) {
+    val running = active?.occurrenceOf(schedule.id) != null
+    // The same lock the editor honours: switching a schedule off, or deleting it, would
+    // otherwise walk straight around the unlock steps.
+    val lockedUntil = if (schedule.editAfterUnlock) null else Stats.lockedUntil(history, schedule.id, now)
+    // And the hours it may be changed in, if it names any.
+    val shut = schedule.editWindow?.takeIf { !EditWindows.isOpen(it, minuteOfDay) }
+    SwipeToDelete(onDelete = { onDelete(schedule) }, enabled = !running && lockedUntil == null && shut == null) {
+        ScheduleCard(
+            schedule = schedule,
+            running = running,
+            lockedUntil = lockedUntil,
+            shutWindow = shut,
+            now = now,
+            onClick = { onEdit(schedule.id) },
+            onToggle = { onToggle(schedule, it) },
+        )
     }
 }
 

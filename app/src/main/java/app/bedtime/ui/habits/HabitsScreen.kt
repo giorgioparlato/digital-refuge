@@ -63,6 +63,7 @@ import app.bedtime.ui.components.DragList
 import app.bedtime.ui.components.NumberStepper
 import app.bedtime.ui.components.ObsidianTextField
 import app.bedtime.ui.components.ObsidianTopBar
+import app.bedtime.ui.components.AddCircleButton
 import app.bedtime.ui.components.OptionRow
 import app.bedtime.ui.components.PageGutter
 import app.bedtime.ui.components.QuickChip
@@ -110,14 +111,47 @@ internal fun HabitsContent(
 ) {
     val c = Obsidian.colors
     var editing by remember { mutableStateOf<Habit?>(null) }
+    Scaffold(
+        containerColor = c.bgPrimary,
+        topBar = { ObsidianTopBar("Habits", onBack = onBack, subtitle = "Kept on this phone") },
+        floatingActionButton = { AddCircleButton("add a habit", onClick = { editing = Habit() }) },
+    ) { padding ->
+        Column(
+            Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = PageGutter, vertical = 4.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            HabitsBody(habits, marks, today, editing, { editing = it }, onMark, onSave, onMove, onDelete)
+            Spacer(Modifier.height(96.dp))
+        }
+    }
+}
+
+/**
+ * Your habits, as on their page and in insights: today's cards, held and dragged to reorder, and the
+ * week told plainly. [editing] is the habit being added or changed, if any; the round + button that
+ * starts a new one belongs to the page around this.
+ */
+@Composable
+internal fun HabitsBody(
+    habits: List<Habit>,
+    marks: Map<String, Map<Long, Int>>,
+    today: Long,
+    editing: Habit?,
+    onEditing: (Habit?) -> Unit,
+    onMark: (Habit, Long, Int) -> Unit = { _, _, _ -> },
+    onSave: (Habit) -> Unit = {},
+    onMove: (List<Habit>) -> Unit = {},
+    onDelete: (Habit) -> Unit = {},
+) {
+    val c = Obsidian.colors
     var open by remember { mutableStateOf<String?>(null) }
     editing?.let { habit ->
         HabitEditDialog(
             habit = habit,
             isNew = habits.none { it.id == habit.id },
-            onDismiss = { editing = null },
-            onSave = { onSave(it); editing = null },
-            onDelete = { onDelete(habit); editing = null; open = null },
+            onDismiss = { onEditing(null) },
+            onSave = { onSave(it); onEditing(null) },
+            onDelete = { onDelete(habit); onEditing(null); open = null },
         )
     }
     habits.firstOrNull { it.id == open }?.let { habit ->
@@ -125,44 +159,28 @@ internal fun HabitsContent(
             HabitDetailContent(
                 habit, marks[habit.id].orEmpty(), today, c.bgSecondary, c.textNormal, c.textMuted, c.accent,
                 onSet = { day, value -> onMark(habit, day, value) },
-                onEdit = { editing = habit },
+                onEdit = { onEditing(habit) },
             )
         }
     }
-    Scaffold(containerColor = c.bgPrimary, topBar = { ObsidianTopBar("Habits", onBack = onBack, subtitle = "Kept on this phone") }) { padding ->
-        Column(
-            Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = PageGutter, vertical = 4.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            if (habits.isEmpty()) {
-                Text(
-                    "Habits you want to keep, ticked off each day: daily, a few times a week, or a count like pages or reps. Add one to start; your home and lock screen can show them too.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = c.textMuted,
-                )
-            } else {
-                Text("Today", style = MaterialTheme.typography.titleLarge, color = c.textNormal)
-            }
-            habits.forEach { habit ->
+    if (habits.isEmpty()) {
+        Text(
+            "Habits you want to keep, ticked off each day: daily, a few times a week, or a count like pages or reps. Add one with the + below; your home and lock screen can show them too.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = c.textMuted,
+        )
+        return
+    }
+    WeekSummary(habits, marks, today)
+    Text("Today", style = MaterialTheme.typography.titleLarge, color = c.textNormal, modifier = Modifier.padding(top = 4.dp))
+    if (habits.size > 1) Text("Hold one and drag it to change the order", style = MaterialTheme.typography.bodySmall, color = c.textFaint)
+    Column {
+        DragList(habits, key = { it.id }, onMoved = onMove, wholeRow = true) { habit ->
+            Box(Modifier.weight(1f)) {
                 HabitCard(habit, marks[habit.id].orEmpty(), today, onTick = {
                     onMark(habit, today, Habits.tapped(habit, marks[habit.id]?.get(today) ?: 0))
                 }, onOpen = { open = habit.id })
             }
-            if (habits.isNotEmpty()) WeekStrip(habits, marks, today)
-            SectionCard {
-                OptionRow(Icons.Default.Add, "Add a habit", onClick = { editing = Habit() }, trailing = { Chevron() })
-            }
-            if (habits.size > 1) {
-                SectionCard(title = "Order", subtitle = "As they show here and in the widgets") {
-                    DragList(habits, key = { it.id }, onMoved = onMove) { habit ->
-                        Column(Modifier.weight(1f).padding(horizontal = 8.dp).clip(RoundedCornerShape(8.dp)).clickable { editing = habit }) {
-                            Text(habit.name, style = MaterialTheme.typography.bodyLarge, color = c.textNormal)
-                            Text(Habits.describe(habit), style = MaterialTheme.typography.bodySmall, color = c.textFaint)
-                        }
-                    }
-                }
-            }
-            Spacer(Modifier.height(24.dp))
         }
     }
 }
@@ -223,24 +241,41 @@ private fun HabitCard(habit: Habit, marks: Map<Long, Int>, today: Long, onTick: 
     }
 }
 
-/** The week at a glance: a square a day, as full as the share of habits kept that day. */
+/**
+ * The last seven days in plain figures: how many of the habits due were kept, then a column a day as
+ * tall as its share, with its count under it ("3/4").
+ */
 @Composable
-private fun WeekStrip(habits: List<Habit>, marks: Map<String, Map<Long, Int>>, today: Long) {
+private fun WeekSummary(habits: List<Habit>, marks: Map<String, Map<Long, Int>>, today: Long) {
     val c = Obsidian.colors
-    Text("This week", style = MaterialTheme.typography.labelLarge, color = c.textMuted, modifier = Modifier.padding(top = 4.dp))
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        ((today - 6)..today).forEach { day ->
-            val share = habits.count { h ->
-                Habits.day(h, marks[h.id].orEmpty(), day).let { it == HabitDay.DONE || it == HabitDay.MET }
-            }.toFloat() / habits.size
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Box(Modifier.size(34.dp).clip(RoundedCornerShape(9.dp)).background(c.accent.copy(alpha = 0.1f + 0.85f * share)))
-                Text(
-                    DateTimeFormatter.ofPattern("EEEEE", Locale.getDefault()).format(LocalDate.ofEpochDay(day)),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = c.textFaint,
-                    modifier = Modifier.padding(top = 2.dp),
-                )
+    val days = ((today - 6)..today).map { day ->
+        val kept = habits.count { h -> Habits.day(h, marks[h.id].orEmpty(), day).let { it == HabitDay.DONE || it == HabitDay.MET } }
+        day to kept
+    }
+    val kept = days.sumOf { it.second }
+    val possible = habits.size * days.size
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(CardRadius)).background(c.bgSecondary).padding(16.dp)) {
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text("$kept of $possible", style = MaterialTheme.typography.headlineSmall, color = c.textNormal)
+            Spacer(Modifier.width(8.dp))
+            Text("kept in the last seven days", style = MaterialTheme.typography.bodyMedium, color = c.textMuted, modifier = Modifier.padding(bottom = 3.dp))
+        }
+        Spacer(Modifier.height(14.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
+            days.forEach { (day, n) ->
+                val share = n.toFloat() / habits.size
+                Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(Modifier.fillMaxWidth().height(48.dp), contentAlignment = Alignment.BottomCenter) {
+                        Box(Modifier.fillMaxWidth().height(48.dp).clip(RoundedCornerShape(4.dp)).background(c.textNormal.copy(alpha = 0.08f)))
+                        Box(Modifier.fillMaxWidth().height((48 * share).dp).clip(RoundedCornerShape(4.dp)).background(c.accent.copy(alpha = if (day == today) 1f else 0.75f)))
+                    }
+                    Text("$n/${habits.size}", style = MaterialTheme.typography.labelSmall, color = c.textMuted, modifier = Modifier.padding(top = 4.dp))
+                    Text(
+                        DateTimeFormatter.ofPattern("EEEEE", Locale.getDefault()).format(LocalDate.ofEpochDay(day)),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (day == today) c.textNormal else c.textFaint,
+                    )
+                }
             }
         }
     }

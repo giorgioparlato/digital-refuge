@@ -85,7 +85,6 @@ import app.bedtime.ui.homestyle.HomeStyleScreen
 import app.bedtime.ui.notes.NoteTargetsScreen
 import app.bedtime.ui.notes.NotesScreen
 import app.bedtime.ui.quotes.QuotesScreen
-import app.bedtime.ui.schedules.SchedulesScreen
 import app.bedtime.ui.settings.SettingsScreen
 import app.bedtime.ui.setup.SetupScreen
 import app.bedtime.ui.theme.BedtimeTheme
@@ -95,12 +94,14 @@ import app.bedtime.unlock.UnlockFlow
 /** String routes for the app's small back stack; also used by the Quick Settings tile. */
 object Routes {
     /** The four tabs; everything else is pushed on top of them. */
-    val TABS = listOf(HOME, SCHEDULES, LIMITS, SETTINGS)
+    /** focus (still "home" to links and widgets), limits, insights, settings. */
+    val TABS = listOf(HOME, LIMITS, INSIGHTS, SETTINGS)
 
     const val HOME = "home"
     const val SCHEDULES = "schedules"
     const val LIMITS = "limits"
     const val SETTINGS = "settings"
+    const val INSIGHTS = "insights"
     const val SETUP = "setup"
     const val HOME_STYLE = "homestyle"
     const val STYLE_SHOWN = "homestyle/shown"
@@ -205,11 +206,13 @@ private fun BedtimeNavigation(pendingRoute: String?, onRouteConsumed: () -> Unit
 
     LaunchedEffect(pendingRoute) {
         if (pendingRoute != null) {
-            if (pendingRoute in Routes.TABS) {
-                tab = pendingRoute
+            // Schedules now live on focus, the home tab.
+            val route = if (pendingRoute == Routes.SCHEDULES) Routes.HOME else pendingRoute
+            if (route in Routes.TABS) {
+                tab = route
                 stack.clear()
-            } else if (stack.lastOrNull() != pendingRoute) {
-                push(pendingRoute)
+            } else if (stack.lastOrNull() != route) {
+                push(route)
             }
             onRouteConsumed()
         }
@@ -239,10 +242,7 @@ private fun BedtimeNavigation(pendingRoute: String?, onRouteConsumed: () -> Unit
         TabShell(tab, onTab = { tab = it }) {
             key(tab) {
                 when (tab) {
-                    Routes.SCHEDULES -> SchedulesScreen(
-                        onEdit = { id -> push(Routes.EDIT + id) },
-                        onCreate = { push(Routes.CREATE) },
-                    )
+                    Routes.INSIGHTS -> StatsScreen(onBack = null)
                     Routes.LIMITS -> LimitsScreen(
                         onEdit = { id -> push(Routes.LIMIT + id) },
                         onCreate = { push(Routes.LIMIT) },
@@ -344,9 +344,9 @@ private fun TabShell(tab: String, onTab: (String) -> Unit, content: @Composable 
                         .padding(top = 10.dp, bottom = 10.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly,
                 ) {
-                    TabItem(BedtimeIcons.Refuge, "home", tab == Routes.HOME) { onTab(Routes.HOME) }
-                    TabItem(Icons.Default.DateRange, "schedules", tab == Routes.SCHEDULES) { onTab(Routes.SCHEDULES) }
+                    TabItem(BedtimeIcons.Refuge, "focus", tab == Routes.HOME || tab == Routes.SCHEDULES) { onTab(Routes.HOME) }
                     TabItem(BedtimeIcons.Hourglass, "limits", tab == Routes.LIMITS) { onTab(Routes.LIMITS) }
+                    TabItem(BedtimeIcons.Leaf, "insights", tab == Routes.INSIGHTS) { onTab(Routes.INSIGHTS) }
                     TabItem(Icons.Default.Settings, "settings", tab == Routes.SETTINGS) { onTab(Routes.SETTINGS) }
                 }
             }

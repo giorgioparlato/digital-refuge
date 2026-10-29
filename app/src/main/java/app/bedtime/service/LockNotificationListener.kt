@@ -56,8 +56,10 @@ class LockNotificationListener : NotificationListenerService(), LockNotification
     override fun refresh() {
         val active = runCatching { activeNotifications }.getOrNull() ?: return
         // A clock app's running timer, read before anything is filtered: it's ongoing, so it never shows as a notification here.
+        // refuge's own countdown, to a session's end, is no timer.
         Timers.publishClock(
             active.mapNotNull { sbn ->
+                if (sbn.packageName == packageName) return@mapNotNull null
                 val extras = sbn.notification.extras ?: return@mapNotNull null
                 Timers.countdownEnd(extras.getBoolean(Notification.EXTRA_SHOW_CHRONOMETER), extras.getBoolean(Notification.EXTRA_CHRONOMETER_COUNT_DOWN), sbn.notification.`when`)
             },

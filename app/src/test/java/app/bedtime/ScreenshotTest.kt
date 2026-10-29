@@ -213,22 +213,6 @@ class ScreenshotTest {
     }
 
     @Test
-    fun addToSearch() = shot {
-        Box(Modifier.padding(24.dp)) {
-            app.bedtime.ui.settings.AddToSearchContent(
-                listOf(
-                    "web:b" to "Search the web · Firefox",
-                    "lookup:d" to "Look up in Translate",
-                    "contacts" to "Contacts: call and message",
-                    "calculator" to "Calculator: \"12 * 3\"",
-                    "files" to "Files in your folders, by name",
-                    "spotify:s" to "Search in Spotify",
-                ),
-            ) {}
-        }
-    }
-
-    @Test
     fun drawerContacts() = shot {
         val anna = app.bedtime.data.ContactHit("Anna Maria", "+46 70 123", "+4670123")
         app.bedtime.ui.minimal.AppDrawerContent(

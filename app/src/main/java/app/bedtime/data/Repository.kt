@@ -243,8 +243,10 @@ class Repository private constructor(context: Context) {
         usage.copy(seconds = usage.seconds + seconds.map { (pkg, s) -> pkg to (usage.seconds[pkg] ?: 0L) + s })
     }
 
-    /** One more unlock on [day]. */
-    suspend fun addUnlock(day: Long) = updateUsage(day) { it.copy(unlocks = (it.unlocks ?: 0) + 1) }
+    /** One more unlock on [day], in [hour]. */
+    suspend fun addUnlock(day: Long, hour: Int) = updateUsage(day) {
+        it.copy(unlocks = (it.unlocks ?: 0) + 1, unlockHours = it.unlockHours + (hour to (it.unlockHours[hour] ?: 0) + 1))
+    }
 
     /** Adds time to [day], by hour: in distracting apps, and in any app; and to [app] if it's a distracting one. */
     suspend fun addHourly(day: Long, distracting: Map<Int, Long>, all: Map<Int, Long>, app: String? = null) = updateUsage(day) { usage ->
@@ -366,7 +368,8 @@ class Repository private constructor(context: Context) {
         /** About three years of nightly sessions, or several months of a busy mix: still a small file. */
         private const val MAX_HISTORY = 1000
         /** Five weeks, enough for the week's figures and the strip of days on the limits tab. */
-        private const val USAGE_DAYS = 35
+        // Nine weeks: enough for a week against the usual of the four before, and the last eight weeks.
+        private const val USAGE_DAYS = 63
         private val usageSerializer = ListSerializer(UsageDay.serializer())
 
         /** How long after starting a block it can still be taken back with "undo". */

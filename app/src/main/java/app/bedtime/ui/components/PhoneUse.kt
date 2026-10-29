@@ -72,11 +72,11 @@ private fun readAndroid(context: android.content.Context, count: Int, excluded: 
 }
 
 /**
- * The last six months on the phone, this one included: Android's monthly record with usage access,
+ * Every month on the phone known: Android's monthly record with usage access (about six months),
  * refuge's own count otherwise (from when it began keeping months).
  */
 @Composable
-fun rememberUseMonths(): List<UsageMonth> {
+fun rememberUseMonths(): Map<String, UsageMonth> {
     val context = LocalContext.current
     val repo = remember { Repository.get(context.applicationContext) }
     val usage by repo.usage.collectAsStateWithLifecycle(initialValue = emptyList())
@@ -94,5 +94,5 @@ fun rememberUseMonths(): List<UsageMonth> {
         }
     }
     val own = UseMonths.own(kept, PhoneUsage.fromRecords(usage).values)
-    return UseMonths.last(UseMonths.merge(android, own), YearMonth.now())
+    return UseMonths.merge(android, own)
 }
