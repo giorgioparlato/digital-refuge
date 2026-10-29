@@ -42,7 +42,7 @@ object Templates {
                 minimalMode = true,
                 dnd = DndMode.PRIORITY,
                 hideNotifications = true,
-                unlock = UnlockConfig(waitEnabled = true, waitMinutes = 10, textEnabled = true, textLength = 150),
+                unlock = UnlockConfig(waitEnabled = true, waitSeconds = 10 * 60, textEnabled = true, textLength = 150),
             )
         },
         Template("work", ScheduleKind.RECURRING, "Work focus", "no social apps · notifications held back", TemplateIcon.TARGET) { apps ->
@@ -54,7 +54,7 @@ object Templates {
                 blockedApps = apps,
                 greyscale = false,
                 hideNotifications = true,
-                unlock = UnlockConfig(waitEnabled = true, waitMinutes = 5, textEnabled = false),
+                unlock = UnlockConfig(waitEnabled = true, waitSeconds = 5 * 60, textEnabled = false),
                 unlockAction = UnlockAction(UnlockMode.PAUSE, pauseMinutes = 10),
             )
         },
@@ -77,7 +77,7 @@ object Templates {
                 blockedApps = apps,
                 greyscale = true,
                 minimalMode = true,
-                unlock = UnlockConfig(waitEnabled = true, waitMinutes = 15, textEnabled = true, textLength = 200),
+                unlock = UnlockConfig(waitEnabled = true, waitSeconds = 15 * 60, textEnabled = true, textLength = 200),
             )
         },
         Template("focus", ScheduleKind.BLOCK, "Focus", "social apps blocked · quiet phone", TemplateIcon.TARGET) { apps ->
@@ -89,7 +89,7 @@ object Templates {
                 greyscale = false,
                 dnd = DndMode.PRIORITY,
                 hideNotifications = true,
-                unlock = UnlockConfig(waitEnabled = true, waitMinutes = 5, textEnabled = true, textLength = 100),
+                unlock = UnlockConfig(waitEnabled = true, waitSeconds = 5 * 60, textEnabled = true, textLength = 100),
             )
         },
         Template("deepwork", ScheduleKind.BLOCK, "Deep work", "minimal home screen · silent phone, music still plays", TemplateIcon.HEADPHONES) { _ ->
@@ -101,7 +101,7 @@ object Templates {
                 minimalMode = true,
                 dnd = DndMode.SILENCE,
                 hideNotifications = true,
-                unlock = UnlockConfig(waitEnabled = true, waitMinutes = 10, textEnabled = true, textLength = 200),
+                unlock = UnlockConfig(waitEnabled = true, waitSeconds = 10 * 60, textEnabled = true, textLength = 200),
             )
         },
         Template("pomodoro", ScheduleKind.BLOCK, "Pomodoro", "one task, then a break", TemplateIcon.HOURGLASS) { apps ->
@@ -124,7 +124,7 @@ object Templates {
                 greyscale = true,
                 dnd = DndMode.PRIORITY,
                 hideNotifications = true,
-                unlock = UnlockConfig(waitEnabled = true, waitMinutes = 5, textEnabled = true, textLength = 100),
+                unlock = UnlockConfig(waitEnabled = true, waitSeconds = 5 * 60, textEnabled = true, textLength = 100),
             )
         },
     )

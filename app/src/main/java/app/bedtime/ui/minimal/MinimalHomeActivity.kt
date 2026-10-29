@@ -27,10 +27,8 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import app.bedtime.ui.components.StatusBarVisibility
 import app.bedtime.data.ContactSearch
 import app.bedtime.data.ContactHit
-import app.bedtime.ui.components.rememberTodayHours
 import app.bedtime.ui.components.HourDetailDialog
 import app.bedtime.data.HourlyUse
-import app.bedtime.ui.components.HourDots
 import app.bedtime.ui.components.rememberUseToday
 import app.bedtime.ui.components.useWidgetSlot
 import app.bedtime.data.HourState
@@ -66,7 +64,6 @@ import androidx.compose.runtime.produceState
 import androidx.compose.material3.IconButton
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import app.bedtime.ui.components.BedtimeIcons
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.rememberLauncherForActivityResult
 import android.widget.Toast
@@ -87,7 +84,6 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -101,14 +97,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import app.bedtime.ui.theme.WithFontFamily
 import app.bedtime.ui.theme.AppFonts

@@ -1,5 +1,7 @@
 package app.bedtime
 
+import app.bedtime.data.AppSettings
+
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -143,11 +145,6 @@ class ScreenshotTest {
     fun homeIdle() = shot(tall = true) { Home(Samples.home()) }
 
     @Test
-    fun homeHours() = shot(tall = true) {
-        Home(Samples.home().copy(hourly = app.bedtime.data.DayHours(mapOf(7 to 120L, 8 to 600L, 9 to 1500L, 12 to 200L, 13 to 900L)), noteCount = 4))
-    }
-
-    @Test
     fun hourDetail() = shot(tall = true, height = 3400) {
         Screen {
             val today = app.bedtime.data.DayHours(
@@ -249,7 +246,7 @@ class ScreenshotTest {
     fun distraction() = shot {
         app.bedtime.ui.settings.DistractionContent(
             appCount = 4, minutes = 5, onPick = {}, onMinutes = {}, onBack = {},
-            totalMinutes = 30, distractedColor = 0xFFD9604AL,
+            totalMinutes = 30,
         )
     }
 
@@ -623,17 +620,44 @@ class ScreenshotTest {
     @Test
     fun settings() = shot {
         SettingsContent(
+            place = null,
+            settings = AppSettings(alwaysAvailable = setOf("a", "b")),
             blocks = listOf(Samples.focus, Samples.deepWork),
-            tileBlockId = null,
             setupStepsLeft = 1,
+        )
+    }
+
+    @Test
+    fun settingsShortcuts() = shot {
+        SettingsContent(
+            place = app.bedtime.ui.settings.SettingsPlace.SHORTCUTS,
+            settings = AppSettings(),
+            blocks = listOf(Samples.focus, Samples.deepWork),
+            setupStepsLeft = 0,
             onBack = {},
-            onSetup = {},
-            onHomeStyle = {},
-            onTileBlock = {},
-            groupCount = 2,
-            onGroups = {},
-            alwaysAvailableCount = 2,
-            onAlwaysAvailable = {},
+        )
+    }
+
+    @Test
+    fun appList() = shot(tall = true, height = 3200) {
+        app.bedtime.ui.settings.AppListContent(
+            settings = AppSettings(
+                homeFavourites = listOf("org.kindle", "com.maps", "com.spotify"),
+                hiddenApps = setOf("com.x", "com.y"),
+                appNames = mapOf("com.spotify" to "Music"),
+                keywords = mapOf(app.bedtime.data.Keywords.appKey("org.kindle") to "k"),
+            ),
+            labels = mapOf("org.kindle" to "Kindle", "com.maps" to "Maps", "com.spotify" to "Spotify"),
+            onBack = {},
+        )
+    }
+
+    @Test
+    fun coverMessages() = shot(tall = true, height = 2800) {
+        app.bedtime.ui.settings.CoverMessagesContent(
+            custom = listOf(app.bedtime.data.CustomMessage("Read a page instead."), app.bedtime.data.CustomMessage("Call someone.", inRandom = false)),
+            onChange = {},
+            onBack = {},
         )
     }
 
@@ -815,33 +839,25 @@ class ScreenshotTest {
     }
 
     @Test
-    fun settingsAsHome() = shot {
+    fun settingsHomeScreen() = shot {
         SettingsContent(
+            place = app.bedtime.ui.settings.SettingsPlace.HOME,
+            settings = AppSettings(homeScreen = true),
             blocks = listOf(Samples.focus),
-            tileBlockId = null,
             setupStepsLeft = 0,
+            isDefaultHome = true,
             onBack = {},
-            onSetup = {},
-            onHomeStyle = {},
-            onTileBlock = {},
-            homeScreen = true,
-            hiddenCount = 3,
         )
     }
 
     @Test
-    fun settingsTall() = shot(tall = true, height = 4600) {
+    fun settingsLockScreen() = shot {
         SettingsContent(
+            place = app.bedtime.ui.settings.SettingsPlace.LOCK,
+            settings = AppSettings(homeScreen = true, homeStyle = HomeStyle(lockNotifications = true)),
             blocks = listOf(Samples.focus),
-            tileBlockId = null,
             setupStepsLeft = 0,
             onBack = {},
-            onSetup = {},
-            onHomeStyle = {},
-            onTileBlock = {},
-            homeScreen = true,
-            groupCount = 2,
-            alwaysAvailableCount = 3,
         )
     }
 
@@ -1174,10 +1190,7 @@ class ScreenshotTest {
                 app.bedtime.data.NoteTarget("scratchpad", "x"),
                 app.bedtime.data.NoteTarget("movies list", "y", app.bedtime.data.NoteStyle.TASK, withDate = false),
             ),
-            calendars = listOf(1L to "Personal", 2L to "Work"),
-            calendarId = null,
-            calendarAccess = true,
-            onAdd = {}, onAddDaily = {}, onEdit = {}, onRemove = {}, onCalendar = {}, onAllowCalendar = {}, onOpenNotes = {}, onBack = {},
+            onAdd = {}, onAddDaily = {}, onEdit = {}, onRemove = {}, onOpenNotes = {}, onBack = {},
         )
     }
 
@@ -1432,7 +1445,6 @@ private object Samples {
         val now = LocalDate.now().atTime(hour, minute).atZone(zone).toInstant().toEpochMilli()
         val runtime = if (runningFocus) RuntimeState(activeRuns = mapOf("focus" to Run(now - 20 * MIN, now + 40 * MIN))) else RuntimeState()
         return HomeUiState(
-            quote = app.bedtime.data.Quotes.all.first(),
             schedules = schedules,
             active = ScheduleEvaluator.evaluate(now, zone, schedules, runtime),
             runtime = runtime,

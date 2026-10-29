@@ -1,5 +1,15 @@
 package app.bedtime.ui.limits
 
+import kotlinx.coroutines.launch
+
+import androidx.compose.runtime.rememberCoroutineScope
+
+import app.bedtime.ui.components.SegmentedChoice
+
+import app.bedtime.ui.components.SectionCard
+
+import app.bedtime.ui.components.SectionLabel
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -17,10 +27,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material3.ExtendedFloatingActionButton
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
@@ -54,6 +60,7 @@ import java.time.LocalDate
 fun LimitsScreen(onEdit: (String) -> Unit, onCreate: () -> Unit) {
     val context = LocalContext.current
     val repo = remember { Repository.get(context) }
+    val scope = rememberCoroutineScope()
     val settings by repo.settings.collectAsStateWithLifecycle(initialValue = null)
     val usage by repo.usage.collectAsStateWithLifecycle(initialValue = emptyList())
     val loaded = settings ?: return
@@ -63,6 +70,8 @@ fun LimitsScreen(onEdit: (String) -> Unit, onCreate: () -> Unit) {
         today = LocalDate.now().toEpochDay(),
         onEdit = onEdit,
         onCreate = onCreate,
+        runNudge = loaded.runNudgeMinutes,
+        onRunNudge = { m -> scope.launch { repo.updateSettings { it.copy(runNudgeMinutes = m) } } },
     )
 }
 
@@ -73,6 +82,9 @@ internal fun LimitsContent(
     today: Long,
     onEdit: (String) -> Unit,
     onCreate: () -> Unit,
+    /** Minutes in a row on the phone before a nudge, or null for none. */
+    runNudge: Int? = null,
+    onRunNudge: (Int?) -> Unit = {},
 ) {
     val c = Obsidian.colors
     val todayUsage = usage.lastOrNull { it.day == today } ?: UsageDay(today)
@@ -107,6 +119,19 @@ internal fun LimitsContent(
             items(limits.size, key = { limits[it].id }) { index ->
                 LimitCard(limits[index], todayUsage, today, onClick = { onEdit(limits[index].id) })
             }
+            // Not one app's limit but the whole phone's: how long in a row before a nudge.
+            item(key = "nudge") {
+                SectionLabel("the whole phone", Modifier.padding(top = 8.dp))
+                SectionCard(title = "A nudge after time in a row", subtitle = "After so long on the phone without the screen going off, in any app, a full screen asks if it's still what you meant to do. Never during a call") {
+                    val nudges = listOf<Int?>(null, 5, 10, 15, 20, 30, 45)
+                    SegmentedChoice(
+                        options = nudges.map { it?.toString() ?: "Off" },
+                        selected = nudges.indexOf(runNudge).coerceAtLeast(0),
+                        onSelect = { onRunNudge(nudges[it]) },
+                    )
+                    Text("Minutes", style = MaterialTheme.typography.labelMedium, color = c.textMuted, modifier = Modifier.padding(top = 8.dp))
+                }
+            }
         }
     }
 }
@@ -118,6 +143,7 @@ internal fun limitSummary(limit: AppLimit): String {
         add(pluralApps(rules.apps.size))
         rules.pauseSeconds?.takeIf { it > 0 }?.let { add("${formatWaitSeconds(it)} pause") }
         rules.dailyMinutes?.let { add("${formatMinutes(it.toLong())} a day" + if (!rules.shared && rules.apps.size > 1) " each" else "") }
+        rules.dailyOpens?.let { add(opensADay(it) + if (!rules.shared && rules.apps.size > 1) " each" else "") }
     }.joinToString(" · ")
 }
 
@@ -137,7 +163,9 @@ private fun LimitCard(limit: AppLimit, today: UsageDay, todayDay: Long, onClick:
     val used = Limits.usedSeconds(limit, today) / 60
     val pause = rules.pauseSeconds?.takeIf { it > 0 }?.let { "${formatWaitSeconds(it)} pause" }
     val tide = if (budget == null || lifted) 0f else (used.toFloat() / total.coerceAtLeast(1)).coerceIn(0f, 1f)
+    val opensLeft = Limits.opensLeft(limit, rules.apps.firstOrNull().orEmpty(), today)?.takeIf { rules.shared || rules.apps.size == 1 }
     val left = when {
+        budget == null && opensLeft != null -> if (opensLeft <= 0) "no opens left" else if (opensLeft == 1) "1 open left" else "$opensLeft opens left"
         budget == null -> pause.orEmpty()
         lifted -> "lifted today"
         used >= total -> "none left"
@@ -145,6 +173,7 @@ private fun LimitCard(limit: AppLimit, today: UsageDay, todayDay: Long, onClick:
     }
     val details = buildList {
         budget?.let { add("${formatMinutes(it.toLong())} a day" + if (!rules.shared && rules.apps.size > 1) " each" else "") }
+        rules.dailyOpens?.let { add(opensADay(it) + if (!rules.shared && rules.apps.size > 1) " each" else "") }
         if (budget == null || rules.apps.size > 1) add(pluralApps(rules.apps.size))
         if (budget != null && pause != null) add(pause)
         if (extra > 0) add("$extra extra today")

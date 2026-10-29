@@ -1,6 +1,5 @@
 package app.bedtime.ui.limits
 
-import app.bedtime.data.TextSource
 import app.bedtime.data.PauseKind
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
@@ -64,9 +63,7 @@ import app.bedtime.ui.components.CalloutKind
 import app.bedtime.ui.components.Chevron
 import app.bedtime.ui.components.CtaButton
 import app.bedtime.ui.components.NumberStepper
-import app.bedtime.ui.components.ObsidianTextField
 import app.bedtime.ui.components.ObsidianToggle
-import app.bedtime.ui.components.ObsidianTopBar
 import app.bedtime.ui.components.OptionRow
 import app.bedtime.ui.components.QuickChip
 import app.bedtime.ui.components.SegmentedChoice
@@ -101,8 +98,8 @@ internal fun limitProblem(draft: AppLimit, newPassword: String): String? {
     val rules = draft.rules
     return when {
         rules.apps.isEmpty() -> "Pick at least one app for this limit."
-        (rules.pauseSeconds ?: 0) <= 0 && rules.dailyMinutes == null -> "Turn on a pause, a daily budget, or both."
-        rules.dailyMinutes != null && rules.outOfTime != OutOfTime.TOMORROW && rules.unlock.passwordEnabled &&
+        (rules.pauseSeconds ?: 0) <= 0 && rules.dailyMinutes == null && rules.dailyOpens == null -> "Turn on a pause, minutes a day, or opens a day."
+        (rules.dailyMinutes != null || rules.dailyOpens != null) && rules.outOfTime != OutOfTime.TOMORROW && rules.unlock.passwordEnabled &&
             !rules.unlock.hasPassword && newPassword.isBlank() -> "Choose a password, or switch that step off."
         else -> null
     }
@@ -339,6 +336,7 @@ internal fun LimitEditContent(
                 Text(
                     when {
                         rules.dailyMinutes != null -> "${formatMinutes(rules.dailyMinutes.toLong())} a day"
+                        rules.dailyOpens != null -> opensADay(rules.dailyOpens)
                         (rules.pauseSeconds ?: 0) > 0 && rules.pauseKind == PauseKind.TYPING -> "${rules.pauseTextLength} characters to type"
                         (rules.pauseSeconds ?: 0) > 0 -> "${formatWaitSeconds(rules.pauseSeconds ?: 0)} pause"
                         else -> "not set yet"
@@ -497,19 +495,45 @@ internal fun LimitEditContent(
                     )
                 }
                 AnimatedVisibility(rules.dailyMinutes != null) {
+                    SubOptionRow("Each day") {
+                        NumberStepper(
+                            rules.dailyMinutes ?: 30,
+                            { v -> setRules { it.copy(dailyMinutes = v) } },
+                            5..480,
+                            step = 5,
+                            suffix = " min",
+                            presets = listOf(10, 15, 20, 30, 45, 60, 90, 120),
+                            title = "minutes a day",
+                            enabled = editable,
+                        )
+                    }
+                }
+                OptionRow(
+                    BedtimeIcons.Target,
+                    "Opens a day",
+                    description = "How many times they can be opened; coming back within a minute isn't another",
+                    enabled = editable,
+                ) {
+                    ObsidianToggle(
+                        rules.dailyOpens != null,
+                        { on -> setRules { it.copy(dailyOpens = if (on) 5 else null) } },
+                        enabled = editable,
+                    )
+                }
+                AnimatedVisibility(rules.dailyOpens != null) {
+                    SubOptionRow("Each day") {
+                        NumberStepper(
+                            rules.dailyOpens ?: 5,
+                            { v -> setRules { it.copy(dailyOpens = v) } },
+                            1..50,
+                            presets = listOf(1, 2, 3, 5, 10, 20),
+                            title = "opens a day",
+                            enabled = editable,
+                        )
+                    }
+                }
+                AnimatedVisibility(rules.dailyMinutes != null || rules.dailyOpens != null) {
                     Column {
-                        SubOptionRow("Each day") {
-                            NumberStepper(
-                                rules.dailyMinutes ?: 30,
-                                { v -> setRules { it.copy(dailyMinutes = v) } },
-                                5..480,
-                                step = 5,
-                                suffix = " min",
-                                presets = listOf(10, 15, 20, 30, 45, 60, 90, 120),
-                                title = "minutes a day",
-                                enabled = editable,
-                            )
-                        }
                         if (rules.apps.size > 1) {
                             Text(
                                 "Shared or each",
@@ -523,11 +547,15 @@ internal fun LimitEditContent(
                                 onSelect = { i -> setRules { it.copy(shared = i == 0) } },
                                 enabled = editable,
                             )
+                            val allowance = listOfNotNull(
+                                rules.dailyMinutes?.let { formatMinutes(it.toLong()) },
+                                rules.dailyOpens?.let { opensADay(it).removeSuffix(" a day") },
+                            ).joinToString(" and ")
                             Text(
                                 if (rules.shared) {
-                                    "${formatMinutes((rules.dailyMinutes ?: 0).toLong())} across all of them, so time doesn't just move from one to another."
+                                    "$allowance across all of them, so it doesn't just move from one to another."
                                 } else {
-                                    "${formatMinutes((rules.dailyMinutes ?: 0).toLong())} in each of them."
+                                    "$allowance in each of them."
                                 },
                                 style = MaterialTheme.typography.bodySmall,
                                 color = c.textMuted,
@@ -557,6 +585,10 @@ internal fun LimitEditContent(
                                 OutOfTime.MORE_TIME -> "The steps below give you a set amount more, and get longer each time if you choose."
                                 OutOfTime.CHOOSE -> "When you need more, you first say how much — some minutes, or the rest of today — then do the steps below."
                                 OutOfTime.REST_OF_DAY -> "The steps below lift the limit until midnight."
+                            } + if (rules.dailyOpens != null && rules.outOfTime != OutOfTime.TOMORROW && rules.outOfTime != OutOfTime.REST_OF_DAY) {
+                                " Out of opens, each time gives one more."
+                            } else {
+                                ""
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = c.textMuted,
@@ -646,3 +678,6 @@ internal fun LimitEditContent(
         }
     }
 }
+
+/** "1 open a day", "5 opens a day". */
+internal fun opensADay(opens: Int): String = if (opens == 1) "1 open a day" else "$opens opens a day"

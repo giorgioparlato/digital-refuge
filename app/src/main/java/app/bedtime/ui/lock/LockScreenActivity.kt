@@ -18,10 +18,8 @@ import app.bedtime.ui.minimal.QuickNoteDialog
 import app.bedtime.data.Notes
 import app.bedtime.data.HomeActions
 import app.bedtime.ui.components.StatusBarVisibility
-import app.bedtime.ui.components.rememberTodayHours
 import app.bedtime.data.HourlyUse
 import app.bedtime.data.Timers
-import app.bedtime.ui.components.HourDots
 import app.bedtime.ui.components.rememberUseToday
 import app.bedtime.ui.components.useWidgetSlot
 import app.bedtime.data.HourState
@@ -41,16 +39,12 @@ import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import app.bedtime.ui.components.ProvideAppIcons
-import app.bedtime.ui.components.AppIcon
-import app.bedtime.data.NoteDetail
 import app.bedtime.data.LockNotifications
 import app.bedtime.data.LockNotification
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Arrangement
 import android.app.ActivityOptions
 import app.bedtime.ui.minimal.rememberCalendarLine
 import app.bedtime.data.Swipe
@@ -77,7 +71,6 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Column
@@ -119,7 +112,6 @@ import app.bedtime.engine.Engine
 import app.bedtime.ui.components.BedtimeIcons
 import app.bedtime.ui.components.Text
 import app.bedtime.ui.formatTime
-import app.bedtime.ui.homestyle.HomePalette
 import app.bedtime.ui.homestyle.palette
 import app.bedtime.ui.minimal.QuoteBlock
 import app.bedtime.ui.minimal.SessionHeader

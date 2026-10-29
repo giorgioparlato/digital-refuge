@@ -1,15 +1,5 @@
 package app.bedtime.ui.settings
 
-import app.bedtime.data.Module
-import app.bedtime.data.Modules
-import app.bedtime.data.Screen
-import app.bedtime.ui.homestyle.TextPresets
-import app.bedtime.ui.homestyle.SwatchRow
-import app.bedtime.ui.homestyle.ColourChoice
-import app.bedtime.ui.homestyle.AccentPresets
-import app.bedtime.ui.components.QuickChip
-import app.bedtime.ui.components.HourDots
-import app.bedtime.data.HourState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -18,9 +8,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
@@ -40,7 +27,6 @@ import app.bedtime.ui.apps.AppPickerScreen
 import app.bedtime.ui.apps.PickerMode
 import app.bedtime.ui.components.BedtimeIcons
 import app.bedtime.ui.components.Chevron
-import app.bedtime.ui.components.ObsidianToggle
 import app.bedtime.ui.components.ObsidianTopBar
 import app.bedtime.ui.components.OptionRow
 import app.bedtime.ui.components.PageGutter
@@ -80,12 +66,6 @@ fun DistractionScreen(onBack: () -> Unit) {
         onMinutes = { m -> scope.launch { repo.updateSettings { it.copy(distractionMinutes = m) } } },
         totalMinutes = current.distractionTotalMinutes,
         onTotalMinutes = { m -> scope.launch { repo.updateSettings { it.copy(distractionTotalMinutes = m) } } },
-        runNudge = current.runNudgeMinutes,
-        onRunNudge = { m -> scope.launch { repo.updateSettings { it.copy(runNudgeMinutes = m) } } },
-        calmColor = current.homeStyle.hourCalmColor,
-        distractedColor = current.homeStyle.hourDistractedColor,
-        onCalmColor = { v -> scope.launch { repo.updateSettings { it.copy(homeStyle = it.homeStyle.copy(hourCalmColor = v)) } } },
-        onDistractedColor = { v -> scope.launch { repo.updateSettings { it.copy(homeStyle = it.homeStyle.copy(hourDistractedColor = v)) } } },
         onBack = onBack,
     )
 }
@@ -97,14 +77,8 @@ internal fun DistractionContent(
     onPick: () -> Unit,
     onMinutes: (Int) -> Unit,
     onBack: () -> Unit,
-    calmColor: Long? = null,
-    distractedColor: Long? = null,
     totalMinutes: Int? = null,
     onTotalMinutes: (Int?) -> Unit = {},
-    runNudge: Int? = null,
-    onRunNudge: (Int?) -> Unit = {},
-    onCalmColor: (Long?) -> Unit = {},
-    onDistractedColor: (Long?) -> Unit = {},
 ) {
     val c = Obsidian.colors
     Scaffold(containerColor = c.bgPrimary, topBar = { ObsidianTopBar("Distracting apps", onBack = onBack) }) { padding ->
@@ -113,7 +87,7 @@ internal fun DistractionContent(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(
-                "Today as 24 dots on the home tab: an hour lights up when you spent more than its minutes in these apps, or, if you like, on the phone at all. Only which app was open is counted, never what was in it.",
+                "Your day as 24 hours: an hour counts as distracted when you spent more than its minutes in these apps, or, if you like, on the phone at all. Only which app was open is counted, never what was in it.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = c.textMuted,
             )
@@ -139,15 +113,6 @@ internal fun DistractionContent(
                     selected = totals.indexOf(totalMinutes).coerceAtLeast(0),
                     onSelect = { onTotalMinutes(totals[it]) },
                 )
-            }
-            SectionCard(title = "A nudge after time in a row", subtitle = "After so long on the phone without the screen going off, in any app, a full screen asks if it's still what you meant to do. Never during a call") {
-                val nudges = listOf<Int?>(null, 5, 10, 15, 20, 30, 45)
-                SegmentedChoice(
-                    options = nudges.map { it?.let { m -> "$m" } ?: "Off" },
-                    selected = nudges.indexOf(runNudge).coerceAtLeast(0),
-                    onSelect = { onRunNudge(nudges[it]) },
-                )
-                Text("Minutes", style = MaterialTheme.typography.labelMedium, color = c.textMuted, modifier = Modifier.padding(top = 8.dp))
             }
             Text(
                 "To see it on your home or lock screen, switch on the distraction tracker in Widgets; its look and colours are there too.",

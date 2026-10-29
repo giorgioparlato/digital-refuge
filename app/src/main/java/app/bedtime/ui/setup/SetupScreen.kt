@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.os.PowerManager
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -71,6 +72,7 @@ fun SetupScreen(onBack: () -> Unit, onAlwaysAvailable: () -> Unit) {
     var greyscaleOk by remember { mutableStateOf(false) }
     var dndOk by remember { mutableStateOf(false) }
     var overlayOk by remember { mutableStateOf(false) }
+    var batteryOk by remember { mutableStateOf(false) }
     var notificationsOk by remember { mutableStateOf(true) }
     var askedNotifications by rememberSaveable { mutableStateOf(false) }
     var previewing by remember { mutableStateOf(false) }
@@ -95,6 +97,7 @@ fun SetupScreen(onBack: () -> Unit, onAlwaysAvailable: () -> Unit) {
         greyscaleOk = GreyscaleController.isAvailable(context)
         dndOk = DndController.hasAccess(context)
         overlayOk = Settings.canDrawOverlays(context)
+        batteryOk = SetupSteps.batteryUnrestricted(context)
         notificationsOk = NotificationManagerCompat.from(context).areNotificationsEnabled()
         isDefaultHome = HomeRole.isDefault(context)
         onPauseOrDispose { }
@@ -122,6 +125,7 @@ fun SetupScreen(onBack: () -> Unit, onAlwaysAvailable: () -> Unit) {
         },
         onOpenDnd = { context.tryStart(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)) },
         onOpenBattery = { context.tryStart(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) },
+        batteryOk = batteryOk,
         overlayOk = overlayOk,
         onOpenOverlay = {
             context.tryStart(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.fromParts("package", context.packageName, null)))
@@ -164,6 +168,7 @@ internal fun SetupContent(
     onPreview: () -> Unit,
     onOpenDnd: () -> Unit,
     onOpenBattery: () -> Unit,
+    batteryOk: Boolean = false,
     overlayOk: Boolean = true,
     onOpenOverlay: () -> Unit = {},
     alwaysAvailableCount: Int = 0,
@@ -253,7 +258,7 @@ internal fun SetupContent(
             StepCard(6, "Choose always-available apps", done = alwaysAvailableCount > 0, badge = "Recommended") {
                 Body(
                     "Apps that stay usable during every session, reached from the emergency button: maps, rides, your authenticator. " +
-                        "Keep the list short. You can change it later in settings → emergency.",
+                        "Keep the list short. You can change it later in settings → apps.",
                 )
                 PlainButton(
                     if (alwaysAvailableCount == 0) "Choose apps" else "Edit · ${pluralApps(alwaysAvailableCount)}",
@@ -262,7 +267,7 @@ internal fun SetupContent(
                 )
             }
 
-            StepCard(7, "Keep digital refuge running", done = false, badge = "Recommended") {
+            StepCard(7, "Keep digital refuge running", done = batteryOk, badge = "Recommended") {
                 Body("Some phones (Samsung, Xiaomi, OnePlus…) put background apps to sleep. If blocking ever stops working, set digital refuge's battery usage to Unrestricted.")
                 PlainButton("Open battery settings", onClick = onOpenBattery, modifier = Modifier.fillMaxWidth())
             }
@@ -332,4 +337,24 @@ private fun Body(text: String) {
 
 private fun Context.tryStart(intent: Intent) {
     runCatching { startActivity(intent) }
+}
+
+/** The setup steps that can be left undone, counted the same wherever "steps left" is said. */
+object SetupSteps {
+    fun batteryUnrestricted(context: Context): Boolean =
+        context.getSystemService(PowerManager::class.java)?.isIgnoringBatteryOptimizations(context.packageName) == true
+
+    /**
+     * Steps 1–7 not yet done. Using refuge as your launcher (step 8) is a choice, not a step left.
+     * Greyscale counts only where this phone can have it.
+     */
+    fun left(context: Context, alwaysAvailableCount: Int): Int = listOf(
+        SystemApps.isAccessibilityServiceEnabled(context),
+        GreyscaleController.isAvailable(context) || Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM,
+        DndController.hasAccess(context),
+        NotificationManagerCompat.from(context).areNotificationsEnabled(),
+        Settings.canDrawOverlays(context),
+        alwaysAvailableCount > 0,
+        batteryUnrestricted(context),
+    ).count { !it }
 }

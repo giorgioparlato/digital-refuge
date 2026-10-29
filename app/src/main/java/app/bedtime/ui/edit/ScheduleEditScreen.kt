@@ -27,15 +27,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -73,9 +70,7 @@ import app.bedtime.data.EditWindow
 import app.bedtime.engine.EditWindows
 import app.bedtime.data.Repository
 import app.bedtime.data.Schedule
-import app.bedtime.data.TextSource
 import app.bedtime.data.Templates
-import app.bedtime.data.UnlockConfig
 import app.bedtime.data.UnlockMode
 import app.bedtime.engine.Engine
 import app.bedtime.service.DndController
@@ -96,10 +91,8 @@ import app.bedtime.ui.components.LowercaseStrings
 import app.bedtime.ui.components.NumberStepper
 import app.bedtime.ui.components.ObsidianTextField
 import app.bedtime.ui.components.ObsidianToggle
-import app.bedtime.ui.components.ObsidianTopBar
 import app.bedtime.ui.components.OptionRow
 import app.bedtime.ui.components.QuickChip
-import app.bedtime.ui.components.SectionCard
 import app.bedtime.ui.components.SectionLabel
 import app.bedtime.ui.components.SegmentedChoice
 import app.bedtime.ui.components.SubOptionRow
@@ -108,7 +101,6 @@ import app.bedtime.ui.components.TimeTile
 import app.bedtime.ui.formatDays
 import app.bedtime.ui.formatTime
 import app.bedtime.ui.formatMinuteOfDay
-import app.bedtime.ui.formatWaitSeconds
 import app.bedtime.ui.formatMinutes
 import app.bedtime.ui.is24Hour
 import app.bedtime.ui.pluralApps
@@ -120,11 +112,9 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlin.math.roundToInt
 import java.time.LocalTime
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.width
@@ -450,7 +440,7 @@ internal fun leavingSummary(draft: Schedule, hasNewPassword: Boolean): String {
 /** The line "the ways around it" shows while it is shut. [changeable] is null when there are no hours set. */
 internal fun waysAroundSummary(draft: Schedule, changeable: String?): String = buildList {
     add(if (draft.pauseEnabled) "emergency break ${draft.breakMinutes} min" else "no emergency break")
-    if (draft.lockSettings) add("settings locked")
+    if (draft.lockSettings) add("off switches covered")
     if (draft.fullScreenAlert) add("reminder on")
     if (changeable != null) add("changeable $changeable")
 }.joinToString(" · ")
@@ -834,18 +824,6 @@ internal fun ScheduleEditContent(
                             )
                         }
                     }
-                    OptionRow(
-                        Icons.Default.Lock,
-                        "Lock settings afterwards",
-                        description = "Keeps this shut until the session would have ended, so unlocking can't soften it",
-                        enabled = editable,
-                    ) {
-                        ObsidianToggle(
-                            !draft.editAfterUnlock,
-                            { on -> onDraftChange(draft.copy(editAfterUnlock = !on)) },
-                            enabled = editable,
-                        )
-                    }
                 }
 
                 // ---------------------------------------------------------------- the ways around it
@@ -882,8 +860,8 @@ internal fun ScheduleEditContent(
                     }
                     OptionRow(
                         Icons.Default.Lock,
-                        "Lock changes during sessions",
-                        description = "Covers the Settings screens that switch blocking off or uninstall the app",
+                        "Cover Android's off switches",
+                        description = "While it runs, covers the Settings screens that switch blocking off or uninstall the app",
                         enabled = editable,
                     ) { ObsidianToggle(draft.lockSettings, { on -> onDraftChange(draft.copy(lockSettings = on)) }, enabled = editable) }
                     OptionRow(
@@ -892,6 +870,19 @@ internal fun ScheduleEditContent(
                         description = "If blocking is switched off while this runs, take over the screen until it's back on",
                         enabled = editable,
                     ) { ObsidianToggle(draft.fullScreenAlert, { on -> onDraftChange(draft.copy(fullScreenAlert = on)) }, enabled = editable) }
+                    // Whether this page itself can be changed: after leaving early, and at what hours.
+                    OptionRow(
+                        Icons.Default.Lock,
+                        "Keep this shut after leaving early",
+                        description = "Its settings stay as they are until it would have ended, so leaving early can't soften it",
+                        enabled = editable,
+                    ) {
+                        ObsidianToggle(
+                            !draft.editAfterUnlock,
+                            { on -> onDraftChange(draft.copy(editAfterUnlock = !on)) },
+                            enabled = editable,
+                        )
+                    }
                     if (!isBlock) {
                         OptionRow(
                             Icons.Default.Lock,

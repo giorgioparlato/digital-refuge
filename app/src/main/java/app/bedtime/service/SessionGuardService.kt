@@ -56,7 +56,7 @@ class SessionGuardService : Service() {
     override fun onCreate() {
         super.onCreate()
         blockingOn = BlockingState.isOn(this)
-        startForeground(NOTIFICATION_ID, SessionNotifier.build(this, null, blockingOn = blockingOn, breakMs = 0))
+        startForeground(NOTIFICATION_ID, SessionNotifier.build(this, null, blockingOn = blockingOn, breakEndsAt = 0))
         contentResolver.registerContentObserver(
             Settings.Secure.getUriFor(Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES),
             false,
@@ -170,9 +170,15 @@ class SessionGuardService : Service() {
         } else {
             TakeoverOverlay.hide(this)
         }
-        val breakMs = if (!blockingOn && BlockingState.isOnBreak()) BlockingState.breakRemainingMs() else 0L
+        // The break's end on the wall clock, to the second, so the notification counts down by itself.
+        val breakEndsAt = if (!blockingOn && BlockingState.isOnBreak()) {
+            (System.currentTimeMillis() + BlockingState.breakRemainingMs() + 500) / 1000 * 1000
+        } else {
+            0L
+        }
         val overlayMissing = current?.isActive == true && current.fullScreenAlert && !overlayOk
-        SessionNotifier.post(this, NOTIFICATION_ID, state, blockingOn, breakMs, overlayMissing)
+        // Posted again only when what it says changes; checking each second costs nothing otherwise.
+        SessionNotifier.post(this, NOTIFICATION_ID, state, blockingOn, breakEndsAt, overlayMissing)
     }
 
     /**

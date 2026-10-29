@@ -13,6 +13,20 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            66,
+            "0.9.20",
+            listOf(
+                "Settings, one row per place: home screen, lock screen, search, apps, notes, cover messages, shortcuts, and about & backup. Every setting lives in one of them, and the search finds any.",
+                "Each widget has one set of options, in the same order everywhere: what it shows, its size, its colours, what a tap does. Holding it on your screen shows the same ones.",
+                "The app list: favourites in your order, hidden apps, your own names and keywords, in one place.",
+                "Cover messages have a page of their own. The nudge after time in a row is on the limits tab, and the calendar the search adds to is on the search page.",
+                "Limits can count opens: so many a day, shared or each.",
+                "Your week, at the top of insights, and if you like a note about it on Sunday evening.",
+                "A weekly backup to a folder you choose, the newest four kept.",
+                "Fixed: resetting the look no longer resets your widgets and gestures; leaving early is never lost if the screen closes; the session's notification no longer refreshes every second.",
+            ),
+        ),
+        ChangelogEntry(
             65,
             "0.9.19",
             listOf(

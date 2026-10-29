@@ -89,6 +89,10 @@ internal class LimitTracker(
     private var currentPass: String? = null
     private var currentPassApps: Set<String> = emptySet()
 
+    /** The app in front that was let in (not covered), and when each such app was last left (elapsed realtime). */
+    private var letIn: String? = null
+    private val lastLeft = mutableMapOf<String, Long>()
+
     /** Milliseconds counted but not yet written down, by package. */
     private val unsaved = mutableMapOf<String, Long>()
 
@@ -130,6 +134,9 @@ internal class LimitTracker(
             currentPass = null
             currentPassApps = emptySet()
         }
+        // Only a visit that was let in can be "back within a minute"; one stopped at a cover wasn't an open.
+        if (previous != null && previous == letIn) lastLeft[previous] = SystemClock.elapsedRealtime()
+        letIn = null
         current = pkg
         since = SystemClock.elapsedRealtime()
         return true
@@ -150,6 +157,14 @@ internal class LimitTracker(
             return true
         }
         if (arrived) {
+            // Back within a minute is the same visit, not another open.
+            val fresh = lastLeft[pkg]?.let { SystemClock.elapsedRealtime() - it < OPEN_AGAIN_MS } != true
+            if (fresh) {
+                Limits.outOfOpens(limits, pkg, day)?.let { limit ->
+                    cover(BlockedActivity.limitIntent(context, pkg, limit.id, opens = true))
+                    return true
+                }
+            }
             val pause = Limits.pauseFor(limits, pkg, day.day)
             if (pause != null) {
                 if (LimitPasses.admit(pause.passKey, pause.graceMinutes * 60_000L, System.currentTimeMillis())) {
@@ -169,6 +184,8 @@ internal class LimitTracker(
                     return true
                 }
             }
+            if (fresh && limits.any { pkg in it.rules.apps && it.rules.dailyOpens != null }) writeScope.launch { repo.recordLaunch(day.day, pkg) }
+            letIn = pkg
         }
         scheduleTick(pkg)
         return false
@@ -240,6 +257,11 @@ internal class LimitTracker(
         if (!warned.add(pkg)) return
         val label = AppCatalog.label(context, pkg)
         Toast.makeText(context, "about a minute of $label left today".lowercase(), Toast.LENGTH_SHORT).show()
+    }
+
+    private companion object {
+        /** Coming back to an app sooner than this after leaving it isn't counted as opening it again. */
+        const val OPEN_AGAIN_MS = 60_000L
     }
 
     private fun cover(intent: android.content.Intent) {

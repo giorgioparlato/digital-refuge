@@ -25,7 +25,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -55,8 +54,14 @@ private val pages = listOf(
         BedtimeIcons.Leaf,
         "limits for every day",
         "outside any session, the apps that pull hardest can ask for a few breaths before they open, or keep to " +
-            "a daily budget.",
+            "so many minutes, or so many opens, a day.",
         "making a limit stricter takes effect at once. loosening it, or deleting it, waits until the next day.",
+    ),
+    Page(
+        BedtimeIcons.Grid,
+        "a quieter phone",
+        "a home screen and a lock screen of their own: the time, the few things you want to see, your apps as words.",
+        "they can stay when no session runs. you'll find them, and everything else, in settings.",
     ),
     Page(
         BedtimeIcons.Hourglass,

@@ -78,6 +78,24 @@ object Limits {
             recent.sumOf { it.extras[limit.id]?.size ?: 0 }
     }
 
+    /** Opens counted on [usage]'s day as [limit] sees them: all its apps together when shared, else [pkg]'s. */
+    fun opensUsed(limit: AppLimit, pkg: String, usage: UsageDay): Int =
+        if (limit.rules.shared) limit.rules.apps.sumOf { usage.launches[it] ?: 0 } else usage.launches[pkg] ?: 0
+
+    /**
+     * Opens of [pkg] left today under [limit]: its daily ones, plus one for each time more was taken.
+     * Null when there's no count to run out of: none set, or lifted for the day.
+     */
+    fun opensLeft(limit: AppLimit, pkg: String, usage: UsageDay): Int? {
+        val opens = limit.rules.dailyOpens ?: return null
+        if (limit.id in usage.lifted) return null
+        return opens + (usage.extras[limit.id]?.size ?: 0) - opensUsed(limit, pkg, usage)
+    }
+
+    /** The first limit with no opens of [pkg] left today, if any: opening it again is what it stops. */
+    fun outOfOpens(limits: List<AppLimit>, pkg: String, usage: UsageDay): AppLimit? =
+        covering(limits, pkg, usage.day).firstOrNull { (opensLeft(it, pkg, usage) ?: 1) <= 0 }
+
     /** The first limit whose budget for [pkg] has run out, if any. */
     fun exhausted(limits: List<AppLimit>, pkg: String, usage: UsageDay, unsaved: Map<String, Long> = emptyMap()): AppLimit? =
         covering(limits, pkg, usage.day).firstOrNull { (secondsLeft(it, pkg, usage, unsaved) ?: 1L) <= 0L }
@@ -134,6 +152,7 @@ object Limits {
             ((old.pauseSeconds ?: 0) > 0 && !old.pauseForGroup && new.pauseForGroup) ||
             ((old.pauseSeconds ?: 0) > 0 && pauseLooser(old, new)) ||
             budgetLooser(old, new) ||
+            opensLooser(old, new) ||
             isLooser(old.unlock, new.unlock)
 
     /** Typing swapped for a wait, less to type, or a pause that grows less with each open. */
@@ -150,6 +169,16 @@ object Limits {
         if (old.shared && !new.shared && new.apps.size > 1) return true
         if (new.outOfTime.ordinal > old.outOfTime.ordinal) return true
         return new.outOfTime == OutOfTime.MORE_TIME && old.outOfTime == OutOfTime.MORE_TIME && new.extraMinutes > old.extraMinutes
+    }
+
+    /** More opens, none counted any more, or shared opens split between the apps. */
+    private fun opensLooser(old: LimitRules, new: LimitRules): Boolean {
+        val oldOpens = old.dailyOpens ?: return false
+        val newOpens = new.dailyOpens ?: return true
+        if (newOpens > oldOpens) return true
+        if (old.shared && !new.shared && new.apps.size > 1) return true
+        // With no budget of minutes, how running out ends is the opens' alone.
+        return old.dailyMinutes == null && new.outOfTime.ordinal > old.outOfTime.ordinal
     }
 
     /** Whether the unlock steps got easier: a step dropped, or made shorter. */

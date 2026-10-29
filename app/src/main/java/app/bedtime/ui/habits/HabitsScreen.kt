@@ -58,7 +58,6 @@ import app.bedtime.data.HabitKind
 import app.bedtime.data.Habits
 import app.bedtime.data.HourlyUse
 import app.bedtime.data.Repository
-import app.bedtime.ui.components.Chevron
 import app.bedtime.ui.components.DragList
 import app.bedtime.ui.components.NumberStepper
 import app.bedtime.ui.components.ObsidianTextField
@@ -67,7 +66,6 @@ import app.bedtime.ui.components.AddCircleButton
 import app.bedtime.ui.components.OptionRow
 import app.bedtime.ui.components.PageGutter
 import app.bedtime.ui.components.QuickChip
-import app.bedtime.ui.components.SectionCard
 import app.bedtime.ui.components.SegmentedChoice
 import app.bedtime.ui.components.Text
 import app.bedtime.ui.theme.Obsidian

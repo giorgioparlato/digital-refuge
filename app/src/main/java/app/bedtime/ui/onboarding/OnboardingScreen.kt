@@ -1,5 +1,13 @@
 package app.bedtime.ui.onboarding
 
+import androidx.compose.material.icons.filled.Edit
+
+import androidx.compose.material.icons.filled.Lock
+
+import androidx.compose.material.icons.filled.Home
+
+import androidx.compose.material.icons.Icons
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -84,9 +92,48 @@ fun OnboardingScreen(onDone: () -> Unit) {
             Point(
                 BedtimeIcons.Leaf,
                 "limits hold every day",
-                "outside any session too, a limit can ask for a few breaths before an app opens, or give it a daily " +
-                    "budget. making one stricter takes effect at once; loosening it, or deleting it, waits until the " +
-                    "next day, so it can't be used to get round today.",
+                "outside any session too, a limit can ask for a few breaths before an app opens, give it so many " +
+                    "minutes a day, or so many opens. making one stricter takes effect at once; loosening it, or " +
+                    "deleting it, waits until the next day, so it can't be used to get round today.",
+            )
+
+            Spacer(Modifier.height(6.dp))
+            Box(Modifier.fillMaxWidth().height(1.dp).background(c.border))
+            Spacer(Modifier.height(28.dp))
+
+            Text("around the sessions", fontSize = 22.sp, fontWeight = FontWeight.Light, color = c.textNormal)
+            Spacer(Modifier.height(10.dp))
+            Text(
+                "the rest of the app is there to make the phone itself quieter, in a session or not. all of it is " +
+                    "optional, and set in settings.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = c.textMuted,
+            )
+            Spacer(Modifier.height(24.dp))
+            Point(
+                Icons.Default.Home,
+                "a quieter home screen",
+                "the clock, the few things you want to see, and your apps as words. during a session with minimal " +
+                    "mode it takes over; it can also be your everyday home screen, with a search that finds apps, " +
+                    "people and a few things to do.",
+            )
+            Point(
+                Icons.Default.Lock,
+                "a lock screen of its own",
+                "over android's own: the time, what's next today, a quote, and only the notifications from the apps " +
+                    "and people you pick. a tap, or a swipe from the bottom, unlocks.",
+            )
+            Point(
+                Icons.Default.Edit,
+                "notes and habits",
+                "a thought typed into the search lands in refuge's notes, or in a file of yours. habits are ticked " +
+                    "off here or on your screens.",
+            )
+            Point(
+                BedtimeIcons.Target,
+                "insights",
+                "what the phone took, how your sessions held and which habits you kept, with a look back at each " +
+                    "week. only which app was in front is ever counted, never what was in it.",
             )
 
             Spacer(Modifier.height(6.dp))
@@ -97,8 +144,8 @@ fun OnboardingScreen(onDone: () -> Unit) {
             Spacer(Modifier.height(10.dp))
             Text(
                 "two things are always true: while a session runs its settings can't be changed, and leaving early " +
-                    "takes the steps you chose. everything below is one switch on top of that. turn them all on for " +
-                    "the firmest it gets, or pick only the ones you want.",
+                    "takes the steps you chose. everything below is one switch on top of that, in each schedule and " +
+                    "block. turn them all on for the firmest it gets, or pick only the ones you want.",
                 style = MaterialTheme.typography.bodyLarge,
                 color = c.textMuted,
             )
@@ -109,36 +156,38 @@ fun OnboardingScreen(onDone: () -> Unit) {
                 "harder each time",
                 "each unlock on the same day makes the wait and the typing longer, by a multiplier you set. it starts " +
                     "fresh each morning.",
-                "in the block",
+                "how hard to leave",
             )
             Switch(
                 "2",
-                "lock settings afterwards",
-                "leave a session early and that block stays shut for what would have been the rest of it, so unlocking " +
+                "keep this shut after leaving early",
+                "leave a session early and it stays as it is for what would have been the rest of it, so leaving " +
                     "can't be used to soften it.",
-                "in the block",
+                "the ways around it",
             )
             Switch(
                 "3",
                 "no emergency break",
                 "with the break switched off there is no short way out, and the unlock steps are the only way through.",
-                "in the block",
+                "the ways around it",
             )
             Switch(
                 "4",
-                "lock changes during sessions",
+                "cover android's off switches",
                 "covers the settings screens that would switch blocking off, and the prompt to uninstall the app.",
-                "settings → staying blocked",
+                "the ways around it",
             )
             Switch(
                 "5",
                 "full-screen reminder",
                 "if blocking is switched off at all, a full screen stays with you until you switch it back on.",
-                "settings → staying blocked",
+                "the ways around it",
             )
 
             Text(
-                "open a block or schedule to set the first three; the ⓘ at the top of it brings you back here.",
+                "open a block or schedule to set each one, under the heading on its tag. the ⓘ at the top of it " +
+                    "brings you back here. everything stays on this phone: there's no account, and the app has no " +
+                    "internet permission at all.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = c.textFaint,
             )

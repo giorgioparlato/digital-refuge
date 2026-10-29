@@ -44,7 +44,7 @@ internal fun alwaysAvailableLockedUntil(
     return listOfNotNull(running, afterUnlock).maxOrNull()
 }
 
-/** Settings → Emergency → Always-available apps. */
+/** Settings → apps → always-available apps (and setup, step 6). */
 @Composable
 fun AlwaysAvailableScreen(onBack: () -> Unit) {
     val context = LocalContext.current

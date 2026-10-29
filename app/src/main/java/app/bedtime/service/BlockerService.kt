@@ -19,6 +19,7 @@ import app.bedtime.apps.AppCatalog
 import app.bedtime.data.AppSettings
 import app.bedtime.data.DndMode
 import app.bedtime.data.HourlyUse
+import app.bedtime.data.AutoBackup
 import app.bedtime.data.Repository
 import app.bedtime.engine.ActiveState
 import app.bedtime.engine.Engine
@@ -126,6 +127,8 @@ class BlockerService : AccessibilityService() {
                 limitTracker.moveTo(null)
                 limitTracker.flush()
                 distractionClock.moveTo(null)
+                // The weekly backup, when one is due: the phone is put down, so nothing is waiting on it.
+                if (AutoBackup.due(settings, System.currentTimeMillis())) releaseScope.launch { AutoBackup.write(applicationContext) }
                 runClock.stop()
                 nudgeJob?.cancel()
                 showLockScreen()
@@ -140,6 +143,8 @@ class BlockerService : AccessibilityService() {
                 scheduleNudge()
                 // Counted here too, so the tracker can show unlocks without usage access.
                 releaseScope.launch { Repository.get(this@BlockerService).addUnlock(HourlyUse.today(), java.time.LocalTime.now().hour) }
+                // Sunday evening's look back on the week, if asked for and not yet given.
+                releaseScope.launch { LookBackNotifier.maybePost(applicationContext) }
             }
             Engine.refresh()
             refreshSystemPackages()

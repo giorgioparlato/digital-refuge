@@ -1,6 +1,5 @@
 package app.bedtime.ui.minimal
 
-import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -31,15 +30,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
-import app.bedtime.data.ClockSize
 import app.bedtime.data.HomeStyle
 import app.bedtime.data.Module
-import app.bedtime.data.QuoteRefresh
-import app.bedtime.data.UseLook
-import app.bedtime.data.WeatherStyle
 import app.bedtime.ui.components.Text
 import app.bedtime.ui.homestyle.HomePalette
 import app.bedtime.ui.homestyle.palette
+import app.bedtime.ui.homestyle.WidgetOption
+import app.bedtime.ui.homestyle.WidgetOptions
 
 /** What a long press on a widget can change from where it is. */
 class WidgetHandlers(
@@ -54,9 +51,8 @@ class WidgetHandlers(
 )
 
 /**
- * A long press on a widget: hide it from this screen, and whatever can be changed from here: the
- * weather's style, the clock's size, how often the quote changes, a way to your habits or your
- * distracting apps.
+ * A long press on a widget: its options, the same as on the Widgets page ([WidgetOptions]), and a way
+ * to hide it from this screen.
  */
 @Composable
 internal fun WidgetSheet(
@@ -96,120 +92,44 @@ internal fun WidgetSheetContent(
             .padding(vertical = 18.dp),
     ) {
         Text(module.label, style = MaterialTheme.typography.titleMedium, color = p.text, modifier = Modifier.padding(horizontal = 22.dp).padding(bottom = 6.dp))
-        @Composable
-        fun <T> choices(label: String, options: List<Pair<String, T>>, selected: T, pick: (T) -> Unit) {
-            Text(label, style = MaterialTheme.typography.labelLarge, color = p.faint, modifier = Modifier.padding(horizontal = 22.dp, vertical = 6.dp))
-            FlowRow(Modifier.padding(horizontal = 22.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                options.forEach { (name, value) -> Chip(name, value == selected, p) { pick(value) } }
-            }
-            Spacer(Modifier.padding(top = 8.dp))
-        }
-        when (module) {
-            Module.WEATHER -> choices(
-                "Show",
-                listOf("Today" to WeatherStyle.TODAY, "3 days" to WeatherStyle.DAYS, "Now + 5" to WeatherStyle.WEEK, "5 days" to WeatherStyle.FIVE_DAYS),
-                style.weatherStyleFor(screen),
-            ) { handlers.change(style.withWeatherStyle(screen, it)) }
-            Module.CLOCK -> choices(
-                "Size",
-                listOf("Very small" to ClockSize.VERY_SMALL, "Small" to ClockSize.SMALL, "Medium" to ClockSize.MEDIUM, "Large" to ClockSize.LARGE),
-                style.clockSize,
-            ) { handlers.change(style.copy(clockSize = it)) }
-            Module.QUOTE -> choices(
-                "A new one every",
-                listOf("Hour" to QuoteRefresh.HOURLY, "6 hours" to QuoteRefresh.SIX_HOURS, "Day" to QuoteRefresh.DAILY, "Week" to QuoteRefresh.WEEKLY),
-                style.quoteRefresh,
-            ) { handlers.change(style.copy(quoteRefresh = it)) }
-            Module.HABITS -> {
-                if (habits.isNotEmpty()) {
-                    Text(if (screen == app.bedtime.data.Screen.HOME) "Show on the home screen" else "Show on the lock screen", style = MaterialTheme.typography.labelLarge, color = p.faint, modifier = Modifier.padding(horizontal = 22.dp, vertical = 6.dp))
-                    habits.forEach { habit ->
-                        Row(
-                            Modifier.fillMaxWidth().clickable { handlers.habitShown(habit.id, !habit.shownOn(screen)) }.padding(horizontal = 22.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            app.bedtime.ui.components.VerbatimText(habit.name, style = MaterialTheme.typography.bodyLarge, color = if (habit.shownOn(screen)) p.text else p.faint, modifier = Modifier.weight(1f))
-                            if (habit.shownOn(screen)) Icon(Icons.Default.Check, contentDescription = "shown", tint = p.accent, modifier = Modifier.size(18.dp))
+        // The same options, in the same order, as on the Widgets page; hints are left to that page.
+        val options = WidgetOptions.of(module, style, screen, handlers.change, notes, habits, handlers.habitShown)
+        Column(Modifier.heightIn(max = 460.dp).verticalScroll(rememberScrollState())) {
+            options.forEach { option ->
+                when (option) {
+                    is WidgetOption.Hint -> Unit
+                    is WidgetOption.Choice<*> -> {
+                        @Suppress("UNCHECKED_CAST")
+                        val choice = option as WidgetOption.Choice<Any?>
+                        Label(choice.label, p)
+                        FlowRow(Modifier.padding(horizontal = 22.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            choice.options.forEach { (name, value) -> Chip(name, value == choice.selected, p) { choice.pick(value) } }
                         }
+                        Spacer(Modifier.padding(top = 8.dp))
                     }
-                }
-                Action(Icons.AutoMirrored.Filled.KeyboardArrowRight, "Open your habits: add, change or remove", p) { handlers.open(app.bedtime.Routes.HABITS); onDone() }
-            }
-            Module.HOURS -> {
-                val use = style.useWidgetFor(screen)
-                fun set(changed: app.bedtime.data.UseWidget) = handlers.change(style.withUseWidget(screen, changed))
-                choices(
-                    "Look",
-                    listOf("Dots" to UseLook.DOTS, "Line" to UseLook.LINE, "Budget" to UseLook.BUDGET, "Apps" to UseLook.APPS, "Apps in a line" to UseLook.APPS_LINE),
-                    use.look,
-                ) { look -> set(if (look == UseLook.LINE && !use.total && !use.distracting) use.copy(look = look, total = true, distracting = true) else use.copy(look = look)) }
-                Text("Show", style = MaterialTheme.typography.labelLarge, color = p.faint, modifier = Modifier.padding(horizontal = 22.dp, vertical = 6.dp))
-                FlowRow(Modifier.padding(horizontal = 22.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (use.look == UseLook.DOTS || use.look == UseLook.LINE) {
-                        Chip("Time on the phone", use.total, p) { set(use.copy(total = !use.total)) }
-                        Chip("Distracting time", use.distracting, p) { set(use.copy(distracting = !use.distracting)) }
-                    }
-                    Chip("Unlocks", use.unlocks, p) { set(use.copy(unlocks = !use.unlocks)) }
-                }
-                Spacer(Modifier.padding(top = 8.dp))
-                if (use.look == UseLook.BUDGET) {
-                    choices("The budget counts", listOf("Distracting apps" to false, "The whole phone" to true), use.budgetWholePhone) { set(use.copy(budgetWholePhone = it)) }
-                    val minutes = if (use.budgetWholePhone) app.bedtime.data.UseWords.PHONE_BUDGETS else app.bedtime.data.UseWords.DISTRACTING_BUDGETS
-                    choices(
-                        "A day's allowance",
-                        minutes.map { app.bedtime.data.UseWords.compact(it) to it },
-                        if (use.budgetWholePhone) use.phoneBudgetMinutes else use.budgetMinutes,
-                    ) { set(if (use.budgetWholePhone) use.copy(phoneBudgetMinutes = it) else use.copy(budgetMinutes = it)) }
-                }
-                Action(Icons.AutoMirrored.Filled.KeyboardArrowRight, "Open your statistics", p) { handlers.open(app.bedtime.Routes.STATS); onDone() }
-                Action(Icons.AutoMirrored.Filled.KeyboardArrowRight, "Choose your distracting apps", p) { handlers.open(app.bedtime.Routes.DISTRACTION); onDone() }
-            }
-            Module.EVENT -> {
-                Action(
-                    Icons.Default.DateRange,
-                    if (style.calendarIcon(screen)) "No calendar icon when nothing's coming" else "A calendar icon when nothing's coming",
-                    p,
-                ) { handlers.change(style.withCalendarIcon(screen, !style.calendarIcon(screen))); onDone() }
-                Action(
-                    Icons.Default.DateRange,
-                    if (style.calendarTomorrow) "Only today's events" else "Tomorrow's first event, once today's are done",
-                    p,
-                ) { handlers.change(style.copy(calendarTomorrow = !style.calendarTomorrow)); onDone() }
-            }
-            Module.NOTE -> {
-                val chosen = style.noteWidgetId ?: app.bedtime.data.Notes.TODO_ID
-                if (notes.any { it.id == chosen }) {
-                    Action(Icons.AutoMirrored.Filled.KeyboardArrowRight, "Open this note in full", p) { handlers.open(app.bedtime.Routes.note(chosen)); onDone() }
-                }
-                choices("Lines", listOf(1, 2, 3, 6, 10).map { it.toString() to it }, style.noteLines) { handlers.change(style.copy(noteLines = it)) }
-                choices("Text", listOf("Small" to app.bedtime.data.TextSize.SMALL, "Medium" to app.bedtime.data.TextSize.MEDIUM, "Large" to app.bedtime.data.TextSize.LARGE), style.noteTextSize) { handlers.change(style.copy(noteTextSize = it)) }
-                val fits = style.noteFitsBesideClock(screen)
-                Action(
-                    Icons.Default.DateRange,
-                    when {
-                        style.noteBeside(screen) && fits -> "In the list, not beside the clock"
-                        fits -> "Beside the clock"
-                        else -> "Beside the clock: needs a small clock, and no weather there"
-                    },
-                    p,
-                    enabled = fits || style.noteBeside(screen),
-                ) { handlers.change(style.withNoteBeside(screen, !style.noteBeside(screen))); onDone() }
-                Text("Show", style = MaterialTheme.typography.labelLarge, color = p.faint, modifier = Modifier.padding(horizontal = 22.dp, vertical = 6.dp))
-                Column(Modifier.heightIn(max = 280.dp).verticalScroll(rememberScrollState())) {
-                    notes.sortedBy { it.id != app.bedtime.data.Notes.TODO_ID }.forEach { note ->
-                        val name = app.bedtime.data.NoteWidget.title(note.text).ifBlank { "A note" }
-                        Row(
-                            Modifier.fillMaxWidth().clickable { handlers.change(style.copy(noteWidgetId = note.id)); onDone() }.padding(horizontal = 22.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            app.bedtime.ui.components.VerbatimText(name, style = MaterialTheme.typography.bodyLarge, color = if (note.id == chosen) p.accent else p.text, modifier = Modifier.weight(1f))
-                            if (note.id == chosen) Icon(Icons.Default.Check, contentDescription = "shown now", tint = p.accent, modifier = Modifier.size(18.dp))
+                    is WidgetOption.Switch -> Ticked(option.label, option.on, p, enabled = option.enabled) { option.set(!option.on) }
+                    is WidgetOption.Colour -> {
+                        Label(option.label, p)
+                        val custom = option.selected != null && option.presets.none { it.second == option.selected }
+                        FlowRow(Modifier.padding(horizontal = 22.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            option.automatic?.let { Chip(it, option.selected == null, p) { option.pick(null) } }
+                            option.presets.forEach { (name, value) -> Chip(name, value == option.selected, p) { option.pick(value) } }
+                            if (custom) Chip("Custom", true, p) {}
                         }
+                        Spacer(Modifier.padding(top = 8.dp))
                     }
-                    if (notes.isEmpty()) Text("No notes yet. Write one in refuge notes.", style = MaterialTheme.typography.bodyMedium, color = p.faint, modifier = Modifier.padding(horizontal = 22.dp))
+                    is WidgetOption.Pick -> {
+                        Label(option.label, p)
+                        if (option.items.isEmpty()) Text(option.empty, style = MaterialTheme.typography.bodyMedium, color = p.faint, modifier = Modifier.padding(horizontal = 22.dp))
+                        option.items.forEach { (id, name) -> Ticked(name, id == option.selected, p, verbatim = true) { option.pick(id); onDone() } }
+                    }
+                    is WidgetOption.Ticks -> {
+                        if (option.items.isNotEmpty()) Label(if (screen == app.bedtime.data.Screen.HOME) "Show on the home screen" else "Show on the lock screen", p)
+                        option.items.forEach { (id, name, on) -> Ticked(name, on, p, verbatim = true) { option.set(id, !on) } }
+                    }
+                    is WidgetOption.Link -> Action(Icons.AutoMirrored.Filled.KeyboardArrowRight, option.label, p) { handlers.open(option.route); onDone() }
                 }
             }
-            else -> Unit
         }
         Action(Icons.Default.Clear, "Hide from this screen", p) { handlers.hide(); onDone() }
         Text(
@@ -218,6 +138,28 @@ internal fun WidgetSheetContent(
             color = p.faint,
             modifier = Modifier.padding(horizontal = 22.dp, vertical = 4.dp),
         )
+    }
+}
+
+@Composable
+private fun Label(text: String, p: HomePalette) {
+    Text(text, style = MaterialTheme.typography.labelLarge, color = p.faint, modifier = Modifier.padding(horizontal = 22.dp, vertical = 6.dp))
+}
+
+/** A line that's on or off, with a tick when it's on. */
+@Composable
+private fun Ticked(label: String, on: Boolean, p: HomePalette, enabled: Boolean = true, verbatim: Boolean = false, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clickable(enabled = enabled, onClick = onClick).padding(horizontal = 22.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        val colour = if (on && enabled) p.text else p.faint
+        if (verbatim) {
+            app.bedtime.ui.components.VerbatimText(label, style = MaterialTheme.typography.bodyLarge, color = colour, modifier = Modifier.weight(1f))
+        } else {
+            Text(label, style = MaterialTheme.typography.bodyLarge, color = colour, modifier = Modifier.weight(1f))
+        }
+        if (on) Icon(Icons.Default.Check, contentDescription = "on", tint = p.accent, modifier = Modifier.size(18.dp))
     }
 }
 

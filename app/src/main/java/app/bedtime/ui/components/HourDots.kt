@@ -35,10 +35,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.bedtime.data.HourState
 import app.bedtime.data.HourlyUse
-import app.bedtime.data.Repository
 import app.bedtime.ui.formatMinuteOfDay
 
 /**

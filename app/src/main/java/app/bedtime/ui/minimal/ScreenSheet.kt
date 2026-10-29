@@ -87,8 +87,8 @@ internal fun ScreenSheetContent(
             }
         }
         Spacer(Modifier.padding(top = 6.dp))
-        Link("Widgets and their order", p) { onOpen(Routes.STYLE_SHOWN) }
-        Link("Look", p) { onOpen(Routes.HOME_STYLE) }
+        Link("Widgets and their order", p) { onOpen(if (screen == Screen.HOME) Routes.STYLE_SHOWN else Routes.STYLE_SHOWN_LOCK) }
+        Link("Look", p) { onOpen(if (screen == Screen.HOME) Routes.HOME_STYLE else Routes.HOME_STYLE_LOCK) }
         Link("Gestures", p) { onOpen(if (screen == Screen.HOME) Routes.STYLE_GESTURES else Routes.STYLE_SWIPES) }
         Link("All settings", p) { onOpen(Routes.SETTINGS) }
     }

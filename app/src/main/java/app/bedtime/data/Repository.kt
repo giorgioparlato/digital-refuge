@@ -243,18 +243,20 @@ class Repository private constructor(context: Context) {
         usage.copy(seconds = usage.seconds + seconds.map { (pkg, s) -> pkg to (usage.seconds[pkg] ?: 0L) + s })
     }
 
+    /** One more open of the limited app [pkg] on [day]. */
+    suspend fun recordLaunch(day: Long, pkg: String) = updateUsage(day) { it.copy(launches = it.launches + (pkg to (it.launches[pkg] ?: 0) + 1)) }
+
     /** One more unlock on [day], in [hour]. */
     suspend fun addUnlock(day: Long, hour: Int) = updateUsage(day) {
         it.copy(unlocks = (it.unlocks ?: 0) + 1, unlockHours = it.unlockHours + (hour to (it.unlockHours[hour] ?: 0) + 1))
     }
 
-    /** Adds time to [day], by hour: in distracting apps, and in any app; and to [app] if it's a distracting one. */
-    suspend fun addHourly(day: Long, distracting: Map<Int, Long>, all: Map<Int, Long>, app: String? = null) = updateUsage(day) { usage ->
-        val spent = distracting.values.sum()
+    /** Adds time to [day], by hour: in distracting apps, and in any app; and to each distracting app in [apps]. */
+    suspend fun addHourly(day: Long, distracting: Map<Int, Long>, all: Map<Int, Long>, apps: Map<String, Long> = emptyMap()) = updateUsage(day) { usage ->
         usage.copy(
             hourly = usage.hourly + distracting.map { (hour, s) -> hour to (usage.hourly[hour] ?: 0L) + s },
             hourlyAll = usage.hourlyAll + all.map { (hour, s) -> hour to (usage.hourlyAll[hour] ?: 0L) + s },
-            distractingSeconds = if (app == null || spent == 0L) usage.distractingSeconds else usage.distractingSeconds + (app to (usage.distractingSeconds[app] ?: 0L) + spent),
+            distractingSeconds = usage.distractingSeconds + apps.filterValues { it > 0 }.map { (app, s) -> app to (usage.distractingSeconds[app] ?: 0L) + s },
         )
     }
 
@@ -326,9 +328,12 @@ class Repository private constructor(context: Context) {
      * older backup has none, and shouldn't wipe yours). Runtime state is left alone.
      */
     suspend fun restore(backup: Backup) {
+        // Where this phone writes its weekly backups is this phone's, not the file's.
+        val here = settings.first()
+        val restored = backup.settings.copy(backupFolder = here.backupFolder, lastBackupAt = here.lastBackupAt)
         store.edit { prefs ->
             prefs[SCHEDULES] = AppJson.encodeToString(schedulesSerializer, backup.schedules)
-            prefs[SETTINGS] = AppJson.encodeToString(AppSettings.serializer(), backup.settings)
+            prefs[SETTINGS] = AppJson.encodeToString(AppSettings.serializer(), restored)
             prefs[HISTORY] = AppJson.encodeToString(historySerializer, backup.history)
             if (backup.notes.isNotEmpty()) prefs[NOTES] = AppJson.encodeToString(notesSerializer, backup.notes)
             if (backup.habitMarks.isNotEmpty()) prefs[HABIT_MARKS] = AppJson.encodeToString(habitMarksSerializer, backup.habitMarks)

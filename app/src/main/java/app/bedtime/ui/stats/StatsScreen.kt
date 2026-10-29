@@ -1,5 +1,11 @@
 package app.bedtime.ui.stats
 
+import java.time.LocalDateTime
+
+import app.bedtime.engine.LookBacks
+
+import app.bedtime.engine.LookBack
+
 import androidx.compose.runtime.mutableStateOf
 import app.bedtime.data.Habit
 import app.bedtime.ui.habits.rememberHabits
@@ -54,7 +60,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.bedtime.ui.components.PageGutter
-import app.bedtime.ui.components.SectionLabel
 import app.bedtime.ui.components.UseDays
 import app.bedtime.ui.components.rememberUseDays
 import app.bedtime.apps.AppCatalog
@@ -72,7 +77,6 @@ import app.bedtime.engine.DayBar
 import app.bedtime.engine.DayMark
 import app.bedtime.engine.Limits
 import app.bedtime.engine.Stats
-import app.bedtime.engine.WeekStats
 import app.bedtime.ui.components.ObsidianTopBar
 import app.bedtime.ui.components.SectionCard
 import app.bedtime.ui.components.Text
@@ -100,6 +104,7 @@ fun StatsScreen(onBack: (() -> Unit)?, initialSection: Int = 0) {
     val settings by repo.settings.collectAsStateWithLifecycle(initialValue = null)
     val usage by repo.usage.collectAsStateWithLifecycle(initialValue = emptyList())
     val (habits, habitMarks) = rememberHabits()
+    val zone = ZoneId.systemDefault()
     var editingHabit by remember { mutableStateOf<Habit?>(null) }
     // Nine weeks: a week against the four before it, and the last eight weeks.
     val use = rememberUseDays(63, live = false)
@@ -107,12 +112,18 @@ fun StatsScreen(onBack: (() -> Unit)?, initialSection: Int = 0) {
     val labels by produceState(emptyMap<String, String>(), packages) {
         value = withContext(Dispatchers.IO) { packages.associateWith { AppCatalog.label(context, it) } }
     }
+    val lookBack = settings?.let { s ->
+        LookBacks.of(LookBacks.weekStart(LocalDateTime.now()), history, use.days, s.distractingApps, habits, habitMarks, zone)
+    }
     StatsContent(
+        lookBack = lookBack,
+        weeklyNote = settings?.weeklyNote == true,
+        onWeeklyNote = { on -> scope.launch { repo.updateSettings { it.copy(weeklyNote = on) } } },
         history = history,
         limits = settings?.limits.orEmpty(),
         usage = usage,
         now = System.currentTimeMillis(),
-        zone = ZoneId.systemDefault(),
+        zone = zone,
         onBack = onBack,
         use = use,
         months = app.bedtime.ui.components.rememberUseMonths(),
@@ -163,6 +174,10 @@ internal fun StatsContent(
     onAddHabit: (() -> Unit)? = null,
     /** Phone use, sessions or habits first. */
     initialSection: Int = 0,
+    /** The week looked back on, above the rest, and the Sunday note about it. */
+    lookBack: LookBack? = null,
+    weeklyNote: Boolean = false,
+    onWeeklyNote: (Boolean) -> Unit = {},
 ) {
     val c = Obsidian.colors
     val week = Stats.week(history, now)
@@ -189,6 +204,7 @@ internal fun StatsContent(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Spacer(Modifier.height(2.dp))
+            lookBack?.let { LookBackCard(it, { pkg -> labels[pkg] ?: pkg }, weeklyNote, onWeeklyNote) }
             if (sections.size > 1) {
                 SegmentedChoice(options = sections, selected = sections.indexOf(shown), onSelect = { shown = sections[it] })
             }

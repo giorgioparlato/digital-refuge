@@ -31,7 +31,6 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import app.bedtime.ui.components.SoftPillButton
 import app.bedtime.ui.components.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -46,7 +45,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.SpanStyle
@@ -73,14 +71,11 @@ import app.bedtime.data.UnlockConfig
 import app.bedtime.data.UnlockMode
 import app.bedtime.engine.Occurrence
 import app.bedtime.ui.components.Breathing
-import app.bedtime.ui.components.Callout
-import app.bedtime.ui.components.CalloutKind
-import app.bedtime.ui.components.CtaButton
 import app.bedtime.ui.components.ObsidianTextField
-import app.bedtime.ui.components.StepChips
 import app.bedtime.ui.formatCountdown
 import app.bedtime.ui.theme.Obsidian
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -168,8 +163,13 @@ internal fun UnlockSteps(
         } else if (!succeeded) {
             succeeded = true
             scope.launch {
-                delay(1_400) // Let the success state register before the screen closes.
-                onComplete()
+                // Let the success state register before the screen closes. The unlock is applied even if
+                // the screen goes first (Back, or the screen switching off): the steps were passed.
+                try {
+                    delay(1_400)
+                } finally {
+                    withContext(NonCancellable) { onComplete() }
+                }
                 onUnlocked()
             }
         }

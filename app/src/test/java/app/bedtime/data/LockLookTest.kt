@@ -34,6 +34,44 @@ class LockLookTest {
     }
 
     @Test
+    fun resettingTheLookKeepsEverythingElse() {
+        val set = home.copy(
+            accent = 0xFF123456,
+            lockScreen = false,
+            lockGestures = mapOf(Swipe.UP to GESTURE_CAMERA),
+            homeGestures = mapOf(HomeGesture.DOUBLE_TAP to HomeActions.LOCK),
+            lockNotificationApps = setOf("a.b"),
+            quickReplies = listOf("on my way"),
+            homeModules = listOf(ModuleChoice(Module.QUOTE, true)),
+            customFontName = "mine.ttf",
+        )
+        val reset = set.edit(Screen.HOME) { it.withDefaultLook(Screen.HOME) }
+        assertEquals(HomeStyle().background, reset.background)
+        assertEquals(HomeStyle().accent, reset.accent)
+        // The clock's size belongs to its widget, not to the look.
+        assertEquals(ClockSize.LARGE, reset.clockSize)
+        assertEquals(false, reset.lockScreen)
+        assertEquals(set.lockGestures, reset.lockGestures)
+        assertEquals(set.homeGestures, reset.homeGestures)
+        assertEquals(set.lockNotificationApps, reset.lockNotificationApps)
+        assertEquals(set.quickReplies, reset.quickReplies)
+        assertEquals(set.homeModules, reset.homeModules)
+        assertEquals("mine.ttf", reset.customFontName)
+        // The lock screen keeps the look it had.
+        assertEquals(0xFF123456, reset.on(Screen.LOCK).accent)
+    }
+
+    @Test
+    fun resettingTheLockScreensLookLeavesHomeAlone() {
+        val set = home.edit(Screen.LOCK) { it.copy(accent = 0xFF654321, textSize = TextSize.LARGE) }
+        val reset = set.edit(Screen.LOCK) { it.withDefaultLook(Screen.LOCK) }
+        assertEquals(HomeStyle().accent, reset.on(Screen.LOCK).accent)
+        assertEquals(TextSize.MEDIUM, reset.on(Screen.LOCK).textSize)
+        assertEquals(0xFF111111, reset.background)
+        assertEquals(ClockSize.LARGE, reset.clockSize)
+    }
+
+    @Test
     fun onHomeAChangeIsJustMade() {
         assertEquals(ClockSize.SMALL, home.edit(Screen.HOME) { it.copy(clockSize = ClockSize.SMALL) }.clockSize)
     }

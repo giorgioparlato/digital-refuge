@@ -10,11 +10,9 @@ import app.bedtime.data.TopSpace
 import androidx.compose.material.icons.filled.Refresh
 import app.bedtime.data.HomeGesture
 import app.bedtime.data.HomeActions
-import app.bedtime.data.TempUnit
 import app.bedtime.data.WeatherView
 import app.bedtime.data.WeatherStyle
 import app.bedtime.data.Weather
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Edit
 import app.bedtime.ui.apps.PickerMode
 import app.bedtime.ui.apps.AppPickerScreen
@@ -42,12 +40,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.Face
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -73,7 +68,6 @@ import app.bedtime.ui.components.Chevron
 import app.bedtime.ui.minimal.CalendarSource
 import app.bedtime.data.GESTURE_CAMERA
 import app.bedtime.data.Swipe
-import app.bedtime.data.ClockSize
 import app.bedtime.ui.components.QuickChip
 import app.bedtime.ui.theme.AppFonts
 import app.bedtime.data.AppFont
@@ -97,13 +91,11 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.bedtime.apps.AppCatalog
 import app.bedtime.apps.AppEntry
-import app.bedtime.data.AppNameSize
 import app.bedtime.data.AppSettings
 import app.bedtime.data.HomeStyle
 import app.bedtime.data.Quote
 import app.bedtime.data.Quotes
 import app.bedtime.data.Repository
-import app.bedtime.data.QuoteRefresh
 import app.bedtime.data.TextSize
 import app.bedtime.data.UseWords
 import app.bedtime.data.UseWidget
@@ -128,15 +120,20 @@ import app.bedtime.ui.theme.Obsidian
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.time.LocalDate
 import java.time.LocalDateTime
 
 @Composable
-fun HomeStyleScreen(onBack: () -> Unit, onQuotes: () -> Unit = {}, page: StylePage = StylePage.LOOK) {
+fun HomeStyleScreen(
+    onBack: () -> Unit,
+    page: StylePage = StylePage.LOOK,
+    screen: Screen = Screen.HOME,
+    onOpen: (String) -> Unit = {},
+) {
     val context = LocalContext.current
     val repo = remember { Repository.get(context) }
     val scope = rememberCoroutineScope()
     val settings: AppSettings? by repo.settings.collectAsStateWithLifecycle(initialValue = null)
+    val notes by repo.notes.collectAsStateWithLifecycle(initialValue = emptyList())
     val weather by repo.weather.collectAsStateWithLifecycle(initialValue = null)
     var allApps by remember { mutableStateOf(emptyList<AppEntry>()) }
     LaunchedEffect(Unit) {
@@ -255,6 +252,13 @@ fun HomeStyleScreen(onBack: () -> Unit, onQuotes: () -> Unit = {}, page: StylePa
         onPickPeople = { if (ContactSearch.canRead(context)) pickingPeople = true else askContacts.launch(Manifest.permission.READ_CONTACTS) },
         weatherHeardAt = weather?.at,
         page = page,
+        initialScreen = screen,
+        notes = notes,
+        habits = current.habits,
+        onHabitShown = { on ->
+            { id, shown -> scope.launch { repo.updateSettings { s -> s.copy(habits = s.habits.map { if (it.id == id) it.withShownOn(on, shown) else it }) } } }
+        },
+        onOpen = onOpen,
         // The preview shows the real weather if there is some, otherwise an example.
         weatherPreview = current.homeStyle.takeIf { Modules.onAnywhere(it, Module.WEATHER) }?.let { style ->
             Weather.view(weather ?: Weather.SAMPLE, (weather?.at ?: Weather.SAMPLE.at) + 1, Weather.fahrenheit(style.weatherUnit), style.weatherStyle)
@@ -267,7 +271,6 @@ fun HomeStyleScreen(onBack: () -> Unit, onQuotes: () -> Unit = {}, page: StylePa
         now = LocalDateTime.now(),
         onBack = onBack,
         quote = Quotes.forPeriod(LocalDateTime.now(), current.homeStyle.quoteRefresh, prefs = current.quotes),
-        onQuotes = onQuotes,
         onAddFont = { forQuote ->
             addingForQuote = forQuote
             pickFont.launch(arrayOf("font/ttf", "font/otf", "font/sfnt", "application/x-font-ttf", "application/x-font-otf", "application/octet-stream"))
@@ -289,8 +292,6 @@ internal fun HomeStyleContent(
     allApps: List<AppEntry> = emptyList(),
     /** [HomeStyle] with the next event switched on somewhere, saved once calendar access is there (asked for if needed). */
     onShowCalendar: (HomeStyle) -> Unit = {},
-    /** Opens the quotes page: your own, favourites, hidden ones. */
-    onQuotes: () -> Unit = {},
     /** Switches lock-screen notifications, sending you to grant notification access first if needed. */
     onLockNotifications: (Boolean) -> Unit = {},
     notificationAccess: Boolean = false,
@@ -305,11 +306,20 @@ internal fun HomeStyleContent(
     weatherPreviewFor: ((WeatherStyle) -> WeatherView?)? = null,
     /** Which of the home and lock screen's pages this is. */
     page: StylePage = StylePage.LOOK,
+    /** The screen Look and Widgets open on: the one you came from. */
+    initialScreen: Screen = Screen.HOME,
+    /** Your notes and habits, for the note and habits widgets to show some of. */
+    notes: List<app.bedtime.data.Note> = emptyList(),
+    habits: List<app.bedtime.data.Habit> = emptyList(),
+    /** Shows or hides a habit in the habits widget on a screen. */
+    onHabitShown: (Screen) -> (String, Boolean) -> Unit = { { _, _ -> } },
+    /** Opens one of digital refuge's pages, from a widget's options. */
+    onOpen: (String) -> Unit = {},
 ) {
     val context = LocalContext.current
     val c = Obsidian.colors
     var pickingSwipe by rememberSaveable { mutableStateOf<Swipe?>(null) }
-    var widgetScreen by rememberSaveable { mutableStateOf(Screen.HOME) }
+    var widgetScreen by rememberSaveable { mutableStateOf(initialScreen) }
     // Look and widgets are each screen's own: the lock screen's choices sit over the home screen's, so
     // these pages show the screen picked, and what's changed here changes for that screen.
     val screen = if (page == StylePage.LOOK || page == StylePage.SHOWN) widgetScreen else Screen.HOME
@@ -421,29 +431,17 @@ internal fun HomeStyleContent(
                         selected = (if (screen == Screen.LOCK) style.lockTopSpace ?: style.topSpace else style.topSpace).ordinal,
                         onSelect = { onChange(if (screen == Screen.LOCK) style.copy(lockTopSpace = TopSpace.entries[it]) else style.copy(topSpace = TopSpace.entries[it])) },
                     )
-                    SizeLabel("Clock", Modifier.padding(top = 16.dp, bottom = 8.dp))
-                    SegmentedChoice(
-                        options = listOf("Very small", "Small", "Medium", "Large"),
-                        selected = style.clockSize.ordinal,
-                        onSelect = { onChange(style.copy(clockSize = ClockSize.entries[it])) },
-                    )
                     SizeLabel("Text", Modifier.padding(top = 16.dp, bottom = 8.dp))
                     SegmentedChoice(
                         options = listOf("Small", "Medium", "Large"),
                         selected = style.textSize.ordinal,
                         onSelect = { onChange(style.copy(textSize = TextSize.entries[it])) },
                     )
-                    SizeLabel("App names", Modifier.padding(top = 16.dp, bottom = 8.dp))
-                    SegmentedChoice(
-                        options = listOf("Very small", "Small", "Medium", "Large"),
-                        selected = style.appNameSize.ordinal,
-                        onSelect = { onChange(style.copy(appNameSize = AppNameSize.entries[it])) },
-                    )
-                    SizeLabel("Full app list and search", Modifier.padding(top = 16.dp, bottom = 8.dp))
-                    SegmentedChoice(
-                        options = listOf("Very small", "Small", "Medium", "Large"),
-                        selected = style.listSize.ordinal,
-                        onSelect = { onChange(style.copy(listSize = AppNameSize.entries[it])) },
+                    Text(
+                        if (screen == Screen.HOME) "The clock's size is in its widget's options; app names are with the app list." else "The clock's size is in its widget's options.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = c.textFaint,
+                        modifier = Modifier.padding(top = 12.dp),
                     )
                 }
                 SectionCard(title = "Fonts", subtitle = "Two choices: one for the clock, date and apps, one for the quote") {
@@ -458,168 +456,40 @@ internal fun HomeStyleContent(
                         modifier = Modifier.padding(top = 12.dp),
                     )
                 }
-                // Your own font's file stays, so resetting keeps it on offer.
-                TextButton(onClick = { onChange(HomeStyle(customFontName = style.customFontName)) }, modifier = Modifier.align(Alignment.CenterHorizontally)) {
+                // Only this screen's colours, sizes and fonts: its widgets, gestures and notifications stay.
+                TextButton(onClick = { onChange(style.withDefaultLook(screen)) }, modifier = Modifier.align(Alignment.CenterHorizontally)) {
                     Text("Reset to default", color = c.textMuted)
                 }
-                SectionCard(title = "Show", subtitle = "Around your apps on the home screen; the status bar on the lock screen too") {
-                    OptionRow(Icons.Default.Notifications, "Android's status bar", description = "Off hides it here and on the lock screen; a swipe down from the top edge shows it") {
+                SectionCard(title = "Show") {
+                    OptionRow(Icons.Default.Notifications, "Android's status bar", description = "On both screens. Off hides it; a swipe down from the top edge shows it") {
                         ObsidianToggle(!style.hideStatusBar, { onChange(style.copy(hideStatusBar = !it)) })
                     }
-                    OptionRow(BedtimeIcons.Grid, "App icons", description = "Small icons next to app names") {
-                        ObsidianToggle(style.showIcons, { onChange(style.copy(showIcons = it)) })
-                    }
-                    OptionRow(BedtimeIcons.Refuge, "The refuge mark", description = "Bottom left; a tap opens digital refuge") {
-                        ObsidianToggle(style.showLogo, { onChange(style.copy(showLogo = it)) })
-                    }
-                    OptionRow(Icons.Default.KeyboardArrowUp, "The arrow to all apps", description = "At the foot; swiping up works either way") {
-                        ObsidianToggle(style.showSwipeArrow, { onChange(style.copy(showSwipeArrow = it)) })
-                    }
-                    OptionRow(Icons.Default.Edit, "A notes button", description = "Bottom right; a tap opens refuge notes") {
-                        ObsidianToggle(style.showNotesButton, { onChange(style.copy(showNotesButton = it)) })
+                    // The rest are the home screen's own: the lock screen has no app list around them.
+                    if (screen == Screen.HOME) {
+                        OptionRow(BedtimeIcons.Refuge, "The refuge mark", description = "Bottom left; a tap opens digital refuge") {
+                            ObsidianToggle(style.showLogo, { onChange(style.copy(showLogo = it)) })
+                        }
+                        OptionRow(Icons.Default.KeyboardArrowUp, "The arrow to all apps", description = "At the foot; swiping up works either way") {
+                            ObsidianToggle(style.showSwipeArrow, { onChange(style.copy(showSwipeArrow = it)) })
+                        }
+                        OptionRow(Icons.Default.Edit, "A notes button", description = "Bottom right; a tap opens refuge notes") {
+                            ObsidianToggle(style.showNotesButton, { onChange(style.copy(showNotesButton = it)) })
+                        }
                     }
                 }
             }
             if (page == StylePage.SHOWN) {
-                // Each widget's options, opened in place from its row.
-                val moduleOptions: @Composable (Module) -> Unit = { module ->
-                    when (module) {
-                    Module.CLOCK -> Column {
-                        SizeLabel("Size", Modifier.padding(bottom = 8.dp))
-                        SegmentedChoice(
-                            options = listOf("Very small", "Small", "Medium", "Large"),
-                            selected = style.clockSize.ordinal,
-                            onSelect = { onChange(style.copy(clockSize = ClockSize.entries[it])) },
-                        )
-                    }
-                    Module.NOTE -> Column {
-                    OptionsHint("Hold it on your screen to choose which note it shows")
-                    SizeLabel("Lines shown", Modifier.padding(bottom = 8.dp))
-                    val lineChoices = listOf(1, 2, 3, 6, 10)
-                    SegmentedChoice(
-                        options = lineChoices.map { it.toString() },
-                        selected = lineChoices.indexOf(style.noteLines).coerceAtLeast(0),
-                        onSelect = { onChange(style.copy(noteLines = lineChoices[it])) },
-                    )
-                    SizeLabel("Text size", Modifier.padding(top = 16.dp, bottom = 8.dp))
-                    SegmentedChoice(
-                        options = listOf("Small", "Medium", "Large"),
-                        selected = style.noteTextSize.ordinal,
-                        onSelect = { onChange(style.copy(noteTextSize = TextSize.entries[it])) },
-                    )
-                    SizeLabel("Its background", Modifier.padding(top = 16.dp, bottom = 8.dp))
-                    ColourChoice(
-                        NotePresets,
-                        style.noteBackground,
-                        { onChange(style.copy(noteBackground = it)) },
-                        automatic = "The screen's own",
-                    )
-                    if (style.noteBackground != null) {
-                        SizeLabel("Its text", Modifier.padding(top = 16.dp, bottom = 8.dp))
-                        val textChoices = listOf(null, true, false)
-                        SegmentedChoice(
-                            options = listOf("To suit it", "Dark", "Light"),
-                            selected = textChoices.indexOf(style.noteDarkText),
-                            onSelect = { onChange(style.copy(noteDarkText = textChoices[it])) },
-                        )
-                    }
-                    val fits = style.noteFitsBesideClock(widgetScreen)
-                    OptionRow(
-                        Icons.Default.DateRange,
-                        "Beside the clock",
-                        description = if (fits) {
-                            "Small, at the top right: its title and first lines"
-                        } else {
-                            "Only with a small or very small clock (Look), and the weather not beside it (off, or set to 5 days)"
-                        },
-                        enabled = fits,
-                    ) { ObsidianToggle(style.noteBeside(widgetScreen) && fits, { onChange(style.withNoteBeside(widgetScreen, it)) }, enabled = fits) }
+                // Each widget's options, opened in place from its row: the same list holding the widget shows.
+                val heard = weatherHeardAt?.let { "Last heard ${formatRelativePast(System.currentTimeMillis() - it)}; hidden when over 3 hours old." }
+                val optionsOf: (Module) -> List<WidgetOption> = { module ->
+                    WidgetOptions.of(module, style, widgetScreen, onChange, notes, habits, onHabitShown(widgetScreen), heard)
                 }
-                    Module.QUOTE -> Column {
-                    OptionsHint("Tap it for another, hold it to favourite or hide it")
-                    run {
-                        SizeLabel("A new one every", Modifier.padding(bottom = 8.dp))
-                        SegmentedChoice(
-                            options = listOf("Hour", "6 hours", "Day", "Week"),
-                            selected = style.quoteRefresh.ordinal,
-                            onSelect = { onChange(style.copy(quoteRefresh = QuoteRefresh.entries[it])) },
-                        )
-                        OptionRow(
-                            Icons.Default.FavoriteBorder,
-                            "Quotes",
-                            description = "Add your own, pick favourites, hide some",
-                            onClick = onQuotes,
-                        ) { Chevron() }
-                    }
-                }
-                    Module.HOURS -> Column {
-                    UseWidgetOptions(style.useWidgetFor(widgetScreen)) { onChange(style.withUseWidget(widgetScreen, it)) }
-                    // Its colours, the same on both screens: the dots, the budget bar and the apps' bars.
-                    SizeLabel("Calm hours", Modifier.padding(top = 16.dp, bottom = 8.dp))
-                    ColourChoice(TextPresets, style.hourCalmColor, { onChange(style.copy(hourCalmColor = it)) }, automatic = "Automatic")
-                    SizeLabel("Distracted hours", Modifier.padding(top = 16.dp, bottom = 8.dp))
-                    ColourChoice(AccentPresets + DistractedPresets, style.hourDistractedColor, { onChange(style.copy(hourDistractedColor = it)) }, automatic = "Accent")
-                }
-                    Module.WEATHER -> Column {
-                    OptionsHint("From Breezy Weather, a free app that does the fetching; this one never goes online")
-                    OptionRow(
-                        Icons.Default.Info,
-                        "Last heard",
-                        description = when (weatherHeardAt) {
-                            null -> "Nothing from Breezy Weather yet"
-                            else -> "${formatRelativePast(System.currentTimeMillis() - weatherHeardAt).replaceFirstChar { it.uppercase() }}. Hidden when over 3 hours old"
-                        },
-                    )
-                    run {
-                        SizeLabel("Show", Modifier.padding(top = 12.dp, bottom = 8.dp))
-                        val styles = listOf(WeatherStyle.TODAY, WeatherStyle.DAYS, WeatherStyle.WEEK, WeatherStyle.FIVE_DAYS)
-                        SegmentedChoice(
-                            options = listOf("Today", "3 days", "Now + 5", "5 days"),
-                            selected = styles.indexOf(style.weatherStyleFor(widgetScreen)).coerceAtLeast(0),
-                            onSelect = { onChange(style.withWeatherStyle(widgetScreen, styles[it])) },
-                        )
-                        SizeLabel("In", Modifier.padding(top = 12.dp, bottom = 8.dp))
-                        SegmentedChoice(
-                            options = listOf("Automatic", "°C", "°F"),
-                            selected = style.weatherUnit.ordinal,
-                            onSelect = { onChange(style.copy(weatherUnit = TempUnit.entries[it])) },
-                        )
-                        Text(
-                            "Install Breezy Weather (it's on F-Droid). In its settings, under widgets, open “Send Gadgetbridge data” and tick digital refuge. It sends the weather each time it updates.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = c.textFaint,
-                            modifier = Modifier.padding(top = 4.dp),
-                        )
-                    }
-                }
-                    Module.EVENT -> Column {
-                    OptionsHint("Read from the calendar already on this phone. Nothing is fetched")
-                    OptionRow(
-                        Icons.Default.DateRange,
-                        "A calendar icon when nothing's coming",
-                        description = "A tap shows the week ahead",
-                    ) { ObsidianToggle(style.calendarIcon(widgetScreen), { onChange(style.withCalendarIcon(widgetScreen, it)) }) }
-                    OptionRow(
-                        Icons.Default.DateRange,
-                        "Tomorrow's first event, once today's are done",
-                        description = "In the evening, what the morning starts with",
-                    ) { ObsidianToggle(style.calendarTomorrow, { onChange(style.copy(calendarTomorrow = it)) }) }
-                    if (widgetScreen == Screen.LOCK) {
-                        OptionRow(
-                            Icons.Default.Lock,
-                            "Event names",
-                            description = "Off, the lock screen only says when the next one is",
-                        ) { ObsidianToggle(style.calendarNamesOnLock, { onChange(style.copy(calendarNamesOnLock = it)) }) }
-                    }
-                }
-                    else -> Unit
-                    }
-                }
+                val moduleOptions: @Composable (Module) -> Unit = { module -> WidgetOptionsPage(optionsOf(module), onOpen) }
                 SectionCard(
                     title = if (widgetScreen == Screen.HOME) "On the home screen" else "On the lock screen",
                     subtitle = "Tap one for its options; drag by the handle to change the order",
                 ) {
-                    WidgetList(style, widgetScreen, onChange, onShowCalendar, OPTIONED, moduleOptions)
+                    WidgetList(style, widgetScreen, onChange, onShowCalendar, Module.entries.filter { optionsOf(it).isNotEmpty() }.toSet(), moduleOptions)
                 }
             }
             if (page == StylePage.NOTIFICATIONS) {
@@ -1001,9 +871,6 @@ private fun WidgetList(
         }
     }
 }
-
-/** The widgets with options of their own on this page. */
-private val OPTIONED = setOf(Module.CLOCK, Module.NOTE, Module.QUOTE, Module.HOURS, Module.WEATHER, Module.EVENT)
 
 /** A line saying how a widget behaves, at the top of its options. */
 @Composable

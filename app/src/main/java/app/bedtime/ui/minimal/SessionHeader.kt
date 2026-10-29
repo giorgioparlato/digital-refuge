@@ -7,13 +7,11 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import app.bedtime.ui.components.WeatherIcons
 import app.bedtime.data.WeatherView
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -41,7 +39,6 @@ import app.bedtime.data.Quote
 import app.bedtime.data.credit
 import app.bedtime.ui.theme.AppFonts
 import androidx.compose.ui.text.font.FontStyle
-import app.bedtime.ui.components.BedtimeIcons
 import app.bedtime.ui.components.ScheduleIcons
 import app.bedtime.ui.components.Text
 import app.bedtime.ui.components.styledTime

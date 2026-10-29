@@ -171,4 +171,33 @@ class LimitsTest {
         assertFalse(Limits.isLooser(typing, typing.copy(pauseTextLength = 100, pauseGrowth = 100)))
         assertFalse(Limits.isLooser(typing.copy(pauseKind = app.bedtime.data.PauseKind.WAIT), typing))
     }
+
+    private val counted = social.copy(rules = social.rules.copy(dailyMinutes = null, dailyOpens = 3))
+
+    @Test
+    fun opensAreCountedTogetherWhenShared() {
+        val usage = UsageDay(today, launches = mapOf("a" to 2, "b" to 1))
+        assertEquals(0, Limits.opensLeft(counted, "a", usage))
+        assertEquals(counted, Limits.outOfOpens(listOf(counted), "b", usage))
+        val each = counted.copy(rules = counted.rules.copy(shared = false))
+        assertEquals(1, Limits.opensLeft(each, "a", usage))
+        assertNull(Limits.outOfOpens(listOf(each), "b", usage))
+    }
+
+    @Test
+    fun takingMoreGivesOneMoreOpenAndLiftingEndsTheCount() {
+        val out = UsageDay(today, launches = mapOf("a" to 3))
+        assertEquals(1, Limits.opensLeft(counted, "a", out.copy(extras = mapOf("social" to listOf(1L)), extraMinutes = mapOf("social" to listOf(0)))))
+        assertNull(Limits.opensLeft(counted, "a", out.copy(lifted = setOf("social"))))
+        // Opens don't touch the minutes, which have no budget here.
+        assertNull(Limits.secondsLeft(counted, "a", out))
+    }
+
+    @Test
+    fun moreOpensOrNoneWaitForMidnight() {
+        assertTrue(Limits.isLooser(counted.rules, counted.rules.copy(dailyOpens = 4)))
+        assertTrue(Limits.isLooser(counted.rules, counted.rules.copy(dailyOpens = null, pauseSeconds = 10)))
+        assertFalse(Limits.isLooser(counted.rules, counted.rules.copy(dailyOpens = 2)))
+        assertFalse(Limits.isLooser(social.rules, social.rules.copy(dailyOpens = 5)))
+    }
 }

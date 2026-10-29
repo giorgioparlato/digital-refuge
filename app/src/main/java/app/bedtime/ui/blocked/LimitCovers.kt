@@ -6,8 +6,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
@@ -26,8 +24,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.bedtime.data.CoverMessages
@@ -40,8 +36,6 @@ import app.bedtime.engine.Limits
 import app.bedtime.service.LimitPasses
 import app.bedtime.ui.components.BedtimeIcons
 import app.bedtime.ui.components.Breathing
-import app.bedtime.ui.components.CtaButton
-import app.bedtime.ui.components.StatusPill
 import app.bedtime.ui.components.Text
 import app.bedtime.ui.formatMinutes
 import app.bedtime.ui.theme.Obsidian
@@ -153,9 +147,12 @@ internal fun PauseContent(appLabel: String, secondsLeft: Int, opens: Int, onOpen
     )
 }
 
-/** A limit's minutes are gone for today: what's left is home, or — if the limit allows — more time. */
+/**
+ * A limit's minutes are gone for today, or with [opens] its opens: what's left is home, or — if the
+ * limit allows — more. Out of opens, "more" is one more open, or the rest of the day.
+ */
 @Composable
-internal fun LimitScreen(pkg: String, limitId: String, onHome: () -> Unit, onFinish: () -> Unit) {
+internal fun LimitScreen(pkg: String, limitId: String, onHome: () -> Unit, onFinish: () -> Unit, opens: Boolean = false) {
     val context = LocalContext.current
     val c = Obsidian.colors
     val repo = remember { Repository.get(context) }
@@ -174,7 +171,11 @@ internal fun LimitScreen(pkg: String, limitId: String, onHome: () -> Unit, onFin
         limit?.let { CoverMessages.pick(it.message, loaded.customMessages) }
     }
     // A minute's slack: the last seconds counted may still be on their way to storage.
-    val stillOut = limit != null && (Limits.secondsLeft(limit, pkg, day) ?: Long.MAX_VALUE) <= 60L
+    val stillOut = limit != null && if (opens) {
+        (Limits.opensLeft(limit, pkg, day) ?: Int.MAX_VALUE) <= 0
+    } else {
+        (Limits.secondsLeft(limit, pkg, day) ?: Long.MAX_VALUE) <= 60L
+    }
 
     // Deleted, changed, lifted or given more time since: nothing left to cover.
     LaunchedEffect(settings, usage) {
@@ -184,7 +185,8 @@ internal fun LimitScreen(pkg: String, limitId: String, onHome: () -> Unit, onFin
         if (limit == null) return@Surface
         val rules = limit.rules
         val name = limit.name.ifBlank { "this limit" }
-        val choosing = rules.outOfTime == OutOfTime.CHOOSE
+        // Opens have no length to choose: more is one more open.
+        val choosing = rules.outOfTime == OutOfTime.CHOOSE && !opens
         if (unlocking && choosing && chosen < 0) {
             val untilMidnight = Duration.between(LocalDateTime.now(), LocalDate.now().plusDays(1).atStartOfDay()).toMinutes().toInt()
             UnlockLengthChoice(
@@ -197,9 +199,10 @@ internal fun LimitScreen(pkg: String, limitId: String, onHome: () -> Unit, onFin
             )
         } else if (unlocking) {
             // Minutes given, or null to lift the limit until midnight.
-            val minutes: Int? = when (rules.outOfTime) {
-                OutOfTime.CHOOSE -> chosen.takeIf { it != REST }
-                OutOfTime.REST_OF_DAY -> null
+            val minutes: Int? = when {
+                rules.outOfTime == OutOfTime.REST_OF_DAY -> null
+                opens -> 0
+                rules.outOfTime == OutOfTime.CHOOSE -> chosen.takeIf { it != REST }
                 else -> rules.extraMinutes
             }
             UnlockSteps(
@@ -207,8 +210,16 @@ internal fun LimitScreen(pkg: String, limitId: String, onHome: () -> Unit, onFin
                 name = name,
                 config = rules.unlock,
                 recentUnlocks = day.extras[limitId]?.size ?: 0,
-                outcome = if (minutes == null) "This lifts $name for the rest of today." else "This gives you $minutes more minutes today.",
-                success = if (minutes == null) "$name is lifted until tomorrow." else "$minutes more minutes. Spend them well.",
+                outcome = when {
+                    minutes == null -> "This lifts $name for the rest of today."
+                    opens -> "This gives you one more open today."
+                    else -> "This gives you $minutes more minutes today."
+                },
+                success = when {
+                    minutes == null -> "$name is lifted until tomorrow."
+                    opens -> "One more open. Make it count."
+                    else -> "$minutes more minutes. Spend them well."
+                },
                 onComplete = {
                     granted = true
                     repo.grantLimit(today, limitId, System.currentTimeMillis(), minutes)
@@ -226,6 +237,7 @@ internal fun LimitScreen(pkg: String, limitId: String, onHome: () -> Unit, onFin
                 appLabel = label,
                 limitName = name,
                 dailyMinutes = rules.dailyMinutes ?: 0,
+                dailyOpens = rules.dailyOpens.takeIf { opens },
                 outOfTime = rules.outOfTime,
                 extraMinutes = rules.extraMinutes,
                 onHome = onHome,
@@ -246,7 +258,30 @@ internal fun LimitContent(
     onHome: () -> Unit,
     onMore: () -> Unit,
     message: String? = null,
+    /** The day's opens, when it's they that are gone rather than the minutes. */
+    dailyOpens: Int? = null,
 ) {
+    if (dailyOpens != null) {
+        val allowance = if (dailyOpens == 1) "1 open" else "$dailyOpens opens"
+        CoverLayout(
+            message = message,
+            emblem = { CoverEmblem(BedtimeIcons.Hourglass) },
+            pill = "$limitName · $allowance a day",
+            title = "$appLabel is done for today",
+            body = when (outOfTime) {
+                OutOfTime.TOMORROW -> "That was today's $allowance. It'll be back tomorrow."
+                OutOfTime.REST_OF_DAY -> "That was today's $allowance. If it really can't wait, you can lift the limit for the rest of today."
+                else -> "That was today's $allowance. If it really can't wait, you can take one more."
+            },
+            primary = CoverAction("Go to home screen", onHome),
+            secondary = when (outOfTime) {
+                OutOfTime.TOMORROW -> emptyList()
+                OutOfTime.REST_OF_DAY -> listOf(CoverAction("Lift it for today", onMore))
+                else -> listOf(CoverAction("Open it once more", onMore))
+            },
+        )
+        return
+    }
     val budget = formatMinutes(dailyMinutes.toLong())
     CoverLayout(
         message = message,

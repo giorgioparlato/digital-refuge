@@ -390,6 +390,8 @@ data class HomeStyle(
         noteDarkText = from.noteDarkText, noteBesideClock = from.noteBesideClock, lockNoteBesideClock = from.lockNoteBesideClock,
         calendarIconWhenEmpty = from.calendarIconWhenEmpty, lockCalendarIconWhenEmpty = from.lockCalendarIconWhenEmpty,
         calendarTomorrow = from.calendarTomorrow, useWidget = from.useWidget, lockUseWidget = from.lockUseWidget,
+        weatherUnit = from.weatherUnit, calendarNamesOnLock = from.calendarNamesOnLock,
+        hourCalmColor = from.hourCalmColor, hourDistractedColor = from.hourDistractedColor,
     )
 
     fun useWidgetFor(screen: Screen): UseWidget = if (screen == Screen.HOME) useWidget else lockUseWidget ?: useWidget
@@ -412,6 +414,17 @@ data class HomeStyle(
     fun noteFitsBesideClock(screen: Screen): Boolean =
         clockSize in setOf(ClockSize.VERY_SMALL, ClockSize.SMALL) &&
             !(Modules.isOn(this, screen, Module.WEATHER) && weatherStyleFor(screen) != WeatherStyle.FIVE_DAYS)
+
+    /**
+     * The Look page's colours, sizes and fonts as they start, for [screen] only, made to the style as that
+     * screen shows it (save it through [edit]). Widgets and their options (the clock's size among them),
+     * gestures, notifications, the app list and your own font stay as they are.
+     */
+    fun withDefaultLook(screen: Screen): HomeStyle {
+        val d = HomeStyle()
+        val look = copy(background = d.background, accent = d.accent, textColor = d.textColor, textSize = d.textSize, font = d.font, quoteFont = d.quoteFont)
+        return if (screen == Screen.HOME) look.copy(topSpace = d.topSpace) else look.copy(lockTopSpace = d.topSpace)
+    }
 }
 
 /** The lock screen's gestures: four swipes starting around the clock, and a double tap anywhere. */
@@ -550,6 +563,14 @@ data class AppSettings(
     val noteTargets: List<NoteTarget> = emptyList(),
     /** Which calendar the search adds events to; null for the first one that can take them. */
     val eventCalendarId: Long? = null,
+    /** The folder (a tree URI) a backup is written to each week; null for none. */
+    val backupFolder: String? = null,
+    /** When the last of those was written. */
+    val lastBackupAt: Long = 0L,
+    /** A notification looking back on the week, on Sunday evening. */
+    val weeklyNote: Boolean = false,
+    /** The week (its Monday, as an epoch day) last looked back on in that notification. */
+    val weeklyNotedWeek: Long = 0L,
 ) {
     /** Where quick notes and the search can add: the to-do note first, then your files. */
     val quickTargets: List<NoteTarget> get() = listOf(Notes.TODO) + noteTargets
@@ -617,7 +638,9 @@ data class LimitRules(
     val pauseForGroup: Boolean = false,
     /** Minutes a day in these apps; null means no budget. */
     val dailyMinutes: Int? = null,
-    /** True: the minutes are shared by all the apps together. False: each app gets them in full. */
+    /** Times a day these apps can be opened; null means no count. Each "more" gives one more. */
+    val dailyOpens: Int? = null,
+    /** True: the minutes and opens are shared by all the apps together. False: each app gets them in full. */
     val shared: Boolean = true,
     val outOfTime: OutOfTime = OutOfTime.MORE_TIME,
     /** What "more time" gives each time, in minutes. */
@@ -672,6 +695,8 @@ data class UsageDay(
     val unlocks: Int? = null,
     /** The same, by hour of the day. */
     val unlockHours: Map<Int, Int> = emptyMap(),
+    /** Times each limited app was opened (after a minute or more away), for limits that count opens. */
+    val launches: Map<String, Int> = emptyMap(),
 )
 
 /** A named set of apps for ticking many at once in the app picker. Copied into schedules, never linked. */

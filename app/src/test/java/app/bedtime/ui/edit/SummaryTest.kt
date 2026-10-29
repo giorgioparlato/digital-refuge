@@ -79,7 +79,7 @@ class SummaryTest {
     @Test
     fun theWaysAroundNameTheDoorsThatAreShut() {
         val firm = bare.copy(pauseEnabled = false, lockSettings = true, fullScreenAlert = true)
-        assertEquals("no emergency break · settings locked · reminder on", waysAroundSummary(firm, null))
+        assertEquals("no emergency break · off switches covered · reminder on", waysAroundSummary(firm, null))
     }
 
     @Test

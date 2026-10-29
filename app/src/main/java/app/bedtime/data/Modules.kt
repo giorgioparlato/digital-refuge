@@ -66,10 +66,6 @@ object Modules {
     fun switched(style: HomeStyle, screen: Screen, module: Module, on: Boolean): HomeStyle =
         with(style, screen, of(style, screen).map { if (it.module == module) it.copy(on = on) else it })
 
-    /** The same on both screens, for the settings that speak of both at once. */
-    fun switchedEverywhere(style: HomeStyle, module: Module, on: Boolean): HomeStyle =
-        Screen.entries.fold(style) { s, screen -> switched(s, screen, module, on) }
-
     /** Each module once, in the order given, and any not in it (new ones) at the end, off. */
     fun arrange(list: List<ModuleChoice>): List<ModuleChoice> {
         val known = list.distinctBy { it.module }

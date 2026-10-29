@@ -8,27 +8,12 @@ import androidx.activity.ComponentActivity
 import androidx.activity.addCallback
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import app.bedtime.data.Repository
 import app.bedtime.data.CoverMessages
-import app.bedtime.ui.components.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -38,19 +23,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.bedtime.apps.AppCatalog
 import app.bedtime.engine.Engine
 import app.bedtime.service.BlockingState
 import app.bedtime.ui.components.BedtimeIcons
-import app.bedtime.ui.components.CtaButton
-import app.bedtime.ui.components.StatusPill
 import app.bedtime.ui.formatTime
 import app.bedtime.ui.theme.BedtimeTheme
 import app.bedtime.ui.theme.Obsidian
@@ -66,6 +45,8 @@ class BlockedActivity : ComponentActivity() {
     /** Not a session at all but a limit: the pause before opening, or a day's minutes gone. */
     private var mode by mutableStateOf<String?>(null)
     private var limitId by mutableStateOf<String?>(null)
+    /** The limit's opens are gone, rather than its minutes. */
+    private var outOfOpens by mutableStateOf(false)
     private var pauseSeconds by mutableIntStateOf(0)
     private var opens by mutableIntStateOf(0)
     private var passKey by mutableStateOf<String?>(null)
@@ -86,8 +67,8 @@ class BlockedActivity : ComponentActivity() {
                     mode == MODE_PAUSE && pkg != null -> key(pkg, opens) {
                         PauseScreen(pkg, pauseSeconds, opens, passKey ?: pkg, onHome = ::goHome, onFinish = ::finish, typing = typing, source = typingSource)
                     }
-                    mode == MODE_LIMIT && pkg != null -> key(pkg, limitId) {
-                        LimitScreen(pkg, limitId.orEmpty(), onHome = ::goHome, onFinish = ::finish)
+                    mode == MODE_LIMIT && pkg != null -> key(pkg, limitId, outOfOpens) {
+                        LimitScreen(pkg, limitId.orEmpty(), onHome = ::goHome, onFinish = ::finish, opens = outOfOpens)
                     }
                     else -> BlockedScreen(pkg, guardingSettings, onHome = ::goHome, onFinish = ::finish)
                 }
@@ -105,6 +86,7 @@ class BlockedActivity : ComponentActivity() {
         guardingSettings = intent.getBooleanExtra(EXTRA_SETTINGS, false)
         mode = intent.getStringExtra(EXTRA_MODE)
         limitId = intent.getStringExtra(EXTRA_LIMIT)
+        outOfOpens = intent.getBooleanExtra(EXTRA_OUT_OF_OPENS, false)
         pauseSeconds = intent.getIntExtra(EXTRA_SECONDS, 0)
         opens = intent.getIntExtra(EXTRA_OPENS, 0)
         passKey = intent.getStringExtra(EXTRA_PASS)
@@ -122,6 +104,7 @@ class BlockedActivity : ComponentActivity() {
         private const val EXTRA_SETTINGS = "settings"
         private const val EXTRA_MODE = "mode"
         private const val EXTRA_LIMIT = "limit"
+        private const val EXTRA_OUT_OF_OPENS = "outOfOpens"
         private const val EXTRA_SECONDS = "seconds"
         private const val EXTRA_OPENS = "opens"
         private const val EXTRA_PASS = "pass"
@@ -144,9 +127,9 @@ class BlockedActivity : ComponentActivity() {
                 .putExtra(EXTRA_OPENS, opens).putExtra(EXTRA_PASS, passKey)
                 .putExtra(EXTRA_TYPING, typing).putExtra(EXTRA_SOURCE, source.name)
 
-        /** [pkg]'s minutes for today are gone under limit [limitId]. */
-        fun limitIntent(context: Context, pkg: String, limitId: String): Intent =
-            intent(context, pkg).putExtra(EXTRA_MODE, MODE_LIMIT).putExtra(EXTRA_LIMIT, limitId)
+        /** [pkg]'s minutes for today are gone under limit [limitId], or with [opens] its opens are. */
+        fun limitIntent(context: Context, pkg: String, limitId: String, opens: Boolean = false): Intent =
+            intent(context, pkg).putExtra(EXTRA_MODE, MODE_LIMIT).putExtra(EXTRA_LIMIT, limitId).putExtra(EXTRA_OUT_OF_OPENS, opens)
 
         /** Covers a Settings screen that would switch blocking off. */
         fun settingsIntent(context: Context): Intent =

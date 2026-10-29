@@ -1,5 +1,11 @@
 package app.bedtime.ui.settings
 
+import androidx.compose.material.icons.filled.DateRange
+
+import androidx.compose.runtime.LaunchedEffect
+
+import app.bedtime.ui.minimal.CalendarSource
+
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.AlertDialog
 import androidx.compose.ui.text.input.ImeAction
@@ -15,11 +21,7 @@ import androidx.compose.foundation.layout.width
 import app.bedtime.data.Keywords
 import app.bedtime.data.ChatApp
 import app.bedtime.ui.components.DragList
-import app.bedtime.ui.components.SectionLabel
-import app.bedtime.ui.components.CardRadius
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material.icons.filled.Call
-import androidx.compose.ui.window.Dialog
 import android.content.Intent
 import android.net.Uri
 import app.bedtime.apps.AppCatalog
@@ -35,19 +37,11 @@ import app.bedtime.data.ContactSearch
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.rememberLauncherForActivityResult
 import android.Manifest
-import androidx.compose.ui.zIndex
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.key
-import androidx.compose.material.icons.filled.Menu
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -55,7 +49,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -103,6 +96,13 @@ fun SearchSettingsScreen(onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
     val settings by repo.settings.collectAsStateWithLifecycle(initialValue = null)
     val found by produceState<List<SearchTarget>?>(null) { value = withContext(Dispatchers.IO) { SearchTargets.find(context) } }
+    // Which calendar "add to calendar" writes to: asked for only when wanted.
+    var calendars by remember { mutableStateOf(emptyList<Pair<Long, String>>()) }
+    var calendarAccess by remember { mutableStateOf(CalendarSource.hasPermission(context) && CalendarSource.canWrite(context)) }
+    LaunchedEffect(calendarAccess) { calendars = withContext(Dispatchers.IO) { CalendarSource.writableCalendars(context) } }
+    val askCalendar = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
+        calendarAccess = granted.values.all { it }
+    }
     val current = settings ?: return
     val targets = found ?: return
     val obsidian = remember { AppCatalog.isLaunchable(context, FolderIndex.OBSIDIAN) }
@@ -202,6 +202,11 @@ fun SearchSettingsScreen(onBack: () -> Unit) {
         onChats = { chosen -> scope.launch { repo.updateSettings { it.copy(contactApps = chosen.map { app -> app.key }) } } },
         categoriesOff = current.searchOff,
         onCategory = { category, on -> scope.launch { repo.updateSettings { it.copy(searchOff = if (on) it.searchOff - category else it.searchOff + category) } } },
+        calendars = calendars,
+        calendarId = current.eventCalendarId,
+        calendarAccess = calendarAccess,
+        onCalendar = { id -> scope.launch { repo.updateSettings { it.copy(eventCalendarId = id) } } },
+        onAllowCalendar = { askCalendar.launch(arrayOf(Manifest.permission.READ_CALENDAR, Manifest.permission.WRITE_CALENDAR)) },
         onRemoveFolder = { key ->
             val at = key.substringAfter(':').toIntOrNull()
             if (at != null) scope.launch {
@@ -239,6 +244,12 @@ internal fun SearchSettingsContent(
     /** Kinds of action switched off whole, and the switch for each. */
     categoriesOff: Set<SearchCategory> = emptySet(),
     onCategory: (SearchCategory, Boolean) -> Unit = { _, _ -> },
+    /** The calendars that can take new events, the one "add to calendar" uses, and whether it may write. */
+    calendars: List<Pair<Long, String>> = emptyList(),
+    calendarId: Long? = null,
+    calendarAccess: Boolean = false,
+    onCalendar: (Long) -> Unit = {},
+    onAllowCalendar: () -> Unit = {},
 ) {
     val c = Obsidian.colors
     val list = choices.map { it.first }
@@ -322,6 +333,22 @@ internal fun SearchSettingsContent(
                                 { now -> onChats(if (now) chosenChats + app else chosenChats - app) },
                                 enabled = on || chosenChats.size < ChatApp.MAX,
                             )
+                        }
+                    }
+                }
+            }
+            if (list.any { it.key == SearchOrder.CALENDAR && it.on } && SearchCategory.DO !in categoriesOff) {
+                SectionCard(title = "Adding to your calendar", subtitle = "“dentist next friday 9” offers to add it, to this calendar") {
+                    if (!calendarAccess) {
+                        OptionRow(Icons.Default.DateRange, "Allow calendar access", description = "Asked anyway the first time you add one", onClick = onAllowCalendar) { Chevron() }
+                    } else if (calendars.isEmpty()) {
+                        Text("No calendar on this phone can take new events.", style = MaterialTheme.typography.bodyMedium, color = c.textMuted)
+                    } else {
+                        val chosen = calendarId?.takeIf { id -> calendars.any { it.first == id } } ?: calendars.first().first
+                        calendars.forEach { (id, name) ->
+                            OptionRow(Icons.Default.DateRange, name, onClick = { onCalendar(id) }) {
+                                if (id == chosen) Text("in use", style = MaterialTheme.typography.labelMedium, color = c.accentText)
+                            }
                         }
                     }
                 }

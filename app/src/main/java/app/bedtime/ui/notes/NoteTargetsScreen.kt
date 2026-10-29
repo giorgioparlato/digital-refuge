@@ -6,7 +6,6 @@ import app.bedtime.ui.components.VerbatimText
 import app.bedtime.ui.components.SegmentedChoice
 import app.bedtime.ui.components.ObsidianToggle
 import app.bedtime.data.NoteStyle
-import android.Manifest
 import android.content.Intent
 import android.net.Uri
 import android.provider.OpenableColumns
@@ -33,12 +32,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -55,25 +52,16 @@ import app.bedtime.ui.components.OptionRow
 import app.bedtime.ui.components.PageGutter
 import app.bedtime.ui.components.SectionCard
 import app.bedtime.ui.components.Text
-import app.bedtime.ui.minimal.CalendarSource
 import app.bedtime.ui.theme.Obsidian
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
-/** Where the minimal home's search sends notes and events: your files, the app's notes, a calendar. */
+/** Where the minimal home's search sends notes: your files, or the app's notes. Events are on the search page. */
 @Composable
 fun NoteTargetsScreen(onBack: () -> Unit, onOpenNotes: () -> Unit) {
     val context = LocalContext.current
     val repo = remember { Repository.get(context) }
     val scope = rememberCoroutineScope()
     val settings by repo.settings.collectAsStateWithLifecycle(initialValue = null)
-    var calendars by remember { mutableStateOf(emptyList<Pair<Long, String>>()) }
-    var calendarAccess by remember { mutableStateOf(CalendarSource.hasPermission(context) && CalendarSource.canWrite(context)) }
-    LaunchedEffect(calendarAccess) { calendars = withContext(Dispatchers.IO) { CalendarSource.writableCalendars(context) } }
-    val askCalendar = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
-        calendarAccess = granted.values.all { it }
-    }
     // A file being named and set up: just picked (new) or tapped to change. The original, to replace.
     var draft by remember { mutableStateOf<NoteTarget?>(null) }
     var original by remember { mutableStateOf<NoteTarget?>(null) }
@@ -124,9 +112,6 @@ fun NoteTargetsScreen(onBack: () -> Unit, onOpenNotes: () -> Unit) {
     }
     NoteTargetsContent(
         targets = current.noteTargets,
-        calendars = calendars,
-        calendarId = current.eventCalendarId,
-        calendarAccess = calendarAccess,
         onAdd = { pickFile.launch(arrayOf("text/*", "application/octet-stream")) },
         onAddDaily = { pickFolder.launch(null) },
         onEdit = { target ->
@@ -137,8 +122,6 @@ fun NoteTargetsScreen(onBack: () -> Unit, onOpenNotes: () -> Unit) {
             runCatching { context.contentResolver.releasePersistableUriPermission(Uri.parse(target.uri), Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION) }
             scope.launch { repo.updateSettings { it.copy(noteTargets = it.noteTargets - target) } }
         },
-        onCalendar = { id -> scope.launch { repo.updateSettings { it.copy(eventCalendarId = id) } } },
-        onAllowCalendar = { askCalendar.launch(arrayOf(Manifest.permission.READ_CALENDAR, Manifest.permission.WRITE_CALENDAR)) },
         onOpenNotes = onOpenNotes,
         onBack = onBack,
     )
@@ -147,15 +130,10 @@ fun NoteTargetsScreen(onBack: () -> Unit, onOpenNotes: () -> Unit) {
 @Composable
 internal fun NoteTargetsContent(
     targets: List<NoteTarget>,
-    calendars: List<Pair<Long, String>>,
-    calendarId: Long?,
-    calendarAccess: Boolean,
     onAdd: () -> Unit,
     onAddDaily: () -> Unit,
     onEdit: (NoteTarget) -> Unit,
     onRemove: (NoteTarget) -> Unit,
-    onCalendar: (Long) -> Unit,
-    onAllowCalendar: () -> Unit,
     onOpenNotes: () -> Unit,
     onBack: () -> Unit,
 ) {
@@ -201,20 +179,6 @@ internal fun NoteTargetsContent(
                 )
             }
             Spacer(Modifier.height(16.dp))
-            SectionCard(title = "Events", subtitle = "“dentist next friday 9” offers to add it to your calendar") {
-                if (!calendarAccess) {
-                    OptionRow(Icons.Default.DateRange, "Allow calendar access", description = "Asked anyway the first time you add one", onClick = onAllowCalendar) { Chevron() }
-                } else if (calendars.isEmpty()) {
-                    Text("No calendar on this phone can take new events.", style = MaterialTheme.typography.bodyMedium, color = c.textMuted)
-                } else {
-                    val chosen = calendarId?.takeIf { id -> calendars.any { it.first == id } } ?: calendars.first().first
-                    calendars.forEach { (id, name) ->
-                        OptionRow(Icons.Default.DateRange, name, onClick = { onCalendar(id) }) {
-                            if (id == chosen) Text("in use", style = MaterialTheme.typography.labelMedium, color = c.accentText)
-                        }
-                    }
-                }
-            }
             Spacer(Modifier.height(32.dp))
         }
     }

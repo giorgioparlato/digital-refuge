@@ -28,7 +28,7 @@ class ModulesTest {
         assertEquals(Module.entries.size, Modules.of(lock, Screen.LOCK).size)
         assertEquals(Modules.shown(style, Screen.HOME), Modules.shown(lock, Screen.HOME))
         assertTrue(Modules.onAnywhere(lock, Module.CLOCK))
-        val noClock = Modules.switchedEverywhere(lock, Module.CLOCK, false)
+        val noClock = Modules.switched(lock, Screen.HOME, Module.CLOCK, false)
         assertFalse(Modules.onAnywhere(noClock, Module.CLOCK))
     }
 

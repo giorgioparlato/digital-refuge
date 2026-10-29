@@ -1,25 +1,8 @@
 package app.bedtime.ui.home
 
-import app.bedtime.data.PhoneUsage
-import app.bedtime.ui.components.rememberUseDays
-import app.bedtime.ui.habits.rememberHabits
-import app.bedtime.ui.habits.HabitsWidget
-import app.bedtime.data.Habits
 import app.bedtime.data.Habit
-import app.bedtime.data.Module
-import app.bedtime.data.Modules
 import app.bedtime.data.HourRule
 import app.bedtime.data.DayHours
-import app.bedtime.ui.components.rememberTodayHours
-import app.bedtime.ui.components.HourDetailDialog
-import app.bedtime.ui.components.HourDots
-import app.bedtime.data.HourlyUse
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.combinedClickable
-import app.bedtime.data.credit
-import app.bedtime.ui.quotes.rememberQuoteActions
-import app.bedtime.ui.quotes.QuoteMenu
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -31,7 +14,6 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -42,7 +24,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
@@ -62,7 +43,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -83,13 +63,10 @@ import app.bedtime.ui.components.CardRadius
 import app.bedtime.apps.AppCatalog
 import app.bedtime.data.AppSettings
 import app.bedtime.data.AppFont
-import app.bedtime.ui.theme.AppFonts
-import androidx.compose.ui.text.font.FontStyle
 import app.bedtime.data.Changelog
 import app.bedtime.data.ChangelogEntry
 import app.bedtime.data.DndMode
 import app.bedtime.data.Quote
-import app.bedtime.data.Quotes
 import app.bedtime.data.Repository
 import app.bedtime.data.RuntimeState
 import app.bedtime.data.Schedule
@@ -98,8 +75,6 @@ import app.bedtime.engine.ActiveState
 import app.bedtime.engine.Engine
 import app.bedtime.engine.Occurrence
 import app.bedtime.engine.ScheduleEvaluator
-import app.bedtime.engine.Stats
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import app.bedtime.service.DndController
 import app.bedtime.service.GreyscaleController
 import app.bedtime.service.SystemApps
@@ -131,28 +106,10 @@ internal data class HomeUiState(
     val greyscaleOk: Boolean,
     val dndOk: Boolean,
     val now: Long,
-    /** Today's quote, or null when the home style hides it. */
-    val quote: Quote? = null,
     /** A block started moments ago, which can still be taken back as if it never began. */
     val undoBlockId: String? = null,
     /** What changed in the update you haven't seen yet. */
     val whatsNew: ChangelogEntry? = null,
-    /** The quote's font, the one chosen for the minimal home. */
-    val quoteFont: AppFont = AppFont.INTER,
-    /** Whether the quote is one of your favourites, for its long-press menu. */
-    val quoteFavourite: Boolean = false,
-    /** How many notes you have, for the line at the foot. */
-    val noteCount: Int = 0,
-    /** Today's seconds by hour; null until there's something to count by. */
-    val hourly: DayHours? = null,
-    val hourRule: HourRule = HourRule(5),
-    val hourCalmColor: Long? = null,
-    val hourDistractedColor: Long? = null,
-    /** Seconds in your distracting apps over the last seven days; null until there are distracting apps to count. */
-    val weekDistracting: Long? = null,
-    /** Your habits and their marks; the section shows once there's at least one. */
-    val habits: List<Habit> = emptyList(),
-    val habitMarks: Map<String, Map<Long, Int>> = emptyMap(),
 )
 
 /** The home tab: what's running now, how the week has gone, and the blocks you can start. */
@@ -163,10 +120,7 @@ fun HomeScreen(
     onTemplate: (String) -> Unit,
     onSetup: () -> Unit,
     onUnlock: (String) -> Unit,
-    onStats: () -> Unit = {},
     onNotes: () -> Unit = {},
-    onDistraction: () -> Unit = {},
-    onHabits: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val repo = remember { Repository.get(context) }
@@ -223,9 +177,7 @@ fun HomeScreen(
         onUnlock = onUnlock,
         onUndo = { id -> scope.launch { repo.undoStart(id) } },
         onDismissWhatsNew = { scope.launch { repo.updateSettings { it.copy(lastSeenVersion = installed) } } },
-        onStats = onStats,
         onNotes = onNotes,
-        onDistraction = onDistraction,
         isInstalled = { AppCatalog.isLaunchable(context, it) },
         onToggle = { schedule, on -> scope.launch { repo.upsert(schedule.copy(enabled = on)) } },
         onDelete = { schedule -> scope.launch { repo.delete(schedule.id) } },
@@ -244,14 +196,7 @@ internal fun HomeContent(
     onUnlock: (String) -> Unit,
     onUndo: (String) -> Unit = {},
     onDismissWhatsNew: () -> Unit = {},
-    onStats: () -> Unit = {},
     onNotes: () -> Unit = {},
-    onDistraction: () -> Unit = {},
-    onHabits: () -> Unit = {},
-    onTickHabit: (Habit) -> Unit = {},
-    onQuoteFavourite: () -> Unit = {},
-    onQuoteHide: () -> Unit = {},
-    onQuoteAnother: () -> Unit = {},
     isInstalled: (String) -> Boolean = { false },
     onToggle: (Schedule, Boolean) -> Unit = { _, _ -> },
     onDelete: (Schedule) -> Unit = {},
