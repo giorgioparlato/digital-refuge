@@ -1,5 +1,9 @@
 package app.bedtime.ui.homestyle
 
+import app.bedtime.ui.components.TimeTile
+
+import app.bedtime.ui.edit.TimePickerDialog
+
 import app.bedtime.ui.settings.CircleScreen
 
 import app.bedtime.data.Circles
@@ -546,12 +550,20 @@ internal fun HomeStyleContent(
                         ObsidianToggle(style.rainAlert, { onChange(style.copy(rainAlert = it)) })
                     }
                     if (style.rainAlert) {
-                        SizeLabel("At", Modifier.padding(top = 12.dp, bottom = 8.dp))
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            RainAlert.TIMES.forEach { minute ->
-                                QuickChip(formatMinuteOfDay(context, minute), style.rainAlertMinute == minute) { onChange(style.copy(rainAlertMinute = minute)) }
-                            }
+                        var pickingTime by rememberSaveable { mutableStateOf(false) }
+                        if (pickingTime) {
+                            TimePickerDialog(
+                                "Rain alert at",
+                                style.rainAlertMinute,
+                                onDismiss = { pickingTime = false },
+                                onConfirm = { minute ->
+                                    onChange(style.copy(rainAlertMinute = minute))
+                                    pickingTime = false
+                                },
+                            )
                         }
+                        // Any time of day; it covers the hours left from then.
+                        TimeTile("At", formatMinuteOfDay(context, style.rainAlertMinute), Modifier.fillMaxWidth().padding(top = 12.dp)) { pickingTime = true }
                         SizeLabel("When the chance is at least", Modifier.padding(top = 16.dp, bottom = 8.dp))
                         SegmentedChoice(
                             options = RainAlert.THRESHOLDS.map { "$it%" },

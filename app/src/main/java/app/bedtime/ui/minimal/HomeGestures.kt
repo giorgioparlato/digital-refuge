@@ -1,5 +1,9 @@
 package app.bedtime.ui.minimal
 
+import androidx.compose.foundation.verticalScroll
+
+import androidx.compose.foundation.rememberScrollState
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -84,6 +88,8 @@ internal fun QuickNoteContent(style: HomeStyle, targets: List<NoteTarget>, onSav
             .clip(RoundedCornerShape(24.dp))
             .background(p.background)
             .border(1.dp, p.faint.copy(alpha = 0.25f), RoundedCornerShape(24.dp))
+            // However long the words, where they go stays within reach.
+            .verticalScroll(rememberScrollState())
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
@@ -96,7 +102,8 @@ internal fun QuickNoteContent(style: HomeStyle, targets: List<NoteTarget>, onSav
             keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 96.dp)
+                // A long paste scrolls inside the box rather than pushing the choices off the screen.
+                .heightIn(min = 96.dp, max = 240.dp)
                 .focusRequester(focusRequester)
                 .border(1.dp, p.faint.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
                 .padding(12.dp),

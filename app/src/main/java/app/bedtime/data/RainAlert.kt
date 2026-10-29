@@ -16,9 +16,6 @@ object RainAlert {
 
     val THRESHOLDS = listOf(10, 20, 30, 50)
 
-    /** The times it can come, as minutes of the day. */
-    val TIMES = listOf(6 * 60, 6 * 60 + 30, 7 * 60, 7 * 60 + 30, 8 * 60, 9 * 60)
-
     /**
      * Today's outlook at [now], or null when there's nothing to say: no fresh forecast, or no chance
      * of rain up to [threshold]. With hours, the chance is the highest of the hours left today, and

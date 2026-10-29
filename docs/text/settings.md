@@ -245,6 +245,7 @@ One file serves the look, widgets, gestures and notifications pages, for both sc
 - From Breezy Weather's forecast (see the weather widget's options to set it up)
 - A rain alert
 - In the morning, when rain is likely today: how likely, and when
+- Rain alert at
 - At
 - When the chance is at least
 - Circles

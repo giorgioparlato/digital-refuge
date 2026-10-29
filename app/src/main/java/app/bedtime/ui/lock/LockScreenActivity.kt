@@ -153,15 +153,13 @@ class LockScreenActivity : ComponentActivity() {
         // Android's lock-screen privacy may have changed since the notifications were last read.
         LockNotifications.refresh()
         ContextCompat.registerReceiver(this, unlocked, IntentFilter(Intent.ACTION_USER_PRESENT), ContextCompat.RECEIVER_NOT_EXPORTED)
-        // Android 14 says when the phone unlocks; a slow look stays as a safety net. Before that, only looking works.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            getSystemService(KeyguardManager::class.java).addKeyguardLockedStateListener(mainExecutor, keyguardListener)
-        }
+        // Looked at often while it's in front: Android's own "unlocked" listener needs a permission only
+        // system apps get (asking for it anyway crashed the app), and USER_PRESENT alone isn't reliable.
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.RESUMED) {
                 while (true) {
                     leaveIfUnlocked()
-                    delay(if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) 2_000 else 300)
+                    delay(300)
                 }
             }
         }
@@ -204,12 +202,7 @@ class LockScreenActivity : ComponentActivity() {
         if (!getSystemService(KeyguardManager::class.java).isKeyguardLocked) finish()
     }
 
-    private val keyguardListener = KeyguardManager.KeyguardLockedStateListener { locked -> if (!locked) leaveIfUnlocked() }
-
     override fun onDestroy() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            getSystemService(KeyguardManager::class.java).removeKeyguardLockedStateListener(keyguardListener)
-        }
         unregisterReceiver(unlocked)
         super.onDestroy()
     }
