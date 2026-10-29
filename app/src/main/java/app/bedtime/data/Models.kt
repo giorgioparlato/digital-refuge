@@ -608,6 +608,10 @@ data class AppSettings(
     val weeklyNote: Boolean = false,
     /** The week (its Monday, as an epoch day) last looked back on in that notification. */
     val weeklyNotedWeek: Long = 0L,
+    /** The week whose look back was put away in insights, before its time was up. */
+    val lookBackPutAway: Long = 0L,
+    /** An app's shortcut run after a quick note goes into one of your files, e.g. a sync app's "Sync now". */
+    val afterNoteShortcut: AppShortcut? = null,
 ) {
     /** Where quick notes and the search can add: the to-do note first, then your files. */
     val quickTargets: List<NoteTarget> get() = listOf(Notes.TODO) + noteTargets

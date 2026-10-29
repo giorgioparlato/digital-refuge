@@ -39,6 +39,13 @@ object LookBacks {
     /** From Sunday at this hour, the week ending today is the one looked back on. */
     const val SUNDAY_HOUR = 18
 
+    /**
+     * Whether the look back is fresh at [now]: from Sunday evening, when the week is done, until the
+     * end of Monday. The rest of the week it's put away, so it doesn't sit over everything else.
+     */
+    fun fresh(now: LocalDateTime): Boolean =
+        (now.dayOfWeek == DayOfWeek.SUNDAY && now.hour >= SUNDAY_HOUR) || now.dayOfWeek == DayOfWeek.MONDAY
+
     /** The Monday of the week to look back on at [now]: this week from Sunday evening, otherwise last week. */
     fun weekStart(now: LocalDateTime): LocalDate {
         val monday = now.toLocalDate().with(DayOfWeek.MONDAY)

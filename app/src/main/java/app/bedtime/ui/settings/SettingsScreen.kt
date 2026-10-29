@@ -457,7 +457,7 @@ private fun settingsEntries(
                 Icons.Default.Notifications,
                 "Notifications",
                 if (style.lockNotifications) "From the apps and people you choose" else "Off",
-                "notifications messages reply replies people contacts circles groups lock screen rain alert weather",
+                "notifications messages reply replies people contacts circles groups lock screen rain alert weather your week sunday note",
                 go(Routes.STYLE_NOTIFICATIONS),
             ),
         )

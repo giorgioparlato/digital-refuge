@@ -1,5 +1,7 @@
 package app.bedtime.data
 
+import kotlinx.coroutines.flow.first
+
 import android.content.Context
 import android.net.Uri
 import android.provider.DocumentsContract
@@ -176,6 +178,10 @@ object Notes {
             if (target.daily) appendDaily(context, Uri.parse(target.uri), target.dailyFormat, at.toLocalDate(), line) else append(context, Uri.parse(target.uri), line)
         }
         if (!added) repo.addNote(words)
+        // Then, say, a sync app's "Sync now", so the file reaches your other devices. Not from the lock
+        // screen: another app's shortcut would only wait behind it, or ask to unlock.
+        val locked = context.getSystemService(android.app.KeyguardManager::class.java)?.isKeyguardLocked == true
+        if (added && !locked) repo.settings.first().afterNoteShortcut?.let { Shortcuts.start(context, it) }
         val name = target.name.lowercase()
         return if (added) "added to $name" else "couldn't reach $name, so it's in refuge notes"
     }

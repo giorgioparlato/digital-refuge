@@ -1,5 +1,25 @@
 package app.bedtime.ui.notes
 
+import androidx.compose.foundation.layout.fillMaxWidth
+
+import kotlinx.coroutines.withContext
+
+import kotlinx.coroutines.Dispatchers
+
+import androidx.compose.material.icons.filled.Refresh
+
+import androidx.compose.foundation.clickable
+
+import androidx.compose.foundation.layout.heightIn
+
+import androidx.compose.foundation.lazy.LazyColumn
+
+import androidx.compose.runtime.produceState
+
+import app.bedtime.data.Shortcuts
+
+import app.bedtime.data.AppShortcut
+
 import java.time.LocalDateTime
 import androidx.compose.ui.text.font.FontFamily
 import app.bedtime.ui.components.VerbatimText
@@ -90,6 +110,10 @@ fun NoteTargetsScreen(onBack: () -> Unit, onOpenNotes: () -> Unit) {
         original = null
         draft = NoteTarget("today", uri.toString(), daily = true)
     }
+    var choosingShortcut by remember { mutableStateOf(false) }
+    val shortcuts by produceState<List<AppShortcut>?>(null, choosingShortcut) {
+        if (choosingShortcut) value = withContext(Dispatchers.IO) { Shortcuts.all(context) }
+    }
     val current = settings ?: return
     draft?.let { target ->
         TargetDialog(
@@ -124,6 +148,58 @@ fun NoteTargetsScreen(onBack: () -> Unit, onOpenNotes: () -> Unit) {
         },
         onOpenNotes = onOpenNotes,
         onBack = onBack,
+        afterNote = current.afterNoteShortcut,
+        onPickAfterNote = { choosingShortcut = true },
+    )
+    if (choosingShortcut) {
+        ShortcutDialog(
+            shortcuts = shortcuts,
+            chosen = current.afterNoteShortcut,
+            onPick = { picked ->
+                scope.launch { repo.updateSettings { it.copy(afterNoteShortcut = picked) } }
+                choosingShortcut = false
+            },
+            onDismiss = { choosingShortcut = false },
+        )
+    }
+}
+
+/** Every app's shortcuts to choose from, or none. Empty unless refuge is the home screen, and it says so. */
+@Composable
+private fun ShortcutDialog(shortcuts: List<AppShortcut>?, chosen: AppShortcut?, onPick: (AppShortcut?) -> Unit, onDismiss: () -> Unit) {
+    val c = Obsidian.colors
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = c.bgSecondary,
+        title = { Text("Then run") },
+        text = {
+            LazyColumn(Modifier.heightIn(max = 420.dp)) {
+                item { ShortcutLine("Nothing", chosen == null) { onPick(null) } }
+                when {
+                    shortcuts == null -> Unit
+                    shortcuts.isEmpty() -> item {
+                        Text("Android shares apps' shortcuts only with the home screen: make refuge yours (in setup) to choose one.", style = MaterialTheme.typography.bodyMedium, color = c.textMuted, modifier = Modifier.padding(top = 8.dp))
+                    }
+                    else -> items(shortcuts.size) { i ->
+                        val s = shortcuts[i]
+                        ShortcutLine("${s.app} · ${s.label}", chosen?.packageName == s.packageName && chosen.id == s.id) { onPick(s) }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = c.textMuted) } },
+    )
+}
+
+@Composable
+private fun ShortcutLine(label: String, chosen: Boolean, onClick: () -> Unit) {
+    val c = Obsidian.colors
+    app.bedtime.ui.components.VerbatimText(
+        label,
+        style = MaterialTheme.typography.bodyLarge,
+        color = if (chosen) c.accentText else c.textNormal,
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 12.dp),
     )
 }
 
@@ -136,6 +212,9 @@ internal fun NoteTargetsContent(
     onRemove: (NoteTarget) -> Unit,
     onOpenNotes: () -> Unit,
     onBack: () -> Unit,
+    /** An app's shortcut run after a note goes into a file, and the choice of it. */
+    afterNote: AppShortcut? = null,
+    onPickAfterNote: () -> Unit = {},
 ) {
     val c = Obsidian.colors
     Scaffold(containerColor = c.bgPrimary, topBar = { ObsidianTopBar("Quick notes", onBack = onBack, subtitle = "From the minimal home's search") }) { padding ->
@@ -179,6 +258,14 @@ internal fun NoteTargetsContent(
                 )
             }
             Spacer(Modifier.height(16.dp))
+            SectionCard(title = "Then", subtitle = "After a note goes into one of your files, from the home screen") {
+                OptionRow(
+                    Icons.Default.Refresh,
+                    "Run an app's shortcut",
+                    description = afterNote?.let { "${it.app} · ${it.label}" } ?: "Nothing. A sync app's “Sync now” sends the file on at once",
+                    onClick = onPickAfterNote,
+                ) { Chevron() }
+            }
             Spacer(Modifier.height(32.dp))
         }
     }

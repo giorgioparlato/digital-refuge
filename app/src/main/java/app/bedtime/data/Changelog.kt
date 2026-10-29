@@ -13,6 +13,16 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            69,
+            "0.9.23",
+            listOf(
+                "Apps' own shortcuts in the search: type \"sync\" for a sync app's \"Sync now\".",
+                "After a quick note goes into one of your files, refuge can run a shortcut too, under notes, e.g. a sync app's \"Sync now\".",
+                "A day can be set against your 7-day or 30-day average, this year's average day, or a day you pick.",
+                "Your week shows from Sunday evening to the end of Monday, with a × to put it away. Its Sunday note is under lock-screen notifications.",
+            ),
+        ),
+        ChangelogEntry(
             68,
             "0.9.22",
             listOf(

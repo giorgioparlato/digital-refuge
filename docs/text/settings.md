@@ -96,7 +96,7 @@ Home screen, lock screen, apps, shortcuts and about & backup are lists of rows f
 - lock screen always launcher
 - Notifications
 - From the apps and people you choose
-- notifications messages reply replies people contacts circles groups lock screen rain alert weather
+- notifications messages reply replies people contacts circles groups lock screen rain alert weather your week sunday note
 - App groups
 - Tick many apps at once when choosing
 - 1 group
@@ -241,6 +241,10 @@ One file serves the look, widgets, gestures and notifications pages, for both sc
 -  and … more
 - Quick replies
 - … ready to send with a tap. Typing your own works too
+- Your week
+- Time in refuge, how sessions held, the phone and habits, against the week before
+- A note on Sunday evening
+- Once the week is done; insights shows it too, until Monday ends
 - Rain today
 - From Breezy Weather's forecast (see the weather widget's options to set it up)
 - A rain alert
@@ -513,6 +517,7 @@ One file serves the look, widgets, gestures and notifications pages, for both sc
 - Contacts: call and message
 - Calculator: "12 * 3"
 - Start a block, by its name
+- Apps' shortcuts, by name: "sync now"
 - Alarms: "alarm 7:30"
 - Timers: "timer 10 min"
 - Settings pages
@@ -601,6 +606,10 @@ One file serves the look, widgets, gestures and notifications pages, for both sc
 
 - that file can't be written to from here
 - that folder can't be written to from here
+- Then run
+- Nothing
+- Android shares apps' shortcuts only with the home screen: make refuge yours (in setup) to choose one.
+- Cancel
 - Quick notes
 - From the minimal home's search
 - Type in the minimal home's search, then pick where it goes: the app's own notes, one of your files, or your calendar if it says when.
@@ -617,6 +626,10 @@ One file serves the look, widgets, gestures and notifications pages, for both sc
 - Add today's daily note
 - Pick your daily-notes folder; today's note is made if it isn't there
 - For Obsidian, pick the note inside your vault. Vaults in Documents work; one kept in Obsidian's own app folder can't be reached by other apps.
+- Then
+- After a note goes into one of your files, from the home screen
+- Run an app's shortcut
+- Nothing. A sync app's “Sync now” sends the file on at once
 - How it reads in the search: “add to …”
 - e.g. today
 - e.g. scratchpad
@@ -630,7 +643,6 @@ One file serves the look, widgets, gestures and notifications pages, for both sc
 - Watch Paterson
 - Add
 - Save
-- Cancel
 
 ## cover messages
 

@@ -27,8 +27,6 @@ insights
 <sub>[LookBackCard.kt](../../app/src/main/java/app/bedtime/ui/stats/LookBackCard.kt)</sub>
 
 - Your week
-- A note on Sunday evening
-- This, as a notification, once the week is done
 - In refuge
 - Sessions
 - … of … kept
@@ -94,8 +92,9 @@ insights
 - the one after
 - on the phone
 - against {against}
--  · nothing to compare with yet
+-  · nothing to compare with
 - , so far
+- a day you pick…
 - By the hour
 - By the day
 - All of it, and the part in distracting apps
@@ -120,6 +119,11 @@ insights
 - your usual week
 - your usual month
 - a year back
+- your 7-day average
+- your 30-day average
+- your average day this year
+- Compare
+- Cancel
 - ↑ {change}%
 - the same
 

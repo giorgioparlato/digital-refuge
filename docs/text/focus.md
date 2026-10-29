@@ -444,6 +444,7 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 - alarm set
 - timer started
 - no clock app took it
+- couldn't run that
 - Hold an app in the full list to add it here.
 - no calendar app opened it
 - more for …

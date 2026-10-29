@@ -262,6 +262,8 @@ fun HomeStyleScreen(
         },
         notificationAccess = notificationAccess,
         onPickNotificationApps = { pickingNotificationApps = true },
+        weeklyNote = current.weeklyNote,
+        onWeeklyNote = { on -> scope.launch { repo.updateSettings { it.copy(weeklyNote = on) } } },
         circles = circles,
         onEditCircle = { id -> editingCircle = id },
         onAddCircle = {
@@ -317,6 +319,9 @@ internal fun HomeStyleContent(
     notificationAccess: Boolean = false,
     /** Opens the choice of apps whose notifications the lock screen shows. */
     onPickNotificationApps: () -> Unit = {},
+    /** The Sunday note looking back on the week, and its switch. */
+    weeklyNote: Boolean = false,
+    onWeeklyNote: (Boolean) -> Unit = {},
     /** Your circles of people and group chats: each opens to change; another can be added, up to [Circles.MAX]. */
     circles: List<Circle> = emptyList(),
     onEditCircle: (String) -> Unit = {},
@@ -543,6 +548,11 @@ internal fun HomeStyleContent(
                             description = "${style.quickReplies.size} ready to send with a tap. Typing your own works too",
                             onClick = { editingReplies = true },
                         ) { Chevron() }
+                    }
+                }
+                SectionCard(title = "Your week", subtitle = "Time in refuge, how sessions held, the phone and habits, against the week before") {
+                    OptionRow(Icons.Default.Notifications, "A note on Sunday evening", description = "Once the week is done; insights shows it too, until Monday ends") {
+                        ObsidianToggle(weeklyNote, onWeeklyNote)
                     }
                 }
                 SectionCard(title = "Rain today", subtitle = "From Breezy Weather's forecast (see the weather widget's options to set it up)") {

@@ -124,6 +124,7 @@ fun SearchSettingsScreen(onBack: () -> Unit) {
             SearchOrder.CONTACTS to "Contacts: call and message",
             SearchOrder.CALCULATOR to "Calculator: \"12 * 3\"",
             SearchOrder.BLOCKS to "Start a block, by its name",
+            SearchOrder.SHORTCUTS to "Apps' shortcuts, by name: \"sync now\"",
             SearchOrder.ALARM to "Alarms: \"alarm 7:30\"",
             SearchOrder.TIMER to "Timers: \"timer 10 min\"",
             SearchOrder.SETTINGS to "Settings pages",

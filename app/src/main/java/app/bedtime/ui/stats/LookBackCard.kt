@@ -4,15 +4,19 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.bedtime.engine.LookBack
-import app.bedtime.ui.components.ObsidianToggle
-import app.bedtime.ui.components.OptionRow
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Icon
+import androidx.compose.ui.draw.clip
 import app.bedtime.ui.components.SectionCard
 import app.bedtime.ui.components.Text
 import app.bedtime.ui.components.VerbatimText
@@ -21,21 +25,26 @@ import app.bedtime.ui.theme.Obsidian
 import java.time.format.DateTimeFormatter
 
 /**
- * The week looked back on, in a few plain lines against the week before, and the choice of a note
- * about it on Sunday evenings.
+ * The week looked back on, in a few plain lines against the week before. It shows only while it's
+ * fresh, and the × puts it away until the next one.
  */
 @Composable
-internal fun LookBackCard(week: LookBack, appLabel: (String) -> String, note: Boolean, onNote: (Boolean) -> Unit) {
+internal fun LookBackCard(week: LookBack, appLabel: (String) -> String, onPutAway: () -> Unit) {
     val c = Obsidian.colors
-    SectionCard(title = "Your week", subtitle = weekLabel(week)) {
-        LookBackLines.of(week, appLabel).forEach { (what, how) ->
-            Row(Modifier.fillMaxWidth().padding(vertical = 5.dp), verticalAlignment = Alignment.Top) {
-                Text(what, style = MaterialTheme.typography.bodyMedium, color = c.textMuted, modifier = Modifier.weight(1f).padding(end = 12.dp))
-                VerbatimText(how, style = MaterialTheme.typography.bodyMedium, color = c.textNormal)
+    Box {
+        SectionCard(title = "Your week", subtitle = weekLabel(week)) {
+            LookBackLines.of(week, appLabel).forEach { (what, how) ->
+                Row(Modifier.fillMaxWidth().padding(vertical = 5.dp), verticalAlignment = Alignment.Top) {
+                    Text(what, style = MaterialTheme.typography.bodyMedium, color = c.textMuted, modifier = Modifier.weight(1f).padding(end = 12.dp))
+                    VerbatimText(how, style = MaterialTheme.typography.bodyMedium, color = c.textNormal)
+                }
             }
         }
-        OptionRow(Icons.Default.Notifications, "A note on Sunday evening", description = "This, as a notification, once the week is done") {
-            ObsidianToggle(note, onNote)
+        Box(
+            Modifier.align(Alignment.TopEnd).padding(6.dp).size(40.dp).clip(CircleShape).clickable(onClickLabel = "put it away until next week", onClick = onPutAway),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(Icons.Default.Clear, contentDescription = "put it away", tint = c.textFaint, modifier = Modifier.size(18.dp))
         }
     }
 }

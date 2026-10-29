@@ -1,5 +1,25 @@
 package app.bedtime.ui.stats
 
+import androidx.compose.runtime.remember
+
+import app.bedtime.ui.components.LowercaseStrings
+
+import androidx.compose.material3.rememberDatePickerState
+
+import androidx.compose.material3.TextButton
+
+import androidx.compose.material3.SelectableDates
+
+import androidx.compose.material3.ExperimentalMaterial3Api
+
+import androidx.compose.material3.DatePickerDialog
+
+import androidx.compose.material3.DatePicker
+
+import androidx.compose.material3.DropdownMenuItem
+
+import androidx.compose.material3.DropdownMenu
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -79,7 +99,8 @@ internal fun PhoneStats(
     months: Map<String, UsageMonth> = emptyMap(),
     /** Apps under one of your limits, marked in the list. */
     limitedApps: Set<String> = emptySet(),
-    versus: Versus = Versus.LAST,
+    /** What you last chose to compare with; a week or a month falls back to the one before for a day's choices. */
+    chosenVersus: Versus = Versus.LAST,
     onVersus: (Versus) -> Unit = {},
     initialPeriod: UsePeriod = UsePeriod.DAY,
 ) {
@@ -111,18 +132,42 @@ internal fun PhoneStats(
         Step(Icons.AutoMirrored.Filled.KeyboardArrowRight, "the one after", enabled = start < currentStart) { startDay = UsePeriods.shift(period, start, 1).toEpochDay() }
     }
 
+    // A day can be set against averages and a day you pick; a week or a month, against the one before when one of those is chosen.
+    var pickedDay by rememberSaveable { mutableStateOf<Long?>(null) }
+    var picking by rememberSaveable { mutableStateOf(false) }
+    var choosing by remember { mutableStateOf(false) }
+    val picked = pickedDay?.let(LocalDate::ofEpochDay)
+    // A day picked lives only as long as the page; coming back, it's the day before again.
+    val versus = Versus.on(period, chosenVersus).let { if (it == Versus.PICKED && picked == null) Versus.LAST else it }
+    if (picking) {
+        DayPickerDialog(
+            initial = picked ?: start.minusDays(7),
+            latest = today.minusDays(1),
+            onPick = { day ->
+                pickedDay = day.toEpochDay()
+                picking = false
+                onVersus(Versus.PICKED)
+            },
+            onDismiss = { picking = false },
+        )
+    }
+
     val dates = UsePeriods.dates(period, start)
     val inProgress = today in dates
     val elapsed = if (inProgress) dates.indexOf(today) + 1 else dates.size
     val totals = UsePeriods.totals(use.days, dates, slotsByHour = period == UsePeriod.DAY)
-    val fromDays = UsePeriods.compare(use.days, period, start, versus, today, nowHour)
+    val fromDays = when {
+        versus == Versus.YEAR_AVG -> UsePeriods.yearAverage(months, start.year)
+        versus == Versus.PICKED && picked == null -> null
+        else -> UsePeriods.compare(use.days, period, start, versus, today, nowHour, picked)
+    }
     // Months beyond the days kept are compared from their totals; the outlines and apps still come from days, where kept.
     val comparison: UseComparison? = if (period == UsePeriod.MONTH && (fromDays == null || versus != Versus.LAST)) {
         UsePeriods.compareMonths(months, start, versus, elapsed)?.copy(unlocks = fromDays?.unlocks, slots = fromDays?.slots.orEmpty(), apps = fromDays?.apps.orEmpty()) ?: fromDays
     } else {
         fromDays
     }
-    val against = versusWords(period, versus, start == currentStart, start)
+    val against = versusWords(period, versus, start == currentStart, start, picked)
 
     SectionCard {
         Row(Modifier.fillMaxWidth()) {
@@ -131,13 +176,30 @@ internal fun PhoneStats(
             Figure(totals.unlocks?.toString() ?: "–", "unlocks", totals.unlocks?.toLong(), comparison?.unlocks?.toLong(), Modifier.weight(1f))
         }
         Spacer(Modifier.height(12.dp))
-        val next = Versus.entries[(versus.ordinal + 1) % Versus.entries.size]
-        Text(
-            "against $against" + (if (comparison == null) " · nothing to compare with yet" else "") + (if (inProgress) ", so far" else "") + "  ▾",
-            style = MaterialTheme.typography.labelMedium,
-            color = c.accentText,
-            modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClickLabel = "compare with ${versusWords(period, next, start == currentStart, start)}") { onVersus(next) }.padding(vertical = 6.dp),
-        )
+        Box {
+            Text(
+                "against $against" + (if (comparison == null) " · nothing to compare with" else "") + (if (inProgress) ", so far" else "") + "  ▾",
+                style = MaterialTheme.typography.labelMedium,
+                color = c.accentText,
+                modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClickLabel = "choose what to compare with") { choosing = true }.padding(vertical = 6.dp),
+            )
+            DropdownMenu(expanded = choosing, onDismissRequest = { choosing = false }, containerColor = c.bgSecondary) {
+                Versus.options(period).forEach { option ->
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                if (option == Versus.PICKED) "a day you pick…" else versusWords(period, option, start == currentStart, start, null),
+                                color = if (option == versus) c.accentText else c.textNormal,
+                            )
+                        },
+                        onClick = {
+                            choosing = false
+                            if (option == Versus.PICKED) picking = true else onVersus(option)
+                        },
+                    )
+                }
+            }
+        }
     }
 
     SectionCard(
@@ -239,7 +301,7 @@ internal fun periodLabel(period: UsePeriod, start: LocalDate, today: LocalDate):
 }
 
 /** What the period is set against, in words: "yesterday", "your usual wednesday", "the month before", "a year back". */
-internal fun versusWords(period: UsePeriod, versus: Versus, current: Boolean, start: LocalDate): String = when (versus) {
+internal fun versusWords(period: UsePeriod, versus: Versus, current: Boolean, start: LocalDate, picked: LocalDate? = null): String = when (versus) {
     Versus.LAST -> when (period) {
         UsePeriod.DAY -> if (current) "yesterday" else "the day before"
         UsePeriod.WEEK -> if (current) "last week" else "the week before"
@@ -251,6 +313,36 @@ internal fun versusWords(period: UsePeriod, versus: Versus, current: Boolean, st
         UsePeriod.MONTH -> "your usual month"
     }
     Versus.YEAR -> "a year back"
+    Versus.WEEK_AVG -> "your 7-day average"
+    Versus.MONTH_AVG -> "your 30-day average"
+    Versus.YEAR_AVG -> "your average day this year"
+    Versus.PICKED -> picked?.format(DateTimeFormatter.ofPattern("EEEE d MMMM", Locale.getDefault())) ?: "a day you pick"
+}
+
+/** Android's own calendar, for a day to compare with: any day up to [latest]. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DayPickerDialog(initial: LocalDate, latest: LocalDate, onPick: (LocalDate) -> Unit, onDismiss: () -> Unit) {
+    val c = Obsidian.colors
+    val utc = java.time.ZoneOffset.UTC
+    val last = latest.atStartOfDay(utc).toInstant().toEpochMilli()
+    val state = rememberDatePickerState(
+        initialSelectedDateMillis = initial.coerceAtMost(latest).atStartOfDay(utc).toInstant().toEpochMilli(),
+        selectableDates = object : SelectableDates {
+            override fun isSelectableDate(utcTimeMillis: Long) = utcTimeMillis <= last
+        },
+    )
+    LowercaseStrings {
+        DatePickerDialog(
+            onDismissRequest = onDismiss,
+            confirmButton = {
+                TextButton(onClick = { state.selectedDateMillis?.let { onPick(java.time.Instant.ofEpochMilli(it).atZone(utc).toLocalDate()) } }) {
+                    Text("Compare", color = c.accentText)
+                }
+            },
+            dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = c.textMuted) } },
+        ) { DatePicker(state = state) }
+    }
 }
 
 @Composable

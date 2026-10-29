@@ -118,6 +118,9 @@ sealed interface DrawerResult {
     data class VaultNote(val file: IndexedFile) : DrawerResult
     /** A file in the folder you chose, found by its name. */
     data class File(val file: IndexedFile) : DrawerResult
+
+    /** One of an app's own shortcuts, run straight from here. */
+    data class Shortcut(val shortcut: app.bedtime.data.AppShortcut) : DrawerResult
 }
 
 object AppDrawer {
@@ -424,6 +427,7 @@ private fun ResultRow(
             is DrawerResult.Setting -> "settings: ${result.page.name.lowercase()}"
             is DrawerResult.VaultNote -> "${FolderIndex.title(result.file)} · obsidian"
             is DrawerResult.File -> result.file.name
+            is DrawerResult.Shortcut -> "${result.shortcut.label.lowercase()} · ${result.shortcut.app.lowercase()}"
         }
         val icon: ImageVector? = when (result) {
             is DrawerResult.App -> null
@@ -446,6 +450,8 @@ private fun ResultRow(
         Box(Modifier.size((30 * names).dp), contentAlignment = Alignment.Center) {
             if (result is DrawerResult.App) {
                 AppIcon(result.app.packageName, result.app.label, (30 * names).dp)
+            } else if (result is DrawerResult.Shortcut) {
+                AppIcon(result.shortcut.packageName, result.shortcut.app, (24 * names).dp)
             } else if (icon != null) {
                 Icon(icon, contentDescription = null, tint = p.accent, modifier = Modifier.size(24.dp))
             }

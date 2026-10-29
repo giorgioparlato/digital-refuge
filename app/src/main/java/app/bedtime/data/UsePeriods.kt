@@ -8,7 +8,24 @@ import java.time.temporal.TemporalAdjusters
 enum class UsePeriod { DAY, WEEK, MONTH }
 
 /** What a period is compared with: the one before, the usual (the four before), or a year back. */
-enum class Versus { LAST, USUAL, YEAR }
+enum class Versus {
+    LAST, USUAL, YEAR,
+
+    /** A day against your average day: over the 7 days before, the 30 before, or this year so far; or one day you pick. */
+    WEEK_AVG, MONTH_AVG, YEAR_AVG, PICKED,
+    ;
+
+    /** Only a day can be set against these. */
+    val dayOnly: Boolean get() = this in setOf(WEEK_AVG, MONTH_AVG, YEAR_AVG, PICKED)
+
+    companion object {
+        /** What a [period] can be set against, in the order they're offered. */
+        fun options(period: UsePeriod): List<Versus> = if (period == UsePeriod.DAY) entries else listOf(LAST, USUAL, YEAR)
+
+        /** [chosen] where [period] can have it; the period before otherwise. */
+        fun on(period: UsePeriod, chosen: Versus): Versus = if (chosen in options(period)) chosen else LAST
+    }
+}
 
 /**
  * A stretch of phone use added up: time on the phone and in distracting apps, unlocks if every day knew
@@ -55,10 +72,15 @@ object UsePeriods {
      * The periods to compare the one beginning [start] with, as their first days. A day's usual is the
      * same weekday in the four weeks before; a year back keeps the weekday for days and weeks.
      */
-    fun against(period: UsePeriod, start: LocalDate, versus: Versus): List<LocalDate> = when (versus) {
+    fun against(period: UsePeriod, start: LocalDate, versus: Versus, picked: LocalDate? = null): List<LocalDate> = when (versus) {
         Versus.LAST -> listOf(shift(period, start, -1))
         Versus.USUAL -> (1L..4L).map { if (period == UsePeriod.DAY) start.minusWeeks(it) else shift(period, start, -it) }
         Versus.YEAR -> listOf(if (period == UsePeriod.MONTH) start.minusYears(1) else start.minusWeeks(52))
+        Versus.WEEK_AVG -> (1L..7L).map { start.minusDays(it) }
+        Versus.MONTH_AVG -> (1L..30L).map { start.minusDays(it) }
+        Versus.PICKED -> listOfNotNull(picked)
+        // From the months' totals instead: see [yearAverage].
+        Versus.YEAR_AVG -> emptyList()
     }
 
     /**
@@ -97,13 +119,13 @@ object UsePeriods {
      * others; then averaged over those with any use. The outlines are the compared periods whole. Null
      * with nothing to compare against.
      */
-    fun compare(days: Map<Long, UseDay>, period: UsePeriod, start: LocalDate, versus: Versus, today: LocalDate, nowHour: Int): UseComparison? {
+    fun compare(days: Map<Long, UseDay>, period: UsePeriod, start: LocalDate, versus: Versus, today: LocalDate, nowHour: Int, picked: LocalDate? = null): UseComparison? {
         val current = dates(period, start)
         val inProgress = today in current
         val elapsed = if (inProgress) current.indexOf(today) + 1 else current.size
         val untilHour = if (period == UsePeriod.DAY && inProgress) nowHour else null
         val byHour = period == UsePeriod.DAY
-        val compared = against(period, start, versus).map { other ->
+        val compared = against(period, start, versus, picked).map { other ->
             val all = dates(period, other)
             totals(days, all.take(elapsed), byHour, untilHour) to totals(days, all, byHour)
         }.filter { (_, whole) -> whole.usedDays > 0 }
@@ -126,6 +148,17 @@ object UsePeriods {
         if (found.isEmpty()) return null
         val n = found.size
         return UseComparison(found.sumOf { it.total / it.days * elapsed } / n, found.sumOf { it.distracting / it.days * elapsed } / n, null, emptyList(), emptyMap())
+    }
+
+    /**
+     * Your average day in [year], from its months' totals: totals only, as the months keep no hours,
+     * apps or unlocks. Null before any day of it was counted.
+     */
+    fun yearAverage(months: Map<String, UsageMonth>, year: Int): UseComparison? {
+        val found = months.values.filter { it.month.startsWith("%04d-".format(year)) && it.days > 0 }
+        val days = found.sumOf { it.days }
+        if (days == 0) return null
+        return UseComparison(found.sumOf { it.total } / days, found.sumOf { it.distracting } / days, null, emptyList(), emptyMap())
     }
 
     /** The change from [then] to [now] in percent, or null with nothing then. */

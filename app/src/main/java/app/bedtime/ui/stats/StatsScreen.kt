@@ -112,13 +112,15 @@ fun StatsScreen(onBack: (() -> Unit)?, initialSection: Int = 0) {
     val labels by produceState(emptyMap<String, String>(), packages) {
         value = withContext(Dispatchers.IO) { packages.associateWith { AppCatalog.label(context, it) } }
     }
-    val lookBack = settings?.let { s ->
-        LookBacks.of(LookBacks.weekStart(LocalDateTime.now()), history, use.days, s.distractingApps, habits, habitMarks, zone)
+    // Only while it's fresh, Sunday evening to Monday night, and until it's put away.
+    val now = LocalDateTime.now()
+    val weekStart = LookBacks.weekStart(now)
+    val lookBack = settings?.takeIf { s -> LookBacks.fresh(now) && s.lookBackPutAway != weekStart.toEpochDay() }?.let { s ->
+        LookBacks.of(weekStart, history, use.days, s.distractingApps, habits, habitMarks, zone)
     }
     StatsContent(
         lookBack = lookBack,
-        weeklyNote = settings?.weeklyNote == true,
-        onWeeklyNote = { on -> scope.launch { repo.updateSettings { it.copy(weeklyNote = on) } } },
+        onPutAwayLookBack = { scope.launch { repo.updateSettings { it.copy(lookBackPutAway = weekStart.toEpochDay()) } } },
         history = history,
         limits = settings?.limits.orEmpty(),
         usage = usage,
@@ -174,10 +176,9 @@ internal fun StatsContent(
     onAddHabit: (() -> Unit)? = null,
     /** Phone use, sessions or habits first. */
     initialSection: Int = 0,
-    /** The week looked back on, above the rest, and the Sunday note about it. */
+    /** The week looked back on, above the rest while it's fresh; [onPutAwayLookBack] puts it away until the next. */
     lookBack: LookBack? = null,
-    weeklyNote: Boolean = false,
-    onWeeklyNote: (Boolean) -> Unit = {},
+    onPutAwayLookBack: () -> Unit = {},
 ) {
     val c = Obsidian.colors
     val week = Stats.week(history, now)
@@ -204,7 +205,7 @@ internal fun StatsContent(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Spacer(Modifier.height(2.dp))
-            lookBack?.let { LookBackCard(it, { pkg -> labels[pkg] ?: pkg }, weeklyNote, onWeeklyNote) }
+            lookBack?.let { LookBackCard(it, { pkg -> labels[pkg] ?: pkg }, onPutAway = onPutAwayLookBack) }
             if (sections.size > 1) {
                 SegmentedChoice(options = sections, selected = sections.indexOf(shown), onSelect = { shown = sections[it] })
             }
@@ -218,7 +219,7 @@ internal fun StatsContent(
                 PhoneStats(
                     use, java.time.LocalDate.ofEpochDay(today), nowHour, labels, onAllowAccess, months,
                     limitedApps = limits.flatMap { it.rules.apps }.toSet(),
-                    versus = versus,
+                    chosenVersus = versus,
                     onVersus = onVersus,
                 )
                 Spacer(Modifier.height(16.dp))

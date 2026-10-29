@@ -1,5 +1,7 @@
 package app.bedtime.ui.minimal
 
+import app.bedtime.data.Shortcuts
+
 import app.bedtime.ui.components.rememberNow
 import androidx.compose.material.icons.filled.Edit
 import app.bedtime.ui.minimal.WidgetSheet
@@ -398,6 +400,10 @@ private fun MinimalHomeScreen(
     val (contacts, contactMessage) = contactsFound
     val chatApps = remember(settings.contactApps) { ChatApp.chosen(settings.contactApps, ContactSearch.chatApps(context)) }
     val openablePackages = openable.map { it.packageName }.toSet()
+    // Apps' own shortcuts, read once the search opens.
+    val appShortcuts by produceState(emptyList<app.bedtime.data.AppShortcut>(), drawer) {
+        if (drawer) value = withContext(Dispatchers.IO) { Shortcuts.all(context) }
+    }
     // An alarm or timer, settings pages (when Settings could be opened now), and notes and files by name.
     val found = buildMap {
         Calculator.evaluate(words)?.let { put(SearchOrder.CALCULATOR, listOf(DrawerResult.Calculation(Calculator.format(it)))) }
@@ -411,6 +417,8 @@ private fun MinimalHomeScreen(
         if (settingsApp == null || settingsApp in openablePackages) put(SearchOrder.SETTINGS, SettingsPages.match(words).map { DrawerResult.Setting(it) })
         if (FolderIndex.OBSIDIAN in openablePackages) put(SearchOrder.OBSIDIAN, FolderIndex.match(vault.second, words, name = FolderIndex::title).map { DrawerResult.VaultNote(it) })
         put(SearchOrder.FILES, FolderIndex.match(folderFiles, words).map { DrawerResult.File(it) })
+        // Only those of apps open to you now: a session's shortcuts are no way round it.
+        put(SearchOrder.SHORTCUTS, Shortcuts.match(appShortcuts.filter { it.packageName in openablePackages }, words).map { DrawerResult.Shortcut(it) })
     }
     val open: (Intent) -> Unit = { intent ->
         runCatching { context.startActivity(intent) }
@@ -480,6 +488,7 @@ private fun MinimalHomeScreen(
             is DrawerResult.Setting -> open(SettingsPages.intent(result.page))
             is DrawerResult.VaultNote -> open(FolderIndex.obsidianIntent(vault.first, result.file))
             is DrawerResult.File -> open(FolderIndex.openIntent(result.file))
+            is DrawerResult.Shortcut -> if (Shortcuts.start(context, result.shortcut)) closeDrawer() else Toast.makeText(context, "couldn't run that", Toast.LENGTH_SHORT).show()
         }
     }
     val homeNote = noteSlots(style, Screen.HOME, widgetNote, onWrite = { n, text -> scope.launch { repo.editNote(n.id, text) } }, onHold = { holding = Module.NOTE })

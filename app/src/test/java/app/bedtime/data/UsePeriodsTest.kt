@@ -79,4 +79,32 @@ class UsePeriodsTest {
         assertEquals(-25, UsePeriods.change(75, 100))
         assertNull(UsePeriods.change(75, 0))
     }
+
+    @Test
+    fun aDayAgainstItsAverages() {
+        assertEquals((1L..7L).map { wed.minusDays(it) }, UsePeriods.against(UsePeriod.DAY, wed, Versus.WEEK_AVG))
+        assertEquals(30, UsePeriods.against(UsePeriod.DAY, wed, Versus.MONTH_AVG).size)
+        assertEquals(listOf(wed.minusDays(40)), UsePeriods.against(UsePeriod.DAY, wed, Versus.PICKED, picked = wed.minusDays(40)))
+        // Two of the seven days had use: the average is theirs.
+        val days = mapOf(day(wed.minusDays(1), all = mapOf(9 to 3600L)), day(wed.minusDays(3), all = mapOf(9 to 1800L)))
+        assertEquals(2700L, UsePeriods.compare(days, UsePeriod.DAY, wed, Versus.WEEK_AVG, today = wed.plusDays(1), nowHour = 12)!!.total)
+    }
+
+    @Test
+    fun theYearsAverageDayFromItsMonths() {
+        val months = mapOf(
+            "2026-09" to UsageMonth("2026-09", total = 30 * 3600L, days = 30),
+            "2026-10" to UsageMonth("2026-10", total = 10 * 7200L, days = 10),
+            "2025-12" to UsageMonth("2025-12", total = 999_999L, days = 31),
+        )
+        assertEquals((30 * 3600L + 10 * 7200L) / 40, UsePeriods.yearAverage(months, 2026)!!.total)
+        assertNull(UsePeriods.yearAverage(months, 2024))
+    }
+
+    @Test
+    fun weeksAndMonthsKeepTheirThreeChoices() {
+        assertEquals(Versus.LAST, Versus.on(UsePeriod.WEEK, Versus.WEEK_AVG))
+        assertEquals(Versus.YEAR_AVG, Versus.on(UsePeriod.DAY, Versus.YEAR_AVG))
+        assertEquals(listOf(Versus.LAST, Versus.USUAL, Versus.YEAR), Versus.options(UsePeriod.MONTH))
+    }
 }
