@@ -1,5 +1,15 @@
 package app.bedtime.ui.minimal
 
+import androidx.compose.foundation.gestures.detectTapGestures
+
+import androidx.compose.ui.input.pointer.pointerInput
+
+import kotlinx.coroutines.launch
+
+import androidx.compose.runtime.rememberCoroutineScope
+
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -86,9 +96,16 @@ internal fun LookUpContent(
     val p = style.palette()
     var words by remember { mutableStateOf(initial) }
     var reading by remember { mutableStateOf<FoundNote?>(null) }
+    /** The words looked up before this one by tapping, to go back through. */
+    var back by remember { mutableStateOf(emptyList<String>()) }
     val focusRequester = remember { FocusRequester() }
     if (focus) LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
     val names by produceState<List<String>?>(null) { value = withContext(Dispatchers.IO) { StarDicts.names(context) } }
+    // With several dictionaries, which to look in: all, or one; remembered for next time.
+    val repo = remember { app.bedtime.data.Repository.get(context) }
+    val saved by repo.settings.collectAsStateWithLifecycle(initialValue = null)
+    val only = saved?.lookUpDictionary?.takeIf { it in names.orEmpty() }
+    val scope = rememberCoroutineScope()
     val refugeNotes by produceState(emptyList<app.bedtime.data.Note>(), notes) {
         if (notes) app.bedtime.data.Repository.get(context).notes.collect { value = it }
     }
@@ -97,9 +114,9 @@ internal fun LookUpContent(
         if (notes && vault != null) value = withContext(Dispatchers.IO) { app.bedtime.data.FolderIndex.list(context, android.net.Uri.parse(vault)) { it.endsWith(".md") } }
     }
     // As you type: the words it could be, the entry for the word itself, and notes that have it.
-    val found by produceState(emptyList<String>() to emptyList<Definition>(), words) {
+    val found by produceState(emptyList<String>() to emptyList<Definition>(), words, only) {
         val w = words.trim()
-        value = if (w.length < 2) emptyList<String>() to emptyList() else withContext(Dispatchers.IO) { StarDicts.suggest(context, w) to StarDicts.define(context, w) }
+        value = if (w.length < 2) emptyList<String>() to emptyList() else withContext(Dispatchers.IO) { StarDicts.suggest(context, w, only = only) to StarDicts.define(context, w, only) }
     }
     val (suggestions, definitions) = found
     val query = words.trim()
@@ -125,9 +142,30 @@ internal fun LookUpContent(
             return@Column
         }
         Text("Look up", style = MaterialTheme.typography.titleMedium, color = p.text)
+        names?.takeIf { it.size > 1 }?.let { all ->
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                (listOf<String?>(null) + all).forEach { name ->
+                    val on = name == only
+                    Text(
+                        name ?: "All",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = if (on) p.text else p.faint,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(50))
+                            .background(if (on) p.accent.copy(alpha = 0.22f) else p.background)
+                            .border(1.dp, if (on) p.accent else p.faint.copy(alpha = 0.4f), RoundedCornerShape(50))
+                            .clickable { scope.launch { repo.updateSettings { it.copy(lookUpDictionary = name) } } }
+                            .padding(horizontal = 10.dp, vertical = 5.dp),
+                    )
+                }
+            }
+        }
         BasicTextField(
             value = words,
-            onValueChange = { words = it },
+            onValueChange = {
+                words = it
+                back = emptyList()
+            },
             singleLine = true,
             textStyle = MaterialTheme.typography.bodyLarge.copy(color = p.text),
             cursorBrush = SolidColor(p.accent),
@@ -143,6 +181,17 @@ internal fun LookUpContent(
                 }
             },
         )
+        back.lastOrNull()?.let { previous ->
+            Text(
+                "‹ back to $previous",
+                style = MaterialTheme.typography.labelLarge,
+                color = p.accent,
+                modifier = Modifier.clip(RoundedCornerShape(50)).clickable {
+                    words = previous
+                    back = back.dropLast(1)
+                }.padding(vertical = 2.dp),
+            )
+        }
         Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             when {
                 names?.isEmpty() == true && !notes -> Text(
@@ -154,7 +203,13 @@ internal fun LookUpContent(
                     Column {
                         Text(d.dictionary, style = MaterialTheme.typography.labelMedium, color = p.accent)
                         VerbatimText(d.word, style = MaterialTheme.typography.titleMedium, color = p.text)
-                        VerbatimText(d.text, style = MaterialTheme.typography.bodyMedium, color = p.text)
+                        EntryText(d, style) { word ->
+                            // Another word from the entry: looked up in its place, with a way back.
+                            if (!word.equals(words.trim(), ignoreCase = true)) {
+                                back = back + words.trim()
+                                words = word
+                            }
+                        }
                     }
                 }
                 suggestions.isNotEmpty() -> FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -220,3 +275,37 @@ private fun NoteReader(note: FoundNote, style: HomeStyle, onBack: () -> Unit) {
 
 /** The most of a note read here: longer ones are cut, as this is for a look, not for writing. */
 private const val MAX_READ = 20_000
+
+/** An entry with its marks shown: labels in italic in the accent, bold as bold, examples in italic and fainter. */
+private fun entryText(d: Definition, p: app.bedtime.ui.homestyle.HomePalette): androidx.compose.ui.text.AnnotatedString =
+    androidx.compose.ui.text.buildAnnotatedString {
+        append(d.text)
+        d.marks.forEach { mark ->
+            val style = when (mark.kind) {
+                app.bedtime.data.MarkKind.LABEL -> androidx.compose.ui.text.SpanStyle(color = p.accent, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
+                app.bedtime.data.MarkKind.STRONG -> androidx.compose.ui.text.SpanStyle(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+                app.bedtime.data.MarkKind.EXAMPLE -> androidx.compose.ui.text.SpanStyle(color = p.faint, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
+                app.bedtime.data.MarkKind.LINK -> androidx.compose.ui.text.SpanStyle(color = p.accent, textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline)
+            }
+            if (mark.end <= d.text.length) addStyle(style, mark.start, mark.end)
+        }
+    }
+
+/** An entry, any word of which can be tapped to look it up: links underlined, the rest as they read. */
+@Composable
+private fun EntryText(d: Definition, style: HomeStyle, onWord: (String) -> Unit) {
+    val p = style.palette()
+    val text = remember(d, p) { entryText(d, p) }
+    var layout by remember { mutableStateOf<androidx.compose.ui.text.TextLayoutResult?>(null) }
+    androidx.compose.foundation.text.BasicText(
+        text,
+        style = MaterialTheme.typography.bodyMedium.copy(color = p.text),
+        onTextLayout = { layout = it },
+        modifier = Modifier.pointerInput(d) {
+            detectTapGestures { position ->
+                val at = layout?.getOffsetForPosition(position) ?: return@detectTapGestures
+                StarDicts.wordAt(d.text, d.marks, at)?.let(onWord)
+            }
+        },
+    )
+}

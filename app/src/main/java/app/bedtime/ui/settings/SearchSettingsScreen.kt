@@ -1,5 +1,11 @@
 package app.bedtime.ui.settings
 
+import androidx.compose.material.icons.filled.ArrowDropDown
+
+import androidx.compose.material3.DropdownMenuItem
+
+import androidx.compose.material3.DropdownMenu
+
 import android.widget.Toast
 
 import androidx.compose.material.icons.filled.Lock
@@ -127,7 +133,15 @@ fun SearchSettingsScreen(onBack: () -> Unit) {
     val targets = found ?: return
     val obsidian = remember { AppCatalog.isLaunchable(context, FolderIndex.OBSIDIAN) }
     val arranged = SearchOrder.arrange(SearchOrder.defaults(targets, current.quickTargets, obsidian), current.searchChoices)
-    val keywords = Keywords.effective(current.keywords, current.keywordsCustom, Keywords.defaults(arranged, current.quickTargets))
+    val keywords = Keywords.live(
+        Keywords.effective(current.keywords, current.keywordsCustom, Keywords.defaults(arranged, current.quickTargets)),
+        arranged.map { it.key }.toSet(),
+    ) { AppCatalog.isLaunchable(context, it) }
+    // Keywords left by what's gone (an uninstalled app's look-up, say) are cleared for good.
+    val stale = if (current.keywordsCustom) current.keywords.keys - keywords.keys else emptySet()
+    LaunchedEffect(stale) {
+        if (stale.isNotEmpty()) repo.updateSettings { it.copy(keywords = it.keywords - stale) }
+    }
     // Each in every search, only by its keyword, or off; saved before that was so, an off one with a keyword is keyword-only.
     val choices = SearchOrder.withModes(arranged, keywords, current.searchModesSet)
     val vaultName by produceState<String?>(null, current.obsidianVault) {
@@ -422,10 +436,26 @@ internal fun SearchSettingsContent(
                     } else if (calendars.isEmpty()) {
                         Text("No calendar on this phone can take new events.", style = MaterialTheme.typography.bodyMedium, color = c.textMuted)
                     } else {
+                        // One line for the calendar in use; the others in a menu under it.
                         val chosen = calendarId?.takeIf { id -> calendars.any { it.first == id } } ?: calendars.first().first
-                        calendars.forEach { (id, name) ->
-                            OptionRow(Icons.Default.DateRange, name, onClick = { onCalendar(id) }) {
-                                if (id == chosen) Text("in use", style = MaterialTheme.typography.labelMedium, color = c.accentText)
+                        var choosing by remember { mutableStateOf(false) }
+                        Box {
+                            OptionRow(
+                                Icons.Default.DateRange,
+                                calendars.first { it.first == chosen }.second,
+                                description = if (calendars.size > 1) "Tap to choose another" else null,
+                                onClick = if (calendars.size > 1) ({ choosing = true }) else null,
+                            ) { if (calendars.size > 1) Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = c.textFaint) }
+                            DropdownMenu(expanded = choosing, onDismissRequest = { choosing = false }, containerColor = c.bgSecondary) {
+                                calendars.forEach { (id, name) ->
+                                    DropdownMenuItem(
+                                        text = { Text(name, color = if (id == chosen) c.accentText else c.textNormal) },
+                                        onClick = {
+                                            choosing = false
+                                            onCalendar(id)
+                                        },
+                                    )
+                                }
                             }
                         }
                     }

@@ -8,8 +8,17 @@ import java.io.InputStream
 import java.io.RandomAccessFile
 import java.util.zip.GZIPInputStream
 
-/** One word's entry: the word as the dictionary has it, which dictionary, and what it says. */
-data class Definition(val word: String, val dictionary: String, val text: String)
+/** What a stretch of an entry is: a grammar label ("adj."), something bold (the headword), an example. */
+enum class MarkKind { LABEL, STRONG, EXAMPLE, LINK }
+
+/** A stretch of an entry's [Definition.text], from [start] to [end], and what it is; a link, to [target]. */
+data class Mark(val start: Int, val end: Int, val kind: MarkKind, val target: String? = null)
+
+/** An entry as text, with what in it is a label, bold or an example. */
+data class Styled(val text: String, val marks: List<Mark> = emptyList())
+
+/** One word's entry: the word as the dictionary has it, which dictionary, what it says, and how it's marked. */
+data class Definition(val word: String, val dictionary: String, val text: String, val marks: List<Mark> = emptyList())
 
 /**
  * A StarDict dictionary kept in the app's own storage: its name, its index (each word, where its entry
@@ -19,7 +28,7 @@ class StarDict(val name: String, private val words: List<String>, private val of
     /** The entry for [word], matched without regard to case; null if it isn't in here. */
     fun define(word: String): Definition? {
         val at = find(word.trim())
-        return if (at < 0) null else Definition(words[at], name, read(at))
+        return if (at < 0) null else read(at).let { Definition(words[at], name, it.text, it.marks) }
     }
 
     /** Up to [limit] words starting with [prefix], in the dictionary's order. */
@@ -51,13 +60,13 @@ class StarDict(val name: String, private val words: List<String>, private val of
         return lo
     }
 
-    private fun read(at: Int): String {
+    private fun read(at: Int): Styled {
         val bytes = ByteArray(sizes[at])
         RandomAccessFile(dict, "r").use { f ->
             f.seek(offsets[at])
             f.readFully(bytes)
         }
-        return StarDicts.plain(bytes, types)
+        return StarDicts.styled(bytes, types)
     }
 
     private fun compare(a: String, b: String): Int = StarDicts.compare(a, b)
@@ -79,12 +88,15 @@ object StarDicts {
         loaded ?: (root(context).listFiles().orEmpty().filter { it.isDirectory }.sortedBy { it.name }.mapNotNull { open(it) }).also { loaded = it }
     }
 
-    /** The first entry for [word] in each dictionary that has it. */
-    fun define(context: Context, word: String): List<Definition> = all(context).mapNotNull { it.define(word) }
+    /** The dictionaries to look in: the one named [only], or all of them when it's null (or gone). */
+    private fun chosen(context: Context, only: String?): List<StarDict> = all(context).let { all -> all.filter { it.name == only }.ifEmpty { all } }
 
-    /** Words starting with [prefix], from every dictionary, each once. */
-    fun suggest(context: Context, prefix: String, limit: Int = 8): List<String> =
-        all(context).flatMap { it.startingWith(prefix, limit) }.distinctBy { it.lowercase() }.take(limit)
+    /** The first entry for [word] in each dictionary that has it; with [only], in that one alone. */
+    fun define(context: Context, word: String, only: String? = null): List<Definition> = chosen(context, only).mapNotNull { it.define(word) }
+
+    /** Words starting with [prefix], from every dictionary (or [only] that one), each once. */
+    fun suggest(context: Context, prefix: String, limit: Int = 8, only: String? = null): List<String> =
+        chosen(context, only).flatMap { it.startingWith(prefix, limit) }.distinctBy { it.lowercase() }.take(limit)
 
     /**
      * StarDict's own order: the words' UTF-8 bytes, A–Z taken as a–z and nothing else changed. Its
@@ -126,9 +138,15 @@ object StarDicts {
             val base = ifo.removeSuffix(".ifo")
             val idx = listOf("$base.idx", "$base.idx.gz").firstOrNull { it in files } ?: return@forEach
             val dict = listOf("$base.dict", "$base.dict.dz").firstOrNull { it in files } ?: return@forEach
-            val into = File(root(context), base.replace(Regex("[^A-Za-z0-9._-]"), "_"))
-            into.mkdirs()
             val resolver = context.contentResolver
+            // Kept under its own title, not its file's name: two dictionaries both called "dict" must not
+            // overwrite each other, and adding the same one again replaces it.
+            val title = resolver.openInputStream(files.getValue(ifo))?.use { stream ->
+                stream.bufferedReader().readLines().firstOrNull { it.startsWith("bookname=") }?.substringAfter('=')?.trim()
+            }?.takeIf { it.isNotEmpty() } ?: base
+            val into = File(root(context), title.replace(Regex("[^A-Za-z0-9._-]"), "_"))
+            into.deleteRecursively()
+            into.mkdirs()
             try {
                 resolver.openInputStream(files.getValue(ifo))?.use { copy(it, File(into, "dict.ifo")) }
                 resolver.openInputStream(files.getValue(idx))?.use { copy(unpacked(it, idx), File(into, "dict.idx")) }
@@ -184,34 +202,172 @@ object StarDicts {
     }
 
     /**
-     * An entry as plain text. With [types] (one letter per field: m plain, h html, x xdxf, g pango…)
-     * the fields are the entry itself; without, each starts with its letter. Markup is taken out,
-     * line breaks kept.
+     * What a tap at [offset] in an entry looks up: a link's word, or else the word under it (letters,
+     * with an inner hyphen or apostrophe). Null between words.
      */
-    internal fun plain(bytes: ByteArray, types: String?): String {
-        val text = if (types != null) {
-            String(bytes, Charsets.UTF_8)
-        } else {
-            // Each field: a type letter, then its text ended by a zero; only text fields are read.
-            buildString {
-                var i = 0
-                while (i < bytes.size) {
-                    val type = bytes[i].toInt().toChar()
-                    var end = i + 1
-                    while (end < bytes.size && bytes[end] != 0.toByte()) end++
-                    if (type.isLowerCase()) append(String(bytes, i + 1, end - i - 1, Charsets.UTF_8)).append('\n')
+    fun wordAt(text: String, marks: List<Mark>, offset: Int): String? {
+        marks.firstOrNull { it.kind == MarkKind.LINK && offset in it.start until it.end }?.target?.let { return it }
+        fun part(c: Char) = c.isLetter() || c == '-' || c == '\''
+        if (offset !in text.indices || !text[offset].isLetter()) return null
+        var start = offset
+        while (start > 0 && part(text[start - 1])) start--
+        var end = offset + 1
+        while (end < text.length && part(text[end])) end++
+        return text.substring(start, end).trim('-', '\'').takeIf { it.length >= 2 }
+    }
+
+    /** An entry as plain text: [styled] without its marks. */
+    internal fun plain(bytes: ByteArray, types: String?): String = styled(bytes, types).text
+
+    /**
+     * An entry as text with its marks. With [types] (one letter per field: m plain, h html, x xdxf,
+     * g pango…) the fields are the entry itself, split by zeros, the last taking the rest; without,
+     * each starts with its letter. Markup is read for what it marks and taken out; plain text is kept
+     * as written. Then grammar labels are found in either: "<adj>", "(n.)", or "n" opening a line.
+     */
+    internal fun styled(bytes: ByteArray, types: String?): Styled {
+        val fields = fields(bytes, types)
+        val out = StringBuilder()
+        val marks = mutableListOf<Mark>()
+        fields.forEach { (type, text) ->
+            if (out.isNotEmpty()) newline(out)
+            if (type in "hxgk") markup(text, out, marks) else plainWithLinks(text.replace('\u0000', '\n'), out, marks)
+        }
+        // Trailing spaces off each line, runs of blank lines down to one, the ends trimmed; marks follow.
+        val raw = out.toString()
+        val keep = BooleanArray(raw.length) { true }
+        raw.lines().fold(0) { at, line ->
+            val trimmed = line.trimEnd().length
+            for (i in at + trimmed until at + line.length) keep[i] = false
+            at + line.length + 1
+        }
+        var newlines = 0
+        for (i in raw.indices) {
+            if (!keep[i]) continue
+            if (raw[i] == '\n') { newlines++; if (newlines > 2) keep[i] = false } else newlines = 0
+        }
+        val first = raw.indices.firstOrNull { keep[it] && !raw[it].isWhitespace() } ?: return Styled("")
+        val last = raw.indices.last { keep[it] && !raw[it].isWhitespace() }
+        val map = IntArray(raw.length + 1)
+        val text = StringBuilder()
+        for (i in raw.indices) {
+            map[i] = text.length
+            if (keep[i] && i in first..last) text.append(raw[i])
+        }
+        map[raw.length] = text.length
+        val moved = marks.map { Mark(map[it.start], map[it.end], it.kind, it.target) }.filter { it.end > it.start }
+        val final = text.toString()
+        return Styled(final, (moved + labels(final, moved)).sortedBy { it.start })
+    }
+
+    /** The entry's fields, each with its type letter: plain ('m') when nothing says otherwise. */
+    private fun fields(bytes: ByteArray, types: String?): List<Pair<Char, String>> {
+        if (types != null) {
+            val parts = String(bytes, Charsets.UTF_8).split('\u0000', limit = types.length.coerceAtLeast(1))
+            return parts.mapIndexed { i, text -> types.getOrElse(i) { types.last() } to text }
+        }
+        val out = mutableListOf<Pair<Char, String>>()
+        var i = 0
+        while (i < bytes.size) {
+            val type = bytes[i].toInt().toChar()
+            var end = i + 1
+            while (end < bytes.size && bytes[end] != 0.toByte()) end++
+            if (type.isLowerCase()) out += type to String(bytes, i + 1, end - i - 1, Charsets.UTF_8)
+            i = end + 1
+        }
+        return out
+    }
+
+    private fun newline(out: StringBuilder) {
+        if (!out.endsWith("\n\n")) out.append('\n')
+    }
+
+    /**
+     * Plain text into [out], its cross-references made links: "{shelter}", as WordNet and dictd write
+     * them, shows as the word alone. A bracketed label ("{f}", gender) is left as written.
+     */
+    private fun plainWithLinks(text: String, out: StringBuilder, marks: MutableList<Mark>) {
+        var at = 0
+        CROSS_REF.findAll(text).forEach { m ->
+            val word = m.groupValues[1].trim()
+            if (Regex("(?i)(?:$LABEL)\\.?").matches(word)) return@forEach
+            out.append(text, at, m.range.first)
+            val start = out.length
+            out.append(word)
+            marks += Mark(start, out.length, MarkKind.LINK, word)
+            at = m.range.last + 1
+        }
+        out.append(text, at, text.length)
+    }
+
+    private val CROSS_REF = Regex("""\{([^{}\n]{1,60})\}""")
+
+    /** What a tag marks: italics and abbreviations are labels, bold is bold, and xdxf's <ex> an example. */
+    private fun kindOf(tag: String): MarkKind? = when (tag) {
+        "i", "em", "abr", "abbr", "gr", "pos" -> MarkKind.LABEL
+        "b", "strong", "k" -> MarkKind.STRONG
+        "ex" -> MarkKind.EXAMPLE
+        "kref" -> MarkKind.LINK
+        else -> null
+    }
+
+    private val ENTITIES = mapOf("lt" to "<", "gt" to ">", "quot" to "\"", "apos" to "'", "#39" to "'", "nbsp" to " ", "amp" to "&")
+
+    /** [text]'s markup read into [out]: tags into [marks] and line breaks, entities into their letters. */
+    private fun markup(text: String, out: StringBuilder, marks: MutableList<Mark>) {
+        val open = ArrayDeque<Triple<String, MarkKind, Int>>()
+        var i = 0
+        while (i < text.length) {
+            val c = text[i]
+            when {
+                c == '<' && text.indexOf('>', i) > i -> {
+                    val end = text.indexOf('>', i)
+                    val tag = text.substring(i + 1, end).trim()
+                    val closing = tag.startsWith("/")
+                    val name = tag.removePrefix("/").takeWhile { it.isLetterOrDigit() }.lowercase()
+                    when {
+                        name == "br" || (closing && name in setOf("p", "div", "li", "tr", "def", "blockquote")) -> newline(out)
+                        kindOf(name) != null && !closing && !tag.endsWith("/") -> open.addLast(Triple(name, kindOf(name)!!, out.length))
+                        kindOf(name) != null && closing -> open.lastOrNull { it.first == name }?.let { started ->
+                            open.remove(started)
+                            if (out.length > started.third) {
+                                val target = if (started.second == MarkKind.LINK) out.substring(started.third).trim() else null
+                                marks += Mark(started.third, out.length, started.second, target)
+                            }
+                        }
+                    }
                     i = end + 1
+                }
+                c == '&' -> {
+                    val semi = text.indexOf(';', i)
+                    val entity = if (semi in (i + 2)..(i + 8)) text.substring(i + 1, semi) else null
+                    val letter = entity?.let { ENTITIES[it] ?: it.removePrefix("#").toIntOrNull()?.let { code -> String(Character.toChars(code)) } }
+                    if (letter != null) {
+                        out.append(letter)
+                        i = semi + 1
+                    } else {
+                        out.append(c)
+                        i++
+                    }
+                }
+                else -> {
+                    out.append(c)
+                    i++
                 }
             }
         }
-        return text
-            .replace(Regex("(?i)<br\\s*/?>|</p>|</div>|</li>"), "\n")
-            .replace(Regex("<[^>]+>"), "")
-            .replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"").replace("&#39;", "'").replace("&nbsp;", " ").replace("&amp;", "&")
-            .replace('\u0000', '\n')
-            .lines().joinToString("\n") { it.trimEnd() }
-            .replace(Regex("\n{3,}"), "\n\n")
-            .trim()
+    }
+
+    private const val LABEL =
+        "noun|verb|adjective|adverb|pronoun|preposition|conjunction|interjection|article|numeral|adj|adv|pron|prep|conj|interj|abbr|num|art|n|v|vt|vi|m|f|nt|pl|c"
+    private val BRACKETED = Regex("""[<(\[{](?:$LABEL)\.?(?:[,;/ ]+(?:$LABEL)\.?)*[>)\]}]""", RegexOption.IGNORE_CASE)
+    private val LINE_START = Regex("""(?m)^[ \t]*((?:$LABEL)\.?)(?=[ \t]|:|\d|$)""", RegexOption.IGNORE_CASE)
+
+    /** Grammar labels in [text] not already marked: a bracketed run of them, or one opening a line. */
+    private fun labels(text: String, marked: List<Mark>): List<Mark> {
+        val found = BRACKETED.findAll(text).map { Mark(it.range.first, it.range.last + 1, MarkKind.LABEL) } +
+            LINE_START.findAll(text).map { m -> m.groups[1]!!.range.let { Mark(it.first, it.last + 1, MarkKind.LABEL) } }
+        return found.filter { f -> marked.none { it.start < f.end && f.start < it.end } }.distinctBy { it.start }.toList()
     }
 
     /** The folder's files by name, as document links. */

@@ -563,8 +563,10 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 - A note
 - refuge notes{later}
 - Look up
+- All
 - A word, or a note
 - A word
+- ‹ back to {previous}
 - No dictionaries yet. Add one under settings › search › dictionaries.
 - Notes
 - Nothing in your dictionaries or notes.

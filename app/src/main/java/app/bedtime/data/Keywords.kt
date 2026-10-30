@@ -38,6 +38,14 @@ object Keywords {
     fun effective(saved: Map<String, String>, custom: Boolean, defaults: Map<String, String>): Map<String, String> =
         if (custom) saved else defaults
 
+    /**
+     * Only the keywords of what's still there: actions the search still offers ([choices]), and apps
+     * [installed] says are on the phone. An app's search action ("look up in …") leaves with the app,
+     * and its keyword shouldn't stay behind, taken and out of reach.
+     */
+    fun live(keywords: Map<String, String>, choices: Set<String>, installed: (String) -> Boolean): Map<String, String> =
+        keywords.filterKeys { key -> if (key.startsWith(APP)) installed(key.removePrefix(APP)) else key in choices }
+
     /** What already has [keyword], other than [key] itself; null when it's free (or empty). */
     fun takenBy(keywords: Map<String, String>, key: String, keyword: String): String? =
         if (keyword.isEmpty()) null else keywords.entries.firstOrNull { it.key != key && it.value == keyword }?.key

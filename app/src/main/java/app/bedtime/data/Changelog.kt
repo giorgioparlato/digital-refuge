@@ -13,6 +13,18 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            71,
+            "0.9.25",
+            listOf(
+                "Dictionary entries read better: parts of speech in italics, in the accent colour, examples fainter.",
+                "Tap any word in an entry to look it up; synonyms and other references are links. \"‹ back\" takes you back.",
+                "With more than one dictionary, choose which to look in, or all.",
+                "Dictionaries are kept by their own title, so two can't overwrite each other.",
+                "A keyword left behind by an uninstalled app's look-up or search is cleared, and free again.",
+                "The calendar the search adds to is chosen from a short menu.",
+            ),
+        ),
+        ChangelogEntry(
             70,
             "0.9.24",
             listOf(

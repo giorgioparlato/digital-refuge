@@ -555,7 +555,7 @@ One file serves the look, widgets, gestures and notifications pages, for both sc
 - Allow calendar access
 - Asked anyway the first time you add one
 - No calendar on this phone can take new events.
-- in use
+- Tap to choose another
 - Look up
 - A word's meaning from your dictionaries, here and on the lock screen without unlocking: put “look up” on a gesture. Your notes are found there too
 - Read on this phone

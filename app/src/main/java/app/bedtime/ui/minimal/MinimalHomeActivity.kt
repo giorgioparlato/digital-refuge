@@ -381,7 +381,11 @@ private fun MinimalHomeScreen(
         }
     }
     val searchChoices = SearchOrder.arrange(SearchOrder.defaults(searchTargets, settings.quickTargets, obsidian), settings.searchChoices)
-    val allKeywords = Keywords.effective(settings.keywords, settings.keywordsCustom, Keywords.defaults(searchChoices, settings.quickTargets))
+    // Only what's still there, once the search's apps are known (until then, nothing is taken out).
+    val liveKeywords: (Map<String, String>) -> Map<String, String> = { all ->
+        if (searchTargets.isEmpty()) all else Keywords.live(all, searchChoices.map { it.key }.toSet()) { AppCatalog.isLaunchable(context, it) }
+    }
+    val allKeywords = liveKeywords(Keywords.effective(settings.keywords, settings.keywordsCustom, Keywords.defaults(searchChoices, settings.quickTargets)))
     // What the search may use: each action in every search, only by its keyword, or off; kinds switched off whole.
     val usable = SearchOrder.usable(SearchOrder.withModes(searchChoices, allKeywords, settings.searchModesSet), settings.searchOff)
     // A keyword first ("m cafe") sends the words after it straight to one place, if that place isn't off.
@@ -391,7 +395,7 @@ private fun MinimalHomeScreen(
     // A single word's meaning, read off the main thread: the first look loads the dictionaries.
     val meanings by produceState(emptyList<app.bedtime.data.Definition>(), words, drawer) {
         val word = words.trim()
-        value = if (drawer && word.length >= 3 && ' ' !in word) withContext(Dispatchers.IO) { app.bedtime.data.StarDicts.define(context, word) } else emptyList()
+        value = if (drawer && word.length >= 3 && ' ' !in word) withContext(Dispatchers.IO) { app.bedtime.data.StarDicts.define(context, word, settings.lookUpDictionary) } else emptyList()
     }
     // Contacts are looked up as you type, only when you've switched them on in the search or used their keyword.
     val contactsOn = usable.any { it.key == SearchOrder.CONTACTS && !it.keywordOnly } || keyword?.key == SearchOrder.CONTACTS
@@ -738,7 +742,7 @@ private fun MinimalHomeScreen(
                 setKeyword = { typed ->
                     val key = Keywords.appKey(app.packageName)
                     val clean = Keywords.clean(typed)
-                    val now = Keywords.effective(settings.keywords, settings.keywordsCustom, Keywords.defaults(searchChoices, settings.quickTargets))
+                    val now = liveKeywords(Keywords.effective(settings.keywords, settings.keywordsCustom, Keywords.defaults(searchChoices, settings.quickTargets)))
                     val taken = Keywords.takenBy(now, key, clean)
                     if (taken == null) {
                         save { s -> s.copy(keywords = if (clean.isEmpty()) now - key else now + (key to clean), keywordsCustom = true) }
