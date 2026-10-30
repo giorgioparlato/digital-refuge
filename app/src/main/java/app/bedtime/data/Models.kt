@@ -510,6 +510,7 @@ object HomeActions {
     const val NOTES = "notes"
     const val WEEK = "week"
     const val BLOCKS = "blocks"
+    const val LOOKUP = "lookup"
     const val CAMERA = GESTURE_CAMERA
 
     /** In the order they're offered, with how each reads. */
@@ -521,6 +522,7 @@ object HomeActions {
         NOTES to "Your notes",
         WEEK to "The week ahead",
         BLOCKS to "Your blocks, to start one",
+        LOOKUP to "Look up a word or a note",
         CAMERA to "Camera",
     )
 
@@ -610,11 +612,20 @@ data class AppSettings(
     val weeklyNotedWeek: Long = 0L,
     /** The week whose look back was put away in insights, before its time was up. */
     val lookBackPutAway: Long = 0L,
+    /** Whether looking up on the lock screen finds your notes too, to read there without unlocking. */
+    val lookUpNotes: Boolean = false,
     /** An app's shortcut run after a quick note goes into one of your files, e.g. a sync app's "Sync now". */
     val afterNoteShortcut: AppShortcut? = null,
 ) {
     /** Where quick notes and the search can add: the to-do note first, then your files. */
     val quickTargets: List<NoteTarget> get() = listOf(Notes.TODO) + noteTargets
+
+    /** These settings without keywords, names or favourites of apps [installed] says are gone. */
+    fun withoutGoneApps(installed: (String) -> Boolean): AppSettings = copy(
+        keywords = keywords.filterKeys { key -> !key.startsWith(Keywords.APP) || installed(key.removePrefix(Keywords.APP)) },
+        appNames = appNames.filterKeys(installed),
+        homeFavourites = homeFavourites.filter(installed),
+    )
 
     /** The folders the search finds files in, including the single one chosen before there could be several. */
     val fileFolders: List<String> get() = (listOfNotNull(filesFolder) + filesFolders).distinct()

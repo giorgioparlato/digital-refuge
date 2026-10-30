@@ -1,5 +1,7 @@
 package app.bedtime.ui.components
 
+import androidx.compose.foundation.layout.fillMaxHeight
+
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.verticalScroll
@@ -74,8 +76,17 @@ fun UseWidgetView(
                 Text(budget.note, style = small, color = if (budget.over) distracted else p.faint)
             }
             Spacer(Modifier.height(8.dp))
-            Box(Modifier.fillMaxWidth().height(5.dp).clip(RoundedCornerShape(50)).background(p.text.copy(alpha = 0.12f))) {
-                Box(Modifier.fillMaxWidth(budget.filled).height(5.dp).clip(RoundedCornerShape(50)).background(if (budget.over) distracted else calm))
+            if (budget.over) {
+                // Past the budget the bar stands for all of it: the budget, then how far beyond.
+                Row(Modifier.fillMaxWidth().height(5.dp)) {
+                    Box(Modifier.weight(budget.allowedPart).fillMaxHeight().clip(RoundedCornerShape(50)).background(calm))
+                    Spacer(Modifier.width(3.dp))
+                    Box(Modifier.weight(1f - budget.allowedPart).fillMaxHeight().clip(RoundedCornerShape(50)).background(distracted))
+                }
+            } else {
+                Box(Modifier.fillMaxWidth().height(5.dp).clip(RoundedCornerShape(50)).background(p.text.copy(alpha = 0.12f))) {
+                    Box(Modifier.fillMaxWidth(budget.filled).height(5.dp).clip(RoundedCornerShape(50)).background(calm))
+                }
             }
             unlocks?.let { Text(it, style = small, color = p.faint, modifier = Modifier.padding(top = 8.dp)) }
         }

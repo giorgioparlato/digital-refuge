@@ -515,12 +515,15 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 
 <sub>[WidgetSheet.kt](../../app/src/main/java/app/bedtime/ui/minimal/WidgetSheet.kt)</sub>
 
+- Other…
 - Custom
 - Show on the home screen
 - Show on the lock screen
 - Hide from this screen
 - This session has its own widgets; hiding takes it off its list. 
 - Bring it back from Widgets in digital refuge's settings.
+- Done
+- Cancel
 
 <sub>[ScreenSheet.kt](../../app/src/main/java/app/bedtime/ui/minimal/ScreenSheet.kt)</sub>
 
@@ -553,6 +556,20 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 <sub>[WeatherLine.kt](../../app/src/main/java/app/bedtime/ui/minimal/WeatherLine.kt)</sub>
 
 - (no text of its own)
+
+<sub>[LookUp.kt](../../app/src/main/java/app/bedtime/ui/minimal/LookUp.kt)</sub>
+
+-  · opens once unlocked
+- A note
+- refuge notes{later}
+- Look up
+- A word, or a note
+- A word
+- No dictionaries yet. Add one under settings › search › dictionaries.
+- Notes
+- Nothing in your dictionaries or notes.
+- Not in your dictionaries.
+- ‹ back
 
 <sub>[NoteWidgetView.kt](../../app/src/main/java/app/bedtime/ui/notes/NoteWidgetView.kt)</sub>
 

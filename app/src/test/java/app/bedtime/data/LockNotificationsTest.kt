@@ -159,4 +159,13 @@ class LockNotificationsTest {
         val rain = LockNotification("r", "app.bedtime", "digital refuge", "rain today", null, 0L, NoteDetail.FULL, ours = true)
         assertTrue(LockNotifications.wanted(rain, LockNotifications.Chosen(emptySet(), emptySet(), emptyList())))
     }
+
+    @Test
+    fun directionsAreTold() {
+        assertTrue(LockNotifications.isNavigation("navigation", ongoing = true, packageName = "any.nav.app"))
+        assertTrue(LockNotifications.isNavigation(null, ongoing = true, packageName = "com.google.android.apps.maps"))
+        // Maps' other notifications (a review asked for, a place saved) aren't directions.
+        assertFalse(LockNotifications.isNavigation(null, ongoing = false, packageName = "com.google.android.apps.maps"))
+        assertFalse(LockNotifications.isNavigation("msg", ongoing = true, packageName = "com.whatsapp"))
+    }
 }

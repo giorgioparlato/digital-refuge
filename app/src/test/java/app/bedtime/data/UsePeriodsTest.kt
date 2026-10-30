@@ -106,5 +106,7 @@ class UsePeriodsTest {
         assertEquals(Versus.LAST, Versus.on(UsePeriod.WEEK, Versus.WEEK_AVG))
         assertEquals(Versus.YEAR_AVG, Versus.on(UsePeriod.DAY, Versus.YEAR_AVG))
         assertEquals(listOf(Versus.LAST, Versus.USUAL, Versus.YEAR), Versus.options(UsePeriod.MONTH))
+        // A year back comes last, after the averages and a day you pick.
+        assertEquals(Versus.YEAR, Versus.options(UsePeriod.DAY).last())
     }
 }

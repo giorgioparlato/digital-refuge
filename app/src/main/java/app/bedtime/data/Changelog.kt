@@ -13,6 +13,19 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            70,
+            "0.9.24",
+            listOf(
+                "Look up: put it on a gesture to find a word in your dictionaries, right on the lock screen. Add StarDict dictionaries under settings › search; bilingual ones translate word by word.",
+                "Look up finds your notes too. On the lock screen only by their titles, opening once you unlock.",
+                "While a navigation app gives directions, refuge's lock screen steps aside for it.",
+                "Every settings page has a search at the top right; on the search page it searches that page, and finds apps to give a keyword.",
+                "A day's allowance can be any amount. Over it, the bar shows how far beyond.",
+                "Days compare with a year back last, after the averages.",
+                "An uninstalled app's keyword and name go with it, and voice messages no longer show in the player.",
+            ),
+        ),
+        ChangelogEntry(
             69,
             "0.9.23",
             listOf(

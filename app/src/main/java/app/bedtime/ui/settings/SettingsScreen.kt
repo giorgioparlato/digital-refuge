@@ -1,5 +1,11 @@
 package app.bedtime.ui.settings
 
+import androidx.compose.runtime.LaunchedEffect
+
+import androidx.compose.ui.focus.focusRequester
+
+import androidx.compose.ui.focus.FocusRequester
+
 import androidx.compose.material.icons.filled.DateRange
 
 import app.bedtime.data.FolderIndex
@@ -109,7 +115,7 @@ enum class SettingsPlace(val route: String, val title: String, val intro: String
 }
 
 @Composable
-fun SettingsScreen(place: SettingsPlace? = null, onBack: (() -> Unit)? = null, onOpen: (String) -> Unit) {
+fun SettingsScreen(place: SettingsPlace? = null, onBack: (() -> Unit)? = null, onOpen: (String) -> Unit, searching: Boolean = false) {
     val context = LocalContext.current
     val repo = remember { Repository.get(context) }
     val scope = rememberCoroutineScope()
@@ -204,6 +210,7 @@ fun SettingsScreen(place: SettingsPlace? = null, onBack: (() -> Unit)? = null, o
     val backupWritable = remember(resumes, settings.backupFolder) { settings.backupFolder?.let { AutoBackup.canWrite(context, it) } ?: false }
 
     SettingsContent(
+        searching = searching,
         place = place,
         settings = settings,
         blocks = schedules.filter { it.isBlock },
@@ -239,6 +246,8 @@ fun SettingsScreen(place: SettingsPlace? = null, onBack: (() -> Unit)? = null, o
 @Composable
 internal fun SettingsContent(
     place: SettingsPlace?,
+    /** Opened from a page's search icon: only the search, ready to type in. */
+    searching: Boolean = false,
     settings: AppSettings,
     blocks: List<Schedule>,
     setupStepsLeft: Int,
@@ -266,12 +275,18 @@ internal fun SettingsContent(
     val entries = settingsEntries(settings, setupStepsLeft, isDefaultHome, onOpen, onLockScreen, onLockAlways, onExport, onImport, backup)
     Scaffold(
         containerColor = c.bgPrimary,
-        topBar = { ObsidianTopBar(place?.title ?: "settings", onBack = onBack, subtitle = if (place == null) "set up once, then left alone" else null) },
+        topBar = {
+            ObsidianTopBar(
+                place?.title ?: if (searching) "Find a setting" else "settings",
+                onBack = onBack,
+                subtitle = if (place == null && !searching) "set up once, then left alone" else null,
+            )
+        },
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())) {
             Column(Modifier.padding(horizontal = PageGutter)) {
                 if (place == null) {
-                    SettingsSearch(query, { query = it })
+                    SettingsSearch(query, { query = it }, focus = searching)
                     if (query.isNotBlank()) {
                         // Anything on any page, by its name or a word in it.
                         val found = entries.filter { it.matches(query) }
@@ -280,7 +295,7 @@ internal fun SettingsContent(
                             Text("Nothing by that name.", style = MaterialTheme.typography.bodyMedium, color = c.textFaint, modifier = Modifier.padding(vertical = 12.dp))
                         }
                         Rows(found)
-                    } else {
+                    } else if (!searching) {
                         val first = entries.filter { it.place == null && !it.searchOnly }
                         Spacer(Modifier.height(4.dp))
                         // Not a preference but a health check: the one row that can be wrong, so it sits alone.
@@ -384,7 +399,7 @@ private fun settingsEntries(
                 Icons.Default.Search,
                 "Search",
                 "What it offers, keywords, contacts, folders, the calendar",
-                "search keyword keywords web maps contacts messaging whatsapp signal telegram alarm timer calculator settings pages files folder obsidian spotify blocks calendar events",
+                "search keyword keywords web maps contacts messaging whatsapp signal telegram alarm timer calculator settings pages files folder obsidian spotify blocks calendar events dictionary dictionaries look up definition meaning",
                 go(Routes.SEARCH),
             ),
         )
@@ -668,8 +683,10 @@ private class Entry(
 
 /** "Find a setting": filters every page's settings as you type. */
 @Composable
-private fun SettingsSearch(query: String, onQuery: (String) -> Unit) {
+private fun SettingsSearch(query: String, onQuery: (String) -> Unit, focus: Boolean = false) {
     val c = Obsidian.colors
+    val focusRequester = remember { FocusRequester() }
+    if (focus) LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
     Row(
         Modifier.fillMaxWidth().padding(top = 14.dp).clip(RoundedCornerShape(14.dp)).background(c.bgSecondary).padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -682,7 +699,7 @@ private fun SettingsSearch(query: String, onQuery: (String) -> Unit) {
             singleLine = true,
             textStyle = MaterialTheme.typography.bodyLarge.copy(color = c.textNormal),
             cursorBrush = SolidColor(c.accent),
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1f).focusRequester(focusRequester),
             decorationBox = { field ->
                 Box {
                     if (query.isEmpty()) Text("Find a setting: keyword, weather, colour…", style = MaterialTheme.typography.bodyLarge, color = c.textFaint)

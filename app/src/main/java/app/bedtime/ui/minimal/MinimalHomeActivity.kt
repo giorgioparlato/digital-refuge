@@ -240,6 +240,8 @@ private fun MinimalHomeScreen(
     var query by rememberSaveable { mutableStateOf("") }
     var notesOpen by rememberSaveable { mutableStateOf(false) }
     var quickNote by rememberSaveable { mutableStateOf(false) }
+    /** The word being looked up, or null with the dictionary closed. */
+    var lookingUp by rememberSaveable { mutableStateOf<String?>(null) }
     var hoursDetail by remember { mutableStateOf(false) }
     var appsDetail by remember { mutableStateOf(false) }
     val (todayHours, useToday) = rememberUseToday()
@@ -367,6 +369,7 @@ private fun MinimalHomeScreen(
             HomeActions.NOTIFICATIONS -> BlockingState.globalAction(context, AccessibilityService.GLOBAL_ACTION_NOTIFICATIONS)
             HomeActions.LOCK -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) BlockingState.globalAction(context, AccessibilityService.GLOBAL_ACTION_LOCK_SCREEN)
             HomeActions.NOTE -> quickNote = true
+            HomeActions.LOOKUP -> lookingUp = ""
             HomeActions.SEARCH -> drawer = true
             HomeActions.NOTES -> notesOpen = true
             HomeActions.WEEK -> scope.launch { week = loadCalendarWeek(context, LocalDateTime.now()) }
@@ -385,6 +388,11 @@ private fun MinimalHomeScreen(
     val keywords = allKeywords.filterKeys { key -> key.startsWith(Keywords.APP) || usable.any { it.key == key } }
     val keyword = Keywords.match(query, keywords)
     val words = keyword?.words ?: query.trim()
+    // A single word's meaning, read off the main thread: the first look loads the dictionaries.
+    val meanings by produceState(emptyList<app.bedtime.data.Definition>(), words, drawer) {
+        val word = words.trim()
+        value = if (drawer && word.length >= 3 && ' ' !in word) withContext(Dispatchers.IO) { app.bedtime.data.StarDicts.define(context, word) } else emptyList()
+    }
     // Contacts are looked up as you type, only when you've switched them on in the search or used their keyword.
     val contactsOn = usable.any { it.key == SearchOrder.CONTACTS && !it.keywordOnly } || keyword?.key == SearchOrder.CONTACTS
     // Words that start with someone's name and go on are a message for them: "@anna running late".
@@ -418,6 +426,7 @@ private fun MinimalHomeScreen(
         if (FolderIndex.OBSIDIAN in openablePackages) put(SearchOrder.OBSIDIAN, FolderIndex.match(vault.second, words, name = FolderIndex::title).map { DrawerResult.VaultNote(it) })
         put(SearchOrder.FILES, FolderIndex.match(folderFiles, words).map { DrawerResult.File(it) })
         // Only those of apps open to you now: a session's shortcuts are no way round it.
+        put(SearchOrder.DICTIONARY, meanings.take(1).map { DrawerResult.Meaning(it) })
         put(SearchOrder.SHORTCUTS, Shortcuts.match(appShortcuts.filter { it.packageName in openablePackages }, words).map { DrawerResult.Shortcut(it) })
     }
     val open: (Intent) -> Unit = { intent ->
@@ -488,6 +497,7 @@ private fun MinimalHomeScreen(
             is DrawerResult.Setting -> open(SettingsPages.intent(result.page))
             is DrawerResult.VaultNote -> open(FolderIndex.obsidianIntent(vault.first, result.file))
             is DrawerResult.File -> open(FolderIndex.openIntent(result.file))
+            is DrawerResult.Meaning -> lookingUp = result.definition.word
             is DrawerResult.Shortcut -> if (Shortcuts.start(context, result.shortcut)) closeDrawer() else Toast.makeText(context, "couldn't run that", Toast.LENGTH_SHORT).show()
         }
     }
@@ -685,6 +695,7 @@ private fun MinimalHomeScreen(
             blocksOpen = false
         }, onDismiss = { blocksOpen = false })
     }
+    lookingUp?.let { word -> LookUpDialog(style, onDismiss = { lookingUp = null }, initial = word, vault = settings.obsidianVault) }
     if (quickNote) QuickNoteDialog(style, settings.quickTargets, onSave = saveNote, onDismiss = { quickNote = false }, vault = settings.obsidianVault)
     if (appsDetail) {
         app.bedtime.ui.components.UseAppsDialog(useToday, style, onDismiss = { appsDetail = false }, onStats = { runCatching { context.startActivity(app.bedtime.MainActivity.intent(context, app.bedtime.Routes.STATS)) } })

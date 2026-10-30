@@ -67,6 +67,22 @@ data class NowPlaying(
  * The music or podcast playing now, from whichever app plays it, kept current; null when nothing does
  * or notification access isn't given (Android shares what's playing only with notification listeners).
  */
+/** Which media sessions the player shows. */
+object NowPlayings {
+    /** Messaging apps, whose sessions are voice messages: a message isn't music, and it's private. */
+    val MESSAGING = setOf(
+        "org.thoughtcrime.securesms", "com.whatsapp", "com.whatsapp.w4b", "org.telegram.messenger", "org.telegram.messenger.web",
+        "com.facebook.orca", "com.google.android.apps.messaging", "com.samsung.android.messaging", "im.vector.app", "com.discord",
+    )
+
+    /**
+     * Worth showing: not a messaging app's, and playing or paused part-way (a session merely left
+     * open, stopped or never started, isn't).
+     */
+    fun isPlayer(packageName: String, state: Int?): Boolean =
+        packageName !in MESSAGING && state in setOf(PlaybackState.STATE_PLAYING, PlaybackState.STATE_PAUSED, PlaybackState.STATE_BUFFERING)
+}
+
 @Composable
 fun rememberNowPlaying(): NowPlaying? {
     val context = LocalContext.current
@@ -99,6 +115,7 @@ fun rememberNowPlaying(): NowPlaying? {
         }
         fun pick() {
             val active = runCatching { sessions.getActiveSessions(component) }.getOrDefault(emptyList())
+                .filter { NowPlayings.isPlayer(it.packageName.orEmpty(), it.playbackState?.state) }
             val chosen = active.firstOrNull { it.playbackState?.state == PlaybackState.STATE_PLAYING } ?: active.firstOrNull()
             if (chosen?.sessionToken != controller?.sessionToken) {
                 controller?.unregisterCallback(callback)

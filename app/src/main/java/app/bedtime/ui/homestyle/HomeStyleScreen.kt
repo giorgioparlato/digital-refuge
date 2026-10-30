@@ -638,6 +638,7 @@ internal fun HomeStyleContent(
                                 null -> if (swipe == Swipe.DOUBLE_TAP) "Nothing" else "Just unlocks"
                                 GESTURE_CAMERA -> "Camera"
                                 HomeActions.NOTE -> "Write a quick note"
+                                HomeActions.LOOKUP -> "Look up a word or a note"
                                 HomeActions.NOTIFICATIONS -> "Show notifications"
                                 HomeActions.LOCK -> "Turn the screen off"
                                 else -> allApps.firstOrNull { it.packageName == target }?.label?.let { "Open $it" } ?: target
@@ -657,7 +658,7 @@ enum class StylePage(val title: String, val intro: String) {
     SHOWN("Widgets", "What your home screen and lock screen show, each its own, in the order you like. Pick the screen here first. Changes save as you go."),
     SWIPES(
         "Lock-screen gestures",
-        "Swipes start around the clock; a double tap is anywhere. Each can open an app once you've unlocked, or straight away the camera, a quick note or your notifications. The middle is for swiping notifications away; from the bottom, any swipe just unlocks.",
+        "Swipes start around the clock; a double tap is anywhere. Each can open an app once you've unlocked, or straight away the camera, a quick note, a look-up or your notifications. The middle is for swiping notifications away; from the bottom, any swipe just unlocks.",
     ),
     GESTURES(
         "Gestures",
@@ -776,6 +777,7 @@ private fun SwipeTargetDialog(swipe: Swipe, apps: List<AppEntry>, onDismiss: () 
             null to if (swipe == Swipe.DOUBLE_TAP) "Nothing" else "Nothing, it just unlocks",
             GESTURE_CAMERA to "Camera, without unlocking",
             HomeActions.NOTE to "Write a quick note, without unlocking",
+            HomeActions.LOOKUP to "Look up a word or a note, without unlocking",
             HomeActions.NOTIFICATIONS to "Show notifications",
             HomeActions.LOCK to "Turn the screen off",
         ),

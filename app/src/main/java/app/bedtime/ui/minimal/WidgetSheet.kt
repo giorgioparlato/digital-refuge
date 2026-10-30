@@ -1,5 +1,13 @@
 package app.bedtime.ui.minimal
 
+import androidx.compose.runtime.setValue
+
+import androidx.compose.runtime.getValue
+
+import androidx.compose.runtime.mutableStateOf
+
+import androidx.compose.runtime.remember
+
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -108,6 +116,18 @@ internal fun WidgetSheetContent(
                         Spacer(Modifier.padding(top = 8.dp))
                     }
                     is WidgetOption.Switch -> Ticked(option.label, option.on, p, enabled = option.enabled) { option.set(!option.on) }
+                    is WidgetOption.Minutes -> {
+                        Label(option.label, p)
+                        var other by remember { mutableStateOf(false) }
+                        FlowRow(Modifier.padding(horizontal = 22.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            option.presets.forEach { m -> Chip(app.bedtime.data.UseWords.compact(m), m == option.value, p) { option.set(m) } }
+                            // Your own amount shows as itself; "other…" asks for one.
+                            if (option.value !in option.presets) Chip(app.bedtime.data.UseWords.compact(option.value), true, p) { other = true }
+                            Chip("Other…", false, p) { other = true }
+                        }
+                        if (other) OtherMinutes(option) { other = false }
+                        Spacer(Modifier.padding(top = 8.dp))
+                    }
                     is WidgetOption.Colour -> {
                         Label(option.label, p)
                         val custom = option.selected != null && option.presets.none { it.second == option.selected }
@@ -185,4 +205,28 @@ private fun Action(icon: ImageVector, label: String, p: HomePalette, enabled: Bo
         Spacer(Modifier.width(16.dp))
         Text(label, style = MaterialTheme.typography.bodyLarge, color = if (enabled) p.text else p.faint)
     }
+}
+
+/** Any number of minutes for [option], typed or stepped, in a dialog of the app's own. */
+@Composable
+private fun OtherMinutes(option: WidgetOption.Minutes, onDone: () -> Unit) {
+    val c = app.bedtime.ui.theme.Obsidian.colors
+    var minutes by remember { mutableStateOf(option.value) }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDone,
+        containerColor = c.bgSecondary,
+        title = { Text(option.label) },
+        text = {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                app.bedtime.ui.components.NumberStepper(minutes, { minutes = it }, option.range, step = 5, presets = option.presets, title = option.label, format = app.bedtime.data.UseWords::compact)
+            }
+        },
+        confirmButton = {
+            androidx.compose.material3.TextButton(onClick = {
+                option.set(minutes)
+                onDone()
+            }) { Text("Done", color = c.accentText) }
+        },
+        dismissButton = { androidx.compose.material3.TextButton(onClick = onDone) { Text("Cancel", color = c.textMuted) } },
+    )
 }

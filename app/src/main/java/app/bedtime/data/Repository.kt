@@ -312,6 +312,13 @@ class Repository private constructor(context: Context) {
     suspend fun updateQuotes(transform: (QuotePrefs) -> QuotePrefs) = updateSettings { it.copy(quotes = transform(it.quotes)) }
 
     /** Fills the always-available list once with suggested apps that are installed. */
+    /**
+     * Forgets what you set for apps that are gone, those [installed] says no to: their keywords, your
+     * names for them, their place among favourites. What sessions and limits hold stays, so putting an
+     * app back can't be a way round them.
+     */
+    suspend fun forgetGoneApps(installed: (String) -> Boolean) = updateSettings { it.withoutGoneApps(installed) }
+
     suspend fun seedAlwaysAvailable(suggested: Set<String>) = updateSettings {
         if (it.alwaysAvailableSeeded) it else it.copy(alwaysAvailable = it.alwaysAvailable + suggested, alwaysAvailableSeeded = true)
     }

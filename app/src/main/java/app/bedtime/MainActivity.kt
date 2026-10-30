@@ -68,6 +68,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import app.bedtime.ui.components.BedtimeIcons
+import app.bedtime.ui.components.LocalSettingsSearch
+import androidx.compose.runtime.CompositionLocalProvider
 import app.bedtime.ui.components.Text
 import app.bedtime.ui.components.ProvideAppIcons
 import app.bedtime.ui.create.CreateScreen
@@ -136,6 +138,17 @@ object Routes {
     const val APP_LIST = "settings/applist"
     const val COVER_MESSAGES = "settings/messages"
     const val PROBLEMS = "settings/problems"
+    /** The search through every setting, from the icon at the top of each settings page. */
+    const val SETTINGS_SEARCH = "settings/search"
+
+    /** Settings' own pages: each has the search icon at the top right. */
+    val SETTINGS_PAGES by lazy {
+        setOf(
+            SETTINGS_HOME, SETTINGS_LOCK, SETTINGS_APPS, SETTINGS_SHORTCUTS, SETTINGS_ABOUT, APP_LIST, COVER_MESSAGES, PROBLEMS,
+            HOME_STYLE, HOME_STYLE_LOCK, STYLE_SHOWN, STYLE_SHOWN_LOCK, STYLE_SWIPES, STYLE_NOTIFICATIONS, STYLE_GESTURES,
+            SEARCH, DISTRACTION, GROUPS, ALWAYS_AVAILABLE, QUICK_NOTES, QUOTES, SETUP,
+        )
+    }
 
     fun unlock(scheduleId: String) = UNLOCK + scheduleId
 
@@ -211,6 +224,8 @@ private fun BedtimeNavigation(pendingRoute: String?, onRouteConsumed: () -> Unit
         }
         Repository.get(context).seedAlwaysAvailable(suggested)
         Repository.get(context).migrateHomeGreen()
+        // Anything left behind by apps removed while refuge wasn't watching.
+        withContext(Dispatchers.IO) { Repository.get(context).forgetGoneApps { AppCatalog.isLaunchable(context, it) } }
         SessionAlarms.schedule(context)
     }
 
@@ -273,7 +288,9 @@ private fun BedtimeNavigation(pendingRoute: String?, onRouteConsumed: () -> Unit
     }
 
     key(top) {
+        CompositionLocalProvider(LocalSettingsSearch provides if (top in Routes.SETTINGS_PAGES) ({ push(Routes.SETTINGS_SEARCH) }) else null) {
         when {
+            top == Routes.SETTINGS_SEARCH -> SettingsScreen(onBack = ::pop, onOpen = ::push, searching = true)
             top == Routes.CREATE -> CreateScreen(onBack = ::pop, onPick = { key -> push(Routes.TEMPLATE + key) })
             top == Routes.SETUP -> SetupScreen(onBack = ::pop, onAlwaysAvailable = { push(Routes.ALWAYS_AVAILABLE) })
             top == Routes.HOME_STYLE -> HomeStyleScreen(onBack = ::pop)
@@ -322,6 +339,7 @@ private fun BedtimeNavigation(pendingRoute: String?, onRouteConsumed: () -> Unit
             top.startsWith(Routes.NOTE) -> NotesScreen(onBack = ::pop, initialOpen = top.removePrefix(Routes.NOTE))
             top.startsWith(Routes.UNLOCK) -> UnlockScreen(top.removePrefix(Routes.UNLOCK), onBack = ::pop)
             top.startsWith(Routes.LIMIT) -> LimitEditScreen(top.removePrefix(Routes.LIMIT).ifEmpty { null }, onBack = ::pop)
+        }
         }
     }
 }

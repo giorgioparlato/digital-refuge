@@ -34,6 +34,7 @@ import app.bedtime.data.UseWidget
 import app.bedtime.data.UseWords
 import app.bedtime.data.WeatherStyle
 import app.bedtime.ui.components.Chevron
+import app.bedtime.ui.components.NumberStepper
 import app.bedtime.ui.components.ObsidianToggle
 import app.bedtime.ui.components.QuickChip
 import app.bedtime.ui.components.SegmentedChoice
@@ -59,6 +60,9 @@ sealed interface WidgetOption {
         val enabled: Boolean = true,
         val set: (Boolean) -> Unit,
     ) : WidgetOption
+
+    /** A number of minutes: any in [range], with [presets] to hand. */
+    class Minutes(override val label: String, val value: Int, val presets: List<Int>, val range: IntRange, val set: (Int) -> Unit) : WidgetOption
 
     /** A colour from a set, or [automatic] (null) where there is one. */
     class Colour(
@@ -205,7 +209,7 @@ object WidgetOptions {
                     null
                 },
                 if (use.look == UseLook.BUDGET) {
-                    WidgetOption.Choice("A day's allowance", budgets.map { UseWords.compact(it) to it }, if (use.budgetWholePhone) use.phoneBudgetMinutes else use.budgetMinutes) {
+                    WidgetOption.Minutes("A day's allowance", if (use.budgetWholePhone) use.phoneBudgetMinutes else use.budgetMinutes, budgets, UseWords.BUDGET_RANGE) {
                         set(if (use.budgetWholePhone) use.copy(phoneBudgetMinutes = it) else use.copy(budgetMinutes = it))
                     }
                 } else {
@@ -257,6 +261,13 @@ internal fun WidgetOptionsPage(options: List<WidgetOption>, onOpen: (String) -> 
                         option.description?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = c.textFaint) }
                     }
                     ObsidianToggle(option.on, option.set, enabled = option.enabled)
+                }
+                is WidgetOption.Minutes -> {
+                    Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(option.label, style = MaterialTheme.typography.bodyLarge, color = c.textNormal, modifier = Modifier.weight(1f))
+                        NumberStepper(option.value, option.set, option.range, step = 5, presets = option.presets, title = option.label, format = UseWords::compact)
+                    }
+                    Spacer12()
                 }
                 is WidgetOption.Colour -> {
                     OptionLabel(option.label)

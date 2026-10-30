@@ -46,6 +46,7 @@ class LockNotificationListener : NotificationListenerService(), LockNotification
     override fun onListenerDisconnected() {
         if (LockNotifications.listener === this) LockNotifications.listener = null
         LockNotifications.publish(emptyList())
+        LockNotifications.publishNavigating(false)
         Timers.publishClock(emptyList())
     }
 
@@ -75,6 +76,8 @@ class LockNotificationListener : NotificationListenerService(), LockNotification
 
     private fun read() {
         val active = runCatching { activeNotifications }.getOrNull() ?: return
+        // Directions being given: refuge's lock screen leaves the screen to the navigation app's own.
+        LockNotifications.publishNavigating(active.any { LockNotifications.isNavigation(it.notification.category, it.isOngoing, it.packageName) })
         // A clock app's running timer, read before anything is filtered: it's ongoing, so it never shows as a notification here.
         // refuge's own countdown, to a session's end, is no timer.
         Timers.publishClock(

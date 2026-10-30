@@ -119,6 +119,9 @@ sealed interface DrawerResult {
     /** A file in the folder you chose, found by its name. */
     data class File(val file: IndexedFile) : DrawerResult
 
+    /** A word's meaning from one of your dictionaries; the whole entry a tap away. */
+    data class Meaning(val definition: app.bedtime.data.Definition) : DrawerResult
+
     /** One of an app's own shortcuts, run straight from here. */
     data class Shortcut(val shortcut: app.bedtime.data.AppShortcut) : DrawerResult
 }
@@ -428,6 +431,7 @@ private fun ResultRow(
             is DrawerResult.VaultNote -> "${FolderIndex.title(result.file)} · obsidian"
             is DrawerResult.File -> result.file.name
             is DrawerResult.Shortcut -> "${result.shortcut.label.lowercase()} · ${result.shortcut.app.lowercase()}"
+            is DrawerResult.Meaning -> "${result.definition.word}: ${result.definition.text.lineSequence().firstOrNull { it.isNotBlank() }.orEmpty().take(80)}"
         }
         val icon: ImageVector? = when (result) {
             is DrawerResult.App -> null

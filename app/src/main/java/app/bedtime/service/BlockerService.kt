@@ -22,6 +22,7 @@ import app.bedtime.data.AppSettings
 import app.bedtime.data.DndMode
 import app.bedtime.data.HourlyUse
 import app.bedtime.data.AutoBackup
+import app.bedtime.data.LockNotifications
 import app.bedtime.data.Problems
 import app.bedtime.engine.Enforcement
 import app.bedtime.engine.Verdict
@@ -90,7 +91,14 @@ class BlockerService : AccessibilityService() {
     private var packagesRegistered = false
 
     private val packagesChanged = object : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) = refreshSystemPackages(force = true)
+        override fun onReceive(context: Context, intent: Intent) {
+            refreshSystemPackages(force = true)
+            // Uninstalled, not just updated: its keyword and your name for it go with it.
+            val gone = intent.data?.schemeSpecificPart
+            if (intent.action == Intent.ACTION_PACKAGE_REMOVED && !intent.getBooleanExtra(Intent.EXTRA_REPLACING, false) && gone != null) {
+                releaseScope.launch { Repository.get(applicationContext).forgetGoneApps { it != gone } }
+            }
+        }
     }
 
     /** When the system packages were last read (elapsed realtime). */
@@ -337,6 +345,9 @@ class BlockerService : AccessibilityService() {
         val inSession = state?.isActive == true && settings.homeStyle.lockScreen
         val always = settings.homeScreen && settings.homeStyle.lockAlways
         if (!inSession && !always) return
+        // While a navigation app gives directions, its own view shows over Android's lock screen; ours
+        // would cover it. Without notification access, a navigation app in front when the screen went off.
+        if (LockNotifications.navigating.value || lastPackage in LockNotifications.NAVIGATION_APPS) return
         Problems.attempt("showing the lock screen") { startActivity(LockScreenActivity.intent(this)) }
     }
 

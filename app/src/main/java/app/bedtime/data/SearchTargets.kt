@@ -110,10 +110,11 @@ object SearchOrder {
     const val CALCULATOR = "calculator"
     const val BLOCKS = "blocks"
     const val SHORTCUTS = "shortcuts"
+    const val DICTIONARY = "dictionary"
 
     /** The heading a choice sits under when adding to the search. */
     fun group(key: String): String = when {
-        key.startsWith("web:") || key.startsWith("wikipedia:") || key.startsWith("maps:") || key.startsWith("lookup:") -> GROUPS[0]
+        key.startsWith("web:") || key.startsWith("wikipedia:") || key.startsWith("maps:") || key.startsWith("lookup:") || key == DICTIONARY -> GROUPS[0]
         key in setOf(CONTACTS, ALARM, TIMER, SETTINGS, CALCULATOR, BLOCKS, SHORTCUTS) -> GROUPS[1]
         key.startsWith("note:") || key == CALENDAR -> GROUPS[2]
         key == FILES || key == OBSIDIAN -> GROUPS[3]
@@ -124,9 +125,37 @@ object SearchOrder {
 
     fun noteKey(target: NoteTarget) = "note:${target.uri}"
 
+    /** Other words [key] is found by on the search page, besides its name: "dictionary" for a look-up. */
+    fun words(key: String): String = when {
+        key.startsWith("web:") -> "web internet browser google"
+        key.startsWith("wikipedia:") -> "wikipedia encyclopedia"
+        key.startsWith("maps:") -> "maps directions places navigation"
+        key.startsWith("lookup:") -> "dictionary define definition meaning word translate"
+        key.startsWith("spotify:") -> "music songs spotify"
+        key.startsWith("note:") -> "notes note write"
+        key == CALENDAR -> "calendar event appointment"
+        key == CONTACTS -> "contacts people call message whatsapp signal"
+        key == ALARM -> "alarm clock wake"
+        key == TIMER -> "timer countdown"
+        key == SETTINGS -> "android settings wifi bluetooth"
+        key == CALCULATOR -> "calculator maths sum"
+        key == BLOCKS -> "blocks focus session start"
+        key == SHORTCUTS -> "shortcuts sync app"
+        key == DICTIONARY -> "dictionary define definition meaning word stardict"
+        key == OBSIDIAN -> "obsidian vault notes"
+        key == FILES -> "files folder documents"
+        else -> ""
+    }
+
+    /** Whether [key], named [label], is what [query] looks for on the search page. */
+    fun matches(key: String, label: String, query: String): Boolean {
+        val q = query.trim()
+        return q.isNotEmpty() && (label.contains(q, ignoreCase = true) || words(key).contains(q, ignoreCase = true))
+    }
+
     /** Which kind of action [key] is: something to find, something to do, or somewhere to look words up. */
     fun category(key: String): SearchCategory = when {
-        listOf("web:", "wikipedia:", "maps:", "lookup:", "spotify:").any { key.startsWith(it) } -> SearchCategory.LOOK_UP
+        listOf("web:", "wikipedia:", "maps:", "lookup:", "spotify:").any { key.startsWith(it) } || key == DICTIONARY -> SearchCategory.LOOK_UP
         key in setOf(ALARM, TIMER, CALCULATOR, CALENDAR, BLOCKS) || key.startsWith("note:") -> SearchCategory.DO
         else -> SearchCategory.FIND
     }
@@ -176,6 +205,7 @@ object SearchOrder {
                 SearchChoice(CALCULATOR, true) +
                 SearchChoice(BLOCKS, true) +
                 SearchChoice(SHORTCUTS, true) +
+                SearchChoice(DICTIONARY, true) +
                 listOfNotNull(SearchChoice(OBSIDIAN, false).takeIf { obsidian }) +
                 SearchChoice(FILES, false),
         )

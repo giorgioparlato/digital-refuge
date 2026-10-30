@@ -1,5 +1,25 @@
 package app.bedtime.ui.settings
 
+import android.widget.Toast
+
+import androidx.compose.material.icons.filled.Lock
+
+import androidx.compose.material.icons.filled.Info
+
+import app.bedtime.data.StarDicts
+
+import androidx.compose.foundation.layout.fillMaxWidth
+
+import androidx.compose.ui.focus.focusRequester
+
+import androidx.compose.runtime.saveable.rememberSaveable
+
+import app.bedtime.ui.components.LocalSettingsSearch
+
+import androidx.compose.runtime.CompositionLocalProvider
+
+import androidx.activity.compose.BackHandler
+
 import androidx.compose.material.icons.filled.DateRange
 
 import androidx.compose.runtime.LaunchedEffect
@@ -125,6 +145,7 @@ fun SearchSettingsScreen(onBack: () -> Unit) {
             SearchOrder.CALCULATOR to "Calculator: \"12 * 3\"",
             SearchOrder.BLOCKS to "Start a block, by its name",
             SearchOrder.SHORTCUTS to "Apps' shortcuts, by name: \"sync now\"",
+            SearchOrder.DICTIONARY to "A word's meaning, from your dictionaries",
             SearchOrder.ALARM to "Alarms: \"alarm 7:30\"",
             SearchOrder.TIMER to "Timers: \"timer 10 min\"",
             SearchOrder.SETTINGS to "Settings pages",
@@ -167,7 +188,32 @@ fun SearchSettingsScreen(onBack: () -> Unit) {
         waitingContacts = null
     }
     val chatApps = remember { ContactSearch.chatApps(context) }
+    // Dictionaries: copied in from a folder you pick, then listed from the app's own storage.
+    var dictionariesChanged by remember { mutableStateOf(0) }
+    val dictionaries by produceState(emptyList<String>(), dictionariesChanged) { value = withContext(Dispatchers.IO) { StarDicts.names(context) } }
+    val pickDictionaries = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            val added = withContext(Dispatchers.IO) { StarDicts.import(context, uri) }
+            Toast.makeText(context, if (added == 0) "no StarDict dictionary in that folder" else if (added == 1) "1 dictionary added" else "$added dictionaries added", Toast.LENGTH_SHORT).show()
+            dictionariesChanged++
+        }
+    }
+    val apps by produceState(emptyList<app.bedtime.apps.AppEntry>()) {
+        value = withContext(Dispatchers.IO) { AppCatalog.launchableApps(context).sortedBy { it.label.lowercase() } }
+    }
     SearchSettingsContent(
+        apps = apps,
+        dictionaries = dictionaries,
+        onAddDictionaries = { pickDictionaries.launch(null) },
+        onRemoveDictionary = { name ->
+            scope.launch {
+                withContext(Dispatchers.IO) { StarDicts.remove(context, name) }
+                dictionariesChanged++
+            }
+        },
+        lookUpNotes = current.lookUpNotes,
+        onLookUpNotes = { on -> scope.launch { repo.updateSettings { it.copy(lookUpNotes = on) } } },
         choices = choices.map { it to (labels[it.key] ?: it.key) },
         keywords = keywords,
         onKeyword = { key, typed ->
@@ -251,9 +297,20 @@ internal fun SearchSettingsContent(
     calendarAccess: Boolean = false,
     onCalendar: (Long) -> Unit = {},
     onAllowCalendar: () -> Unit = {},
+    /** Your apps, found by the page's own search to give one a keyword. */
+    apps: List<app.bedtime.apps.AppEntry> = emptyList(),
+    /** Your dictionaries by name, adding and taking away; and whether the lock screen's look-up finds notes. */
+    dictionaries: List<String> = emptyList(),
+    onAddDictionaries: () -> Unit = {},
+    onRemoveDictionary: (String) -> Unit = {},
+    lookUpNotes: Boolean = false,
+    onLookUpNotes: (Boolean) -> Unit = {},
 ) {
     val c = Obsidian.colors
     val list = choices.map { it.first }
+    // The page's own search: null when closed. It finds this page's actions, and apps to give a keyword.
+    var filter by rememberSaveable { mutableStateOf<String?>(null) }
+    BackHandler(enabled = filter != null) { filter = null }
     val labels = choices.associate { (choice, label) -> choice.key to label }
     var conflict by remember { mutableStateOf<Pair<String, String>?>(null) }
     conflict?.let { (keyword, owner) ->
@@ -265,11 +322,45 @@ internal fun SearchSettingsContent(
             confirmButton = { TextButton(onClick = { conflict = null }) { Text("OK", color = c.accentText) } },
         )
     }
-    Scaffold(containerColor = c.bgPrimary, topBar = { ObsidianTopBar("Search", onBack = onBack) }) { padding ->
+    // Here the icon at the top searches this page, not every setting.
+    CompositionLocalProvider(LocalSettingsSearch provides { filter = "" }) {
+    Scaffold(containerColor = c.bgPrimary, topBar = { ObsidianTopBar("Search", onBack = { if (filter != null) filter = null else onBack() }) }) { padding ->
         Column(
             Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = PageGutter, vertical = 4.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            val query = filter
+            if (query != null) {
+                PageFilter(query) { filter = it }
+                val found = list.filter { SearchOrder.matches(it.key, labels[it.key] ?: it.key, query) }
+                val foundApps = if (query.trim().length < 2) emptyList() else apps.filter { it.label.contains(query.trim(), ignoreCase = true) }.take(8)
+                if (query.isNotBlank() && found.isEmpty() && foundApps.isEmpty()) {
+                    Text("Nothing by that name.", style = MaterialTheme.typography.bodyMedium, color = c.textFaint)
+                }
+                if (found.isNotEmpty()) {
+                    SectionCard(title = "Actions") {
+                        found.forEachIndexed { i, choice ->
+                            if (i > 0) Spacer(Modifier.height(12.dp))
+                            ChoiceRow(choice, labels[choice.key] ?: choice.key, keywords[choice.key].orEmpty(), onKeyword = { typed -> onKeyword(choice.key, typed)?.let { owner -> conflict = Keywords.clean(typed) to owner } }) { mode ->
+                                if (choice.mode != mode) onChange(SearchOrder.setMode(list, choice.key, mode))
+                            }
+                        }
+                    }
+                }
+                if (foundApps.isNotEmpty()) {
+                    SectionCard(title = "Apps", subtitle = "A keyword typed alone in the search opens it") {
+                        foundApps.forEach { entry ->
+                            val key = Keywords.appKey(entry.packageName)
+                            Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                app.bedtime.ui.components.VerbatimText(entry.label, style = MaterialTheme.typography.bodyLarge, color = c.textNormal, modifier = Modifier.weight(1f))
+                                KeywordBox(keywords[key].orEmpty()) { typed -> onKeyword(key, typed)?.let { owner -> conflict = Keywords.clean(typed) to owner } }
+                            }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(24.dp))
+                return@Column
+            }
             Text(
                 "Matching apps always come first; then what's found, what you can do, and where to look your words up, in that order. Each action is in every search, only with its keyword (type it, a space, then your words: \"m cafe\"), or off. Only apps a session allows are offered during it.",
                 style = MaterialTheme.typography.bodyMedium,
@@ -299,27 +390,13 @@ internal fun SearchSettingsContent(
                     } else {
                         Spacer(Modifier.height(8.dp))
                         DragList(inCategory, key = { it.key }, onMoved = { moved -> onChange(list.filterNot { SearchOrder.category(it.key) == category } + moved) }) { choice ->
-                            Column(Modifier.weight(1f).padding(horizontal = 8.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(
-                                        labels[choice.key] ?: choice.key,
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        color = if (choice.mode == SearchMode.OFF) c.textFaint else c.textNormal,
-                                        modifier = Modifier.weight(1f),
-                                    )
-                                    if (choice.mode != SearchMode.OFF) {
-                                        KeywordBox(keywords[choice.key].orEmpty()) { typed -> onKeyword(choice.key, typed)?.let { owner -> conflict = Keywords.clean(typed) to owner } }
-                                    }
-                                }
-                                Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    listOf(SearchMode.EVERY to "Every search", SearchMode.KEYWORD to "Keyword only", SearchMode.OFF to "Off").forEach { (mode, label) ->
-                                        ModeChip(label, choice.mode == mode) { if (choice.mode != mode) onChange(SearchOrder.setMode(list, choice.key, mode)) }
-                                    }
-                                }
-                                if (choice.mode == SearchMode.KEYWORD && keywords[choice.key].isNullOrEmpty()) {
-                                    Text("Give it a keyword, or nothing reaches it", style = MaterialTheme.typography.labelSmall, color = c.accentText, modifier = Modifier.padding(top = 4.dp))
-                                }
-                            }
+                            ChoiceRow(
+                                choice,
+                                labels[choice.key] ?: choice.key,
+                                keywords[choice.key].orEmpty(),
+                                onKeyword = { typed -> onKeyword(choice.key, typed)?.let { owner -> conflict = Keywords.clean(typed) to owner } },
+                                modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                            ) { mode -> if (choice.mode != mode) onChange(SearchOrder.setMode(list, choice.key, mode)) }
                         }
                     }
                 }
@@ -354,6 +431,32 @@ internal fun SearchSettingsContent(
                     }
                 }
             }
+            SectionCard(
+                title = "Look up",
+                subtitle = "A word's meaning from your dictionaries, here and on the lock screen without unlocking: put “look up” on a gesture. Your notes are found there too",
+            ) {
+                dictionaries.forEach { name ->
+                    OptionRow(Icons.Default.Info, name, description = "Read on this phone") {
+                        Icon(
+                            Icons.Default.Clear,
+                            contentDescription = "take this dictionary away",
+                            tint = c.textFaint,
+                            modifier = Modifier.size(36.dp).clip(RoundedCornerShape(50)).clickable { onRemoveDictionary(name) }.padding(8.dp),
+                        )
+                    }
+                }
+                OptionRow(
+                    Icons.Default.Add,
+                    "Add dictionaries from a folder",
+                    description = "StarDict files (.ifo, .idx and .dict or .dict.dz), free for many languages; copied in, so the folder isn't needed after",
+                    onClick = onAddDictionaries,
+                ) { Chevron() }
+                OptionRow(
+                    Icons.Default.Lock,
+                    "Notes on the lock screen too",
+                    description = "Found by their titles; a note opens only once you've unlocked, so what's in it never shows there",
+                ) { ObsidianToggle(lookUpNotes, onLookUpNotes) }
+            }
             SectionCard(title = "Folders", subtitle = "Only names are read, to match what you type; nothing inside the files.") {
                 folders.forEach { (key, title, chosen) ->
                     val removable = key.startsWith("${SearchOrder.FILES}:")
@@ -381,6 +484,40 @@ internal fun SearchSettingsContent(
             Spacer(Modifier.height(24.dp))
         }
     }
+}
+}
+
+/** One action: its name and keyword, and whether it's in every search, only by its keyword, or off. */
+@Composable
+private fun ChoiceRow(choice: SearchChoice, label: String, keyword: String, onKeyword: (String) -> Unit, modifier: Modifier = Modifier, onMode: (SearchMode) -> Unit) {
+    val c = Obsidian.colors
+    Column(modifier) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(label, style = MaterialTheme.typography.bodyLarge, color = if (choice.mode == SearchMode.OFF) c.textFaint else c.textNormal, modifier = Modifier.weight(1f))
+            if (choice.mode != SearchMode.OFF) KeywordBox(keyword, onKeyword)
+        }
+        Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            listOf(SearchMode.EVERY to "Every search", SearchMode.KEYWORD to "Keyword only", SearchMode.OFF to "Off").forEach { (mode, name) ->
+                ModeChip(name, choice.mode == mode) { onMode(mode) }
+            }
+        }
+        if (choice.mode == SearchMode.KEYWORD && keyword.isEmpty()) {
+            Text("Give it a keyword, or nothing reaches it", style = MaterialTheme.typography.labelSmall, color = c.accentText, modifier = Modifier.padding(top = 4.dp))
+        }
+    }
+}
+
+/** This page's own search: what it offers, and apps, by name. */
+@Composable
+private fun PageFilter(query: String, onQuery: (String) -> Unit) {
+    val focus = remember { androidx.compose.ui.focus.FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
+    ObsidianTextField(
+        value = query,
+        onValueChange = onQuery,
+        placeholder = "An action, like dictionary, or an app",
+        modifier = Modifier.fillMaxWidth().focusRequester(focus),
+    )
 }
 
 /** One of an action's three states, as a small chip; the chosen one filled. */

@@ -28,7 +28,8 @@ settings
 │   ├── look · widgets (as on the home screen, its own)
 │   ├── notifications: from these apps · quick replies · circles ── a circle: name · colour · people · groups
 │   └── gestures
-├── search: what it offers · keywords · beside each contact · adding to your calendar · folders · try it
+├── search: what it offers · keywords · beside each contact · adding to your calendar · look up (dictionaries,
+│           notes on the lock screen) · folders · try it · its own 🔍 (actions, apps to give a keyword)
 ├── apps: app groups · always-available apps · distracting apps
 ├── notes: refuge notes · your files · today's daily note
 ├── cover messages: yours · the app's own
@@ -54,6 +55,7 @@ Home screen, lock screen, apps, shortcuts and about & backup are lists of rows f
 - settings restored
 - Replace
 - Cancel
+- Find a setting
 - set up once, then left alone
 - Nothing by that name.
 - digital refuge {version} · everything stays on this phone
@@ -75,7 +77,7 @@ Home screen, lock screen, apps, shortcuts and about & backup are lists of rows f
 - lock screen
 - Search
 - What it offers, keywords, contacts, folders, the calendar
-- search keyword keywords web maps contacts messaging whatsapp signal telegram alarm timer calculator settings pages files folder obsidian spotify blocks calendar events
+- search keyword keywords web maps contacts messaging whatsapp signal telegram alarm timer calculator settings pages files folder obsidian spotify blocks calendar events dictionary dictionaries look up definition meaning
 - Cover messages
 - What a blocked app's cover says
 - The app's and … of yours
@@ -266,6 +268,7 @@ One file serves the look, widgets, gestures and notifications pages, for both sc
 - Just unlocks
 - Camera
 - Write a quick note
+- Look up a word or a note
 - Show notifications
 - Turn the screen off
 - Look
@@ -273,7 +276,7 @@ One file serves the look, widgets, gestures and notifications pages, for both sc
 - Widgets
 - What your home screen and lock screen show, each its own, in the order you like. Pick the screen here first. Changes save as you go.
 - Lock-screen gestures
-- Swipes start around the clock; a double tap is anywhere. Each can open an app once you've unlocked, or straight away the camera, a quick note or your notifications. The middle is for swiping notifications away; from the bottom, any swipe just unlocks.
+- Swipes start around the clock; a double tap is anywhere. Each can open an app once you've unlocked, or straight away the camera, a quick note, a look-up or your notifications. The middle is for swiping notifications away; from the bottom, any swipe just unlocks.
 - Gestures
 - On your home screen, and the minimal one during sessions. Swipes start anywhere but the very top edge, which stays Android's; a double tap is on an empty spot.
 - Lock-screen notifications
@@ -291,6 +294,7 @@ One file serves the look, widgets, gestures and notifications pages, for both sc
 - Nothing, it just unlocks
 - Camera, without unlocking
 - Write a quick note, without unlocking
+- Look up a word or a note, without unlocking
 - Open an app, once unlocked
 - + your own font
 - + another
@@ -518,11 +522,15 @@ One file serves the look, widgets, gestures and notifications pages, for both sc
 - Calculator: "12 * 3"
 - Start a block, by its name
 - Apps' shortcuts, by name: "sync now"
+- A word's meaning, from your dictionaries
 - Alarms: "alarm 7:30"
 - Timers: "timer 10 min"
 - Settings pages
 - Obsidian notes, by title
 - Files in your folders, by name
+- no StarDict dictionary in that folder
+- 1 dictionary added
+- {added} dictionaries added
 - Obsidian vault
 - Folder of files
 - Search the web · {appLabel}
@@ -533,12 +541,12 @@ One file serves the look, widgets, gestures and notifications pages, for both sc
 - “{keyword}” is taken
 - It's already the keyword for {owner}. Pick another, or change that one first.
 - Search
+- Nothing by that name.
+- Actions
+- Apps
+- A keyword typed alone in the search opens it
 - Matching apps always come first; then what's found, what you can do, and where to look your words up, in that order. Each action is in every search, only with its keyword (type it, a space, then your words: "m cafe"), or off. Only apps a session allows are offered during it.
 - Switched off: none of these show, not even by keyword. Each keeps its own setting for when it's back.
-- Every search
-- Keyword only
-- Off
-- Give it a keyword, or nothing reaches it
 - Beside each contact
 - Up to … ways to message them, in the order you pick them
 - A message typed after their name is copied, to paste
@@ -548,10 +556,22 @@ One file serves the look, widgets, gestures and notifications pages, for both sc
 - Asked anyway the first time you add one
 - No calendar on this phone can take new events.
 - in use
+- Look up
+- A word's meaning from your dictionaries, here and on the lock screen without unlocking: put “look up” on a gesture. Your notes are found there too
+- Read on this phone
+- Add dictionaries from a folder
+- StarDict files (.ifo, .idx and .dict or .dict.dz), free for many languages; copied in, so the folder isn't needed after
+- Notes on the lock screen too
+- Found by their titles; a note opens only once you've unlocked, so what's in it never shows there
 - Folders
 - Only names are read, to match what you type; nothing inside the files.
 - None chosen yet
 - Add a folder of files
+- Every search
+- Keyword only
+- Off
+- Give it a keyword, or nothing reaches it
+- An action, like dictionary, or an app
 - Try it
 - anna, t 10, m cafe…
 - By its keyword, only: …, with “…”

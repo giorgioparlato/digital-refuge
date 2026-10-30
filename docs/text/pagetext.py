@@ -116,7 +116,7 @@ focus
     ("the editor", ["ui/edit/ScheduleEditScreen.kt", "ui/edit/UnlockStepsEditor.kt", "ui/components/MessageChoice.kt", "data/CoverMessages.kt"]),
     ("leave early", ["unlock/UnlockFlow.kt", "unlock/UnlockChoice.kt"]),
     ("while a session runs: the covers", ["ui/blocked/BlockedActivity.kt", "ui/blocked/CoverLayout.kt"]),
-    ("while a session runs: the minimal home screen", ["ui/minimal/MinimalHomeActivity.kt", "ui/minimal/SessionHeader.kt", "ui/minimal/EmergencyContent.kt", "ui/minimal/AppDrawer.kt", "ui/minimal/AppActions.kt", "ui/minimal/BlockSheet.kt", "ui/minimal/WidgetSheet.kt", "ui/minimal/ScreenSheet.kt", "ui/minimal/CalendarLine.kt", "ui/minimal/CalendarWeek.kt", "ui/minimal/WeatherLine.kt", "ui/notes/NoteWidgetView.kt", "ui/quotes/QuoteMenu.kt"]),
+    ("while a session runs: the minimal home screen", ["ui/minimal/MinimalHomeActivity.kt", "ui/minimal/SessionHeader.kt", "ui/minimal/EmergencyContent.kt", "ui/minimal/AppDrawer.kt", "ui/minimal/AppActions.kt", "ui/minimal/BlockSheet.kt", "ui/minimal/WidgetSheet.kt", "ui/minimal/ScreenSheet.kt", "ui/minimal/CalendarLine.kt", "ui/minimal/CalendarWeek.kt", "ui/minimal/WeatherLine.kt", "ui/minimal/LookUp.kt", "ui/notes/NoteWidgetView.kt", "ui/quotes/QuoteMenu.kt"]),
     ("while a session runs: the lock screen", ["ui/lock/LockScreenActivity.kt", "ui/lock/LockNotificationViews.kt"]),
     ("while a session runs: notification, reminder, tile and widget", ["service/SessionNotifier.kt", "service/TakeoverOverlay.kt", "service/FocusTileService.kt", "ui/widget/BlockWidget.kt", "ui/widget/BlockWidgetConfigActivity.kt"]),
 ])
@@ -175,7 +175,8 @@ settings
 │   ├── look · widgets (as on the home screen, its own)
 │   ├── notifications: from these apps · quick replies · circles ── a circle: name · colour · people · groups
 │   └── gestures
-├── search: what it offers · keywords · beside each contact · adding to your calendar · folders · try it
+├── search: what it offers · keywords · beside each contact · adding to your calendar · look up (dictionaries,
+│           notes on the lock screen) · folders · try it · its own 🔍 (actions, apps to give a keyword)
 ├── apps: app groups · always-available apps · distracting apps
 ├── notes: refuge notes · your files · today's daily note
 ├── cover messages: yours · the app's own

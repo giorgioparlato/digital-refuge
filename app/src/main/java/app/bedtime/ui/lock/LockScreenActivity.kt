@@ -397,11 +397,13 @@ private fun LockScreen(
     val sessionStyle = Modules.during(lockStyle, state?.active.orEmpty().map { it.start to it.schedule })
     val nowPlaying = if (Modules.isOn(sessionStyle, Screen.LOCK, Module.NOW_PLAYING)) rememberNowPlaying() else null
     var quickNote by remember { mutableStateOf(false) }
+    var lookingUp by remember { mutableStateOf(false) }
     // A gesture's action: a quick note or the notification shade right here, otherwise an app (the camera
     // straight away, any other once unlocked).
     val runAction: (String) -> Unit = { action ->
         when (action) {
             HomeActions.NOTE -> quickNote = true
+            HomeActions.LOOKUP -> lookingUp = true
             HomeActions.NOTIFICATIONS -> BlockingState.globalAction(context, AccessibilityService.GLOBAL_ACTION_NOTIFICATIONS)
             HomeActions.LOCK -> onScreenOff()
             else -> onOpenApp(action)
@@ -488,6 +490,27 @@ private fun LockScreen(
             notes = allNotes,
             screen = Screen.LOCK,
             habits = habitList,
+        )
+    }
+    // Your dictionaries, read right here: nothing to unlock for a word.
+    // Notes only if you've said so: here, anyone holding the phone could read them.
+    // Notes by title only: one opens, in refuge or Obsidian, once you've unlocked, never here.
+    if (lookingUp) {
+        app.bedtime.ui.minimal.LookUpDialog(
+            lockStyle,
+            onDismiss = { lookingUp = false },
+            notes = settings.lookUpNotes,
+            vault = settings.obsidianVault,
+            elsewhere = app.bedtime.ui.minimal.NotesOpenElsewhere(
+                refuge = { id ->
+                    lookingUp = false
+                    onOpenRoute(app.bedtime.Routes.note(id))
+                },
+                vault = { file ->
+                    lookingUp = false
+                    settings.obsidianVault?.let { onOpenIntent(app.bedtime.data.FolderIndex.obsidianIntent(it, file)) }
+                },
+            ),
         )
     }
     if (quickNote) {

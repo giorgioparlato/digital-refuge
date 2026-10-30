@@ -53,8 +53,8 @@ private val pages = listOf(
     Page(
         BedtimeIcons.Leaf,
         "limits for every day",
-        "outside any session, the apps that pull hardest can ask for a few breaths before they open, or keep to " +
-            "so many minutes, or so many opens, a day.",
+        "outside any session, the most distracting apps can ask for a few breaths before they open, and have a " +
+            "limited number of minutes or opens, a day.",
         "making a limit stricter takes effect at once. loosening it, or deleting it, waits until the next day.",
     ),
     Page(

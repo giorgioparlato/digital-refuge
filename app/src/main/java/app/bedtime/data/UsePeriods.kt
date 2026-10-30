@@ -20,7 +20,8 @@ enum class Versus {
 
     companion object {
         /** What a [period] can be set against, in the order they're offered. */
-        fun options(period: UsePeriod): List<Versus> = if (period == UsePeriod.DAY) entries else listOf(LAST, USUAL, YEAR)
+        fun options(period: UsePeriod): List<Versus> =
+            if (period == UsePeriod.DAY) listOf(LAST, USUAL, WEEK_AVG, MONTH_AVG, YEAR_AVG, PICKED, YEAR) else listOf(LAST, USUAL, YEAR)
 
         /** [chosen] where [period] can have it; the period before otherwise. */
         fun on(period: UsePeriod, chosen: Versus): Versus = if (chosen in options(period)) chosen else LAST

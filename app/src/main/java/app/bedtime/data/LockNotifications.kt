@@ -69,6 +69,25 @@ object LockNotifications {
         fun action(key: String, index: Int): Notification.Action?
     }
 
+    private val _navigating = MutableStateFlow(false)
+
+    /** Whether a navigation app is giving directions now: refuge's lock screen steps aside for it. */
+    val navigating: StateFlow<Boolean> = _navigating
+
+    internal fun publishNavigating(on: Boolean) {
+        _navigating.value = on
+    }
+
+    /** The common navigation apps, for when their notification doesn't say what it is. */
+    val NAVIGATION_APPS = setOf(
+        "com.google.android.apps.maps", "com.waze", "net.osmand", "net.osmand.plus", "app.organicmaps",
+        "com.here.app.maps", "com.sygic.aura", "com.generalmagic.magicearth",
+    )
+
+    /** A notification of directions being given: one that says so, or an ongoing one from a navigation app. */
+    fun isNavigation(category: String?, ongoing: Boolean, packageName: String): Boolean =
+        category == "navigation" || (ongoing && packageName in NAVIGATION_APPS)
+
     /** Swiped away, by key and post time: gone at once, and an update to the same one can still show. */
     private val dismissed = mutableSetOf<Pair<String, Long>>()
 

@@ -1,5 +1,9 @@
 package app.bedtime.ui.components
 
+import androidx.compose.material.icons.filled.Search
+
+import androidx.compose.runtime.staticCompositionLocalOf
+
 import androidx.compose.runtime.setValue
 
 import androidx.compose.runtime.getValue
@@ -94,6 +98,12 @@ import java.util.Locale
 val PageGutter = 20.dp
 
 /**
+ * Set over settings' own pages: opens the search through every setting. Each of those pages shows it
+ * at the top right, through [ObsidianTopBar]; elsewhere it's null and nothing shows.
+ */
+val LocalSettingsSearch = staticCompositionLocalOf<(() -> Unit)?> { null }
+
+/**
  * The top of every page that isn't a hero: a large, light title on the app's fade, a back arrow
  * beside it when there's somewhere to go back to, and an optional quiet line underneath. Tabs,
  * detail pages and editors all start the same way, so moving between them never changes what the
@@ -127,6 +137,14 @@ fun ObsidianTopBar(
             }
             Text(title, fontSize = 26.sp, fontWeight = FontWeight.Light, color = c.textNormal, modifier = Modifier.weight(1f))
             actions()
+            LocalSettingsSearch.current?.let { search ->
+                Icon(
+                    Icons.Default.Search,
+                    contentDescription = "find a setting",
+                    tint = c.textMuted,
+                    modifier = Modifier.clip(CircleShape).clickable(onClick = search).padding(8.dp).size(22.dp),
+                )
+            }
         }
         if (subtitle != null) {
             Spacer(Modifier.height(6.dp))

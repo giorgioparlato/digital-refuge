@@ -36,6 +36,9 @@ class UseWordsTest {
         assertEquals("25 min over", over.note)
         assertTrue(over.over)
         assertEquals(1f, over.filled)
+        // The bar stands for all 3h 25m: the budget is its first 180 of 205 minutes, the rest over.
+        assertEquals(180f / 205f, over.allowedPart, 0.001f)
+        assertEquals(1f, under.allowedPart)
     }
 
     @Test

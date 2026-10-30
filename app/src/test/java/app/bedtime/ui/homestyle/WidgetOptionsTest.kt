@@ -25,6 +25,7 @@ class WidgetOptionsTest {
                     }
                     is WidgetOption.Switch -> option.set(!option.on)
                     is WidgetOption.Colour -> option.pick(option.presets.first().second)
+                    is WidgetOption.Minutes -> option.set(option.value + 5)
                     is WidgetOption.Pick -> option.items.firstOrNull { it.first != option.selected }?.let { option.pick(it.first) }
                     else -> Unit
                 }
@@ -36,14 +37,14 @@ class WidgetOptionsTest {
     @Test
     fun everyChangeFromTheSheetIsKept() {
         // The sheet saves through sheetFields: whatever an option changes must be among them.
-        val style = HomeStyle(noteBackground = 0xFF223344)
-        Module.entries.forEach { module ->
+        val budget = HomeStyle(useWidget = app.bedtime.data.UseWidget(look = app.bedtime.data.UseLook.BUDGET))
+        listOf(HomeStyle(noteBackground = 0xFF223344), budget).forEach { style -> Module.entries.forEach { module ->
             Screen.entries.forEach { screen ->
                 changes(module, style, screen).forEach { (label, changed) ->
                     assertEquals("$module on $screen: $label", changed, style.sheetFields(changed))
                 }
             }
-        }
+        } }
     }
 
     @Test

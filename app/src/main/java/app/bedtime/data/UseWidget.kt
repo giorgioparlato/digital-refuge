@@ -33,7 +33,14 @@ data class UseToday(
 )
 
 /** The budget bar's words, its note at the right ("20 min left", "25m over"), and how full it is. */
-data class UseBudget(val line: String, val note: String, val filled: Float, val over: Boolean)
+data class UseBudget(
+    val line: String,
+    val note: String,
+    val filled: Float,
+    val over: Boolean,
+    /** Over budget, where the budget ends along a bar that stands for all that was used; 1 within it. */
+    val allowedPart: Float = 1f,
+)
 
 object UseWords {
     /** "38 min", "1h", "3h 40m". */
@@ -51,6 +58,9 @@ object UseWords {
     /** The allowances to choose from: for distracting apps, and for the whole phone. */
     val DISTRACTING_BUDGETS = listOf(15, 30, 45, 60, 90, 120)
     val PHONE_BUDGETS = listOf(30, 60, 90, 120, 180, 240, 300)
+
+    /** Any allowance from five minutes to the whole of a waking day, in fives. */
+    val BUDGET_RANGE = 5..16 * 60
 
     /** An allowance on a narrow chip: "45m", "1h", "1½h". */
     fun compact(minutes: Int): String = when {
@@ -88,6 +98,7 @@ object UseWords {
             note = if (over) "${short(used - allowed)} over" else "${short(allowed - used)} left",
             filled = (used.toFloat() / allowed).coerceIn(0f, 1f),
             over = over,
+            allowedPart = if (over) allowed.toFloat() / used else 1f,
         )
     }
 
