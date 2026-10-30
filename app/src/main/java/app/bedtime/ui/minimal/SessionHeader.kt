@@ -87,6 +87,10 @@ internal fun SessionHeader(
     onHold: ((Module) -> Unit)? = null,
     /** Which screen this is, for the settings each has its own of. */
     screen: Screen = Screen.HOME,
+    /** A tap on the clock (on the lock screen, the unlock, as anywhere there). */
+    onClockTap: (() -> Unit)? = null,
+    /** A double tap on the clock: its own gesture, or the screen's double tap. */
+    onClockDoubleTap: (() -> Unit)? = null,
 ) {
     val hold: (Module) -> (() -> Unit)? = { m -> onHold?.let { { it(m) } } }
     // Long-pressing a widget that has no tap of its own.
@@ -114,7 +118,20 @@ internal fun SessionHeader(
     val one: @Composable (Int, Module) -> Unit = { at, module ->
             when (module) {
                 Module.GREETING -> Text(greeting(now.hour), style = MaterialTheme.typography.titleMedium, color = p.accent, modifier = held(Module.GREETING))
-                Module.CLOCK -> Row(held(Module.CLOCK), verticalAlignment = Alignment.CenterVertically) {
+                Module.CLOCK -> Row(
+                    if (onClockTap == null && onClockDoubleTap == null) {
+                        held(Module.CLOCK)
+                    } else {
+                        Modifier.pointerInput(onClockTap, onClockDoubleTap, onHold) {
+                            detectTapGestures(
+                                onTap = onClockTap?.let { { _ -> it() } },
+                                onDoubleTap = onClockDoubleTap?.let { { _ -> it() } },
+                                onLongPress = onHold?.let { { _ -> it(Module.CLOCK) } },
+                            )
+                        }
+                    },
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     Text(
                         styledTime(timeFormatter(context).format(now), suffixSize = (30 * clock).sp),
                         style = MaterialTheme.typography.displayLarge.copy(

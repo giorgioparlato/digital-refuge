@@ -13,7 +13,7 @@ class StarDictTest {
     val folder = TemporaryFolder()
 
     /** A dictionary as StarDict writes one: its words sorted its way, each pointing into the .dict. */
-    private fun make(name: String, entries: List<Pair<String, String>>, types: String? = "m"): StarDict {
+    private fun make(name: String, entries: List<Pair<String, String>>, types: String? = "m", forms: List<Pair<String, String>> = emptyList()): StarDict {
         val dir = folder.newFolder(name)
         val sorted = entries.sortedWith { a, b -> StarDicts.compare(a.first, b.first) }
         val dict = ByteArrayOutputStream()
@@ -30,6 +30,17 @@ class StarDictTest {
         java.io.File(dir, "dict.ifo").writeText("StarDict's dict ifo file\nversion=2.4.2\nbookname=$name\nwordcount=${entries.size}\n" + (types?.let { "sametypesequence=$it\n" } ?: ""))
         java.io.File(dir, "dict.idx").writeBytes(idx.toByteArray())
         java.io.File(dir, "dict.dict").writeBytes(dict.toByteArray())
+        if (forms.isNotEmpty()) {
+            // Each form, then the place of its word in the index.
+            val syn = ByteArrayOutputStream()
+            val synOut = DataOutputStream(syn)
+            forms.sortedWith { a, b -> StarDicts.compare(a.first, b.first) }.forEach { (form, word) ->
+                synOut.write(form.toByteArray())
+                synOut.writeByte(0)
+                synOut.writeInt(sorted.indexOfFirst { it.first == word })
+            }
+            java.io.File(dir, "dict.syn").writeBytes(syn.toByteArray())
+        }
         return StarDicts.open(dir)!!
     }
 
@@ -109,5 +120,24 @@ class StarDictTest {
         // Between words, or on a lone letter, nothing.
         assertNull(StarDicts.wordAt(text, emptyList(), 7))
         assertNull(StarDicts.wordAt(text, emptyList(), 0))
+    }
+
+    @Test
+    fun aFormLeadsToItsWord() {
+        val d = make("English", listOf("run" to "to move fast", "ran" to "see run"), forms = listOf("running" to "run", "runs" to "run"))
+        assertEquals(Definition("run", "English", "to move fast"), d.define("Running"))
+        // A word that's an entry of its own is read as itself first.
+        assertEquals("see run", d.define("ran")!!.text)
+        assertNull(d.define("runner"))
+    }
+
+    @Test
+    fun aPreviewSkipsTheWordRepeatedAndRunsLinesTogether() {
+        assertEquals("<n, c> · cat", StarDicts.preview(Definition("katt", "Swedish", "katt /kat/\n<n, c>\ncat")))
+        assertEquals("n 1: a place of safety · v 1: to shelter", StarDicts.preview(Definition("refuge", "WordNet", "n 1: a place of safety\nv 1: to shelter")))
+        // A first line that says more than the word stays.
+        assertEquals("run: to move fast · see also ran", StarDicts.preview(Definition("run", "D", "run: to move fast\nsee also ran")))
+        val long = StarDicts.preview(Definition("w", "D", "word ".repeat(40).trim()), length = 20)
+        assertEquals("word word word word…", long)
     }
 }

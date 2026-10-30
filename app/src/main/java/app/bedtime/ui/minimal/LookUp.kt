@@ -41,7 +41,18 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import app.bedtime.data.ClockAction
+import app.bedtime.data.ClockActions
 import app.bedtime.data.Definition
+import app.bedtime.data.Keywords
+import app.bedtime.data.SearchOrder
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.window.DialogProperties
+import kotlin.math.abs
 import app.bedtime.data.HomeStyle
 import app.bedtime.data.StarDicts
 import app.bedtime.ui.components.Text
@@ -68,6 +79,10 @@ internal class NotesOpenElsewhere(val refuge: (String) -> Unit, val vault: (app.
 /**
  * A word looked up in your dictionaries, right where you are: on the home screen, or the lock screen
  * without unlocking. With [notes], your refuge notes and Obsidian notes ([vault]) too, to read in place.
+ * With [onTimer], "timer 10" (or the timer's [timerKeyword], "t 10") offers to start one.
+ *
+ * It sits at the top, clear of the keyboard and of Android's swipe at the foot: a swipe up or down on
+ * it, a tap beside it, or Back puts it away and leaves the screen as it was.
  */
 @Composable
 internal fun LookUpDialog(
@@ -77,8 +92,26 @@ internal fun LookUpDialog(
     notes: Boolean = true,
     vault: String? = null,
     elsewhere: NotesOpenElsewhere? = null,
+    onTimer: ((ClockAction.Timer) -> Unit)? = null,
+    timerKeyword: String? = null,
 ) {
-    Dialog(onDismissRequest = onDismiss) { LookUpContent(style, initial, notes = notes, vault = vault, elsewhere = elsewhere) }
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
+        val away = with(LocalDensity.current) { 48.dp.toPx() }
+        Box(
+            Modifier
+                .fillMaxSize()
+                .pointerInput(onDismiss) { detectTapGestures { onDismiss() } }
+                .pointerInput(onDismiss) {
+                    var travel = 0f
+                    detectVerticalDragGestures(onDragStart = { travel = 0f }, onDragEnd = { if (abs(travel) > away) onDismiss() }) { _, dy -> travel += dy }
+                }
+                .safeDrawingPadding()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            contentAlignment = Alignment.TopCenter,
+        ) {
+            LookUpContent(style, initial, notes = notes, vault = vault, elsewhere = elsewhere, onTimer = onTimer, timerKeyword = timerKeyword)
+        }
+    }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -91,6 +124,8 @@ internal fun LookUpContent(
     vault: String? = null,
     /** With this, notes aren't read here but found by title and handed on: on the lock screen, to open once unlocked. */
     elsewhere: NotesOpenElsewhere? = null,
+    onTimer: ((ClockAction.Timer) -> Unit)? = null,
+    timerKeyword: String? = null,
 ) {
     val context = LocalContext.current
     val p = style.palette()
@@ -120,6 +155,11 @@ internal fun LookUpContent(
     }
     val (suggestions, definitions) = found
     val query = words.trim()
+    // "timer 10 min", or the timer's own keyword and a length: "t 10".
+    val timer = if (onTimer == null) null else {
+        ClockActions.parse(query) as? ClockAction.Timer
+            ?: timerKeyword?.let { Keywords.match(query, mapOf(SearchOrder.TIMER to it)) }?.let { ClockActions.timer(it.words) }
+    }
     val foundNotes = if (!notes || query.length < 2) emptyList() else {
         // Locked, only titles are searched: what's inside a note shouldn't show, not even as a match.
         val later = if (elsewhere != null) " · opens once unlocked" else ""
@@ -134,6 +174,8 @@ internal fun LookUpContent(
             .clip(RoundedCornerShape(24.dp))
             .background(p.background)
             .border(1.dp, p.faint.copy(alpha = 0.25f), RoundedCornerShape(24.dp))
+            // A tap on the panel stays on it; only one beside it puts it away.
+            .pointerInput(Unit) { detectTapGestures { } }
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
@@ -176,7 +218,11 @@ internal fun LookUpContent(
                 .padding(12.dp),
             decorationBox = { field ->
                 Box {
-                    if (words.isEmpty()) Text(if (notes) "A word, or a note" else "A word", style = MaterialTheme.typography.bodyLarge, color = p.faint)
+                    if (words.isEmpty()) {
+                        val kinds = listOfNotNull("A word", "a note".takeIf { notes }, "“timer 10”".takeIf { onTimer != null })
+                        val hint = if (kinds.size == 1) kinds[0] else kinds.dropLast(1).joinToString(", ") + " or " + kinds.last()
+                        Text(hint, style = MaterialTheme.typography.bodyLarge, color = p.faint)
+                    }
                     field()
                 }
             },
@@ -192,7 +238,21 @@ internal fun LookUpContent(
                 }.padding(vertical = 2.dp),
             )
         }
-        Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        // The results take what room there is above the keyboard, and scroll.
+        Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            if (timer != null && onTimer != null) {
+                Text(
+                    ClockActions.label(timer) { _, _ -> "" },
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = p.accent,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .border(1.dp, p.accent.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                        .clickable { onTimer(timer) }
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                )
+            }
             when {
                 names?.isEmpty() == true && !notes -> Text(
                     "No dictionaries yet. Add one under settings › search › dictionaries.",
@@ -247,7 +307,7 @@ internal fun LookUpContent(
                     }
                 }
             }
-            if (query.length >= 2 && definitions.isEmpty() && suggestions.isEmpty() && foundNotes.isEmpty()) {
+            if (query.length >= 2 && timer == null && definitions.isEmpty() && suggestions.isEmpty() && foundNotes.isEmpty()) {
                 Text(if (notes) "Nothing in your dictionaries or notes." else "Not in your dictionaries.", style = MaterialTheme.typography.bodyMedium, color = p.faint)
             }
         }

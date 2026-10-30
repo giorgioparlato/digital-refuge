@@ -126,6 +126,8 @@ import app.bedtime.data.Screen
 import app.bedtime.ui.theme.BedtimeTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
 import java.time.LocalDateTime
 
 /**
@@ -508,9 +510,26 @@ private fun LockScreen(
                 },
                 vault = { file ->
                     lookingUp = false
-                    settings.obsidianVault?.let { onOpenIntent(app.bedtime.data.FolderIndex.obsidianIntent(it, file)) }
+                    // Obsidian knows the vault by its folder's name, not by the address Android gave refuge for it.
+                    settings.obsidianVault?.let { tree ->
+                        scope.launch {
+                            val name = withContext(Dispatchers.IO) { app.bedtime.data.FolderIndex.folderName(context, android.net.Uri.parse(tree)) }
+                            onOpenIntent(app.bedtime.data.FolderIndex.obsidianIntent(name, file))
+                        }
+                    }
                 },
             ),
+            // Started in your clock app without unlocking, where it allows that, and counted down here.
+            onTimer = { timer ->
+                runCatching { context.startActivity(app.bedtime.data.ClockActions.intent(timer)) }
+                    .onSuccess {
+                        scope.launch { repo.addTimer(System.currentTimeMillis() + timer.seconds * 1000L) }
+                        Toast.makeText(context, "timer started", Toast.LENGTH_SHORT).show()
+                        lookingUp = false
+                    }
+                    .onFailure { Toast.makeText(context, "no clock app took it", Toast.LENGTH_SHORT).show() }
+            },
+            timerKeyword = settings.keywords[app.bedtime.data.SearchOrder.TIMER].takeIf { settings.keywordsCustom },
         )
     }
     if (quickNote) {
@@ -579,6 +598,7 @@ private fun LockScreen(
         // A swipe from around the clock does what you set; every other swipe just unlocks.
         onSwipe = { swipe -> style.lockGestures[swipe]?.let(runAction) ?: onOpen() },
         onDoubleTap = style.lockGestures[Swipe.DOUBLE_TAP]?.let { action -> { runAction(action) } },
+        onClockDoubleTap = (style.lockGestures[Swipe.CLOCK_DOUBLE_TAP] ?: style.lockGestures[Swipe.DOUBLE_TAP])?.let { action -> { runAction(action) } },
         onShade = { BlockingState.globalAction(context, AccessibilityService.GLOBAL_ACTION_NOTIFICATIONS) },
         quote = Quotes.forPeriod(now, style.quoteRefresh, prefs = settings.quotes),
         calendar = rememberCalendarLine(style, now, onLockScreen = true),
@@ -644,6 +664,8 @@ internal fun LockScreenContent(
     useToday: app.bedtime.data.UseToday? = null,
     /** A double tap anywhere, when you've set one; a single tap then waits a moment to be sure. */
     onDoubleTap: (() -> Unit)? = null,
+    /** A double tap on the clock: its own, or else the one anywhere. */
+    onClockDoubleTap: (() -> Unit)? = null,
     /** A pull down from the very top: the notification shade. */
     onShade: () -> Unit = {},
     onHours: (() -> Unit)? = null,
@@ -730,6 +752,8 @@ internal fun LockScreenContent(
                     noteBeside = noteBeside,
                     onHold = onWidgetHold,
                     screen = Screen.LOCK,
+                    onClockTap = onOpen,
+                    onClockDoubleTap = onClockDoubleTap,
                     hours = useWidgetSlot(style.useWidgetFor(Screen.LOCK), hours, useToday, style, onHours, onWidgetHold?.let { { it(Module.HOURS) } }),
                     quote = quote?.takeIf { !quoteAtFoot }?.let { q ->
                         {

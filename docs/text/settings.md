@@ -264,6 +264,7 @@ One file serves the look, widgets, gestures and notifications pages, for both sc
 - Swipe up
 - All apps and search
 - Open {it}
+- Same as a double tap
 - Nothing
 - Just unlocks
 - Camera
@@ -276,15 +277,16 @@ One file serves the look, widgets, gestures and notifications pages, for both sc
 - Widgets
 - What your home screen and lock screen show, each its own, in the order you like. Pick the screen here first. Changes save as you go.
 - Lock-screen gestures
-- Swipes start around the clock; a double tap is anywhere. Each can open an app once you've unlocked, or straight away the camera, a quick note, a look-up or your notifications. The middle is for swiping notifications away; from the bottom, any swipe just unlocks.
+- Swipes start around the clock; a double tap is anywhere, and one on the clock can do something else. Each can open an app once you've unlocked, or straight away the camera, a quick note, a look-up or your notifications. The middle is for swiping notifications away; from the bottom, any swipe just unlocks.
 - Gestures
-- On your home screen, and the minimal one during sessions. Swipes start anywhere but the very top edge, which stays Android's; a double tap is on an empty spot.
+- On your home screen, and the minimal one during sessions. Swipes start anywhere but the very top edge, which stays Android's; a double tap is on an empty spot, and one on the clock can do something else.
 - Lock-screen notifications
 - Those the session lets through, from the apps you choose, as private as Android's own lock screen.
 - Swipe down
 - Swipe left
 - Swipe right
 - Double tap
+- Double tap on the clock
 - … does
 - Open an app
 - Search your apps
@@ -547,6 +549,8 @@ One file serves the look, widgets, gestures and notifications pages, for both sc
 - A keyword typed alone in the search opens it
 - Matching apps always come first; then what's found, what you can do, and where to look your words up, in that order. Each action is in every search, only with its keyword (type it, a space, then your words: "m cafe"), or off. Only apps a session allows are offered during it.
 - Switched off: none of these show, not even by keyword. Each keeps its own setting for when it's back.
+- Add more
+- … more to choose from
 - Beside each contact
 - Up to … ways to message them, in the order you pick them
 - A message typed after their name is copied, to paste
@@ -557,7 +561,8 @@ One file serves the look, widgets, gestures and notifications pages, for both sc
 - No calendar on this phone can take new events.
 - Tap to choose another
 - Look up
-- A word's meaning from your dictionaries, here and on the lock screen without unlocking: put “look up” on a gesture. Your notes are found there too
+- A word's meaning from your own dictionaries, read on this phone, nothing sent anywhere
+- No dictionary yet: add one below to start.
 - Read on this phone
 - Add dictionaries from a folder
 - StarDict files (.ifo, .idx and .dict or .dict.dz), free for many languages; copied in, so the folder isn't needed after
@@ -567,6 +572,9 @@ One file serves the look, widgets, gestures and notifications pages, for both sc
 - Only names are read, to match what you type; nothing inside the files.
 - None chosen yet
 - Add a folder of files
+- Find one
+- Close
+- 1. Add a dictionary: StarDict files (FreeDict and WordNet have free ones), copied from a folder. 2. In the search, type a word: its meaning shows under “Look up”, in every search or only after its keyword (set above). Tap it for the whole entry. 3. Without unlocking: set a lock-screen gesture to “look up” (settings › lock screen › gestures), then type a word. Tap any word in an entry to look that up too; “timer 10” starts a timer. 4. With several dictionaries, the chips at the top of the look-up pick one, or all.
 - Every search
 - Keyword only
 - Off

@@ -621,7 +621,8 @@ internal fun HomeStyleContent(
                         OptionRow(
                             gesture.icon(),
                             gesture.label(),
-                            description = HomeActions.label(action) ?: action?.let { pkg -> allApps.firstOrNull { it.packageName == pkg }?.label?.let { "Open $it" } ?: pkg } ?: "Nothing",
+                            description = HomeActions.label(action) ?: action?.let { pkg -> allApps.firstOrNull { it.packageName == pkg }?.label?.let { "Open $it" } ?: pkg }
+                                ?: if (gesture == HomeGesture.CLOCK_DOUBLE_TAP) "Same as a double tap" else "Nothing",
                             onClick = { pickingGesture = gesture },
                         ) { Chevron() }
                     }
@@ -635,7 +636,11 @@ internal fun HomeStyleContent(
                             swipe.icon(),
                             swipe.label(),
                             description = when (target) {
-                                null -> if (swipe == Swipe.DOUBLE_TAP) "Nothing" else "Just unlocks"
+                                null -> when (swipe) {
+                                    Swipe.DOUBLE_TAP -> "Nothing"
+                                    Swipe.CLOCK_DOUBLE_TAP -> "Same as a double tap"
+                                    else -> "Just unlocks"
+                                }
                                 GESTURE_CAMERA -> "Camera"
                                 HomeActions.NOTE -> "Write a quick note"
                                 HomeActions.LOOKUP -> "Look up a word or a note"
@@ -658,11 +663,11 @@ enum class StylePage(val title: String, val intro: String) {
     SHOWN("Widgets", "What your home screen and lock screen show, each its own, in the order you like. Pick the screen here first. Changes save as you go."),
     SWIPES(
         "Lock-screen gestures",
-        "Swipes start around the clock; a double tap is anywhere. Each can open an app once you've unlocked, or straight away the camera, a quick note, a look-up or your notifications. The middle is for swiping notifications away; from the bottom, any swipe just unlocks.",
+        "Swipes start around the clock; a double tap is anywhere, and one on the clock can do something else. Each can open an app once you've unlocked, or straight away the camera, a quick note, a look-up or your notifications. The middle is for swiping notifications away; from the bottom, any swipe just unlocks.",
     ),
     GESTURES(
         "Gestures",
-        "On your home screen, and the minimal one during sessions. Swipes start anywhere but the very top edge, which stays Android's; a double tap is on an empty spot.",
+        "On your home screen, and the minimal one during sessions. Swipes start anywhere but the very top edge, which stays Android's; a double tap is on an empty spot, and one on the clock can do something else.",
     ),
     NOTIFICATIONS("Lock-screen notifications", "Those the session lets through, from the apps you choose, as private as Android's own lock screen."),
 }
@@ -671,7 +676,7 @@ private fun HomeGesture.icon(): ImageVector = when (this) {
     HomeGesture.SWIPE_DOWN -> Icons.Default.KeyboardArrowDown
     HomeGesture.SWIPE_LEFT -> Icons.AutoMirrored.Filled.KeyboardArrowLeft
     HomeGesture.SWIPE_RIGHT -> Icons.AutoMirrored.Filled.KeyboardArrowRight
-    HomeGesture.DOUBLE_TAP -> Icons.Default.Refresh
+    HomeGesture.DOUBLE_TAP, HomeGesture.CLOCK_DOUBLE_TAP -> Icons.Default.Refresh
 }
 
 private fun HomeGesture.label(): String = when (this) {
@@ -679,6 +684,7 @@ private fun HomeGesture.label(): String = when (this) {
     HomeGesture.SWIPE_LEFT -> "Swipe left"
     HomeGesture.SWIPE_RIGHT -> "Swipe right"
     HomeGesture.DOUBLE_TAP -> "Double tap"
+    HomeGesture.CLOCK_DOUBLE_TAP -> "Double tap on the clock"
 }
 
 /** What a home-screen gesture does: nothing, one of the app's own actions, or opening any app. */
@@ -686,7 +692,8 @@ private fun HomeGesture.label(): String = when (this) {
 private fun HomeGestureDialog(gesture: HomeGesture, apps: List<AppEntry>, onDismiss: () -> Unit, onPick: (String?) -> Unit) {
     GestureDialog(
         title = "${gesture.label()} does",
-        actions = listOf<Pair<String?, String>>(null to "Nothing") + HomeActions.all.map { (action, label) -> action to label },
+        actions = listOf<Pair<String?, String>>(null to if (gesture == HomeGesture.CLOCK_DOUBLE_TAP) "Same as a double tap" else "Nothing") +
+            HomeActions.all.map { (action, label) -> action to label },
         appsTitle = "Open an app",
         apps = apps,
         onDismiss = onDismiss,
@@ -758,10 +765,14 @@ private fun GestureDialog(
     )
 }
 
-private fun Swipe.label(): String = if (this == Swipe.DOUBLE_TAP) "Double tap" else "Swipe ${name.lowercase()}"
+private fun Swipe.label(): String = when (this) {
+    Swipe.DOUBLE_TAP -> "Double tap"
+    Swipe.CLOCK_DOUBLE_TAP -> "Double tap on the clock"
+    else -> "Swipe ${name.lowercase()}"
+}
 
 private fun Swipe.icon(): ImageVector = when (this) {
-    Swipe.DOUBLE_TAP -> Icons.Default.Refresh
+    Swipe.DOUBLE_TAP, Swipe.CLOCK_DOUBLE_TAP -> Icons.Default.Refresh
     Swipe.UP -> Icons.Default.KeyboardArrowUp
     Swipe.DOWN -> Icons.Default.KeyboardArrowDown
     Swipe.LEFT -> Icons.AutoMirrored.Filled.KeyboardArrowLeft
@@ -774,7 +785,11 @@ private fun SwipeTargetDialog(swipe: Swipe, apps: List<AppEntry>, onDismiss: () 
     GestureDialog(
         title = "${swipe.label()} does",
         actions = listOf(
-            null to if (swipe == Swipe.DOUBLE_TAP) "Nothing" else "Nothing, it just unlocks",
+            null to when (swipe) {
+                Swipe.DOUBLE_TAP -> "Nothing"
+                Swipe.CLOCK_DOUBLE_TAP -> "Same as a double tap"
+                else -> "Nothing, it just unlocks"
+            },
             GESTURE_CAMERA to "Camera, without unlocking",
             HomeActions.NOTE to "Write a quick note, without unlocking",
             HomeActions.LOOKUP to "Look up a word or a note, without unlocking",

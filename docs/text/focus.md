@@ -564,8 +564,9 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 - refuge notes{later}
 - Look up
 - All
-- A word, or a note
 - A word
+- a note
+- “timer 10”
 - ‹ back to {previous}
 - No dictionaries yet. Add one under settings › search › dictionaries.
 - Notes
@@ -593,6 +594,8 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 <sub>[LockScreenActivity.kt](../../app/src/main/java/app/bedtime/ui/lock/LockScreenActivity.kt)</sub>
 
 - that didn't go through
+- timer started
+- no clock app took it
 - unlock the phone
 - tap to open
 

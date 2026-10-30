@@ -1,5 +1,13 @@
 package app.bedtime.ui.settings
 
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.foundation.layout.heightIn
+
 import androidx.compose.material.icons.filled.ArrowDropDown
 
 import androidx.compose.material3.DropdownMenuItem
@@ -327,6 +335,8 @@ internal fun SearchSettingsContent(
     BackHandler(enabled = filter != null) { filter = null }
     val labels = choices.associate { (choice, label) -> choice.key to label }
     var conflict by remember { mutableStateOf<Pair<String, String>?>(null) }
+    // The kind whose unused actions are being chosen from, if any.
+    var adding by remember { mutableStateOf<SearchCategory?>(null) }
     conflict?.let { (keyword, owner) ->
         AlertDialog(
             onDismissRequest = { conflict = null },
@@ -402,8 +412,11 @@ internal fun SearchSettingsContent(
                             modifier = Modifier.padding(top = 8.dp),
                         )
                     } else {
+                        // Only what's in use shows; what's off waits behind "Add more", to keep this short.
+                        val used = inCategory.filter { it.mode != SearchMode.OFF }
+                        val unused = inCategory.filter { it.mode == SearchMode.OFF }
                         Spacer(Modifier.height(8.dp))
-                        DragList(inCategory, key = { it.key }, onMoved = { moved -> onChange(list.filterNot { SearchOrder.category(it.key) == category } + moved) }) { choice ->
+                        DragList(used, key = { it.key }, onMoved = { moved -> onChange(list.filterNot { SearchOrder.category(it.key) == category } + moved + unused) }) { choice ->
                             ChoiceRow(
                                 choice,
                                 labels[choice.key] ?: choice.key,
@@ -412,7 +425,20 @@ internal fun SearchSettingsContent(
                                 modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
                             ) { mode -> if (choice.mode != mode) onChange(SearchOrder.setMode(list, choice.key, mode)) }
                         }
+                        if (unused.isNotEmpty()) {
+                            OptionRow(Icons.Default.Add, "Add more", description = "${unused.size} more to choose from", onClick = { adding = category }) { Chevron() }
+                        }
                     }
+                }
+            }
+            adding?.let { category ->
+                AddMoreDialog(
+                    category,
+                    list.filter { SearchOrder.category(it.key) == category && it.mode == SearchMode.OFF }.map { it.key to (labels[it.key] ?: it.key) },
+                    onDismiss = { adding = null },
+                ) { key ->
+                    adding = null
+                    onChange(SearchOrder.setMode(list, key, SearchMode.EVERY))
                 }
             }
             if (list.any { it.key == SearchOrder.CONTACTS && it.on } && SearchCategory.FIND !in categoriesOff && chatApps.size > 1) {
@@ -463,8 +489,17 @@ internal fun SearchSettingsContent(
             }
             SectionCard(
                 title = "Look up",
-                subtitle = "A word's meaning from your dictionaries, here and on the lock screen without unlocking: put “look up” on a gesture. Your notes are found there too",
+                subtitle = "A word's meaning from your own dictionaries, read on this phone, nothing sent anywhere",
             ) {
+                Text(
+                    LOOK_UP_HOW,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = c.textMuted,
+                    modifier = Modifier.padding(bottom = 8.dp),
+                )
+                if (dictionaries.isEmpty()) {
+                    Text("No dictionary yet: add one below to start.", style = MaterialTheme.typography.bodySmall, color = c.accentText, modifier = Modifier.padding(bottom = 4.dp))
+                }
                 dictionaries.forEach { name ->
                     OptionRow(Icons.Default.Info, name, description = "Read on this phone") {
                         Icon(
@@ -516,6 +551,78 @@ internal fun SearchSettingsContent(
     }
 }
 }
+
+/**
+ * What's off in one kind, to add to the search: each with its app's icon, or a sign for refuge's own,
+ * and a box to find one by name. A pick is added to every search.
+ */
+@Composable
+private fun AddMoreDialog(category: SearchCategory, unused: List<Pair<String, String>>, onDismiss: () -> Unit, onAdd: (String) -> Unit) {
+    val c = Obsidian.colors
+    var query by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = c.bgSecondary,
+        title = { Text("Add to ${category.title.lowercase()}") },
+        text = {
+            Column {
+                ObsidianTextField(value = query, onValueChange = { query = it }, placeholder = "Find one", modifier = Modifier.fillMaxWidth())
+                val shown = unused.filter { (key, label) -> query.isBlank() || SearchOrder.matches(key, label, query) }
+                Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()).padding(top = 8.dp)) {
+                    if (shown.isEmpty()) Text("Nothing by that name.", style = MaterialTheme.typography.bodyMedium, color = c.textFaint, modifier = Modifier.padding(vertical = 12.dp))
+                    shown.forEach { (key, label) ->
+                        Row(
+                            Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { onAdd(key) }.padding(vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            val pkg = appOf(key)
+                            if (pkg != null) {
+                                app.bedtime.ui.components.AppIcon(pkg, label, size = 28.dp)
+                            } else {
+                                Box(Modifier.size(28.dp), contentAlignment = Alignment.Center) {
+                                    Icon(signOf(key), contentDescription = null, tint = c.accent, modifier = Modifier.size(22.dp))
+                                }
+                            }
+                            Text(label, style = MaterialTheme.typography.bodyLarge, color = c.textNormal, modifier = Modifier.weight(1f).padding(start = 14.dp))
+                            Icon(Icons.Default.Add, contentDescription = "add", tint = c.textFaint, modifier = Modifier.size(18.dp))
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Close", color = c.textMuted) } },
+    )
+}
+
+/** The app an action sends your words to, by its key ("maps:<package>"), or Obsidian; null for refuge's own. */
+private fun appOf(key: String): String? = when {
+    key == SearchOrder.OBSIDIAN -> FolderIndex.OBSIDIAN
+    listOf("web:", "wikipedia:", "maps:", "lookup:", "spotify:").any { key.startsWith(it) } -> key.substringAfter(':')
+    else -> null
+}
+
+/** A sign for one of refuge's own actions. */
+private fun signOf(key: String): androidx.compose.ui.graphics.vector.ImageVector = when {
+    key.startsWith("note:") -> Icons.Default.Edit
+    key == SearchOrder.CALENDAR -> Icons.Default.DateRange
+    key == SearchOrder.CONTACTS -> Icons.Default.Person
+    key == SearchOrder.ALARM -> Icons.Default.Notifications
+    key == SearchOrder.TIMER -> Icons.Default.PlayArrow
+    key == SearchOrder.SETTINGS -> Icons.Default.Settings
+    key == SearchOrder.BLOCKS -> Icons.Default.Lock
+    key == SearchOrder.SHORTCUTS -> Icons.Default.Star
+    key == SearchOrder.DICTIONARY -> Icons.Default.Info
+    key == SearchOrder.FILES -> Icons.AutoMirrored.Filled.List
+    else -> Icons.Default.Add
+}
+
+/** How the look-up is used, step by step, on the search page. */
+private const val LOOK_UP_HOW =
+    "1. Add a dictionary: StarDict files (FreeDict and WordNet have free ones), copied from a folder.\n" +
+        "2. In the search, type a word: its meaning shows under “Look up”, in every search or only after its keyword (set above). Tap it for the whole entry.\n" +
+        "3. Without unlocking: set a lock-screen gesture to “look up” (settings › lock screen › gestures), then type a word. Tap any word in an entry to look that up too; “timer 10” starts a timer.\n" +
+        "4. With several dictionaries, the chips at the top of the look-up pick one, or all."
 
 /** One action: its name and keyword, and whether it's in every search, only by its keyword, or off. */
 @Composable

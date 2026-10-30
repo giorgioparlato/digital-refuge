@@ -364,7 +364,9 @@ private fun MinimalHomeScreen(
     }
     // What a gesture on the home screen does, as you set it.
     val onGesture: (HomeGesture) -> Unit = { gesture ->
-        when (val action = style.homeGestures[gesture]) {
+        // A double tap on the clock with nothing of its own is a double tap like any other.
+        val set = style.homeGestures[gesture] ?: style.homeGestures[HomeGesture.DOUBLE_TAP].takeIf { gesture == HomeGesture.CLOCK_DOUBLE_TAP }
+        when (val action = set) {
             null -> Unit
             HomeActions.NOTIFICATIONS -> BlockingState.globalAction(context, AccessibilityService.GLOBAL_ACTION_NOTIFICATIONS)
             HomeActions.LOCK -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) BlockingState.globalAction(context, AccessibilityService.GLOBAL_ACTION_LOCK_SCREEN)
@@ -392,10 +394,18 @@ private fun MinimalHomeScreen(
     val keywords = allKeywords.filterKeys { key -> key.startsWith(Keywords.APP) || usable.any { it.key == key } }
     val keyword = Keywords.match(query, keywords)
     val words = keyword?.words ?: query.trim()
-    // A single word's meaning, read off the main thread: the first look loads the dictionaries.
-    val meanings by produceState(emptyList<app.bedtime.data.Definition>(), words, drawer) {
+    // The dictionaries are read once the search opens, so the first word doesn't wait for them.
+    LaunchedEffect(drawer) { if (drawer) withContext(Dispatchers.IO) { app.bedtime.data.StarDicts.all(context) } }
+    // A single word's meaning, read off the main thread; by the dictionary's keyword, any word or words.
+    // Every dictionary is looked in, the one picked in the look-up first, so a word is never missed for that.
+    val byDictionary = keyword?.key == SearchOrder.DICTIONARY
+    val meanings by produceState(emptyList<app.bedtime.data.Definition>(), words, drawer, byDictionary) {
         val word = words.trim()
-        value = if (drawer && word.length >= 3 && ' ' !in word) withContext(Dispatchers.IO) { app.bedtime.data.StarDicts.define(context, word, settings.lookUpDictionary) } else emptyList()
+        value = if (drawer && word.isNotEmpty() && (byDictionary || (word.length >= 3 && ' ' !in word))) {
+            withContext(Dispatchers.IO) { app.bedtime.data.StarDicts.define(context, word).sortedBy { it.dictionary != settings.lookUpDictionary } }
+        } else {
+            emptyList()
+        }
     }
     // Contacts are looked up as you type, only when you've switched them on in the search or used their keyword.
     val contactsOn = usable.any { it.key == SearchOrder.CONTACTS && !it.keywordOnly } || keyword?.key == SearchOrder.CONTACTS
@@ -699,7 +709,19 @@ private fun MinimalHomeScreen(
             blocksOpen = false
         }, onDismiss = { blocksOpen = false })
     }
-    lookingUp?.let { word -> LookUpDialog(style, onDismiss = { lookingUp = null }, initial = word, vault = settings.obsidianVault) }
+    lookingUp?.let { word ->
+        LookUpDialog(
+            style,
+            onDismiss = { lookingUp = null },
+            initial = word,
+            vault = settings.obsidianVault,
+            onTimer = { timer ->
+                onResult(DrawerResult.Clock(timer))
+                lookingUp = null
+            },
+            timerKeyword = allKeywords[SearchOrder.TIMER],
+        )
+    }
     if (quickNote) QuickNoteDialog(style, settings.quickTargets, onSave = saveNote, onDismiss = { quickNote = false }, vault = settings.obsidianVault)
     if (appsDetail) {
         app.bedtime.ui.components.UseAppsDialog(useToday, style, onDismiss = { appsDetail = false }, onStats = { runCatching { context.startActivity(app.bedtime.MainActivity.intent(context, app.bedtime.Routes.STATS)) } })
@@ -890,6 +912,7 @@ internal fun MinimalHomeContent(
                 note = note,
                 noteBeside = noteBeside,
                 onHold = onWidgetHold,
+                onClockDoubleTap = { onGesture(HomeGesture.CLOCK_DOUBLE_TAP) },
             )
             Spacer(Modifier.height(if (preview) 28.dp else 44.dp))
             LazyColumn(Modifier.weight(1f).fillMaxWidth().nestedScroll(overscroll)) {

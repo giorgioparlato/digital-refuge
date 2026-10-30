@@ -13,6 +13,19 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            72,
+            "0.9.26",
+            listOf(
+                "A double tap on the clock can do something of its own, on the home and lock screens; until you set it, it's a double tap like anywhere else.",
+                "Look up opens at the top of the screen, above the keyboard. Swipe it up or down to put it away.",
+                "Type \"timer 10\" in the look-up to start a timer, on the lock screen too.",
+                "The search finds a word's meaning in every dictionary, the one you picked first, and with its keyword any word or phrase.",
+                "Dictionaries that list word forms find \"running\" under run; add yours again to pick that up.",
+                "Search settings show only what you use; the rest waits behind \"Add more\", with icons and a search.",
+                "An Obsidian note found on the lock screen now opens that note, not Obsidian's start page.",
+            ),
+        ),
+        ChangelogEntry(
             71,
             "0.9.25",
             listOf(

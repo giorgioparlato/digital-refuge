@@ -431,7 +431,7 @@ private fun ResultRow(
             is DrawerResult.VaultNote -> "${FolderIndex.title(result.file)} · obsidian"
             is DrawerResult.File -> result.file.name
             is DrawerResult.Shortcut -> "${result.shortcut.label.lowercase()} · ${result.shortcut.app.lowercase()}"
-            is DrawerResult.Meaning -> "${result.definition.word}: ${result.definition.text.lineSequence().firstOrNull { it.isNotBlank() }.orEmpty().take(80)}"
+            is DrawerResult.Meaning -> "${result.definition.word}: ${app.bedtime.data.StarDicts.preview(result.definition)}"
         }
         val icon: ImageVector? = when (result) {
             is DrawerResult.App -> null

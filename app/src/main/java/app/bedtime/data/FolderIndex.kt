@@ -61,7 +61,7 @@ object FolderIndex {
             .take(limit)
     }
 
-    /** Opens [note] in Obsidian, in the vault named [vault]. */
+    /** Opens [note] in Obsidian; [vault] is the vault's name, as [folderName] reads it, not its folder's address. */
     fun obsidianIntent(vault: String, note: IndexedFile): Intent =
         Intent(Intent.ACTION_VIEW, Uri.parse("obsidian://open?vault=${Uri.encode(vault)}&file=${Uri.encode(note.path.removeSuffix(".md"))}"))
             .setPackage(OBSIDIAN)

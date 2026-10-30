@@ -24,18 +24,29 @@ data class Definition(val word: String, val dictionary: String, val text: String
  * A StarDict dictionary kept in the app's own storage: its name, its index (each word, where its entry
  * starts and how long it is) and its entries' file. Read only on this phone; nothing is fetched.
  */
-class StarDict(val name: String, private val words: List<String>, private val offsets: LongArray, private val sizes: IntArray, private val dict: File, private val types: String?) {
-    /** The entry for [word], matched without regard to case; null if it isn't in here. */
+class StarDict(
+    val name: String,
+    private val words: List<String>,
+    private val offsets: LongArray,
+    private val sizes: IntArray,
+    private val dict: File,
+    private val types: String?,
+    /** Its .syn, when it has one: other forms of words ("ran", "running"), each leading to its entry's place in [words]. */
+    private val synonyms: List<String> = emptyList(),
+    private val synonymOf: IntArray = IntArray(0),
+) {
+    /** The entry for [word], or for the word it's a form of, matched without regard to case; null if it isn't in here. */
     fun define(word: String): Definition? {
-        val at = find(word.trim())
-        return if (at < 0) null else read(at).let { Definition(words[at], name, it.text, it.marks) }
+        val w = word.trim()
+        val at = find(words, w).takeIf { it >= 0 } ?: find(synonyms, w).takeIf { it >= 0 }?.let { synonymOf[it] }?.takeIf { it in words.indices } ?: return null
+        return read(at).let { Definition(words[at], name, it.text, it.marks) }
     }
 
     /** Up to [limit] words starting with [prefix], in the dictionary's order. */
     fun startingWith(prefix: String, limit: Int = 8): List<String> {
         val p = prefix.trim()
         if (p.isEmpty()) return emptyList()
-        var i = lowerBound(p)
+        var i = lowerBound(words, p)
         val out = mutableListOf<String>()
         while (i < words.size && out.size < limit && words[i].startsWith(p, ignoreCase = true)) {
             if (out.none { it.equals(words[i], ignoreCase = true) }) out += words[i]
@@ -44,18 +55,18 @@ class StarDict(val name: String, private val words: List<String>, private val of
         return out
     }
 
-    private fun find(word: String): Int {
-        val i = lowerBound(word)
-        return if (i < words.size && words[i].equals(word, ignoreCase = true)) i else -1
+    private fun find(list: List<String>, word: String): Int {
+        val i = lowerBound(list, word)
+        return if (i < list.size && list[i].equals(word, ignoreCase = true)) i else -1
     }
 
-    /** The first index whose word isn't before [word], comparing as StarDict sorts: case aside first. */
-    private fun lowerBound(word: String): Int {
+    /** The first index in [list] whose word isn't before [word], comparing as StarDict sorts: case aside first. */
+    private fun lowerBound(list: List<String>, word: String): Int {
         var lo = 0
-        var hi = words.size
+        var hi = list.size
         while (lo < hi) {
             val mid = (lo + hi) ushr 1
-            if (compare(words[mid], word) < 0) lo = mid + 1 else hi = mid
+            if (compare(list[mid], word) < 0) lo = mid + 1 else hi = mid
         }
         return lo
     }
@@ -91,8 +102,24 @@ object StarDicts {
     /** The dictionaries to look in: the one named [only], or all of them when it's null (or gone). */
     private fun chosen(context: Context, only: String?): List<StarDict> = all(context).let { all -> all.filter { it.name == only }.ifEmpty { all } }
 
-    /** The first entry for [word] in each dictionary that has it; with [only], in that one alone. */
+    /** The first entry for [word] (or the word it's a form of, where the dictionary lists forms) in each dictionary that has it; with [only], in that one alone. */
     fun define(context: Context, word: String, only: String? = null): List<Definition> = chosen(context, only).mapNotNull { it.define(word) }
+
+    /**
+     * An entry in a line, for the search: what it says, its lines run together, without a first line
+     * that only repeats the word, perhaps with its pronunciation ("katt /kat/"), and cut at about
+     * [length] letters. A first line with more than that ("run: to move fast") stays.
+     */
+    fun preview(d: Definition, length: Int = 90): String {
+        val lines = d.text.lines().map { it.trim() }.filter { it.isNotEmpty() }
+        val onlyTheWord = lines.size > 1 && lines.first().startsWith(d.word, ignoreCase = true) &&
+            lines.first().drop(d.word.length).replace(PRONUNCIATION, "").isBlank()
+        val rest = if (onlyTheWord) lines.drop(1) else lines
+        val line = rest.joinToString(" · ")
+        return if (line.length <= length) line else line.take(length).substringBeforeLast(' ') + "…"
+    }
+
+    private val PRONUNCIATION = Regex("""/[^/]*/|\[[^\]]*]""")
 
     /** Words starting with [prefix], from every dictionary (or [only] that one), each once. */
     fun suggest(context: Context, prefix: String, limit: Int = 8, only: String? = null): List<String> =
@@ -138,6 +165,7 @@ object StarDicts {
             val base = ifo.removeSuffix(".ifo")
             val idx = listOf("$base.idx", "$base.idx.gz").firstOrNull { it in files } ?: return@forEach
             val dict = listOf("$base.dict", "$base.dict.dz").firstOrNull { it in files } ?: return@forEach
+            val syn = listOf("$base.syn", "$base.syn.dz").firstOrNull { it in files }
             val resolver = context.contentResolver
             // Kept under its own title, not its file's name: two dictionaries both called "dict" must not
             // overwrite each other, and adding the same one again replaces it.
@@ -151,6 +179,7 @@ object StarDicts {
                 resolver.openInputStream(files.getValue(ifo))?.use { copy(it, File(into, "dict.ifo")) }
                 resolver.openInputStream(files.getValue(idx))?.use { copy(unpacked(it, idx), File(into, "dict.idx")) }
                 resolver.openInputStream(files.getValue(dict))?.use { copy(unpacked(it, dict), File(into, "dict.dict")) }
+                syn?.let { name -> resolver.openInputStream(files.getValue(name))?.use { copy(unpacked(it, name), File(into, "dict.syn")) } }
                 if (open(into) != null) added++ else into.deleteRecursively()
             } catch (e: Exception) {
                 Problems.note("adding the dictionary $base", e)
@@ -174,8 +203,25 @@ object StarDicts {
         val info = readIfo(File(dir, "dict.ifo"))
         val wide = info["idxoffsetbits"] == "64"
         val (words, offsets, sizes) = readIdx(File(dir, "dict.idx").readBytes(), wide)
-        StarDict(info["bookname"] ?: dir.name, words, offsets, sizes, File(dir, "dict.dict"), info["sametypesequence"])
+        val (synonyms, synonymOf) = File(dir, "dict.syn").takeIf { it.exists() }?.let { readSyn(it.readBytes()) } ?: (emptyList<String>() to IntArray(0))
+        StarDict(info["bookname"] ?: dir.name, words, offsets, sizes, File(dir, "dict.dict"), info["sametypesequence"], synonyms, synonymOf)
     }.getOrNull()
+
+    /** The forms list: each form (UTF-8, ended by a zero), then the place of its word in the index. */
+    internal fun readSyn(bytes: ByteArray): Pair<List<String>, IntArray> {
+        val forms = ArrayList<String>()
+        val places = ArrayList<Int>()
+        var i = 0
+        while (i < bytes.size) {
+            var end = i
+            while (end < bytes.size && bytes[end] != 0.toByte()) end++
+            if (end + 5 > bytes.size) break
+            forms += String(bytes, i, end - i, Charsets.UTF_8)
+            places += ((bytes[end + 1].toInt() and 0xFF) shl 24) or ((bytes[end + 2].toInt() and 0xFF) shl 16) or ((bytes[end + 3].toInt() and 0xFF) shl 8) or (bytes[end + 4].toInt() and 0xFF)
+            i = end + 5
+        }
+        return forms to places.toIntArray()
+    }
 
     internal fun readIfo(file: File): Map<String, String> =
         file.takeIf { it.exists() }?.readLines()?.mapNotNull { line -> line.split('=', limit = 2).takeIf { it.size == 2 }?.let { it[0].trim() to it[1].trim() } }?.toMap().orEmpty()

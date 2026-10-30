@@ -464,9 +464,12 @@ object Circles {
     )
 }
 
-/** The lock screen's gestures: four swipes starting around the clock, and a double tap anywhere. */
+/**
+ * The lock screen's gestures: four swipes starting around the clock, a double tap anywhere, and one on
+ * the clock, which does what a double tap does until it's given something of its own.
+ */
 @Serializable
-enum class Swipe { UP, DOWN, LEFT, RIGHT, DOUBLE_TAP }
+enum class Swipe { UP, DOWN, LEFT, RIGHT, DOUBLE_TAP, CLOCK_DOUBLE_TAP }
 
 /** The camera, which unlike any other app can open over the lock screen without unlocking. */
 const val GESTURE_CAMERA = "camera"
@@ -497,9 +500,9 @@ enum class SearchCategory(val title: String, val hint: String) {
     LOOK_UP("Look up", "Your words sent to an app or the web"),
 }
 
-/** The home screen's gestures; a swipe up always opens every app. */
+/** The home screen's gestures; a swipe up always opens every app. A double tap on the clock is a double tap until it's set. */
 @Serializable
-enum class HomeGesture { SWIPE_DOWN, SWIPE_LEFT, SWIPE_RIGHT, DOUBLE_TAP }
+enum class HomeGesture { SWIPE_DOWN, SWIPE_LEFT, SWIPE_RIGHT, DOUBLE_TAP, CLOCK_DOUBLE_TAP }
 
 /** What a home-screen gesture can do besides opening an app. None has a dot in it, so none is a package. */
 object HomeActions {
