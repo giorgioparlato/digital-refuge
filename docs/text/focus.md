@@ -562,16 +562,9 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 -  · opens once unlocked
 - A note
 - refuge notes{later}
-- Look up
 - All
-- A word
-- a note
-- “timer 10”
-- ‹ back to {previous}
-- No dictionaries yet. Add one under settings › search › dictionaries.
+- the whole entry ›
 - Notes
-- Nothing in your dictionaries or notes.
-- Not in your dictionaries.
 - ‹ back
 
 <sub>[NoteWidgetView.kt](../../app/src/main/java/app/bedtime/ui/notes/NoteWidgetView.kt)</sub>
@@ -594,10 +587,15 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 <sub>[LockScreenActivity.kt](../../app/src/main/java/app/bedtime/ui/lock/LockScreenActivity.kt)</sub>
 
 - that didn't go through
-- timer started
-- no clock app took it
 - unlock the phone
 - tap to open
+- timer started
+- no clock app took it
+- allow calendar access under settings › search first
+- added to your calendar
+- couldn't add it to a calendar
+- … until …
+- copied …
 
 <sub>[LockNotificationViews.kt](../../app/src/main/java/app/bedtime/ui/lock/LockNotificationViews.kt)</sub>
 

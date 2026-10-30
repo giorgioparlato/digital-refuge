@@ -178,4 +178,42 @@ class AppDrawerTest {
             AppDrawer.results("o trip", emptyList(), emptyList(), emptyList(), null, choices, keyword = app.bedtime.data.Keywords.Hit(SearchOrder.OBSIDIAN, "trip"), found = found),
         )
     }
+
+    private val friday = LocalDateTime.of(2026, 10, 30, 12, 0)
+
+    @Test
+    fun theQuickNoteOffersWhatItsWordsSayToDo() {
+        val settings = app.bedtime.data.AppSettings()
+        val deep = app.bedtime.data.Schedule(name = "Deep work", durationMinutes = 90)
+        val offers = { words: String -> AppDrawer.noteOffers(words, settings, listOf(deep), friday) }
+        assertEquals(listOf(DrawerResult.Clock(app.bedtime.data.ClockAction.Timer(600, ""))), offers("timer 10"))
+        assertTrue(offers("dentist mon 9").single() is DrawerResult.AddEvent)
+        assertEquals(listOf(DrawerResult.Calculation("36")), offers("12 * 3"))
+        assertEquals(listOf(DrawerResult.StartBlock(deep)), offers("deep"))
+        // A note that says nothing to do is just a note.
+        assertEquals(emptyList<DrawerResult>(), offers("call mum about lunch"))
+        assertEquals(emptyList<DrawerResult>(), offers(" "))
+    }
+
+    @Test
+    fun theQuickNoteFollowsTheSearchSettings() {
+        // The calculator switched off, and timers kept to their keyword.
+        val settings = app.bedtime.data.AppSettings(
+            searchChoices = listOf(SearchChoice(SearchOrder.CALCULATOR, false), SearchChoice(SearchOrder.TIMER, true, keywordOnly = true)),
+            searchModesSet = true,
+            keywords = mapOf(SearchOrder.TIMER to "t"),
+            keywordsCustom = true,
+        )
+        val offers = { words: String -> AppDrawer.noteOffers(words, settings, emptyList(), friday) }
+        assertEquals(emptyList<DrawerResult>(), offers("12 * 3"))
+        assertEquals(emptyList<DrawerResult>(), offers("timer 10"))
+        assertEquals(listOf(DrawerResult.Clock(app.bedtime.data.ClockAction.Timer(600, ""))), offers("t 10"))
+    }
+
+    @Test
+    fun onlyASingleWordIsLookedUp() {
+        assertEquals("serendipity", lookUpWord(" serendipity "))
+        assertEquals(null, lookUpWord("call mum"))
+        assertEquals(null, lookUpWord("a"))
+    }
 }

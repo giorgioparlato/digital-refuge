@@ -268,8 +268,7 @@ One file serves the look, widgets, gestures and notifications pages, for both sc
 - Nothing
 - Just unlocks
 - Camera
-- Write a quick note
-- Look up a word or a note
+- Write a note or look up a word
 - Show notifications
 - Turn the screen off
 - Look
@@ -277,7 +276,7 @@ One file serves the look, widgets, gestures and notifications pages, for both sc
 - Widgets
 - What your home screen and lock screen show, each its own, in the order you like. Pick the screen here first. Changes save as you go.
 - Lock-screen gestures
-- Swipes start around the clock; a double tap is anywhere, and one on the clock can do something else. Each can open an app once you've unlocked, or straight away the camera, a quick note, a look-up or your notifications. The middle is for swiping notifications away; from the bottom, any swipe just unlocks.
+- Swipes start around the clock; a double tap is anywhere, and one on the clock can do something else. Each can open an app once you've unlocked, or straight away the camera, a quick note (where one word looks it up) or your notifications. The middle is for swiping notifications away; from the bottom, any swipe just unlocks.
 - Gestures
 - On your home screen, and the minimal one during sessions. Swipes start anywhere but the very top edge, which stays Android's; a double tap is on an empty spot, and one on the clock can do something else.
 - Lock-screen notifications
@@ -295,8 +294,7 @@ One file serves the look, widgets, gestures and notifications pages, for both sc
 - Swipe …
 - Nothing, it just unlocks
 - Camera, without unlocking
-- Write a quick note, without unlocking
-- Look up a word or a note, without unlocking
+- Write a note or look up a word, without unlocking
 - Open an app, once unlocked
 - + your own font
 - + another
@@ -574,7 +572,7 @@ One file serves the look, widgets, gestures and notifications pages, for both sc
 - Add a folder of files
 - Find one
 - Close
-- 1. Add a dictionary: StarDict files (FreeDict and WordNet have free ones), copied from a folder. 2. In the search, type a word: its meaning shows under “Look up”, in every search or only after its keyword (set above). Tap it for the whole entry. 3. Without unlocking: set a lock-screen gesture to “look up” (settings › lock screen › gestures), then type a word. Tap any word in an entry to look that up too; “timer 10” starts a timer. 4. With several dictionaries, the chips at the top of the look-up pick one, or all.
+- 1. Add a dictionary: StarDict files (FreeDict and WordNet have free ones), copied from a folder. 2. In the search, type a word: its meaning shows under “Look up”, in every search or only after its keyword (set above). Tap it for the whole entry. 3. Without unlocking: type a single word in the quick note (put it on a gesture under settings › lock screen › gestures). Entries show above where the note goes; a second word takes them away. Tap any word in an entry to look that up too. 4. With several dictionaries, the chips at the top of the look-up pick one, or all.
 - Every search
 - Keyword only
 - Off

@@ -621,7 +621,7 @@ private fun signOf(key: String): androidx.compose.ui.graphics.vector.ImageVector
 private const val LOOK_UP_HOW =
     "1. Add a dictionary: StarDict files (FreeDict and WordNet have free ones), copied from a folder.\n" +
         "2. In the search, type a word: its meaning shows under “Look up”, in every search or only after its keyword (set above). Tap it for the whole entry.\n" +
-        "3. Without unlocking: set a lock-screen gesture to “look up” (settings › lock screen › gestures), then type a word. Tap any word in an entry to look that up too; “timer 10” starts a timer.\n" +
+        "3. Without unlocking: type a single word in the quick note (put it on a gesture under settings › lock screen › gestures). Entries show above where the note goes; a second word takes them away. Tap any word in an entry to look that up too.\n" +
         "4. With several dictionaries, the chips at the top of the look-up pick one, or all."
 
 /** One action: its name and keyword, and whether it's in every search, only by its keyword, or off. */

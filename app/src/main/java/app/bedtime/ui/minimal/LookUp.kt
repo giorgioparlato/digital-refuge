@@ -1,68 +1,55 @@
 package app.bedtime.ui.minimal
 
-import androidx.compose.foundation.gestures.detectTapGestures
-
-import androidx.compose.ui.input.pointer.pointerInput
-
-import kotlinx.coroutines.launch
-
-import androidx.compose.runtime.rememberCoroutineScope
-
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
-import app.bedtime.data.ClockAction
-import app.bedtime.data.ClockActions
-import app.bedtime.data.Definition
-import app.bedtime.data.Keywords
-import app.bedtime.data.SearchOrder
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.window.DialogProperties
-import kotlin.math.abs
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.bedtime.data.Definition
 import app.bedtime.data.HomeStyle
 import app.bedtime.data.StarDicts
 import app.bedtime.ui.components.Text
 import app.bedtime.ui.components.VerbatimText
 import app.bedtime.ui.homestyle.palette
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.math.abs
 
 /** A note found by the look-up: its title, and its text once opened. */
-private data class FoundNote(
+internal data class FoundNote(
     val title: String,
     val where: String,
     val refugeId: String? = null,
@@ -77,24 +64,19 @@ private data class FoundNote(
 internal class NotesOpenElsewhere(val refuge: (String) -> Unit, val vault: (app.bedtime.data.IndexedFile) -> Unit)
 
 /**
- * A word looked up in your dictionaries, right where you are: on the home screen, or the lock screen
- * without unlocking. With [notes], your refuge notes and Obsidian notes ([vault]) too, to read in place.
- * With [onTimer], "timer 10" (or the timer's [timerKeyword], "t 10") offers to start one.
- *
- * It sits at the top, clear of the keyboard and of Android's swipe at the foot: a swipe up or down on
- * it, a tap beside it, or Back puts it away and leaves the screen as it was.
+ * The quick note's look-up: a single word typed brings your dictionaries' entries for it and, with
+ * [notes], your notes that have it. With [elsewhere] (on the lock screen) notes are found by their
+ * titles alone and open once you've unlocked, never here.
+ */
+internal data class LookUpWith(val notes: Boolean = true, val elsewhere: NotesOpenElsewhere? = null)
+
+/**
+ * A panel at the top of the screen, clear of the keyboard and of Android's swipe at the foot. A tap
+ * beside it or Back puts it away; so does a swipe up or down on it while [swipeAway] says so (not
+ * once there's a note in it that a stray swipe would lose).
  */
 @Composable
-internal fun LookUpDialog(
-    style: HomeStyle,
-    onDismiss: () -> Unit,
-    initial: String = "",
-    notes: Boolean = true,
-    vault: String? = null,
-    elsewhere: NotesOpenElsewhere? = null,
-    onTimer: ((ClockAction.Timer) -> Unit)? = null,
-    timerKeyword: String? = null,
-) {
+internal fun TopPanel(onDismiss: () -> Unit, swipeAway: () -> Boolean = { true }, content: @Composable () -> Unit) {
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         val away = with(LocalDensity.current) { 48.dp.toPx() }
         Box(
@@ -103,87 +85,70 @@ internal fun LookUpDialog(
                 .pointerInput(onDismiss) { detectTapGestures { onDismiss() } }
                 .pointerInput(onDismiss) {
                     var travel = 0f
-                    detectVerticalDragGestures(onDragStart = { travel = 0f }, onDragEnd = { if (abs(travel) > away) onDismiss() }) { _, dy -> travel += dy }
+                    detectVerticalDragGestures(
+                        onDragStart = { travel = 0f },
+                        onDragEnd = { if (abs(travel) > away && swipeAway()) onDismiss() },
+                    ) { _, dy -> travel += dy }
                 }
                 .safeDrawingPadding()
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             contentAlignment = Alignment.TopCenter,
-        ) {
-            LookUpContent(style, initial, notes = notes, vault = vault, elsewhere = elsewhere, onTimer = onTimer, timerKeyword = timerKeyword)
-        }
+        ) { content() }
     }
 }
 
+/** A single word, for the look-up: no spaces in it, and at least two letters. */
+internal fun lookUpWord(words: String): String? = words.trim().takeIf { it.length >= 2 && it.none(Char::isWhitespace) }
+
+/**
+ * What your dictionaries and notes have for [word]: the dictionaries to choose from, each one's
+ * entry cut to three lines (all of it a tap away, or from the start when [whole]), words it could be
+ * when there's no entry, and notes. Any word in an entry can be tapped to look that up ([onWord]).
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun LookUpContent(
+internal fun WordResults(
     style: HomeStyle,
-    initial: String = "",
-    focus: Boolean = true,
-    notes: Boolean = true,
-    vault: String? = null,
-    /** With this, notes aren't read here but found by title and handed on: on the lock screen, to open once unlocked. */
-    elsewhere: NotesOpenElsewhere? = null,
-    onTimer: ((ClockAction.Timer) -> Unit)? = null,
-    timerKeyword: String? = null,
+    word: String,
+    lookUp: LookUpWith,
+    vault: String?,
+    whole: Boolean,
+    onWord: (String) -> Unit,
+    onRead: (FoundNote) -> Unit,
 ) {
     val context = LocalContext.current
     val p = style.palette()
-    var words by remember { mutableStateOf(initial) }
-    var reading by remember { mutableStateOf<FoundNote?>(null) }
-    /** The words looked up before this one by tapping, to go back through. */
-    var back by remember { mutableStateOf(emptyList<String>()) }
-    val focusRequester = remember { FocusRequester() }
-    if (focus) LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
     val names by produceState<List<String>?>(null) { value = withContext(Dispatchers.IO) { StarDicts.names(context) } }
     // With several dictionaries, which to look in: all, or one; remembered for next time.
     val repo = remember { app.bedtime.data.Repository.get(context) }
     val saved by repo.settings.collectAsStateWithLifecycle(initialValue = null)
     val only = saved?.lookUpDictionary?.takeIf { it in names.orEmpty() }
     val scope = rememberCoroutineScope()
+    val notes = lookUp.notes
+    val elsewhere = lookUp.elsewhere
     val refugeNotes by produceState(emptyList<app.bedtime.data.Note>(), notes) {
-        if (notes) app.bedtime.data.Repository.get(context).notes.collect { value = it }
+        if (notes) repo.notes.collect { value = it }
     }
     // The vault's notes by name, listed once.
     val vaultFiles by produceState(emptyList<app.bedtime.data.IndexedFile>(), notes, vault) {
         if (notes && vault != null) value = withContext(Dispatchers.IO) { app.bedtime.data.FolderIndex.list(context, android.net.Uri.parse(vault)) { it.endsWith(".md") } }
     }
-    // As you type: the words it could be, the entry for the word itself, and notes that have it.
-    val found by produceState(emptyList<String>() to emptyList<Definition>(), words, only) {
-        val w = words.trim()
-        value = if (w.length < 2) emptyList<String>() to emptyList() else withContext(Dispatchers.IO) { StarDicts.suggest(context, w, only = only) to StarDicts.define(context, w, only) }
+    // The entry for the word itself, or the words it could be.
+    val found by produceState(emptyList<String>() to emptyList<Definition>(), word, only) {
+        value = withContext(Dispatchers.IO) { StarDicts.suggest(context, word, only = only) to StarDicts.define(context, word, only) }
     }
     val (suggestions, definitions) = found
-    val query = words.trim()
-    // "timer 10 min", or the timer's own keyword and a length: "t 10".
-    val timer = if (onTimer == null) null else {
-        ClockActions.parse(query) as? ClockAction.Timer
-            ?: timerKeyword?.let { Keywords.match(query, mapOf(SearchOrder.TIMER to it)) }?.let { ClockActions.timer(it.words) }
-    }
-    val foundNotes = if (!notes || query.length < 2) emptyList() else {
+    val foundNotes = if (!notes) emptyList() else {
         // Locked, only titles are searched: what's inside a note shouldn't show, not even as a match.
         val later = if (elsewhere != null) " · opens once unlocked" else ""
         refugeNotes.map { it to app.bedtime.data.NoteWidget.title(it.text).ifBlank { "A note" } }
-            .filter { (note, title) -> (if (elsewhere != null) title else note.text).contains(query, ignoreCase = true) }
+            .filter { (note, title) -> (if (elsewhere != null) title else note.text).contains(word, ignoreCase = true) }
             .take(5).map { (note, title) -> FoundNote(title, "refuge notes$later", refugeId = note.id, refugeText = note.text) } +
-            app.bedtime.data.FolderIndex.match(vaultFiles, query, limit = 5, name = app.bedtime.data.FolderIndex::title).map { FoundNote(app.bedtime.data.FolderIndex.title(it), "obsidian$later", vaultFile = it) }
+            app.bedtime.data.FolderIndex.match(vaultFiles, word, limit = 5, name = app.bedtime.data.FolderIndex::title).map { FoundNote(app.bedtime.data.FolderIndex.title(it), "obsidian$later", vaultFile = it) }
     }
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(24.dp))
-            .background(p.background)
-            .border(1.dp, p.faint.copy(alpha = 0.25f), RoundedCornerShape(24.dp))
-            // A tap on the panel stays on it; only one beside it puts it away.
-            .pointerInput(Unit) { detectTapGestures { } }
-            .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        reading?.let { note ->
-            NoteReader(note, style) { reading = null }
-            return@Column
-        }
-        Text("Look up", style = MaterialTheme.typography.titleMedium, color = p.text)
+    // Entries opened in full, by dictionary.
+    var opened by remember(word) { mutableStateOf(emptySet<String>()) }
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         names?.takeIf { it.size > 1 }?.let { all ->
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 (listOf<String?>(null) + all).forEach { name ->
@@ -202,113 +167,57 @@ internal fun LookUpContent(
                 }
             }
         }
-        BasicTextField(
-            value = words,
-            onValueChange = {
-                words = it
-                back = emptyList()
-            },
-            singleLine = true,
-            textStyle = MaterialTheme.typography.bodyLarge.copy(color = p.text),
-            cursorBrush = SolidColor(p.accent),
-            modifier = Modifier
-                .fillMaxWidth()
-                .focusRequester(focusRequester)
-                .border(1.dp, p.faint.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
-                .padding(12.dp),
-            decorationBox = { field ->
-                Box {
-                    if (words.isEmpty()) {
-                        val kinds = listOfNotNull("A word", "a note".takeIf { notes }, "“timer 10”".takeIf { onTimer != null })
-                        val hint = if (kinds.size == 1) kinds[0] else kinds.dropLast(1).joinToString(", ") + " or " + kinds.last()
-                        Text(hint, style = MaterialTheme.typography.bodyLarge, color = p.faint)
-                    }
-                    field()
-                }
-            },
-        )
-        back.lastOrNull()?.let { previous ->
-            Text(
-                "‹ back to $previous",
-                style = MaterialTheme.typography.labelLarge,
-                color = p.accent,
-                modifier = Modifier.clip(RoundedCornerShape(50)).clickable {
-                    words = previous
-                    back = back.dropLast(1)
-                }.padding(vertical = 2.dp),
-            )
-        }
-        // The results take what room there is above the keyboard, and scroll.
-        Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            if (timer != null && onTimer != null) {
-                Text(
-                    ClockActions.label(timer) { _, _ -> "" },
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = p.accent,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .border(1.dp, p.accent.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
-                        .clickable { onTimer(timer) }
-                        .padding(horizontal = 14.dp, vertical = 12.dp),
-                )
-            }
-            when {
-                names?.isEmpty() == true && !notes -> Text(
-                    "No dictionaries yet. Add one under settings › search › dictionaries.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = p.faint,
-                )
-                definitions.isNotEmpty() -> definitions.forEach { d ->
-                    Column {
-                        Text(d.dictionary, style = MaterialTheme.typography.labelMedium, color = p.accent)
-                        VerbatimText(d.word, style = MaterialTheme.typography.titleMedium, color = p.text)
-                        EntryText(d, style) { word ->
-                            // Another word from the entry: looked up in its place, with a way back.
-                            if (!word.equals(words.trim(), ignoreCase = true)) {
-                                back = back + words.trim()
-                                words = word
-                            }
-                        }
-                    }
-                }
-                suggestions.isNotEmpty() -> FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    suggestions.forEach { word ->
-                        VerbatimText(
-                            word,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = p.text,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(50))
-                                .border(1.dp, p.faint.copy(alpha = 0.4f), RoundedCornerShape(50))
-                                .clickable { words = word }
-                                .padding(horizontal = 12.dp, vertical = 7.dp),
+        when {
+            definitions.isNotEmpty() -> definitions.forEach { d ->
+                Column {
+                    Text(d.dictionary, style = MaterialTheme.typography.labelMedium, color = p.accent)
+                    VerbatimText(d.word, style = MaterialTheme.typography.titleMedium, color = p.text)
+                    val full = whole || d.dictionary in opened
+                    var cut by remember(d) { mutableStateOf(false) }
+                    EntryText(d, style, maxLines = if (full) Int.MAX_VALUE else 3, onCut = { cut = it }, onWord = onWord)
+                    if (!full && cut) {
+                        Text(
+                            "the whole entry ›",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = p.accent,
+                            modifier = Modifier.padding(top = 4.dp).clip(RoundedCornerShape(50)).clickable { opened = opened + d.dictionary }.padding(vertical = 2.dp),
                         )
                     }
                 }
             }
-            if (foundNotes.isNotEmpty()) {
-                Column {
-                    Text("Notes", style = MaterialTheme.typography.labelMedium, color = p.accent)
-                    foundNotes.forEach { note ->
-                        val open = {
-                            val file = note.vaultFile
-                            val id = note.refugeId
-                            when {
-                                elsewhere == null -> reading = note
-                                file != null -> elsewhere.vault(file)
-                                id != null -> elsewhere.refuge(id)
-                            }
-                        }
-                        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable { open() }.padding(vertical = 8.dp)) {
-                            VerbatimText(note.title, style = MaterialTheme.typography.bodyLarge, color = p.text)
-                            Text(note.where, style = MaterialTheme.typography.labelSmall, color = p.faint)
-                        }
-                    }
+            suggestions.isNotEmpty() -> FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                suggestions.forEach { suggestion ->
+                    VerbatimText(
+                        suggestion,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = p.text,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(50))
+                            .border(1.dp, p.faint.copy(alpha = 0.4f), RoundedCornerShape(50))
+                            .clickable { onWord(suggestion) }
+                            .padding(horizontal = 12.dp, vertical = 7.dp),
+                    )
                 }
             }
-            if (query.length >= 2 && timer == null && definitions.isEmpty() && suggestions.isEmpty() && foundNotes.isEmpty()) {
-                Text(if (notes) "Nothing in your dictionaries or notes." else "Not in your dictionaries.", style = MaterialTheme.typography.bodyMedium, color = p.faint)
+        }
+        if (foundNotes.isNotEmpty()) {
+            Column {
+                Text("Notes", style = MaterialTheme.typography.labelMedium, color = p.accent)
+                foundNotes.forEach { note ->
+                    val open = {
+                        val file = note.vaultFile
+                        val id = note.refugeId
+                        when {
+                            elsewhere == null -> onRead(note)
+                            file != null -> elsewhere.vault(file)
+                            id != null -> elsewhere.refuge(id)
+                        }
+                    }
+                    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable { open() }.padding(vertical = 8.dp)) {
+                        VerbatimText(note.title, style = MaterialTheme.typography.bodyLarge, color = p.text)
+                        Text(note.where, style = MaterialTheme.typography.labelSmall, color = p.faint)
+                    }
+                }
             }
         }
     }
@@ -316,7 +225,7 @@ internal fun LookUpContent(
 
 /** A note read in place: refuge's own, or a file from your vault, read from the phone. */
 @Composable
-private fun NoteReader(note: FoundNote, style: HomeStyle, onBack: () -> Unit) {
+internal fun NoteReader(note: FoundNote, style: HomeStyle, onBack: () -> Unit) {
     val context = LocalContext.current
     val p = style.palette()
     val text by produceState(note.refugeText, note) {
@@ -351,16 +260,24 @@ private fun entryText(d: Definition, p: app.bedtime.ui.homestyle.HomePalette): a
         }
     }
 
-/** An entry, any word of which can be tapped to look it up: links underlined, the rest as they read. */
+/**
+ * An entry, any word of which can be tapped to look it up: links underlined, the rest as they read.
+ * At most [maxLines]; [onCut] hears whether that left some out.
+ */
 @Composable
-private fun EntryText(d: Definition, style: HomeStyle, onWord: (String) -> Unit) {
+private fun EntryText(d: Definition, style: HomeStyle, maxLines: Int, onCut: (Boolean) -> Unit, onWord: (String) -> Unit) {
     val p = style.palette()
     val text = remember(d, p) { entryText(d, p) }
     var layout by remember { mutableStateOf<androidx.compose.ui.text.TextLayoutResult?>(null) }
     androidx.compose.foundation.text.BasicText(
         text,
         style = MaterialTheme.typography.bodyMedium.copy(color = p.text),
-        onTextLayout = { layout = it },
+        maxLines = maxLines,
+        overflow = TextOverflow.Ellipsis,
+        onTextLayout = {
+            layout = it
+            onCut(it.hasVisualOverflow)
+        },
         modifier = Modifier.pointerInput(d) {
             detectTapGestures { position ->
                 val at = layout?.getOffsetForPosition(position) ?: return@detectTapGestures

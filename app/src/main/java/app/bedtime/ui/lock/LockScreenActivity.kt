@@ -399,13 +399,12 @@ private fun LockScreen(
     val sessionStyle = Modules.during(lockStyle, state?.active.orEmpty().map { it.start to it.schedule })
     val nowPlaying = if (Modules.isOn(sessionStyle, Screen.LOCK, Module.NOW_PLAYING)) rememberNowPlaying() else null
     var quickNote by remember { mutableStateOf(false) }
-    var lookingUp by remember { mutableStateOf(false) }
     // A gesture's action: a quick note or the notification shade right here, otherwise an app (the camera
     // straight away, any other once unlocked).
     val runAction: (String) -> Unit = { action ->
         when (action) {
-            HomeActions.NOTE -> quickNote = true
-            HomeActions.LOOKUP -> lookingUp = true
+            // A quick note and the look-up are one box now.
+            HomeActions.NOTE, HomeActions.LOOKUP -> quickNote = true
             HomeActions.NOTIFICATIONS -> BlockingState.globalAction(context, AccessibilityService.GLOBAL_ACTION_NOTIFICATIONS)
             HomeActions.LOCK -> onScreenOff()
             else -> onOpenApp(action)
@@ -494,51 +493,39 @@ private fun LockScreen(
             habits = habitList,
         )
     }
-    // Your dictionaries, read right here: nothing to unlock for a word.
+    // A quick note, and with a single word your dictionaries, read right here: nothing to unlock for a word.
     // Notes only if you've said so: here, anyone holding the phone could read them.
     // Notes by title only: one opens, in refuge or Obsidian, once you've unlocked, never here.
-    if (lookingUp) {
-        app.bedtime.ui.minimal.LookUpDialog(
-            lockStyle,
-            onDismiss = { lookingUp = false },
-            notes = settings.lookUpNotes,
-            vault = settings.obsidianVault,
-            elsewhere = app.bedtime.ui.minimal.NotesOpenElsewhere(
-                refuge = { id ->
-                    lookingUp = false
-                    onOpenRoute(app.bedtime.Routes.note(id))
-                },
-                vault = { file ->
-                    lookingUp = false
-                    // Obsidian knows the vault by its folder's name, not by the address Android gave refuge for it.
-                    settings.obsidianVault?.let { tree ->
-                        scope.launch {
-                            val name = withContext(Dispatchers.IO) { app.bedtime.data.FolderIndex.folderName(context, android.net.Uri.parse(tree)) }
-                            onOpenIntent(app.bedtime.data.FolderIndex.obsidianIntent(name, file))
-                        }
-                    }
-                },
-            ),
-            // Started in your clock app without unlocking, where it allows that, and counted down here.
-            onTimer = { timer ->
-                runCatching { context.startActivity(app.bedtime.data.ClockActions.intent(timer)) }
-                    .onSuccess {
-                        scope.launch { repo.addTimer(System.currentTimeMillis() + timer.seconds * 1000L) }
-                        Toast.makeText(context, "timer started", Toast.LENGTH_SHORT).show()
-                        lookingUp = false
-                    }
-                    .onFailure { Toast.makeText(context, "no clock app took it", Toast.LENGTH_SHORT).show() }
-            },
-            timerKeyword = settings.keywords[app.bedtime.data.SearchOrder.TIMER].takeIf { settings.keywordsCustom },
-        )
-    }
     if (quickNote) {
+        val schedules by repo.schedules.collectAsStateWithLifecycle(initialValue = emptyList())
+        val blocks = schedules.filter { it.isBlock && it.enabled }
         QuickNoteDialog(
             lockStyle,
             settings.quickTargets,
             onSave = { words, target -> scope.launch { Toast.makeText(context, Notes.save(context, repo, words, target), Toast.LENGTH_SHORT).show() } },
             onDismiss = { quickNote = false },
             vault = settings.obsidianVault,
+            lookUp = app.bedtime.ui.minimal.LookUpWith(
+                notes = settings.lookUpNotes,
+                elsewhere = app.bedtime.ui.minimal.NotesOpenElsewhere(
+                    refuge = { id ->
+                        quickNote = false
+                        onOpenRoute(app.bedtime.Routes.note(id))
+                    },
+                    vault = { file ->
+                        quickNote = false
+                        // Obsidian knows the vault by its folder's name, not by the address Android gave refuge for it.
+                        settings.obsidianVault?.let { tree ->
+                            scope.launch {
+                                val name = withContext(Dispatchers.IO) { app.bedtime.data.FolderIndex.folderName(context, android.net.Uri.parse(tree)) }
+                                onOpenIntent(app.bedtime.data.FolderIndex.obsidianIntent(name, file))
+                            }
+                        }
+                    },
+                ),
+            ),
+            offers = { words -> app.bedtime.ui.minimal.AppDrawer.noteOffers(words, settings, blocks, LocalDateTime.now()) },
+            onOffer = { offer -> runOffer(context, repo, scope, settings, offer) },
         )
     }
     // The list folds back to its summary line whenever the screen goes off.
@@ -804,6 +791,45 @@ internal fun LockScreenContent(
                 Spacer(Modifier.height(12.dp))
             }
         }
+    }
+}
+
+/**
+ * What the quick note offered, done without unlocking: a timer in your clock app (counted down here),
+ * an event in your calendar, a block started, a sum copied. Each only makes the phone stricter or
+ * adds something; nothing here opens a way into it.
+ */
+private fun runOffer(context: Context, repo: Repository, scope: kotlinx.coroutines.CoroutineScope, settings: AppSettings, offer: app.bedtime.ui.minimal.DrawerResult) {
+    val say = { text: String -> Toast.makeText(context, text, Toast.LENGTH_SHORT).show() }
+    when (offer) {
+        is app.bedtime.ui.minimal.DrawerResult.Clock -> {
+            val timer = offer.action as? app.bedtime.data.ClockAction.Timer ?: return
+            runCatching { context.startActivity(app.bedtime.data.ClockActions.intent(timer)) }
+                .onSuccess {
+                    scope.launch { repo.addTimer(System.currentTimeMillis() + timer.seconds * 1000L) }
+                    say("timer started")
+                }
+                .onFailure { say("no clock app took it") }
+        }
+        // Calendar access can't be asked for here: it's given once, from the search or its settings.
+        is app.bedtime.ui.minimal.DrawerResult.AddEvent -> if (!app.bedtime.ui.minimal.CalendarSource.hasPermission(context) || !app.bedtime.ui.minimal.CalendarSource.canWrite(context)) {
+            say("allow calendar access under settings › search first")
+        } else {
+            scope.launch {
+                val saved = withContext(Dispatchers.IO) { app.bedtime.ui.minimal.CalendarSource.insert(context, offer.event, settings.eventCalendarId) }
+                say(if (saved) "added to your calendar" else "couldn't add it to a calendar")
+            }
+        }
+        is app.bedtime.ui.minimal.DrawerResult.StartBlock -> scope.launch {
+            repo.startBlock(offer.block, offer.block.durationMinutes)
+            say("${offer.block.name} until ${formatTime(context, System.currentTimeMillis() + offer.block.durationMinutes * 60_000L)}".lowercase())
+        }
+        is app.bedtime.ui.minimal.DrawerResult.Calculation -> {
+            context.getSystemService(android.content.ClipboardManager::class.java)
+                ?.setPrimaryClip(android.content.ClipData.newPlainText("answer", offer.answer))
+            say("copied ${offer.answer}")
+        }
+        else -> Unit
     }
 }
 

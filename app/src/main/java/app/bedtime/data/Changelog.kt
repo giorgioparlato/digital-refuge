@@ -13,6 +13,16 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            73,
+            "0.9.27",
+            listOf(
+                "The quick note and look-up are one box: type a single word and your dictionaries show above where the note goes; a second word takes them away, and the note works as before.",
+                "Entries show three lines at first; \"the whole entry\" opens the rest, and any word in one can still be tapped.",
+                "Above where the note goes, when your words say so: a timer, an event for your calendar, a block to start, or a sum to copy. They follow your search settings.",
+                "A gesture set to look up opens the same box.",
+            ),
+        ),
+        ChangelogEntry(
             72,
             "0.9.26",
             listOf(

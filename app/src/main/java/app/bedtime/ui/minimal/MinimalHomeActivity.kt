@@ -370,8 +370,8 @@ private fun MinimalHomeScreen(
             null -> Unit
             HomeActions.NOTIFICATIONS -> BlockingState.globalAction(context, AccessibilityService.GLOBAL_ACTION_NOTIFICATIONS)
             HomeActions.LOCK -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) BlockingState.globalAction(context, AccessibilityService.GLOBAL_ACTION_LOCK_SCREEN)
-            HomeActions.NOTE -> quickNote = true
-            HomeActions.LOOKUP -> lookingUp = ""
+            // A quick note and the look-up are one box now.
+            HomeActions.NOTE, HomeActions.LOOKUP -> quickNote = true
             HomeActions.SEARCH -> drawer = true
             HomeActions.NOTES -> notesOpen = true
             HomeActions.WEEK -> scope.launch { week = loadCalendarWeek(context, LocalDateTime.now()) }
@@ -709,20 +709,25 @@ private fun MinimalHomeScreen(
             blocksOpen = false
         }, onDismiss = { blocksOpen = false })
     }
-    lookingUp?.let { word ->
-        LookUpDialog(
+
+    // A quick note, and with a single word your dictionaries; from a meaning in the search, that word, its entries whole.
+    if (quickNote || lookingUp != null) {
+        QuickNoteDialog(
             style,
-            onDismiss = { lookingUp = null },
-            initial = word,
-            vault = settings.obsidianVault,
-            onTimer = { timer ->
-                onResult(DrawerResult.Clock(timer))
+            settings.quickTargets,
+            onSave = saveNote,
+            onDismiss = {
+                quickNote = false
                 lookingUp = null
             },
-            timerKeyword = allKeywords[SearchOrder.TIMER],
+            vault = settings.obsidianVault,
+            lookUp = LookUpWith(),
+            offers = { words -> AppDrawer.noteOffers(words, settings, blocks, LocalDateTime.now()) },
+            onOffer = onResult,
+            initial = lookingUp.orEmpty(),
+            whole = !lookingUp.isNullOrEmpty(),
         )
     }
-    if (quickNote) QuickNoteDialog(style, settings.quickTargets, onSave = saveNote, onDismiss = { quickNote = false }, vault = settings.obsidianVault)
     if (appsDetail) {
         app.bedtime.ui.components.UseAppsDialog(useToday, style, onDismiss = { appsDetail = false }, onStats = { runCatching { context.startActivity(app.bedtime.MainActivity.intent(context, app.bedtime.Routes.STATS)) } })
     }

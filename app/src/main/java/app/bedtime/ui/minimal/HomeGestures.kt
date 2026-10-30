@@ -1,5 +1,15 @@
 package app.bedtime.ui.minimal
 
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.height
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.runtime.produceState
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
 import androidx.compose.foundation.verticalScroll
 
 import androidx.compose.foundation.rememberScrollState
@@ -68,35 +78,94 @@ fun readHomeDrag(dx: Float, dy: Float, minDistance: Float): HomeDrag = when {
 }
 
 /**
- * A note written straight from the home screen: the words, then where they go, as from the search:
- * the app's own notes, or one of your files.
+ * A note written straight from the home screen or the lock screen: the words, then where they go, as
+ * from the search: the app's own notes, or one of your files. With [lookUp], a single word also
+ * brings your dictionaries' entries above where it goes; a second word takes them away and it's a
+ * note again. What the words say to do ([offers]: a timer, an event, a block, a sum) sits first.
  */
 @Composable
-internal fun QuickNoteDialog(style: HomeStyle, targets: List<NoteTarget>, onSave: (String, NoteTarget?) -> Unit, onDismiss: () -> Unit, vault: String? = null) {
-    Dialog(onDismissRequest = onDismiss) { QuickNoteContent(style, targets, onSave = { words, target -> onSave(words, target); onDismiss() }, vault = vault) }
+internal fun QuickNoteDialog(
+    style: HomeStyle,
+    targets: List<NoteTarget>,
+    onSave: (String, NoteTarget?) -> Unit,
+    onDismiss: () -> Unit,
+    vault: String? = null,
+    lookUp: LookUpWith? = null,
+    offers: (String) -> List<DrawerResult> = { emptyList() },
+    onOffer: (DrawerResult) -> Unit = {},
+    initial: String = "",
+    whole: Boolean = false,
+) {
+    var words by remember { mutableStateOf(initial) }
+    // A swipe puts it away only while there's no more than a word in it, so a note isn't lost to one.
+    TopPanel(onDismiss, swipeAway = { lookUpWord(words) != null || words.isBlank() }) {
+        QuickNoteContent(
+            style, targets,
+            onSave = { text, target -> onSave(text, target); onDismiss() },
+            vault = vault,
+            lookUp = lookUp,
+            offers = offers,
+            onOffer = { onOffer(it); onDismiss() },
+            whole = whole,
+            words = words,
+            onWords = { words = it },
+        )
+    }
 }
 
 @Composable
-internal fun QuickNoteContent(style: HomeStyle, targets: List<NoteTarget>, onSave: (String, NoteTarget?) -> Unit, initial: String = "", focus: Boolean = true, vault: String? = null) {
+internal fun QuickNoteContent(
+    style: HomeStyle,
+    targets: List<NoteTarget>,
+    onSave: (String, NoteTarget?) -> Unit,
+    initial: String = "",
+    focus: Boolean = true,
+    vault: String? = null,
+    lookUp: LookUpWith? = null,
+    offers: (String) -> List<DrawerResult> = { emptyList() },
+    onOffer: (DrawerResult) -> Unit = {},
+    whole: Boolean = false,
+    words: String? = null,
+    onWords: ((String) -> Unit)? = null,
+) {
+    val context = LocalContext.current
     val p = style.palette()
-    var words by remember { mutableStateOf(initial) }
+    // The words are kept by the dialog when it has them, so it knows whether a swipe may close it.
+    var own by remember { mutableStateOf(initial) }
+    val text = words ?: own
+    /** The words looked up before this one by tapping, to go back through. */
+    var back by remember { mutableStateOf(emptyList<String>()) }
+    val setText: (String) -> Unit = { onWords?.invoke(it) ?: run { own = it } }
+    var reading by remember { mutableStateOf<FoundNote?>(null) }
     val focusRequester = remember { FocusRequester() }
     if (focus) LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
+    val hasDictionaries by produceState(false, lookUp) {
+        if (lookUp != null) value = withContext(Dispatchers.IO) { app.bedtime.data.StarDicts.names(context).isNotEmpty() }
+    }
     Column(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(24.dp))
             .background(p.background)
             .border(1.dp, p.faint.copy(alpha = 0.25f), RoundedCornerShape(24.dp))
+            // A tap on the panel stays on it; only one beside it puts it away.
+            .pointerInput(Unit) { detectTapGestures { } }
             // However long the words, where they go stays within reach.
             .verticalScroll(rememberScrollState())
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        reading?.let { note ->
+            NoteReader(note, style) { reading = null }
+            return@Column
+        }
         Text("A quick note", style = MaterialTheme.typography.titleMedium, color = p.text)
         BasicTextField(
-            value = words,
-            onValueChange = { words = it },
+            value = text,
+            onValueChange = {
+                setText(it)
+                back = emptyList()
+            },
             textStyle = MaterialTheme.typography.bodyLarge.copy(color = p.text),
             cursorBrush = SolidColor(p.accent),
             keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
@@ -109,18 +178,46 @@ internal fun QuickNoteContent(style: HomeStyle, targets: List<NoteTarget>, onSav
                 .padding(12.dp),
             decorationBox = { field ->
                 Box {
-                    if (words.isEmpty()) Text("What's on your mind", style = MaterialTheme.typography.bodyLarge, color = p.faint)
+                    if (text.isEmpty()) Text(if (hasDictionaries) "What's on your mind, or a word to look up" else "What's on your mind", style = MaterialTheme.typography.bodyLarge, color = p.faint)
                     field()
                 }
             },
         )
-        val ready = words.isNotBlank()
+        back.lastOrNull()?.let { previous ->
+            Text(
+                "‹ back to $previous",
+                style = MaterialTheme.typography.labelLarge,
+                color = p.accent,
+                modifier = Modifier.clip(RoundedCornerShape(50)).clickable {
+                    setText(previous)
+                    back = back.dropLast(1)
+                }.padding(vertical = 2.dp),
+            )
+        }
+        // What the words say to do, first: a timer, an event, a block, a sum.
+        remember(text) { offers(text) }.forEach { offer -> OfferRow(offer, style) { onOffer(offer) } }
+        val word = lookUpWord(text)
+        if (lookUp != null && word != null) {
+            WordResults(
+                style, word, lookUp, vault, whole,
+                onWord = { tapped ->
+                    // Another word from an entry: looked up in its place, with a way back.
+                    if (!tapped.equals(word, ignoreCase = true)) {
+                        back = back + word
+                        setText(tapped)
+                    }
+                },
+                onRead = { reading = it },
+            )
+            Box(Modifier.fillMaxWidth().padding(vertical = 2.dp).height(1.dp).background(p.faint.copy(alpha = 0.25f)))
+        }
+        val ready = text.isNotBlank()
         (listOf<NoteTarget?>(null) + targets).forEach { target ->
             Row(
                 Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(10.dp))
-                    .clickable(enabled = ready) { onSave(words.trim(), target) }
+                    .clickable(enabled = ready) { onSave(text.trim(), target) }
                     .padding(vertical = 10.dp, horizontal = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -141,5 +238,37 @@ internal fun QuickNoteContent(style: HomeStyle, targets: List<NoteTarget>, onSav
                 )
             }
         }
+    }
+}
+
+/** Something the words say to do, above where the note goes: start a timer, add an event, start a block, copy a sum. */
+@Composable
+private fun OfferRow(offer: DrawerResult, style: HomeStyle, onClick: () -> Unit) {
+    val context = LocalContext.current
+    val p = style.palette()
+    val (icon, label) = when (offer) {
+        is DrawerResult.Clock -> Icons.Default.PlayArrow to app.bedtime.data.ClockActions.label(offer.action) { h, m ->
+            app.bedtime.ui.formatTime(context, java.time.LocalDate.now().atTime(h, m).atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()).lowercase()
+        }
+        is DrawerResult.AddEvent -> Icons.Default.DateRange to AppDrawer.eventLabel(offer.event) {
+            app.bedtime.ui.formatTime(context, it.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli())
+        }
+        is DrawerResult.StartBlock -> app.bedtime.ui.components.ScheduleIcons.of(offer.block.icon) to
+            "start ${offer.block.name.lowercase()} · ${app.bedtime.ui.formatMinutes(offer.block.durationMinutes.toLong())}"
+        is DrawerResult.Calculation -> Icons.Default.Add to "= ${offer.answer} · copy"
+        else -> return
+    }
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .border(1.dp, p.accent.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, contentDescription = null, tint = p.accent, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.width(12.dp))
+        Text(label, style = MaterialTheme.typography.bodyLarge, color = p.accent)
     }
 }

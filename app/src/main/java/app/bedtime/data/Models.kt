@@ -516,20 +516,20 @@ object HomeActions {
     const val LOOKUP = "lookup"
     const val CAMERA = GESTURE_CAMERA
 
-    /** In the order they're offered, with how each reads. */
+    /** In the order they're offered, with how each reads. The look-up is in the quick note now, so it isn't offered of its own. */
     val all: List<Pair<String, String>> = listOf(
         NOTIFICATIONS to "Show notifications",
         LOCK to "Turn the screen off",
-        NOTE to "Write a quick note",
+        NOTE to "Write a note or look up a word",
         SEARCH to "Search",
         NOTES to "Your notes",
         WEEK to "The week ahead",
         BLOCKS to "Your blocks, to start one",
-        LOOKUP to "Look up a word or a note",
         CAMERA to "Camera",
     )
 
-    fun label(action: String?): String? = all.firstOrNull { it.first == action }?.second
+    /** How [action] reads; a gesture still set to the look-up opens the quick note, and reads as it. */
+    fun label(action: String?): String? = all.firstOrNull { it.first == (if (action == LOOKUP) NOTE else action) }?.second
 }
 
 /** The fonts the minimal home can use: four that ship with the app, and one you add. */

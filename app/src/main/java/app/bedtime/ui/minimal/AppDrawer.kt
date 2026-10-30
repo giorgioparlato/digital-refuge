@@ -184,6 +184,32 @@ object AppDrawer {
         }
     }
 
+    /**
+     * What the quick note offers to do with [words], above where the note goes: a timer, an event, a
+     * block to start, a sum. Each only where the search has it; one kept to its keyword only when that
+     * keyword comes first ("t 10").
+     */
+    fun noteOffers(words: String, settings: app.bedtime.data.AppSettings, blocks: List<app.bedtime.data.Schedule>, now: java.time.LocalDateTime): List<DrawerResult> {
+        val typed = words.trim()
+        if (typed.isEmpty()) return emptyList()
+        val choices = SearchOrder.arrange(SearchOrder.defaults(emptyList(), settings.quickTargets), settings.searchChoices)
+        val keywords = Keywords.effective(settings.keywords, settings.keywordsCustom, Keywords.defaults(choices, settings.quickTargets))
+        val usable = SearchOrder.usable(SearchOrder.withModes(choices, keywords, settings.searchModesSet), settings.searchOff)
+        // The words for [key]: those after its keyword, or all of them where it's in every search; null where it's off.
+        fun wordsFor(key: String): String? {
+            val choice = usable.firstOrNull { it.key == key } ?: return null
+            return keywords[key]?.let { Keywords.match(typed, mapOf(key to it)) }?.words ?: typed.takeIf { !choice.keywordOnly }
+        }
+        fun byKeyword(key: String) = usable.any { it.key == key } && keywords[key]?.let { Keywords.match(typed, mapOf(key to it)) } != null
+        return buildList {
+            wordsFor(SearchOrder.TIMER)?.let { w -> if (byKeyword(SearchOrder.TIMER)) ClockActions.timer(w) else ClockActions.parse(w) as? ClockAction.Timer }
+                ?.let { add(DrawerResult.Clock(it)) }
+            wordsFor(SearchOrder.CALENDAR)?.let { app.bedtime.data.EventParser.parse(it, now) }?.let { add(DrawerResult.AddEvent(it)) }
+            wordsFor(SearchOrder.BLOCKS)?.takeIf { it.length >= 2 }?.let { w -> blocks.filter { it.name.contains(w, ignoreCase = true) }.take(2).forEach { add(DrawerResult.StartBlock(it)) } }
+            wordsFor(SearchOrder.CALCULATOR)?.let { app.bedtime.data.Calculator.evaluate(it) }?.let { add(DrawerResult.Calculation(app.bedtime.data.Calculator.format(it))) }
+        }
+    }
+
     /** Whether [result] does something with the words (searches, saves a note or an event, sets the clock), rather than opening something found. */
     fun isAction(result: DrawerResult): Boolean =
         result is DrawerResult.Search || result is DrawerResult.AddNote || result is DrawerResult.AddEvent || result is DrawerResult.Clock ||
