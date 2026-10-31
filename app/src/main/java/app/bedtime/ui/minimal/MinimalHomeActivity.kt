@@ -519,7 +519,10 @@ private fun MinimalHomeScreen(
     when {
         notesOpen -> {
             BackHandler { notesOpen = false }
-            NotesScreen(onBack = { notesOpen = false })
+            NotesScreen(onBack = { notesOpen = false }, onSettings = {
+                notesOpen = false
+                context.startActivity(app.bedtime.MainActivity.intent(context, app.bedtime.Routes.QUICK_NOTES))
+            })
         }
         drawer -> {
             BackHandler { closeDrawer() }

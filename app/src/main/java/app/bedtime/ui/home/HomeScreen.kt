@@ -121,6 +121,8 @@ fun HomeScreen(
     onSetup: () -> Unit,
     onUnlock: (String) -> Unit,
     onNotes: () -> Unit = {},
+    /** "Ask why" settings: after unlocking, and before distracting apps. */
+    onWhy: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val repo = remember { Repository.get(context) }
@@ -178,6 +180,7 @@ fun HomeScreen(
         onUndo = { id -> scope.launch { repo.undoStart(id) } },
         onDismissWhatsNew = { scope.launch { repo.updateSettings { it.copy(lastSeenVersion = installed) } } },
         onNotes = onNotes,
+        onWhy = onWhy,
         isInstalled = { AppCatalog.isLaunchable(context, it) },
         onToggle = { schedule, on -> scope.launch { repo.upsert(schedule.copy(enabled = on)) } },
         onDelete = { schedule -> scope.launch { repo.delete(schedule.id) } },
@@ -197,6 +200,8 @@ internal fun HomeContent(
     onUndo: (String) -> Unit = {},
     onDismissWhatsNew: () -> Unit = {},
     onNotes: () -> Unit = {},
+    /** "Ask why" settings: after unlocking, and before distracting apps. */
+    onWhy: () -> Unit = {},
     isInstalled: (String) -> Boolean = { false },
     onToggle: (Schedule, Boolean) -> Unit = { _, _ -> },
     onDelete: (Schedule) -> Unit = {},
@@ -284,6 +289,15 @@ internal fun HomeContent(
                         ScheduleItem(schedulesOnly[index], ui.active, ui.history, ui.now, minuteOfDay, onEdit, onToggle, onDelete)
                     }
                 }
+            }
+            // A pause before picking up the phone, a tap from here too.
+            item(key = "why") {
+                Text(
+                    "Ask why you're picking up the phone ›",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = c.textMuted,
+                    modifier = Modifier.padding(horizontal = PageGutter).clip(RoundedCornerShape(8.dp)).clickable(onClick = onWhy).padding(vertical = 12.dp),
+                )
             }
         }
         if (ui.schedules.isNotEmpty()) {

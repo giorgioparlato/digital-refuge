@@ -1,5 +1,13 @@
 package app.bedtime.service
 
+import app.bedtime.ui.blocked.WhyActivity
+
+import app.bedtime.data.Why
+
+import app.bedtime.data.Shortcuts
+
+import app.bedtime.data.FolderIndex
+
 import android.os.SystemClock
 
 import android.accessibilityservice.AccessibilityService
@@ -148,6 +156,8 @@ class BlockerService : AccessibilityService() {
                 limitTracker.moveTo(null)
                 limitTracker.flush()
                 distractionClock.moveTo(null)
+                // Put down in Obsidian: its sync waits for the next unlock, as one from the lock screen does.
+                if (lastPackage == FolderIndex.OBSIDIAN) syncAfterObsidian(locked = true)
                 // The weekly backup, when one is due: the phone is put down, so nothing is waiting on it.
                 if (AutoBackup.due(settings, System.currentTimeMillis())) releaseScope.launch { AutoBackup.write(applicationContext) }
                 runClock.stop()
@@ -166,6 +176,9 @@ class BlockerService : AccessibilityService() {
                 releaseScope.launch { Repository.get(this@BlockerService).addUnlock(HourlyUse.today(), java.time.LocalTime.now().hour) }
                 // Sunday evening's look back on the week, if asked for and not yet given.
                 releaseScope.launch { LookBackNotifier.maybePost(applicationContext) }
+                askWhyAfterUnlock()
+                // A note added to a file on the lock screen: its sync, now that you're in.
+                releaseScope.launch { app.bedtime.data.Notes.syncIfWaiting(applicationContext, Repository.get(applicationContext)) }
             }
             Engine.refresh()
             refreshSystemPackages()
@@ -280,6 +293,8 @@ class BlockerService : AccessibilityService() {
         // the phone sideways threw you out of an app the session allowed. Without a class name we can't
         // tell, so it counts as an app, as it always did.
         if (className != null && !isActivity(pkg, className)) return
+        // Leaving Obsidian: what you wrote there goes out with the same sync as a quick note's, if asked.
+        if (lastPackage == FolderIndex.OBSIDIAN && pkg != FolderIndex.OBSIDIAN) syncAfterObsidian(locked = false)
         lastPackage = pkg
         recentsInFront = RecentsScreens.matches(className)
         val boundary = state?.nextBoundary
@@ -302,6 +317,13 @@ class BlockerService : AccessibilityService() {
      * A window that really is the foreground app is still there a moment later; a flash is not,
      * because the app underneath comes back and takes this timer with it.
      */
+    /** The "then" shortcut after Obsidian, now, or once unlocked ([locked]); only with one chosen and this on. */
+    private fun syncAfterObsidian(locked: Boolean) {
+        val shortcut = settings.afterNoteShortcut ?: return
+        if (!settings.syncAfterObsidian) return
+        if (locked) app.bedtime.data.Notes.syncWhenUnlocked(this) else releaseScope.launch { Shortcuts.start(this@BlockerService, shortcut) }
+    }
+
     private fun settle(pkg: String) {
         pendingSettle?.let(handler::removeCallbacks)
         // enforce() re-reads the state, so a session ending before this runs leaves it with nothing to do.
@@ -396,13 +418,36 @@ class BlockerService : AccessibilityService() {
         distractionClock.moveTo(pkg)
         if (pkg == null) return
         when (Enforcement.decide(pkg, packageName, state, alwaysAllowed, settings.alwaysAvailable, recentsInFront, ::opensAsApp)) {
-            Verdict.LET_THROUGH -> Unit
+            Verdict.LET_THROUGH -> if (arrived) askWhy(pkg)
             Verdict.COVER -> Problems.attempt("covering a blocked app") { startActivity(BlockedActivity.intent(this, pkg)) }
             // In minimal mode the stock launcher and recents are "not allowed" too, so Home lands here.
             Verdict.MINIMAL_HOME -> Problems.attempt("going to the minimal home") { startActivity(MinimalHomeActivity.intent(this)) }
             // Limits hold every day, and inside a session for the apps it lets through.
-            Verdict.CHECK_LIMITS -> limitTracker.check(pkg, arrived)
+            Verdict.CHECK_LIMITS -> if (!limitTracker.check(pkg, arrived) && arrived) askWhy(pkg)
         }
+    }
+
+    /** When "why?" was last asked: for each app, and after an unlock. */
+    private val whyAsked = mutableMapOf<String, Long>()
+    private var whyAfterUnlock = 0L
+
+    /** "Why am I opening this?", before a distracting or limited app, if asked for, and not again for a while. */
+    private fun askWhy(pkg: String) {
+        if (pkg == packageName || !Why.asks(settings.askOnApps, state?.isActive == true)) return
+        if (pkg !in settings.distractingApps && settings.limits.none { pkg in it.rules.apps }) return
+        val now = System.currentTimeMillis()
+        // Just asked after the unlock that led here: once is enough.
+        if (now - whyAfterUnlock < 60_000L || !Why.due(whyAsked[pkg] ?: 0L, now, Why.APP_AGAIN_MS)) return
+        whyAsked[pkg] = now
+        Problems.attempt("asking why") { startActivity(WhyActivity.intent(this, pkg)) }
+    }
+
+    /** "Why am I unlocking my phone right now?", just after an unlock, over whatever it opened to. */
+    private fun askWhyAfterUnlock() {
+        val now = System.currentTimeMillis()
+        if (!Why.asks(settings.askOnUnlock, state?.isActive == true) || !Why.due(whyAfterUnlock, now, Why.UNLOCK_AGAIN_MS)) return
+        whyAfterUnlock = now
+        handler.postDelayed({ Problems.attempt("asking why") { startActivity(WhyActivity.intent(this)) } }, 700)
     }
 
     /**

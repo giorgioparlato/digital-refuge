@@ -6,13 +6,17 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import java.util.UUID
 
-/** One kind of journalling, with a line on how to go about it and the questions it asks. Yours to change. */
+/**
+ * One kind of journalling, with a line on how to go about it and the questions it asks, each perhaps
+ * with an example to show what an answer looks like ([hints], by question). Yours to change.
+ */
 @Serializable
 data class JournalSection(
     val id: String = UUID.randomUUID().toString(),
     val name: String,
     val guide: String = "",
     val prompts: List<String> = emptyList(),
+    val hints: Map<String, String> = emptyMap(),
 )
 
 /** A day's microjournal entry: what was written, and the sections it drew on, by name, as they were then. */
@@ -20,61 +24,83 @@ data class JournalSection(
 data class JournalEntry(val day: Long, val text: String, val aims: List<String> = emptyList(), val editedAt: Long = 0L)
 
 /**
- * The microjournal: an entry a day, and sections of prompts to write from. The suggested sections
- * follow the journalling system by Struthless (vent, obligations, mindset, ideation, trajectory), with
- * gratitude as one of its own; each is only a start, to rename, rewrite, delete or add to.
+ * The microjournal: an entry a day, and sections of prompts to write from. The suggested sections come
+ * from Struthless's "The Journalling Techniques that Changed My Life", and self compassion's three steps
+ * from Kristin Neff; their words live in docs/text/journal.md. Each is only a start, to rename,
+ * rewrite, delete or add to.
  */
 object Journal {
+    /** A section from its questions, each with its example, or null for none. Written by docs/text/journal_to_code.py. */
+    private fun section(id: String, name: String, guide: String, vararg prompts: Pair<String, String?>) =
+        JournalSection(id, name, guide, prompts.map { it.first }, prompts.mapNotNull { (q, h) -> h?.let { q to it } }.toMap())
+
     val SUGGESTED: List<JournalSection> = listOf(
-        JournalSection(
-            "vent", "Vent",
-            "Write what's bothering you, unedited, without holding back. A few sentences is enough: your head is for solving problems, not storing them.",
-            listOf("What's annoying me right now?", "What am I carrying that I'd rather put down?", "What would I write if no one could ever read it?"),
+        section(
+            "clarity", "Clarity",
+            "Write every single thought as you have it. In one sitting, or jot each new thought down as it comes. Once you see the words in front of you, they don't look as scary.",
         ),
-        JournalSection(
-            "obligations", "Obligations",
-            "Get every task out of your head, then sort it.",
-            listOf(
-                "Everything on my mind to do, big or small, in any order",
-                "Sorted into a few areas: health, work, home, money…",
-                "Which one, if done, would make the rest easier?",
-                "Today's bare minimum, and the extra if it goes well",
-            ),
+        section(
+            "fixation", "Pattern interrupt",
+            "For when you get fixated on something that you can't think about other stuff.",
+            "Imagine six impossible things and write them down" to "From Lewis Carroll. E.g a camel and his best friend skating over an exploding pigeon.",
+            "How can I make someone else happy right now?" to "You get out of serving yourself and start serving someone else.",
+            "What's something in my immediate environment that I have never noticed?" to "If you're stuck in the past or the future, doing this immediately draws you to the present.",
         ),
-        JournalSection(
-            "mindset", "Mindset",
-            "Specific questions train the mind better than vague intentions.",
-            listOf(
-                "How could this turn out to be good for me?",
-                "I am becoming ___ because…",
-                "How could I make sure I miss my goal?",
-                "What would a friend who wants me to succeed tell me?",
-                "What would change my mind about something I believe?",
-                "Out of 10, how do I feel about it, and why not one lower?",
-            ),
+        section(
+            "reflection", "Daily reflections",
+            "Reflect on your day with the same questions. Do them most days for a month and you'll learn so much about yourself.",
+            "What excited me?" to null,
+            "What drained me of energy?" to null,
+            "What did I learn?" to null,
+            "What are 10 things I'm grateful for?" to null,
+            "How did I move towards what I long for?" to null,
         ),
-        JournalSection(
-            "gratitude", "Gratitude",
-            "Noticing what went right, however small.",
-            listOf(
-                "Three things I'm grateful for: one ordinary, one by chance, one I made happen",
-                "Who made today easier, and have I told them?",
-                "What small thing went right today?",
-            ),
+        section(
+            "bad", "When bad things happen",
+            "“There is nothing either good or bad, but thinking makes it so.”",
+            "What happened, objectively?" to "Separate what actually happened from the meaning you instinctively gave it.",
+            "What did I make it mean?" to "Here's where you get a glimpse of your cognitive distortions.",
+            "How would I comfort a friend I loved if this happened to them?" to "Instead of beating yourself up, treat yourself like a friend you love, and give yourself a little compassion.",
+            "How is this the best thing that has ever happened to me?" to "This question can be challenging, but finding answers to it can help us reframe how we view events in our life.",
         ),
-        JournalSection(
-            "ideation", "Ideation",
-            "Quantity first: good ideas come out of many okay ones.",
-            listOf(
-                "As many answers as I can in five minutes to…",
-                "How would someone else solve this: a child, an inventor, a company?",
-                "A question to sleep on, and my answer in the morning",
-            ),
+        section(
+            "anxiety", "Anxieties",
+            "Divide the page into three columns: fears, fixes, and the outcome you'd bet on.",
+            "Will this matter in 10 days time?" to null,
         ),
-        JournalSection(
-            "trajectory", "Trajectory",
-            "Small days add up; check which way they point.",
-            listOf("My goal, and did today move me towards it or away?", "What gave me energy today?", "What drained me today?", "What did I learn today?"),
+        section(
+            "todo", "To-do list and direction",
+            "Start with a full page: a scattered list of all your obligations and the things you'd like to do. Then order it with a few questions, often down to less than 15 points.",
+            "Everything I have to do, and would like to do" to null,
+            "What is non-negotiable? What is exciting?" to "The musts, and the ones you can't wait to do.",
+            "What on my list, if done, would make everything else easier?" to null,
+            "What of these, if taken away from me, would I fight to get back?" to null,
+            "What 20% of activities are producing 80% of the results?" to null,
+        ),
+        section(
+            "decision", "Making a decision",
+            "A problem well defined is a problem half solved.",
+            "What is the decision, or the problem? Defined clearly" to null,
+            "What are the options, and are they mutually exclusive?" to null,
+            "If I had to make this decision in 60 seconds, what would I choose?" to "Put a timer on and write your decision: with it ticking down, your intuition speaks up.",
+            "Could I live with this outcome?" to "Ask it of your 60-second answer.",
+            "What would this look like if it were easy?" to null,
+        ),
+        section(
+            "direction", "Direction in life",
+            "Like a graph: one point gives no direction; two give a relationship, and the more points, the clearer the direction.",
+            "What did I want five years ago?" to null,
+            "What do I want now?" to null,
+            "What do I think I'll want in five years' time?" to null,
+            "If I knew I couldn't fail, what would I do?" to null,
+        ),
+        section(
+            "compassion", "Self compassion",
+            "Two ways in: a short love letter to yourself, or three steps, noticing what you felt, seeing it's human, and answering it with kindness.",
+            "Write a short love letter to yourself" to "As you would to someone you love: what you appreciate, what you forgive, what you wish for them.",
+            "Go over the day, note down anything you've felt bad about, or" to "name what caused the difficult experience, the emotions you felt, and how they felt in the body",
+            "how is this part of being human?" to "think about how that experience is connected to being an imperfect human being",
+            "write yourself some kind, gentle words of understanding with a reassuring tone. show yourself some care and kindness." to null,
         ),
     )
 
@@ -93,11 +119,20 @@ object Journal {
 
     fun withPrompt(sections: List<JournalSection>, id: String, prompt: String) = sections.changed(id) { it.copy(prompts = it.prompts + prompt) }
 
+    /** A question reworded; its example stays with it. */
     fun editedPrompt(sections: List<JournalSection>, id: String, index: Int, prompt: String) =
-        sections.changed(id) { s -> s.copy(prompts = s.prompts.mapIndexed { i, p -> if (i == index) prompt else p }) }
+        sections.changed(id) { s ->
+            val old = s.prompts.getOrNull(index) ?: return@changed s
+            val hint = s.hints[old]
+            s.copy(prompts = s.prompts.mapIndexed { i, p -> if (i == index) prompt else p }, hints = (s.hints - old) + listOfNotNull(hint?.let { prompt to it }))
+        }
 
     fun withoutPrompt(sections: List<JournalSection>, id: String, index: Int) =
-        sections.changed(id) { s -> s.copy(prompts = s.prompts.filterIndexed { i, _ -> i != index }) }
+        sections.changed(id) { s -> s.copy(prompts = s.prompts.filterIndexed { i, _ -> i != index }, hints = s.hints - s.prompts.getOrNull(index).orEmpty()) }
+
+    /** A question's example set, or taken away when empty. */
+    fun withHint(sections: List<JournalSection>, id: String, prompt: String, hint: String) =
+        sections.changed(id) { s -> s.copy(hints = if (hint.isBlank()) s.hints - prompt else s.hints + (prompt to hint.trim())) }
 
     /** "saturday 31 october · vent, mindset"; just the day without any sections, and the year when it isn't this one. */
     fun title(entry: JournalEntry, today: LocalDate): String {

@@ -102,7 +102,7 @@ internal fun JournalPromptsContent(sections: List<JournalSection>, onChange: (Li
             dismissButton = { TextButton(onClick = { restoring = false }) { Text("Cancel", color = c.textMuted) } },
         )
     }
-    Scaffold(containerColor = c.bgPrimary, topBar = { ObsidianTopBar("Sections and prompts", onBack = onBack, subtitle = JOURNAL_CREDIT) }) { padding ->
+    Scaffold(containerColor = c.bgPrimary, topBar = { ObsidianTopBar("Sections and prompts", onBack = onBack, subtitle = "Start from the suggestions; change, delete or add your own") }) { padding ->
         Column(
             Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = PageGutter, vertical = 4.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -143,6 +143,10 @@ internal fun JournalPromptsContent(sections: List<JournalSection>, onChange: (Li
                                 modifier = Modifier.size(40.dp).clip(RoundedCornerShape(50)).clickable { onChange(Journal.withoutPrompt(sections, section.id, i)) }.padding(10.dp),
                             )
                         }
+                        // Its example, to show what an answer might be.
+                        CommitField(section.hints[prompt].orEmpty(), "An example, to guide it (optional)", Modifier.fillMaxWidth().padding(start = 16.dp, end = 40.dp, top = 4.dp), singleLine = false) { hint ->
+                            onChange(Journal.withHint(sections, section.id, prompt, hint))
+                        }
                     }
                     Spacer(Modifier.height(6.dp))
                     CommitField("", "Add a prompt", Modifier.fillMaxWidth(), clearAfter = true) { added ->
@@ -154,6 +158,17 @@ internal fun JournalPromptsContent(sections: List<JournalSection>, onChange: (Li
                 CommitField("", "Its name, then add its prompts", Modifier.fillMaxWidth(), clearAfter = true) { name ->
                     if (name.isNotBlank()) onChange(Journal.withSection(sections, name.trim()))
                 }
+            }
+            val context = LocalContext.current
+            JOURNAL_CREDITS.forEach { (credit, link) ->
+                Text(
+                    credit,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = c.textMuted,
+                    modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable {
+                        runCatching { context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(link)).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                    }.padding(vertical = 4.dp),
+                )
             }
             Text(
                 "Back to the suggestions",

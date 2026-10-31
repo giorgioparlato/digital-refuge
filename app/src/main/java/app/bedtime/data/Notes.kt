@@ -14,14 +14,115 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import java.util.UUID
 
-/** A note kept in the app, written in Markdown. */
+/** A note kept in the app, written in Markdown; it can be pinned near the top, and given labels to find it by. */
 @Serializable
 data class Note(
     val id: String = UUID.randomUUID().toString(),
     val text: String,
     val createdAt: Long,
     val editedAt: Long = createdAt,
+    val pinned: Boolean = false,
+    val labels: List<String> = emptyList(),
+    /** When to be reminded of it, as epoch millis; null for never. */
+    val remindAt: Long? = null,
 )
+
+/** A note in the trash: when it went, and where it was, to go back there. */
+@Serializable
+data class TrashedNote(val note: Note, val deletedAt: Long, val at: Int = 0)
+
+/** Refuge notes kept in order, moved into one another, merged, pinned and labelled; deleted ones kept a month. */
+object NoteShelf {
+    /** How long a deleted note waits in the trash before it's gone. */
+    const val TRASH_DAYS = 30L
+
+    /** [trash] without those older than a month at [now]. */
+    fun keptTrash(trash: List<TrashedNote>, now: Long): List<TrashedNote> = trash.filter { now - it.deletedAt < TRASH_DAYS * 86_400_000L }
+
+    /** Days left before a trashed note goes, at least one while it's still there. */
+    fun daysLeft(item: TrashedNote, now: Long): Long = (TRASH_DAYS - (now - item.deletedAt) / 86_400_000L).coerceAtLeast(1)
+
+    /** The "why" answers first while pinned, then the to-do, then those pinned, then the rest, each in the order they were. */
+    fun ordered(notes: List<Note>): List<Note> = notes.sortedBy {
+        when {
+            it.id == Why.NOTE_ID && it.pinned -> 0
+            it.id == Notes.TODO_ID -> 1
+            it.pinned -> 2
+            else -> 3
+        }
+    }
+
+    /** Only those with [label]; all of them with none. */
+    fun labelled(notes: List<Note>, label: String?): List<Note> = if (label == null) notes else notes.filter { label in it.labels }
+
+    /** Every label in use, A–Z, each once. */
+    fun labels(notes: List<Note>): List<String> = notes.flatMap { it.labels }.distinctBy { it.lowercase() }.sortedBy { it.lowercase() }
+
+    /**
+     * [from] moved to the end of [into] and gone from the list: a single line as a list item (a to-do
+     * in the to-do note, above those done), anything longer after a blank line. Its labels go with it.
+     */
+    fun movedInto(notes: List<Note>, from: String, into: String, at: Long): List<Note> {
+        val source = notes.firstOrNull { it.id == from } ?: return notes
+        val target = notes.firstOrNull { it.id == into }?.takeIf { from != into } ?: return notes
+        val words = source.text.trim()
+        val lines = words.lines().filter { it.isNotBlank() }
+        val text = when {
+            words.isEmpty() -> target.text
+            target.id == Notes.TODO_ID && lines.size == 1 -> Todo.added(target.text, "- [ ] " + lines.single().trim().removePrefix("- ").removePrefix("[ ] "))
+            lines.size == 1 -> Notes.appended(target.text, lines.single().trim().let { if (it.startsWith("- ") || it.startsWith("* ")) it else "- $it" })
+            else -> target.text.trimEnd() + "\n\n" + words + "\n"
+        }
+        val moved = target.copy(text = text, editedAt = at, labels = (target.labels + source.labels).distinct())
+        return notes.filterNot { it.id == from }.map { if (it.id == into) moved else it }
+    }
+
+    /** The notes [ids], in that order, made one: the first keeps its place, the rest follow it after blank lines. */
+    fun merged(notes: List<Note>, ids: List<String>, at: Long): List<Note> {
+        val chosen = ids.mapNotNull { id -> notes.firstOrNull { it.id == id } }
+        if (chosen.size < 2) return notes
+        val first = chosen.first()
+        val one = first.copy(
+            text = chosen.joinToString("\n\n") { it.text.trim() } + "\n",
+            editedAt = at,
+            pinned = chosen.any { it.pinned },
+            labels = chosen.flatMap { it.labels }.distinct(),
+        )
+        val gone = chosen.drop(1).map { it.id }.toSet()
+        return notes.filterNot { it.id in gone }.map { if (it.id == first.id) one else it }
+    }
+
+    fun pinned(notes: List<Note>, id: String, pinned: Boolean): List<Note> = notes.map { if (it.id == id) it.copy(pinned = pinned) else it }
+
+    fun reminded(notes: List<Note>, id: String, at: Long?): List<Note> = notes.map { if (it.id == id) it.copy(remindAt = at) else it }
+
+    /** The next reminder still to come after [now], if any. */
+    fun nextReminder(notes: List<Note>, now: Long): Long? = notes.mapNotNull { it.remindAt }.filter { it > now }.minOrNull()
+
+    /** Those due by [now], to be told about. */
+    fun due(notes: List<Note>, now: Long): List<Note> = notes.filter { (it.remindAt ?: Long.MAX_VALUE) <= now }
+
+    /**
+     * When "remind me" can be, from [now]: in an hour, in three, this evening (while that's more than
+     * an hour off), tomorrow morning, and next Monday morning. Each with when, as epoch millis.
+     */
+    fun reminderChoices(now: LocalDateTime): List<Pair<String, Long>> {
+        val zone = java.time.ZoneId.systemDefault()
+        fun millis(at: LocalDateTime) = at.atZone(zone).toInstant().toEpochMilli()
+        val evening = now.toLocalDate().atTime(18, 0)
+        val monday = now.toLocalDate().with(java.time.temporal.TemporalAdjusters.next(java.time.DayOfWeek.MONDAY)).atTime(9, 0)
+        return listOfNotNull(
+            "In an hour" to millis(now.plusHours(1)),
+            "In 3 hours" to millis(now.plusHours(3)),
+            ("This evening" to millis(evening)).takeIf { now.plusHours(1).isBefore(evening) },
+            "Tomorrow morning" to millis(now.toLocalDate().plusDays(1).atTime(9, 0)),
+            "Next week" to millis(monday),
+        )
+    }
+
+    fun withLabels(notes: List<Note>, id: String, labels: List<String>): List<Note> =
+        notes.map { if (it.id == id) it.copy(labels = labels.map { l -> l.trim() }.filter { l -> l.isNotEmpty() }.distinctBy { l -> l.lowercase() }) else it }
+}
 
 /** How a quick note is written into a file: a list item, a to-do, or a plain line. */
 @Serializable
@@ -158,6 +259,23 @@ object Notes {
         }.getOrDefault(false)
     }
 
+    private const val WAITING = "syncWhenUnlocked"
+
+    private fun prefs(context: Context) = context.getSharedPreferences("notes", Context.MODE_PRIVATE)
+
+    /** A note went into one of your files on the lock screen: its "then" shortcut runs once you're in. */
+    fun syncWhenUnlocked(context: Context) {
+        prefs(context).edit().putBoolean(WAITING, true).apply()
+    }
+
+    /** Just unlocked: the shortcut a note on the lock screen left waiting, if one did. */
+    suspend fun syncIfWaiting(context: Context, repo: Repository) {
+        val prefs = prefs(context)
+        if (!prefs.getBoolean(WAITING, false)) return
+        prefs.edit().remove(WAITING).apply()
+        repo.settings.first().afterNoteShortcut?.let { Shortcuts.start(context, it) }
+    }
+
     /**
      * Saves a quick note: in the app's own notes when [target] is null, otherwise at the end of that file
      * (or today's daily note). If the file can't be reached it waits in the app's notes, so nothing is
@@ -178,10 +296,10 @@ object Notes {
             if (target.daily) appendDaily(context, Uri.parse(target.uri), target.dailyFormat, at.toLocalDate(), line) else append(context, Uri.parse(target.uri), line)
         }
         if (!added) repo.addNote(words)
-        // Then, say, a sync app's "Sync now", so the file reaches your other devices. Not from the lock
-        // screen: another app's shortcut would only wait behind it, or ask to unlock.
+        // Then, say, a sync app's "Sync now", so the file reaches your other devices. From the lock
+        // screen it waits until you're in: there it would only sit behind the lock, or ask to unlock.
         val locked = context.getSystemService(android.app.KeyguardManager::class.java)?.isKeyguardLocked == true
-        if (added && !locked) repo.settings.first().afterNoteShortcut?.let { Shortcuts.start(context, it) }
+        if (added) repo.settings.first().afterNoteShortcut?.let { if (locked) syncWhenUnlocked(context) else Shortcuts.start(context, it) }
         val name = target.name.lowercase()
         return if (added) "added to $name" else "couldn't reach $name, so it's in refuge notes"
     }
@@ -219,5 +337,144 @@ object NoteWidget {
         if (index !in lines.indices) return text
         lines[index] = lines[index].replace(Regex("""\[([ xX])]""")) { if (it.groupValues[1].isBlank()) "[x]" else "[ ]" }
         return lines.joinToString("\n")
+    }
+}
+
+/** A to-do done: its lines (the item and any under it), what it says, and the day it was done, if known. */
+data class DoneTodo(val lines: List<String>, val text: String, val date: LocalDate?)
+
+/**
+ * The to-do note's own ways. A ticked item goes to the done ones kept together at the end of the note,
+ * newest first, with the day it was done ("✅ 2026-10-31", as Obsidian's Tasks writes it); unticked it
+ * comes back to the end of the list, without it. A new one goes in above the done. Items under an
+ * item move with it; one ticked under another stays among its own, dated.
+ */
+object Todo {
+    private val item = Regex("""^(\s*)[-*+]\s+\[([ xX])]\s*(.*)$""")
+    private val listLine = Regex("""^\s*[-*+]\s""")
+    private val doneDate = Regex("""\s+✅\s*(\d{4}-\d{2}-\d{2})\s*$""")
+
+    private fun indent(line: String) = line.length - line.trimStart().length
+
+    /** In a list: an item, or anything indented under one. */
+    private fun inList(line: String) = line.isNotBlank() && (listLine.containsMatchIn(line) || indent(line) > 0)
+
+    private fun ticked(line: String) = item.find(line)?.groupValues?.get(2)?.isNotBlank() == true
+
+    /** Where the item at [at] ends: its own line and those indented under it. */
+    private fun extent(lines: List<String>, at: Int): Int {
+        var end = at + 1
+        while (end < lines.size && lines[end].isNotBlank() && indent(lines[end]) > indent(lines[at])) end++
+        return end
+    }
+
+    /** The lines from [at]'s list holding its siblings: the same indent, under the same parent, unbroken. */
+    private fun siblings(lines: List<String>, at: Int, depth: Int): IntRange {
+        var start = at
+        while (start > 0 && inList(lines[start - 1]) && indent(lines[start - 1]) >= depth) start--
+        var end = at
+        while (end < lines.size && inList(lines[end]) && indent(lines[end]) >= depth) end++
+        return start until end
+    }
+
+    private fun done(lines: List<String>): DoneTodo {
+        val first = lines.first()
+        val date = doneDate.find(first)?.groupValues?.get(1)?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+        val text = item.find(first.replace(doneDate, ""))?.groupValues?.get(3)?.trim().orEmpty()
+        return DoneTodo(lines, text, date)
+    }
+
+    /** The note's to-dos still to do (and all else in it), and those done, as they're kept: newest first. */
+    fun split(text: String): Pair<String, List<DoneTodo>> {
+        val lines = text.lines()
+        val open = mutableListOf<String>()
+        val done = mutableListOf<DoneTodo>()
+        var i = 0
+        while (i < lines.size) {
+            if (indent(lines[i]) == 0 && ticked(lines[i])) {
+                val end = extent(lines, i)
+                done += done(lines.subList(i, end))
+                i = end
+            } else {
+                open += lines[i]
+                i++
+            }
+        }
+        return open.joinToString("\n").trimEnd() to done
+    }
+
+    /** The note again: what's still to do, then the done ones after a blank line. */
+    fun join(open: String, done: List<DoneTodo>): String {
+        val head = open.trimEnd()
+        if (done.isEmpty()) return if (head.isEmpty()) "" else "$head\n"
+        return (if (head.isEmpty()) "" else "$head\n\n") + done.flatMap { it.lines }.joinToString("\n") + "\n"
+    }
+
+    /** [text] with the to-do on line [index] ticked (to the done ones, dated [today]) or unticked (back to the list, undated). */
+    fun toggled(text: String, index: Int, today: LocalDate): String {
+        val lines = text.lines().toMutableList()
+        val m = lines.getOrNull(index)?.let { item.find(it) } ?: return text
+        val depth = m.groupValues[1].length
+        val ticking = m.groupValues[2].isBlank()
+        val moving = lines.subList(index, extent(lines, index)).toMutableList()
+        moving[0] = if (ticking) {
+            moving[0].replaceFirst(Regex("""\[ ]"""), "[x]").trimEnd() + " ✅ " + today
+        } else {
+            moving[0].replaceFirst(Regex("""\[[xX]]"""), "[ ]").replace(doneDate, "")
+        }
+        repeat(moving.size) { lines.removeAt(index) }
+        if (depth == 0) {
+            val (open, done) = split(lines.joinToString("\n"))
+            return if (ticking) join(open, listOf(done(moving)) + done) else join(addedLines(open, moving), done)
+        }
+        // One under another: it stays among its own, done ones after those to do.
+        val anchor = listOf(index, index - 1).firstOrNull { it in lines.indices && inList(lines[it]) && indent(lines[it]) >= depth }
+        if (anchor == null) {
+            lines.addAll(index, moving)
+            return lines.joinToString("\n")
+        }
+        val around = siblings(lines, anchor, depth)
+        val tops = around.filter { indent(lines[it]) == depth }
+        val to = if (ticking) around.last + 1 else tops.firstOrNull { ticked(lines[it]) } ?: (around.last + 1)
+        lines.addAll(to, moving)
+        return lines.joinToString("\n")
+    }
+
+    /** [open] with [moving] at the end of its last list, or at the end. */
+    private fun addedLines(open: String, moving: List<String>): String {
+        val lines = open.lines().toMutableList()
+        val last = lines.indexOfLast { inList(it) && indent(it) == 0 }
+        if (last < 0) return (if (open.isBlank()) "" else open.trimEnd() + "\n") + moving.joinToString("\n")
+        lines.addAll(siblings(lines, last, 0).last + 1, moving)
+        return lines.joinToString("\n")
+    }
+
+    /** [text] with [line], a new to-do, at the end of the list, above those done. */
+    fun added(text: String, line: String): String {
+        val (open, done) = split(text)
+        return join(addedLines(open, listOf(line)), done)
+    }
+
+    /** [text] without its done ones. */
+    fun withoutDone(text: String): String = join(split(text).first, emptyList())
+
+    /**
+     * The done ones folded by when: this week, last week, earlier this month, last month, then each
+     * month of this year by name, and each year before; those without a date last.
+     */
+    fun groups(done: List<DoneTodo>, today: LocalDate): List<Pair<String, List<DoneTodo>>> {
+        val week = today.with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY))
+        val month = today.withDayOfMonth(1)
+        fun group(date: LocalDate?): String = when {
+            date == null -> "Undated"
+            !date.isBefore(week) -> "This week"
+            !date.isBefore(week.minusWeeks(1)) -> "Last week"
+            !date.isBefore(month) -> "Earlier this month"
+            !date.isBefore(month.minusMonths(1)) -> "Last month"
+            date.year == today.year -> date.month.getDisplayName(java.time.format.TextStyle.FULL, Locale.getDefault())
+            else -> date.year.toString()
+        }
+        val order = done.sortedWith(compareBy<DoneTodo> { it.date == null }.thenByDescending { it.date })
+        return order.groupBy { group(it.date) }.toList()
     }
 }

@@ -1,5 +1,11 @@
 package app.bedtime.ui.edit
 
+import androidx.compose.runtime.getValue
+
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+
+import androidx.compose.material.icons.filled.Create
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
@@ -39,11 +45,12 @@ internal fun unlockSteps(unlock: UnlockConfig, hasNewPassword: Boolean): List<St
             },
         )
     }
+    if (unlock.writeEnabled) add("write ${unlock.writeWords} words")
     if (unlock.passwordEnabled && (unlock.hasPassword || hasNewPassword)) add("a password")
 }
 
 /**
- * Wait, type, password and "harder each time": the steps an unlock takes. Shared by schedules,
+ * Wait, type, write, password and "harder each time": the steps an unlock takes. Shared by schedules,
  * blocks and limits, so the same words mean the same thing everywhere.
  */
 @Composable
@@ -67,6 +74,7 @@ internal fun UnlockStepsEditor(
             { v -> setUnlock { it.copy(textSource = v) } },
             editable,
         )
+        WritingStep(unlock, { change -> setUnlock(change) }, editable)
         OptionRow(Icons.Default.Lock, "Password", description = "Tip: let someone else choose it", enabled = editable) {
             ObsidianToggle(unlock.passwordEnabled, { on -> setUnlock { it.copy(passwordEnabled = on) } }, enabled = editable)
         }
@@ -79,7 +87,7 @@ internal fun UnlockStepsEditor(
                 modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
             )
         }
-        AnimatedVisibility(unlock.waitEnabled || unlock.textEnabled) {
+        AnimatedVisibility(unlock.waitEnabled || unlock.textEnabled || unlock.writeEnabled) {
             Column {
                 HarderStep(
                     unlock.escalate,
@@ -87,11 +95,11 @@ internal fun UnlockStepsEditor(
                     (unlock.escalateFactor * 10).roundToInt(),
                     { v -> setUnlock { it.copy(escalateFactor = v / 10f) } },
                     editable,
-                    description = "Each early unlock in a day makes the wait and text longer",
+                    description = "Each early unlock in a day makes the wait, the typing and the writing longer",
                 )
             }
         }
-        val anyStep = unlock.waitEnabled || unlock.textEnabled ||
+        val anyStep = unlock.waitEnabled || unlock.textEnabled || unlock.writeEnabled ||
             (unlock.passwordEnabled && (unlock.hasPassword || newPassword.isNotBlank()))
         AnimatedVisibility(!anyStep) {
             Callout(
@@ -100,6 +108,44 @@ internal fun UnlockStepsEditor(
                 body = "Unlocking will take a single tap.",
                 modifier = Modifier.padding(top = 8.dp),
             )
+        }
+    }
+}
+
+/**
+ * "Write a few lines": at least so many words, from a prompt of the microjournal's sections you pick,
+ * or "why do I want to unlock this?" with none picked. What's written goes with your answers to "why?".
+ */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+internal fun WritingStep(unlock: UnlockConfig, onChange: ((UnlockConfig) -> UnlockConfig) -> Unit, editable: Boolean) {
+    val c = Obsidian.colors
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val repo = androidx.compose.runtime.remember { app.bedtime.data.Repository.get(context) }
+    val settings by repo.settings.collectAsStateWithLifecycle(initialValue = null)
+    val sections = app.bedtime.data.Journal.sections(settings?.journalSections)
+    OptionRow(Icons.Default.Create, "Write a few lines", description = "Why you want to unlock, or from prompts you choose; kept with your answers to “why?”", enabled = editable) {
+        ObsidianToggle(unlock.writeEnabled, { on -> onChange { it.copy(writeEnabled = on) } }, enabled = editable)
+    }
+    AnimatedVisibility(unlock.writeEnabled) {
+        Column {
+            SubOptionRow("Words, at least") {
+                NumberStepper(unlock.writeWords, { v -> onChange { it.copy(writeWords = v) } }, 5..500, step = 5, enabled = editable, presets = listOf(10, 20, 30, 50, 100, 200), title = "words")
+            }
+            Text("Prompts from", style = MaterialTheme.typography.bodyMedium, color = c.textMuted, modifier = Modifier.padding(top = 12.dp, bottom = 8.dp))
+            androidx.compose.foundation.layout.FlowRow(
+                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp),
+                verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp),
+            ) {
+                app.bedtime.ui.components.QuickChip("Just “why?”", unlock.writeSections.isEmpty()) { if (editable) onChange { it.copy(writeSections = emptyList()) } }
+                sections.forEach { section ->
+                    val on = section.name in unlock.writeSections
+                    app.bedtime.ui.components.QuickChip(section.name, on) {
+                        if (editable) onChange { it.copy(writeSections = if (on) it.writeSections - section.name else it.writeSections + section.name) }
+                    }
+                }
+            }
+            Text("The microjournal's sections, as you've written them in settings › notes.", style = MaterialTheme.typography.bodySmall, color = c.textFaint, modifier = Modifier.padding(top = 8.dp))
         }
     }
 }

@@ -115,7 +115,9 @@ internal fun QuickNoteDialog(
             whole = whole,
             initial = initial,
             onWords = { words = it },
-            journal = journal?.let { j -> JournalWith(j.sections) { text, aims -> j.onSave(text, aims); onDismiss() } },
+            journal = journal?.let { j ->
+                JournalWith(j.sections, j.openFull?.let { open -> { open(); onDismiss() } }) { text, aims -> j.onSave(text, aims); onDismiss() }
+            },
         )
     }
 }
@@ -193,7 +195,16 @@ internal fun QuickNoteContent(
                 }
             }
         }
-        if (journaling && journal != null) {
+        // Locked, the prompts are a step away: they need room, so today's entry opens once you've unlocked.
+        val openFull = journal?.openFull
+        if (journaling && openFull != null) {
+            Text(
+                "With prompts: unlock and open today's entry ›",
+                style = MaterialTheme.typography.labelLarge,
+                color = p.accent,
+                modifier = Modifier.clip(RoundedCornerShape(50)).clickable(onClick = openFull).padding(vertical = 6.dp),
+            )
+        } else if (journaling && journal != null) {
             app.bedtime.ui.notes.JournalPrompts(
                 journal.sections, aims, onPick = { aims = it },
                 onPrompt = { prompt ->
@@ -340,4 +351,9 @@ private fun OfferRow(offer: DrawerResult, style: HomeStyle, onClick: () -> Unit)
 }
 
 /** The microjournal as the quick note reaches it: your sections, and where today's words go, with the sections picked. */
-internal class JournalWith(val sections: List<app.bedtime.data.JournalSection>, val onSave: (String, List<String>) -> Unit)
+internal class JournalWith(
+    val sections: List<app.bedtime.data.JournalSection>,
+    /** Where the prompts are, when they aren't here: on the lock screen, today's entry once unlocked. */
+    val openFull: (() -> Unit)? = null,
+    val onSave: (String, List<String>) -> Unit,
+)

@@ -10,30 +10,42 @@ class JournalTest {
 
     @Test
     fun theSuggestionsUntilYouChangeThem() {
-        assertEquals(listOf("Vent", "Obligations", "Mindset", "Gratitude", "Ideation", "Trajectory"), Journal.sections(null).map { it.name })
-        val yours = Journal.withoutSection(Journal.SUGGESTED, "vent")
-        assertEquals(5, Journal.sections(yours).size)
-        // Gratitude is a section of its own, and its prompt isn't under mindset any more.
-        assertEquals(true, Journal.SUGGESTED.first { it.id == "mindset" }.prompts.none { "grateful" in it })
+        assertEquals(
+            listOf("Clarity", "Pattern interrupt", "Daily reflections", "When bad things happen", "Anxieties", "To-do list and direction", "Making a decision", "Direction in life", "Self compassion"),
+            Journal.sections(null).map { it.name },
+        )
+        // A question's example is there only where one was written.
+        val bad = Journal.SUGGESTED.first { it.id == "bad" }
+        assertEquals(bad.prompts.toSet(), bad.hints.keys)
+        assertEquals(emptyMap<String, String>(), Journal.SUGGESTED.first { it.id == "reflection" }.hints)
+        assertEquals(emptyList<String>(), Journal.SUGGESTED.first { it.id == "clarity" }.prompts)
+        assertEquals(8, Journal.sections(Journal.withoutSection(Journal.SUGGESTED, "clarity")).size)
     }
 
     @Test
     fun sectionsAndPromptsAreYoursToChange() {
         var s = Journal.SUGGESTED
-        s = Journal.renamed(s, "vent", "Let it out")
-        s = Journal.withGuide(s, "vent", "No editing.")
-        s = Journal.withPrompt(s, "vent", "What's loud in my head?")
-        s = Journal.editedPrompt(s, "vent", 0, "What's annoying me?")
-        s = Journal.withoutPrompt(s, "vent", 1)
-        val vent = s.first { it.id == "vent" }
-        assertEquals("Let it out", vent.name)
-        assertEquals("No editing.", vent.guide)
-        assertEquals(listOf("What's annoying me?", "What would I write if no one could ever read it?", "What's loud in my head?"), vent.prompts)
+        val first = s.first { it.id == "bad" }.prompts.first()
+        s = Journal.renamed(s, "bad", "Hard days")
+        s = Journal.withGuide(s, "bad", "One at a time.")
+        s = Journal.withPrompt(s, "bad", "What's loud in my head?")
+        s = Journal.editedPrompt(s, "bad", 0, "What happened?")
+        s = Journal.withoutPrompt(s, "bad", 1)
+        val hard = s.first { it.id == "bad" }
+        assertEquals("Hard days", hard.name)
+        assertEquals("One at a time.", hard.guide)
+        assertEquals(listOf("What happened?", "How would I comfort a friend I loved if this happened to them?", "How is this the best thing that has ever happened to me?", "What's loud in my head?"), hard.prompts)
+        // A reworded question keeps its example; a deleted one takes its own with it.
+        assertEquals(Journal.SUGGESTED.first { it.id == "bad" }.hints[first], hard.hints["What happened?"])
+        assertEquals(null, hard.hints["What did I make it mean?"])
+        s = Journal.withHint(s, "bad", "What's loud in my head?", "  the meeting tomorrow ")
+        assertEquals("the meeting tomorrow", s.first { it.id == "bad" }.hints["What's loud in my head?"])
+        s = Journal.withHint(s, "bad", "What's loud in my head?", "")
+        assertEquals(null, s.first { it.id == "bad" }.hints["What's loud in my head?"])
         s = Journal.withSection(s, "Dreams")
         assertEquals("Dreams", s.last().name)
-        assertEquals(emptyList<String>(), s.last().prompts)
         // Other sections are left as they were.
-        assertEquals(Journal.SUGGESTED.first { it.id == "mindset" }, s.first { it.id == "mindset" })
+        assertEquals(Journal.SUGGESTED.first { it.id == "decision" }, s.first { it.id == "decision" })
     }
 
     @Test

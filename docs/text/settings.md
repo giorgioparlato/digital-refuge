@@ -138,6 +138,8 @@ Home screen, lock screen, apps, shortcuts and about & backup are lists of rows f
 - quick settings tile
 - Edit your quick settings and add the “refuge” tile. Tapping it starts:
 - Find a setting: keyword, weather, colour…
+- During sessions
+- Always
 
 ## permissions & setup
 
@@ -657,9 +659,11 @@ One file serves the look, widgets, gestures and notifications pages, for both sc
 - Pick your daily-notes folder; today's note is made if it isn't there
 - For Obsidian, pick the note inside your vault. Vaults in Documents work; one kept in Obsidian's own app folder can't be reached by other apps.
 - Then
-- After a note goes into one of your files, from the home screen
+- After a note goes into one of your files; from the lock screen, once you unlock
 - Run an app's shortcut
 - Nothing. A sync app's “Sync now” sends the file on at once
+- Also when you leave Obsidian
+- So what you wrote there is sent on too; on the lock screen, once you unlock
 - How it reads in the search: “add to …”
 - e.g. today
 - e.g. scratchpad

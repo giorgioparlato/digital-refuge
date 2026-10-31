@@ -92,6 +92,10 @@ data class UnlockConfig(
     val textLength: Int = 200,
     /** Random letters, plain words, or a passage worth reading while you copy it. */
     val textSource: TextSource = TextSource.LETTERS,
+    /** Writing at least [writeWords] words, from a prompt of the sections named in [writeSections] (none: the "why" question). */
+    val writeEnabled: Boolean = false,
+    val writeWords: Int = 30,
+    val writeSections: List<String> = emptyList(),
     val passwordEnabled: Boolean = false,
     val passwordHash: String? = null,
     val passwordSalt: String? = null,
@@ -113,6 +117,10 @@ enum class TextSource { LETTERS, WORDS, PASSAGES }
 /** Notifications on refuge's lock screen during a session: as usual, from its own apps and people, or none. */
 @Serializable
 enum class LockNotes { USUAL, OWN, NONE }
+
+/** When "why?" is asked: never, only while a session runs, or always. */
+@Serializable
+enum class AskWhen { OFF, SESSIONS, ALWAYS }
 
 /** What a limit's pause before opening asks: a wait, or typing a little. */
 @Serializable
@@ -625,6 +633,15 @@ data class AppSettings(
     val lookUpNotes: Boolean = false,
     /** An app's shortcut run after a quick note goes into one of your files, e.g. a sync app's "Sync now". */
     val afterNoteShortcut: AppShortcut? = null,
+    /** That shortcut also when you leave Obsidian, so what you wrote there is sent on too. */
+    val syncAfterObsidian: Boolean = false,
+    /** "Why am I unlocking my phone right now?" after an unlock, and before a distracting or limited app. */
+    val askOnUnlock: AskWhen = AskWhen.OFF,
+    val askOnApps: AskWhen = AskWhen.OFF,
+    /** Your own words for it; null keeps the suggested ones ([Why]). */
+    val whyQuestion: String? = null,
+    val whyNudge: String? = null,
+    val whyTags: List<String>? = null,
 ) {
     /** Where quick notes and the search can add: the to-do note first, then your files. */
     val quickTargets: List<NoteTarget> get() = listOf(Notes.TODO) + noteTargets

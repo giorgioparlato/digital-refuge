@@ -84,7 +84,8 @@ class Repository private constructor(context: Context) {
         if (notes.none { it.id == Notes.TODO_ID }) {
             listOf(Note(Notes.TODO_ID, "# To-do\n$item\n", at)) + notes
         } else {
-            notes.map { if (it.id == Notes.TODO_ID) it.copy(text = Notes.appended(it.text, item), editedAt = at) else it }
+            // Above those already done, which gather at the foot.
+            notes.map { if (it.id == Notes.TODO_ID) it.copy(text = Todo.added(it.text, item), editedAt = at) else it }
         }
     }
 
@@ -113,7 +114,52 @@ class Repository private constructor(context: Context) {
     suspend fun addToJournal(day: Long, text: String, aims: List<String>, at: Long = System.currentTimeMillis()) =
         update(JOURNAL, journalSerializer, emptyList()) { Journal.added(it, day, text, aims, at) }
 
-    suspend fun deleteNote(id: String) = update(NOTES, notesSerializer, emptyList()) { notes -> notes.filterNot { it.id == id } }
+    /** A note moved into another, merged with others, pinned or labelled, as [NoteShelf] does it. */
+    suspend fun moveNote(from: String, into: String) = update(NOTES, notesSerializer, emptyList()) { NoteShelf.movedInto(it, from, into, System.currentTimeMillis()) }
+
+    suspend fun mergeNotes(ids: List<String>) = update(NOTES, notesSerializer, emptyList()) { NoteShelf.merged(it, ids, System.currentTimeMillis()) }
+
+    suspend fun pinNote(id: String, pinned: Boolean) = update(NOTES, notesSerializer, emptyList()) { NoteShelf.pinned(it, id, pinned) }
+
+    suspend fun remindNote(id: String, at: Long?) = update(NOTES, notesSerializer, emptyList()) { NoteShelf.reminded(it, id, at) }
+
+    /** An answer to "why?", added to its own note, which starts pinned at the top. */
+    suspend fun addWhy(line: String, at: Long = System.currentTimeMillis()) = update(NOTES, notesSerializer, emptyList()) { notes ->
+        if (notes.none { it.id == Why.NOTE_ID }) {
+            listOf(Note(Why.NOTE_ID, "${Why.NOTE_TITLE}\n$line\n", at, pinned = true)) + notes
+        } else {
+            notes.map { if (it.id == Why.NOTE_ID) it.copy(text = Notes.appended(it.text, line), editedAt = at) else it }
+        }
+    }
+
+    /** Notes deleted in the last month, newest first. */
+    val trash: Flow<List<TrashedNote>> = observe(NOTES_TRASH, trashSerializer, emptyList()).map { NoteShelf.keptTrash(it, System.currentTimeMillis()).sortedByDescending { t -> t.deletedAt } }
+
+    /** Puts back a note from the trash, where it was. */
+    suspend fun restoreNote(note: Note, at: Int) {
+        update(NOTES, notesSerializer, emptyList()) { notes ->
+            if (notes.any { it.id == note.id }) notes else notes.toMutableList().apply { add(at.coerceIn(0, size), note) }
+        }
+        update(NOTES_TRASH, trashSerializer, emptyList()) { trash -> trash.filterNot { it.note.id == note.id } }
+    }
+
+    /** Gone from the trash for good: one, or all of it. */
+    suspend fun forgetTrashed(id: String?) = update(NOTES_TRASH, trashSerializer, emptyList()) { trash -> if (id == null) emptyList() else trash.filterNot { it.note.id == id } }
+
+    suspend fun labelNote(id: String, labels: List<String>) = update(NOTES, notesSerializer, emptyList()) { NoteShelf.withLabels(it, id, labels) }
+
+    /** Into the trash for a month, where it was kept; a note left empty just goes. */
+    suspend fun deleteNote(id: String) {
+        var gone: TrashedNote? = null
+        update(NOTES, notesSerializer, emptyList()) { notes ->
+            val at = notes.indexOfFirst { it.id == id }
+            if (at >= 0 && notes[at].text.isNotBlank()) gone = TrashedNote(notes[at], System.currentTimeMillis(), at)
+            notes.filterNot { it.id == id }
+        }
+        gone?.let { item ->
+            update(NOTES_TRASH, trashSerializer, emptyList()) { trash -> NoteShelf.keptTrash(trash.filterNot { it.note.id == item.note.id } + item, item.deletedAt) }
+        }
+    }
 
     /** The latest weather Breezy Weather sent, if any. */
     val weather: Flow<WeatherNow?> = observe(WEATHER, WeatherNow.serializer().nullable, null)
@@ -429,6 +475,8 @@ class Repository private constructor(context: Context) {
         private const val MONTHS_KEPT = 24
         private val NOTES = stringPreferencesKey("notes")
         private val JOURNAL = stringPreferencesKey("journal")
+        private val NOTES_TRASH = stringPreferencesKey("notes_trash")
+        private val trashSerializer = ListSerializer(TrashedNote.serializer())
         private val journalSerializer = ListSerializer(JournalEntry.serializer())
         private val WEATHER = stringPreferencesKey("weather")
         private val notesSerializer = ListSerializer(Note.serializer())
@@ -436,7 +484,7 @@ class Repository private constructor(context: Context) {
         private val habitMarksSerializer = ListSerializer(HabitMark.serializer())
 
         /** The keys kept in the day-to-day file rather than with the settings. */
-        internal val DAY_KEYS: Set<Preferences.Key<String>> by lazy { setOf(USAGE, USAGE_MONTHS, NOTES, JOURNAL, HABIT_MARKS, WEATHER, TIMERS, LOCK_QUIET) }
+        internal val DAY_KEYS: Set<Preferences.Key<String>> by lazy { setOf(USAGE, USAGE_MONTHS, NOTES, NOTES_TRASH, JOURNAL, HABIT_MARKS, WEATHER, TIMERS, LOCK_QUIET) }
         private val quietSerializer = MapSerializer(String.serializer(), Long.serializer())
         private val timersSerializer = ListSerializer(Long.serializer())
         /** About three years of nightly sessions, or several months of a busy mix: still a small file. */

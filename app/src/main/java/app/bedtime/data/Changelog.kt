@@ -13,6 +13,20 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            77,
+            "0.9.31",
+            listOf(
+                "Ask why: after unlocking, and before distracting apps, a moment to ask yourself why, with tags for how you feel. Off until you switch it on, in settings or from the focus page.",
+                "Writing can be an unlock step for schedules, blocks and limits: a few lines, from the microjournal's prompts or \"why?\", typed rather than pasted.",
+                "The microjournal's suggested sections are new, each question with an example where it helps.",
+                "Notes: search, a trash that keeps deleted notes a month, undo after deleting, undo and redo while writing, pins, labels, moving and merging notes, and reminders.",
+                "The to-do: ticked items gather at the end with their date, folded by when they were done.",
+                "Share text from any app into refuge; share or copy a note out.",
+                "A note added on the lock screen syncs once you unlock; leaving Obsidian can sync too.",
+                "Murakami's quotes are gone, and Shelley has joined.",
+            ),
+        ),
+        ChangelogEntry(
             76,
             "0.9.30",
             listOf(

@@ -38,6 +38,7 @@ object Quotes {
             "Robin Wall Kimmerer", "Braiding Sweetgrass",
         ),
         Quote("Know that life can only be found in the present moment.", "Thich Nhat Hanh", "Peace Is Every Step"),
+        Quote("One wandering thought pollutes the day.", "Percy Bysshe Shelley", "Mutability"),
         Quote(
             "He cannot be happy and strong until he too lives with nature in the present, above time.",
             "Ralph Waldo Emerson", "Self-Reliance",
@@ -63,10 +64,6 @@ object Quotes {
             "Robin Wall Kimmerer", "Braiding Sweetgrass",
         ),
         Quote(
-            "If you only read the books that everyone else is reading, you can only think what everyone else is thinking.",
-            "Haruki Murakami", "Norwegian Wood",
-        ),
-        Quote(
             "Breathing in, I calm body and mind. Breathing out, I smile. Dwelling in the present moment, I know this is " +
             "the only moment.",
             "Thich Nhat Hanh",
@@ -76,11 +73,6 @@ object Quotes {
         Quote(
             "The land is the real teacher. All we need as students is mindfulness.",
             "Robin Wall Kimmerer", "Braiding Sweetgrass",
-        ),
-        Quote(
-            "The most important thing we learn at school is the fact that the most important things can't be learned at " +
-            "school.",
-            "Haruki Murakami", "What I Talk About When I Talk About Running",
         ),
         Quote(
             "When you love someone, the best thing you can offer is your presence. How can you love if you are not there?",
@@ -102,10 +94,6 @@ object Quotes {
             "Robin Wall Kimmerer", "Braiding Sweetgrass",
         ),
         Quote("Thought creates the world and then says, 'I didn't do it.'", "David Bohm"),
-        Quote(
-            "We're both looking at the same moon, in the same world. We're connected to reality by the same line.",
-            "Haruki Murakami", "Sputnik Sweetheart",
-        ),
         Quote(
             "The real miracle is not to walk either on water or in thin air, but to walk on earth.",
             "Thich Nhat Hanh", "The Miracle of Mindfulness",
@@ -161,10 +149,6 @@ object Quotes {
             "Communication can lead to the creation of something new only if people are able to freely listen to each " +
             "other, without prejudice.",
             "David Bohm", "On Dialogue",
-        ),
-        Quote(
-            "It's all a question of imagination. Our responsibility begins with the power to imagine.",
-            "Haruki Murakami", "Kafka on the Shore",
         ),
         Quote(
             "Beauty is the harvest of presence, the evanescent moment of seeing or hearing on the outside what already " +

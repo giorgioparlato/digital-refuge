@@ -130,6 +130,8 @@ object Routes {
     const val NOTE = "note/"
     const val QUICK_NOTES = "quicknotes"
     const val JOURNAL_PROMPTS = "quicknotes/journal"
+    const val WHY = "settings/why"
+    const val JOURNAL_TODAY = "notes/journal"
     /** Settings' own pages, one per place ([app.bedtime.ui.settings.SettingsPlace]), and those under them. */
     const val SETTINGS_HOME = "settings/home"
     const val SETTINGS_LOCK = "settings/lock"
@@ -147,7 +149,7 @@ object Routes {
         setOf(
             SETTINGS_HOME, SETTINGS_LOCK, SETTINGS_APPS, SETTINGS_SHORTCUTS, SETTINGS_ABOUT, APP_LIST, COVER_MESSAGES, PROBLEMS,
             HOME_STYLE, HOME_STYLE_LOCK, STYLE_SHOWN, STYLE_SHOWN_LOCK, STYLE_SWIPES, STYLE_NOTIFICATIONS, STYLE_GESTURES,
-            SEARCH, DISTRACTION, GROUPS, ALWAYS_AVAILABLE, QUICK_NOTES, JOURNAL_PROMPTS, QUOTES, SETUP,
+            SEARCH, DISTRACTION, GROUPS, ALWAYS_AVAILABLE, QUICK_NOTES, JOURNAL_PROMPTS, WHY, QUOTES, SETUP,
         )
     }
 
@@ -281,6 +283,7 @@ private fun BedtimeNavigation(pendingRoute: String?, onRouteConsumed: () -> Unit
                         onSetup = { push(Routes.SETUP) },
                         onUnlock = { id -> push(Routes.unlock(id)) },
                         onNotes = { push(Routes.NOTES) },
+                        onWhy = { push(Routes.WHY) },
                     )
                 }
             }
@@ -314,9 +317,11 @@ private fun BedtimeNavigation(pendingRoute: String?, onRouteConsumed: () -> Unit
             top == Routes.WALKTHROUGH -> WalkthroughScreen(onDone = ::pop)
             top == Routes.STATS -> StatsScreen(onBack = ::pop, onOpen = ::push)
             top == Routes.QUOTES -> QuotesScreen(onBack = ::pop)
-            top == Routes.NOTES -> NotesScreen(onBack = ::pop)
+            top == Routes.NOTES -> NotesScreen(onBack = ::pop, onSettings = { push(Routes.QUICK_NOTES) })
+            top == Routes.JOURNAL_TODAY -> NotesScreen(onBack = ::pop, onSettings = { push(Routes.QUICK_NOTES) }, openJournal = true)
             top == Routes.QUICK_NOTES -> NoteTargetsScreen(onBack = ::pop, onOpenNotes = { push(Routes.NOTES) }, onOpenJournalPrompts = { push(Routes.JOURNAL_PROMPTS) })
             top == Routes.JOURNAL_PROMPTS -> app.bedtime.ui.notes.JournalPromptsScreen(onBack = ::pop)
+            top == Routes.WHY -> app.bedtime.ui.settings.WhySettingsScreen(onBack = ::pop, onOpenAnswers = { push(Routes.note(app.bedtime.data.Why.NOTE_ID)) })
             top.startsWith(Routes.EDIT) -> ScheduleEditScreen(
                 scheduleId = top.removePrefix(Routes.EDIT).ifEmpty { null },
                 template = null,
@@ -338,7 +343,7 @@ private fun BedtimeNavigation(pendingRoute: String?, onRouteConsumed: () -> Unit
                 onSetup = { push(Routes.SETUP) },
                 onHowItWorks = { push(Routes.ONBOARDING) },
             )
-            top.startsWith(Routes.NOTE) -> NotesScreen(onBack = ::pop, initialOpen = top.removePrefix(Routes.NOTE))
+            top.startsWith(Routes.NOTE) -> NotesScreen(onBack = ::pop, initialOpen = top.removePrefix(Routes.NOTE), onSettings = { push(Routes.QUICK_NOTES) })
             top.startsWith(Routes.UNLOCK) -> UnlockScreen(top.removePrefix(Routes.UNLOCK), onBack = ::pop)
             top.startsWith(Routes.LIMIT) -> LimitEditScreen(top.removePrefix(Routes.LIMIT).ifEmpty { null }, onBack = ::pop)
         }

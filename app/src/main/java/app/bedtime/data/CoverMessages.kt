@@ -12,6 +12,7 @@ object CoverMessages {
         "This will still be here later.",
         "Take a breath. Then decide.",
         "Look up for a moment.",
+        "Do I want to get brainwashed by a trillion dollar addictive panic machine right now?",
     )
 
     /** Everything a cover set to "a different one each time" draws from. */

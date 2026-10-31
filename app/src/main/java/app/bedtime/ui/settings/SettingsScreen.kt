@@ -479,9 +479,11 @@ private fun settingsEntries(
             ),
         )
         add(Entry(lock, Icons.Default.KeyboardArrowUp, "Gestures", "An app, the camera, screen off…", "gesture gestures swipe double tap lock camera screen off", go(Routes.STYLE_SWIPES)))
+        add(Entry(lock, Icons.Default.Info, "Ask why after unlocking", whyWords(s.askOnUnlock), "why unlock unlocking question journal struthless hungry angry lonely tired halt", go(Routes.WHY)))
 
         // ---------------------------------------------------------------- apps
         val apps = SettingsPlace.APPS
+        add(Entry(apps, Icons.Default.Info, "Ask why before distracting apps", whyWords(s.askOnApps), "why distracting limited apps question journal struthless", go(Routes.WHY)))
         add(
             Entry(
                 apps,
@@ -713,4 +715,11 @@ private fun SettingsSearch(query: String, onQuery: (String) -> Unit, focus: Bool
             Icon(Icons.Default.Clear, contentDescription = "clear", tint = c.textFaint, modifier = Modifier.size(20.dp).clip(RoundedCornerShape(50)).clickable { onQuery("") })
         }
     }
+}
+
+/** "Off", "During sessions", "Always": when "why?" is asked. */
+private fun whyWords(mode: app.bedtime.data.AskWhen): String = when (mode) {
+    app.bedtime.data.AskWhen.OFF -> "Off"
+    app.bedtime.data.AskWhen.SESSIONS -> "During sessions"
+    app.bedtime.data.AskWhen.ALWAYS -> "Always"
 }

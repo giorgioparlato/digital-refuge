@@ -209,7 +209,7 @@ object LockNotifications {
         notes.sortedWith(compareBy<LockNotification> { note -> circleOf(note, circles)?.let(circles::indexOf) ?: circles.size }.thenByDescending { it.postedAt })
 
     /** refuge's own notifications that belong on its lock screen: the rain alert and the week's note. */
-    val OUR_CHANNELS = setOf("rain", "look_back")
+    val OUR_CHANNELS = setOf("rain", "look_back", "note_reminders")
 
     /**
      * Worth a line at all: not ongoing (music, navigation), not a group's summary, not minimal; and of

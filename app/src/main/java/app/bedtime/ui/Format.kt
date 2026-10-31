@@ -91,5 +91,6 @@ fun formatWaitSeconds(seconds: Int): String = when {
 fun unlockSummary(config: UnlockConfig): String = listOfNotNull(
     if (config.waitEnabled) "wait ${formatWaitSeconds(config.waitDurationSeconds)}" else null,
     if (config.textEnabled) "type ${config.textLength}" else null,
+    if (config.writeEnabled) "write ${config.writeWords} words" else null,
     if (config.passwordEnabled && config.hasPassword) "password" else null,
 ).joinToString(" + ").let { if (it.isEmpty()) "instant unlock" else "unlock: $it" }

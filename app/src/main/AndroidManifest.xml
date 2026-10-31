@@ -121,6 +121,14 @@
             android:windowSoftInputMode="adjustResize" />
 
         <activity
+            android:name=".ui.blocked.WhyActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity="app.bedtime.why"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
             android:name=".ui.blocked.NudgeActivity"
             android:excludeFromRecents="true"
             android:exported="false"
@@ -202,6 +210,25 @@
         <receiver
             android:name=".service.RainAlarmReceiver"
             android:exported="false" />
+
+        <receiver
+            android:name=".service.NoteReminderReceiver"
+            android:exported="false" />
+
+        <!-- Text shared from any app, kept as a quick note: in refuge notes or one of your files. -->
+        <activity
+            android:name=".ui.minimal.ShareActivity"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity>
 
         <receiver
             android:name=".service.UndoStartReceiver"

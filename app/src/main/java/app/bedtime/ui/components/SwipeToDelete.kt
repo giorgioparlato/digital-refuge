@@ -1,5 +1,13 @@
 package app.bedtime.ui.components
 
+import androidx.compose.runtime.mutableStateOf
+
+import androidx.compose.runtime.setValue
+
+import androidx.compose.runtime.getValue
+
+import androidx.compose.ui.layout.onSizeChanged
+
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -29,7 +37,8 @@ import kotlin.math.roundToInt
 
 /**
  * Swipe a row left to reveal a red "delete" button behind it; deleting takes a second tap on that
- * button, so it never happens by accident. Swiping right closes it again.
+ * button, so it never happens by accident. Swiping right closes it again. With [swipeAway], where a
+ * deletion can be undone (notes go to a trash), a swipe most of the way across deletes it at once.
  *
  * [panel] should match the screen behind the row, so the red button only shows once revealed.
  */
@@ -39,6 +48,7 @@ fun SwipeToDelete(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     panel: Color = Obsidian.colors.bgPrimary,
+    swipeAway: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     if (!enabled) {
@@ -51,7 +61,8 @@ fun SwipeToDelete(
     val revealPx = with(LocalDensity.current) { 96.dp.toPx() }
     val offset = remember { Animatable(0f) }
 
-    Box(modifier.fillMaxWidth()) {
+    var width by remember { mutableStateOf(0f) }
+    Box(modifier.fillMaxWidth().onSizeChanged { width = it.width.toFloat() }) {
         // The delete button, revealed as the row slides left.
         Box(Modifier.matchParentSize(), contentAlignment = Alignment.CenterEnd) {
             Box(
@@ -78,10 +89,20 @@ fun SwipeToDelete(
                 .pointerInput(Unit) {
                     detectHorizontalDragGestures(
                         onHorizontalDrag = { _, dx ->
-                            scope.launch { offset.snapTo((offset.value + dx).coerceIn(-revealPx, 0f)) }
+                            val furthest = if (swipeAway) -width else -revealPx
+                            scope.launch { offset.snapTo((offset.value + dx).coerceIn(furthest, 0f)) }
                         },
                         onDragEnd = {
-                            scope.launch { offset.animateTo(if (offset.value < -revealPx / 2) -revealPx else 0f) }
+                            scope.launch {
+                                if (swipeAway && offset.value < -width * 0.45f) {
+                                    // Most of the way across: gone, with the undo the list offers.
+                                    offset.animateTo(-width)
+                                    onDelete()
+                                    offset.snapTo(0f)
+                                } else {
+                                    offset.animateTo(if (offset.value < -revealPx / 2) -revealPx else 0f)
+                                }
+                            }
                         },
                     )
                 },

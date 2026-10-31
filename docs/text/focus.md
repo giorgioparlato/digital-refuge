@@ -44,6 +44,7 @@ focus
 
 - No blocks yet · add one
 - No schedules yet · add one
+- Ask why you're picking up the phone ›
 - new block or schedule
 - digital refuge
 - … is on
@@ -100,12 +101,62 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 
 <sub>[NotesScreen.kt](../../app/src/main/java/app/bedtime/ui/notes/NotesScreen.kt)</sub>
 
+- in the trash for a month
+- Unpin
+- Pin near the top
+- Labels…
+- Reminder…
+- Remind me…
+- Move into…
+- Pick to merge
+- Share…
+- Copy
+- note copied
+- Clear done
+- done ones cleared
+- 1 picked
+- … picked
+- Tap notes in the order to merge them
+- Merge
 - Notes
 - Written in Markdown, kept on this phone
 - new note
 - Nothing yet. Type in the minimal home's search and pick “save in refuge notes”, or start one with +.
+- Words in any note
+- All
+- No note has “{query}”.
+- Trash · … ›
+- Empty the trash?
+- The note in it goes for good.
+- The … notes in it go for good.
+- Empty
+- Cancel
+- Trash
+- Deleted notes stay a month, then go
+- Nothing in the trash.
+- goes tomorrow · swipe to delete now
+- goes in {left} days · swipe to delete now
+- Put back
+- {day} …
+- Clear the one done?
+- Clear the … done?
+- Clear
+- This week
+- Done · …
+- {name} · …
+- At what time?
+- Remind me
+- Next
+- Set for 
+- A day and time…
+- No reminder
 - Microjournal
 - A few lines a day, with prompts if you want them
+- Move into
+- A note
+- Labels
+- A new label, like books
+- Save
 - New note
 - Note
 - # A title  - a list - [ ] a to-do
@@ -314,14 +365,21 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 - wait …
 - copy out a passage
 - type … characters
+- write … words
 - a password
 - Password
 - Tip: let someone else choose it
 - New password (leave empty to keep)
 - Choose a password
-- Each early unlock in a day makes the wait and text longer
+- Each early unlock in a day makes the wait, the typing and the writing longer
 - No steps picked
 - Unlocking will take a single tap.
+- Write a few lines
+- Why you want to unlock, or from prompts you choose; kept with your answers to “why?”
+- Words, at least
+- Prompts from
+- Just “why?”
+- The microjournal's sections, as you've written them in settings › notes.
 - Start a timer, come back when it's done
 - Wait it out
 - Timer
@@ -361,6 +419,7 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 - This will still be here later.
 - Take a breath. Then decide.
 - Look up for a moment.
+- Do I want to get brainwashed by a trillion dollar addictive panic machine right now?
 - A different one each time
 
 ## leave early
@@ -369,13 +428,17 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 
 - Wait
 - Type
+- Write
 - Password
 - the rest of the block
 - the rest of the session
+- Why do I want to unlock … right now?
 - … unlock today \u00b7 the steps are longer
 - Unlock
 - Continue
 - Waiting\u2026
+- unlocking …
+- {prompt} {text}
 - {outcome} The timer only runs while this screen is open, and starts over if you back out.
 - {outcome} Spaces and punctuation fill themselves in; pasting and typos are rejected.
 - This ends the block.

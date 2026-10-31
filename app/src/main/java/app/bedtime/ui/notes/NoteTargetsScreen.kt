@@ -150,6 +150,8 @@ fun NoteTargetsScreen(onBack: () -> Unit, onOpenNotes: () -> Unit, onOpenJournal
         onBack = onBack,
         afterNote = current.afterNoteShortcut,
         onPickAfterNote = { choosingShortcut = true },
+        syncAfterObsidian = current.syncAfterObsidian,
+        onSyncAfterObsidian = { on -> scope.launch { repo.updateSettings { it.copy(syncAfterObsidian = on) } } },
         journalOn = current.journalOn,
         onJournalOn = { on -> scope.launch { repo.updateSettings { it.copy(journalOn = on) } } },
         onJournalPrompts = onOpenJournalPrompts,
@@ -218,6 +220,8 @@ internal fun NoteTargetsContent(
     /** An app's shortcut run after a note goes into a file, and the choice of it. */
     afterNote: AppShortcut? = null,
     onPickAfterNote: () -> Unit = {},
+    syncAfterObsidian: Boolean = false,
+    onSyncAfterObsidian: (Boolean) -> Unit = {},
     /** The microjournal, off until you want it, and its sections and prompts. */
     journalOn: Boolean = false,
     onJournalOn: (Boolean) -> Unit = {},
@@ -271,13 +275,18 @@ internal fun NoteTargetsContent(
                 )
             }
             Spacer(Modifier.height(16.dp))
-            SectionCard(title = "Then", subtitle = "After a note goes into one of your files, from the home screen") {
+            SectionCard(title = "Then", subtitle = "After a note goes into one of your files; from the lock screen, once you unlock") {
                 OptionRow(
                     Icons.Default.Refresh,
                     "Run an app's shortcut",
                     description = afterNote?.let { "${it.app} · ${it.label}" } ?: "Nothing. A sync app's “Sync now” sends the file on at once",
                     onClick = onPickAfterNote,
                 ) { Chevron() }
+                if (afterNote != null) {
+                    OptionRow(Icons.Default.Refresh, "Also when you leave Obsidian", description = "So what you wrote there is sent on too; on the lock screen, once you unlock") {
+                        ObsidianToggle(syncAfterObsidian, onSyncAfterObsidian)
+                    }
+                }
             }
             Spacer(Modifier.height(32.dp))
         }

@@ -554,7 +554,10 @@ private fun LockScreen(
             offers = { words -> app.bedtime.ui.minimal.AppDrawer.noteOffers(words, settings, blocks, LocalDateTime.now()) },
             onOffer = { offer -> runOffer(context, repo, scope, settings, offer) },
             // Only added to here: nothing already written in it shows on the lock screen.
-            journal = if (!settings.journalOn) null else app.bedtime.ui.minimal.JournalWith(app.bedtime.data.Journal.sections(settings.journalSections)) { text, aims ->
+            journal = if (!settings.journalOn) null else app.bedtime.ui.minimal.JournalWith(
+                app.bedtime.data.Journal.sections(settings.journalSections),
+                openFull = { onOpenRoute(app.bedtime.Routes.JOURNAL_TODAY) },
+            ) { text, aims ->
                 scope.launch {
                     repo.addToJournal(java.time.LocalDate.now().toEpochDay(), text, aims)
                     Toast.makeText(context, "added to today's microjournal", Toast.LENGTH_SHORT).show()

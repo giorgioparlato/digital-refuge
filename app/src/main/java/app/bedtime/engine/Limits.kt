@@ -185,6 +185,7 @@ object Limits {
     fun isLooser(old: UnlockConfig, new: UnlockConfig): Boolean =
         (old.waitEnabled && (!new.waitEnabled || new.waitDurationSeconds < old.waitDurationSeconds)) ||
             (old.textEnabled && (!new.textEnabled || new.textLength < old.textLength)) ||
+            (old.writeEnabled && (!new.writeEnabled || new.writeWords < old.writeWords)) ||
             (old.passwordEnabled && old.hasPassword && !new.passwordEnabled) ||
             (old.escalate && (!new.escalate || new.escalateFactor < old.escalateFactor))
 }

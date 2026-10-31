@@ -48,15 +48,18 @@ import app.bedtime.ui.theme.Obsidian
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
-/** The credit for the suggested sections, wherever the prompts show. */
-internal const val JOURNAL_CREDIT = "Suggested sections after the journalling system by Struthless"
+/** The credits for the suggested sections, on their settings page, each with where it's from. */
+internal val JOURNAL_CREDITS = listOf(
+    "The suggested sections and questions come from Struthless's video “The Journalling Techniques that Changed My Life” ›" to "https://www.youtube.com/watch?v=dArgOrm98Bk",
+    "Self compassion's three steps are Kristin Neff's self-compassion journal ›" to "https://self-compassion.org/exercises/exercise-6-self-compassion-journal/",
+)
 
 /**
  * The microjournal: an entry a day, newest first, today's always on top (to start, until it exists).
  * An entry opens in the note editor, with your sections' prompts a toggle away.
  */
 @Composable
-internal fun JournalContent(onBack: () -> Unit) {
+internal fun JournalContent(onBack: () -> Unit, openToday: Boolean = false) {
     val context = LocalContext.current
     val repo = remember { Repository.get(context) }
     val scope = rememberCoroutineScope()
@@ -64,7 +67,7 @@ internal fun JournalContent(onBack: () -> Unit) {
     val settings by repo.settings.collectAsStateWithLifecycle(initialValue = null)
     val sections = Journal.sections(settings?.journalSections)
     val today = LocalDate.now()
-    var open by rememberSaveable { mutableStateOf<Long?>(null) }
+    var open by rememberSaveable { mutableStateOf(if (openToday) today.toEpochDay() else null) }
     val all = entries ?: return
     open?.let { day ->
         val entry = all.firstOrNull { it.day == day }
@@ -74,6 +77,7 @@ internal fun JournalContent(onBack: () -> Unit) {
             today,
             onSave = { text, aims -> scope.launch { repo.saveJournal(day, text, aims) } },
             onDone = { open = null },
+            promptsOpen = openToday,
         )
         return
     }
@@ -110,10 +114,10 @@ internal fun JournalContent(onBack: () -> Unit) {
 
 /** A day's entry in the note editor, with the prompts above it once toggled on; the sections picked are the entry's own. */
 @Composable
-private fun JournalEditor(entry: JournalEntry, sections: List<JournalSection>, today: LocalDate, onSave: (String, List<String>) -> Unit, onDone: () -> Unit) {
+private fun JournalEditor(entry: JournalEntry, sections: List<JournalSection>, today: LocalDate, onSave: (String, List<String>) -> Unit, onDone: () -> Unit, promptsOpen: Boolean = false) {
     val c = Obsidian.colors
     var aims by remember { mutableStateOf(entry.aims) }
-    var prompting by rememberSaveable { mutableStateOf(false) }
+    var prompting by rememberSaveable { mutableStateOf(promptsOpen) }
     NoteEditor(
         initial = remember { entry.text },
         isNew = entry.text.isEmpty(),
@@ -175,16 +179,16 @@ internal fun JournalPrompts(
                     Text("${section.name}: ${section.guide}", style = MaterialTheme.typography.bodySmall, color = faint)
                 }
                 section.prompts.forEach { prompt ->
-                    Text(
-                        "› $prompt",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = accent,
-                        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable(onClickLabel = "add this prompt") { onPrompt(prompt) }.padding(vertical = 6.dp),
-                    )
+                    // The question, and under it an example of an answer, for a sense of what it asks.
+                    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable(onClickLabel = "add this prompt") { onPrompt(prompt) }.padding(vertical = 6.dp)) {
+                        Text("› $prompt", style = MaterialTheme.typography.bodyMedium, color = accent)
+                        section.hints[prompt]?.let { hint ->
+                            Text(hint, style = MaterialTheme.typography.bodySmall.copy(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic), color = faint, modifier = Modifier.padding(start = 12.dp, top = 2.dp))
+                        }
+                    }
                 }
             }
         }
         if (sections.isEmpty()) Text("No sections yet: add some under settings › notes › microjournal.", style = MaterialTheme.typography.bodySmall, color = faint)
-        Text(JOURNAL_CREDIT, style = MaterialTheme.typography.labelSmall, color = faint)
     }
 }

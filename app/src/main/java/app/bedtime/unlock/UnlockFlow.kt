@@ -81,7 +81,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 
-private enum class Challenge(val label: String) { WAIT("Wait"), TEXT("Type"), PASSWORD("Password") }
+private enum class Challenge(val label: String) { WAIT("Wait"), TEXT("Type"), WRITE("Write"), PASSWORD("Password") }
 
 /**
  * Runs every enabled challenge of the occurrence's schedule in order (wait → text → password),
@@ -151,6 +151,7 @@ internal fun UnlockSteps(
         buildList {
             if (config.waitEnabled) add(Challenge.WAIT)
             if (config.textEnabled) add(Challenge.TEXT)
+            if (config.writeEnabled) add(Challenge.WRITE)
             if (config.passwordEnabled && config.hasPassword) add(Challenge.PASSWORD)
         }
     }
@@ -176,10 +177,19 @@ internal fun UnlockSteps(
     }
 
     if (recentUnlocks == null) return
+    // What's written to unlock goes with the other answers to "why?", in their note; its prompts are the sections chosen.
+    val context = LocalContext.current
+    val repo = remember { Repository.get(context) }
+    val settings by repo.settings.collectAsStateWithLifecycle(initialValue = null)
+    val sections = app.bedtime.data.Journal.sections(settings?.journalSections).filter { it.name in config.writeSections }
+    // A section with no questions of its own (clarity) is written from its guide.
+    val prompts = sections.flatMap { s -> s.prompts.map { it to s.hints[it] }.ifEmpty { listOf(s.guide to null) } }
+        .ifEmpty { listOf("Why do I want to unlock ${name.lowercase()} right now?" to null) }
+    val writeWords = if (config.escalate) Escalation.textLength(config.writeWords, recentUnlocks, config.escalateFactor) else config.writeWords
     val escalating = config.escalate && recentUnlocks > 0
     val textLength = if (config.escalate) Escalation.textLength(config.textLength, recentUnlocks, config.escalateFactor) else config.textLength
     val waitMs = (if (config.escalate) Escalation.waitSeconds(config.waitDurationSeconds, recentUnlocks, config.escalateFactor) else config.waitDurationSeconds) * 1000L
-    val note = if (escalating && (config.waitEnabled || config.textEnabled)) {
+    val note = if (escalating && (config.waitEnabled || config.textEnabled || config.writeEnabled)) {
         "${ordinal(recentUnlocks + 1)} unlock today \u00b7 the steps are longer"
     } else {
         null
@@ -221,6 +231,11 @@ internal fun UnlockSteps(
                 null -> Unit
                 Challenge.WAIT -> WaitChallengeContent(remaining = remaining, total = waitMs)
                 Challenge.TEXT -> TextChallengeInput(textLength, config.textSource, onPassed = ::passCurrent)
+                Challenge.WRITE -> WriteChallenge(writeWords, prompts) { prompt, text ->
+                    val line = app.bedtime.data.Why.line(java.time.LocalDateTime.now(), "unlocking ${name.lowercase()}", emptyList(), "$prompt $text", wentOn = true)
+                    scope.launch { withContext(NonCancellable) { repo.addWhy(line) } }
+                    passCurrent()
+                }
                 Challenge.PASSWORD -> PasswordChallenge(config, onPassed = ::passCurrent)
             }
         }

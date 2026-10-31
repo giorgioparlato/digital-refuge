@@ -111,6 +111,7 @@ class BootReceiver : BroadcastReceiver() {
             Repository.get(context).migrateHomeGreen()
             SessionAlarms.schedule(context)
             RainAlarm.schedule(context, Repository.get(context).settings.first().homeStyle)
+            NoteReminders.schedule(context, Repository.get(context).notes.first())
         }
     }
 }

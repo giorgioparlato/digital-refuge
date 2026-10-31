@@ -1,5 +1,7 @@
 package app.bedtime.ui.minimal
 
+import app.bedtime.data.Notes
+
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -27,7 +29,10 @@ internal class NoteSlots(val inList: (@Composable () -> Unit)?, val beside: (@Co
  */
 internal fun noteSlots(style: HomeStyle, screen: Screen, note: Note?, onWrite: (Note, String) -> Unit, onHold: () -> Unit): NoteSlots {
     if (!Modules.isOn(style, screen, Module.NOTE)) return NoteSlots(null, null)
-    val toggle = { i: Int -> note?.let { onWrite(it, NoteWidget.toggled(it.text, i)) } ?: Unit }
+    // The to-do note's ticked items go down below the rest, dated, as in the note itself.
+    val toggle = { i: Int ->
+        note?.let { n -> onWrite(n, if (n.id == Notes.TODO_ID) app.bedtime.data.Todo.toggled(n.text, i, java.time.LocalDate.now()) else NoteWidget.toggled(n.text, i)) } ?: Unit
+    }
     val save = { written: String -> note?.let { onWrite(it, written) } ?: Unit }
     return NoteSlots(
         inList = {
