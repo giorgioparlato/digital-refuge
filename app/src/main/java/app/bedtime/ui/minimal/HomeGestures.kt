@@ -3,6 +3,7 @@ package app.bedtime.ui.minimal
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.input.pointer.pointerInput
@@ -106,6 +107,7 @@ internal fun QuickNoteDialog(
             lookUp = lookUp,
             offers = offers,
             onOffer = { onOffer(it); onDismiss() },
+            onClose = onDismiss,
             whole = whole,
             words = words,
             onWords = { words = it },
@@ -127,6 +129,8 @@ internal fun QuickNoteContent(
     whole: Boolean = false,
     words: String? = null,
     onWords: ((String) -> Unit)? = null,
+    /** An × at the top, to put it away. */
+    onClose: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val p = style.palette()
@@ -159,7 +163,14 @@ internal fun QuickNoteContent(
             NoteReader(note, style) { reading = null }
             return@Column
         }
-        Text("A quick note", style = MaterialTheme.typography.titleMedium, color = p.text)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("A quick note", style = MaterialTheme.typography.titleMedium, color = p.text, modifier = Modifier.weight(1f))
+            if (onClose != null) {
+                Box(Modifier.size(36.dp).clip(RoundedCornerShape(50)).clickable(onClickLabel = "close", onClick = onClose), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.Close, contentDescription = null, tint = p.faint, modifier = Modifier.size(20.dp))
+                }
+            }
+        }
         BasicTextField(
             value = text,
             onValueChange = {

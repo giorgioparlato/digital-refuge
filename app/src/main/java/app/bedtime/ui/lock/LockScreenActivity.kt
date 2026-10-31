@@ -113,6 +113,7 @@ import app.bedtime.data.HomeStyle
 import app.bedtime.data.Quote
 import app.bedtime.data.Quotes
 import app.bedtime.data.Repository
+import app.bedtime.data.Problems
 import app.bedtime.engine.Engine
 import app.bedtime.ui.components.BedtimeIcons
 import app.bedtime.ui.components.Text
@@ -141,6 +142,9 @@ class LockScreenActivity : ComponentActivity() {
 
     /** Black and at the lowest brightness, for phones that won't turn the screen off while locked. */
     private val blackout = mutableStateOf(false)
+
+    /** Whether the quick note (and its look-up) is open, so leaving it by Android's swipe can bring this screen back. */
+    private val boxOpen = mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -179,6 +183,7 @@ class LockScreenActivity : ComponentActivity() {
                         onConfirmed = ::unlockActLock,
                         onOpenRoute = { route -> unlockThen { startActivity(app.bedtime.MainActivity.intent(this, route)) } },
                         onOpenIntent = { intent -> unlockThen { runCatching { startActivity(intent) } } },
+                        boxOpen = boxOpen,
                     )
                     if (blackout.value) {
                         Box(
@@ -280,10 +285,18 @@ class LockScreenActivity : ComponentActivity() {
      * a touch brings it back.
      */
     private fun screenOff() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) BlockingState.service?.performGlobalAction(AccessibilityService.GLOBAL_ACTION_LOCK_SCREEN)
+        // Android's own lock, as the power button: through the accessibility service, no other permission.
+        val asked = when {
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.P -> "not on this Android"
+            BlockingState.service == null -> "blocking is off"
+            BlockingState.service?.performGlobalAction(AccessibilityService.GLOBAL_ACTION_LOCK_SCREEN) == true -> "taken"
+            else -> "refused"
+        }
         lifecycleScope.launch {
             delay(600)
             if (getSystemService(PowerManager::class.java).isInteractive) {
+                // Noted, to see on the phone whether Android's lock ever turns the screen off from here.
+                Problems.note("screen off from the lock screen: Android's lock was $asked, the screen stayed on, so it went black instead")
                 blackout.value = true
                 window.attributes = window.attributes.apply { screenBrightness = 0f }
             }
@@ -298,6 +311,16 @@ class LockScreenActivity : ComponentActivity() {
     override fun onStop() {
         // Asleep now, so the next wake shows the lock screen as it was.
         if (blackout.value) wake()
+        // Android's swipe up from the foot, with the quick note open, shows Android's own lock screen over
+        // this one: still locked, the screen still on. The box closes and this screen comes back. Not
+        // during a call, whose screen this mustn't cover.
+        val audio = getSystemService(android.media.AudioManager::class.java)
+        if (boxOpen.value && !isFinishing && getSystemService(KeyguardManager::class.java).isKeyguardLocked &&
+            getSystemService(PowerManager::class.java).isInteractive && audio.mode == android.media.AudioManager.MODE_NORMAL
+        ) {
+            boxOpen.value = false
+            Problems.attempt("coming back over Android's lock screen") { startActivity(intent(this)) }
+        }
         super.onStop()
     }
 
@@ -380,6 +403,8 @@ private fun LockScreen(
     onOpenRoute: (String) -> Unit = {},
     /** Any other app's screen (an event in the calendar), after the usual unlock. */
     onOpenIntent: (Intent) -> Unit = {},
+    /** Whether the quick note is open, kept by the screen. */
+    boxOpen: androidx.compose.runtime.MutableState<Boolean> = remember { mutableStateOf(false) },
 ) {
     val context = LocalContext.current
     val repo = remember { Repository.get(context) }
@@ -398,7 +423,7 @@ private fun LockScreen(
     val circles = app.bedtime.data.Circles.of(settings.homeStyle)
     val sessionStyle = Modules.during(lockStyle, state?.active.orEmpty().map { it.start to it.schedule })
     val nowPlaying = if (Modules.isOn(sessionStyle, Screen.LOCK, Module.NOW_PLAYING)) rememberNowPlaying() else null
-    var quickNote by remember { mutableStateOf(false) }
+    var quickNote by boxOpen
     // A gesture's action: a quick note or the notification shade right here, otherwise an app (the camera
     // straight away, any other once unlocked).
     val runAction: (String) -> Unit = { action ->

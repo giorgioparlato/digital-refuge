@@ -13,6 +13,15 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            74,
+            "0.9.28",
+            listOf(
+                "The quick note has an × at the top to close it.",
+                "On the lock screen, Android's swipe up from the very bottom with the quick note open brings back refuge's lock screen, not Android's.",
+                "Turning the screen off from the lock screen notes under recent problems when Android's own lock didn't do it, to see why.",
+            ),
+        ),
+        ChangelogEntry(
             73,
             "0.9.27",
             listOf(
