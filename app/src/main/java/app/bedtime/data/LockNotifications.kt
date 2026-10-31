@@ -131,6 +131,25 @@ object LockNotifications {
     /** What "quiet until morning" quiets: just the conversation if there is one, otherwise the whole app. */
     fun quietKey(note: LockNotification): String = note.conversation?.let { "${note.packageName}/$it" } ?: note.packageName
 
+    /**
+     * How long "quiet until…" can last, from [now]: an hour, three, this evening (while that's more
+     * than an hour off), tomorrow morning (or this one, before 7:00), and the end of the session
+     * running, if one is. Each with when it ends, as epoch millis.
+     */
+    fun quietChoices(now: java.time.LocalDateTime, sessionEnd: Long? = null): List<Pair<String, Long>> {
+        val zone = java.time.ZoneId.systemDefault()
+        fun millis(at: java.time.LocalDateTime) = at.atZone(zone).toInstant().toEpochMilli()
+        val evening = now.toLocalDate().atTime(18, 0)
+        val morning = now.toLocalDate().atTime(7, 0).let { if (now.isBefore(it)) it else it.plusDays(1) }
+        return listOfNotNull(
+            "1 hour" to millis(now.plusHours(1)),
+            "3 hours" to millis(now.plusHours(3)),
+            ("this evening" to millis(evening)).takeIf { now.plusHours(1).isBefore(evening) },
+            (if (morning.toLocalDate() == now.toLocalDate()) "this morning" else "tomorrow morning") to millis(morning),
+            sessionEnd?.takeIf { it > millis(now) }?.let { "the session ends" to it },
+        )
+    }
+
     /** Whether [note] is quieted by any entry in [quiet] still running at [now]. */
     fun isQuiet(note: LockNotification, quiet: Map<String, Long>, now: Long): Boolean =
         listOf(note.packageName, quietKey(note)).any { (quiet[it] ?: 0L) > now }

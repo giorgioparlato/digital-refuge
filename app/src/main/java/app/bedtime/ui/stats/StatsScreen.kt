@@ -96,7 +96,7 @@ import kotlin.math.ceil
  * Insights: your phone use, how your sessions held, and your habits. As a tab it has no way back; opened
  * from elsewhere (the hour dots' report, a widget) it has one. [initialSection]: 0 phone, 1 sessions, 2 habits.
  */
-fun StatsScreen(onBack: (() -> Unit)?, initialSection: Int = 0) {
+fun StatsScreen(onBack: (() -> Unit)?, initialSection: Int = 0, onOpen: (String) -> Unit = {}) {
     val context = LocalContext.current
     val repo = remember { Repository.get(context) }
     val scope = rememberCoroutineScope()
@@ -134,6 +134,21 @@ fun StatsScreen(onBack: (() -> Unit)?, initialSection: Int = 0) {
         onAllowAccess = { runCatching { context.startActivity(UsageReader.accessIntent(context)) } },
         versus = settings?.statsVersus ?: app.bedtime.data.Versus.LAST,
         onVersus = { v -> scope.launch { repo.updateSettings { it.copy(statsVersus = v) } } },
+        homeStyle = settings?.homeStyle ?: app.bedtime.data.HomeStyle(),
+        // Changed where it's kept: the lock screen's tracker if that's the one with your budget, else the home screen's.
+        onBudget = { whole, minutes ->
+            scope.launch {
+                repo.updateSettings { s ->
+                    val style = s.homeStyle
+                    val lock = style.lockUseWidget
+                    s.copy(
+                        homeStyle = if (lock != null && lock.chosen(whole) && !style.useWidget.chosen(whole)) style.copy(lockUseWidget = lock.withAllowance(whole, minutes))
+                        else style.copy(useWidget = style.useWidget.withAllowance(whole, minutes)),
+                    )
+                }
+            }
+        },
+        onOpen = onOpen,
         habits = {
             HabitsBody(
                 habits, habitMarks, HourlyUse.today(), editingHabit, { editingHabit = it },
@@ -171,6 +186,10 @@ internal fun StatsContent(
     onAllowAccess: (() -> Unit)? = null,
     versus: app.bedtime.data.Versus = app.bedtime.data.Versus.LAST,
     onVersus: (app.bedtime.data.Versus) -> Unit = {},
+    /** Your home screen's look: the tracker's budget and colours, for the month's heatmap. */
+    homeStyle: app.bedtime.data.HomeStyle = app.bedtime.data.HomeStyle(),
+    onBudget: (Boolean, Int) -> Unit = { _, _ -> },
+    onOpen: (String) -> Unit = {},
     /** Your habits, as their third section, and the round + that adds one there; without them, two sections. */
     habits: (@Composable () -> Unit)? = null,
     onAddHabit: (() -> Unit)? = null,
@@ -221,6 +240,9 @@ internal fun StatsContent(
                     limitedApps = limits.flatMap { it.rules.apps }.toSet(),
                     chosenVersus = versus,
                     onVersus = onVersus,
+                    homeStyle = homeStyle,
+                    onBudget = onBudget,
+                    onOpen = onOpen,
                 )
                 Spacer(Modifier.height(16.dp))
                 return@Column

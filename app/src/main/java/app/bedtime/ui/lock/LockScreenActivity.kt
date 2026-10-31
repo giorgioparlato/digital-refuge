@@ -579,9 +579,8 @@ private fun LockScreen(
         Box(Modifier.fillMaxSize().background(style.palette().background))
         return
     }
-    // "Later" and "quiet" last until the session ends; outside one, an hour, and the morning.
+    // "Later" lasts until the session ends, or an hour outside one; "quiet" until the time you choose.
     val laterUntil = occurrence?.end ?: (System.currentTimeMillis() + 60 * 60_000L)
-    val quietUntil = occurrence?.end ?: nextMorning(now)
     // Like a quick note, writing in it here saves as you go.
     val lockNote = noteSlots(style, Screen.LOCK, widgetNote, onWrite = { n, text -> scope.launch { repo.editNote(n.id, text) } }, onHold = { holding = Module.NOTE })
     LockScreenContent(
@@ -639,13 +638,14 @@ private fun LockScreen(
             open = onOpenNotification,
             dismiss = LockNotifications::dismiss,
             later = { LockNotifications.later(it, System.currentTimeMillis(), laterUntil) },
-            quiet = { note ->
+            quiet = { note, until ->
                 val key = LockNotifications.quietKey(note)
-                scope.launch { repo.quiet(key, quietUntil) }
+                scope.launch { repo.quiet(key, until) }
                 // What's already here comes back when the quiet ends, like "later".
                 notifications.filter { LockNotifications.quietKey(it) == key }
-                    .forEach { LockNotifications.later(it, System.currentTimeMillis(), quietUntil) }
+                    .forEach { LockNotifications.later(it, System.currentTimeMillis(), until) }
             },
+            quietChoices = { LockNotifications.quietChoices(LocalDateTime.now(), occurrence?.end) },
             act = onAct,
         ),
     )
@@ -856,13 +856,6 @@ private fun runOffer(context: Context, repo: Repository, scope: kotlinx.coroutin
         }
         else -> Unit
     }
-}
-
-/** The next 7:00, as epoch millis: when "quiet until morning" ends outside a session. */
-private fun nextMorning(now: LocalDateTime): Long {
-    val today = now.toLocalDate().atTime(7, 0)
-    val morning = if (now.isBefore(today)) today else today.plusDays(1)
-    return morning.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
 }
 
 /** A timer counting down, under the widgets; a swipe either way hides it until it ends. */

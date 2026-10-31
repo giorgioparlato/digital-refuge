@@ -14,9 +14,9 @@ class UseMonthsTest {
     fun daysAddUpIntoTheirMonths() {
         val kept = listOf(UsageMonth("2026-09", total = 1_000, distracting = 400, days = 10))
         val own = UseMonths.own(kept, listOf(day("2026-09-30", 100, 50), day("2026-10-01", 200, 20), day("2026-10-02", 0, 0)))
-        assertEquals(UsageMonth("2026-09", 1_100, 450, 11), own["2026-09"])
+        assertEquals(UsageMonth("2026-09", 1_100, 450, 11, daily = mapOf(30 to 100L), dailyDistracting = mapOf(30 to 50L)), own["2026-09"])
         // A day without any use doesn't count towards the average.
-        assertEquals(UsageMonth("2026-10", 200, 20, 1), own["2026-10"])
+        assertEquals(UsageMonth("2026-10", 200, 20, 1, daily = mapOf(1 to 200L), dailyDistracting = mapOf(1 to 20L)), own["2026-10"])
     }
 
     @Test

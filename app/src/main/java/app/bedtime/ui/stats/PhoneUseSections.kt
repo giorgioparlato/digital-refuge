@@ -1,5 +1,11 @@
 package app.bedtime.ui.stats
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import app.bedtime.data.HeatDay
+import app.bedtime.data.UseHeat
+
 import androidx.compose.runtime.remember
 
 import app.bedtime.ui.components.LowercaseStrings
@@ -103,6 +109,12 @@ internal fun PhoneStats(
     chosenVersus: Versus = Versus.LAST,
     onVersus: (Versus) -> Unit = {},
     initialPeriod: UsePeriod = UsePeriod.DAY,
+    /** The tracker's budget and colours, for the month's heatmap. */
+    homeStyle: app.bedtime.data.HomeStyle = app.bedtime.data.HomeStyle(),
+    /** Sets the day's allowance for the whole phone (true) or distracting apps. */
+    onBudget: (Boolean, Int) -> Unit = { _, _ -> },
+    /** Another page of the app: which apps are distracting. */
+    onOpen: (String) -> Unit = {},
 ) {
     val c = Obsidian.colors
     var period by rememberSaveable { mutableStateOf(initialPeriod) }
@@ -112,6 +124,16 @@ internal fun PhoneStats(
     fun go(to: UsePeriod, date: LocalDate) {
         period = to
         startDay = UsePeriods.start(to, date).toEpochDay()
+    }
+    // A day opened from a month: Back returns to that month rather than leaving.
+    var fromMonth by rememberSaveable { mutableStateOf<Long?>(null) }
+    BackHandler(enabled = fromMonth != null && period == UsePeriod.DAY) {
+        fromMonth?.let { go(UsePeriod.MONTH, LocalDate.ofEpochDay(it)) }
+        fromMonth = null
+    }
+    val openDay = { date: LocalDate ->
+        if (period == UsePeriod.MONTH) fromMonth = start.toEpochDay()
+        go(UsePeriod.DAY, date)
     }
 
     if (!use.fromAndroid && onAllowAccess != null) {
@@ -125,7 +147,10 @@ internal fun PhoneStats(
         }
     }
 
-    SegmentedChoice(options = listOf("Day", "Week", "Month"), selected = period.ordinal, onSelect = { go(UsePeriod.entries[it], today) })
+    SegmentedChoice(options = listOf("Day", "Week", "Month"), selected = period.ordinal, onSelect = {
+        fromMonth = null
+        go(UsePeriod.entries[it], today)
+    })
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Step(Icons.AutoMirrored.Filled.KeyboardArrowLeft, "the one before", enabled = true) { startDay = UsePeriods.shift(period, start, -1).toEpochDay() }
         Text(periodLabel(period, start, today), style = MaterialTheme.typography.titleMedium, color = c.textNormal, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
@@ -168,6 +193,19 @@ internal fun PhoneStats(
         fromDays
     }
     val against = versusWords(period, versus, start == currentStart, start, picked)
+
+    if (period == UsePeriod.MONTH) {
+        // The whole phone first; distracting apps a tap away.
+        var wholePhone by rememberSaveable { mutableStateOf(true) }
+        MonthHeat(
+            UseHeat.month(YearMonth.from(start), use.days, months[UseMonths.key(start.toEpochDay())], wholePhone, today),
+            homeStyle,
+            wholePhone = wholePhone,
+            onWholePhone = { wholePhone = it },
+            onDay = openDay,
+            onBudget = onBudget,
+        )
+    }
 
     SectionCard {
         Row(Modifier.fillMaxWidth()) {
@@ -225,7 +263,7 @@ internal fun PhoneStats(
             axisEvery = if (period == UsePeriod.MONTH) 7 else null,
             picked = todayIndex,
             dots = period == UsePeriod.DAY,
-            onPick = if (period == UsePeriod.DAY) null else { i -> go(UsePeriod.DAY, dates[i]) },
+            onPick = if (period == UsePeriod.DAY) null else { i -> openDay(dates[i]) },
         )
         if (period == UsePeriod.WEEK) {
             Spacer(Modifier.height(16.dp))
@@ -267,6 +305,11 @@ internal fun PhoneStats(
             )
         }
         if (ranked.isEmpty()) Text("Nothing here.", style = MaterialTheme.typography.bodyMedium, color = c.textFaint, modifier = Modifier.padding(top = 4.dp))
+        Spacer(Modifier.height(4.dp))
+        LinkLine(
+            if (use.distractingApps.isEmpty()) "No distracting apps chosen yet. Choose them" else "Which apps are distracting",
+            strong = use.distractingApps.isEmpty(),
+        ) { onOpen(app.bedtime.Routes.DISTRACTION) }
         if (ranked.size > 8) {
             Text(
                 if (everything) "Fewer" else "All ${ranked.size}",
@@ -276,6 +319,160 @@ internal fun PhoneStats(
             )
         }
     }
+}
+
+/** Within the budget: calm, the tracker's calm colour where it's set. */
+private val Within = Color(0xFF86BC9F)
+
+/** Over it, from the tracker's distracted colour (rose unless set) towards red, at twice the budget. */
+private val Rose = Color(0xFFE47B8A)
+private val Reddest = Color(0xFFD7263D)
+
+/**
+ * The month a day at a time, each coloured by its time against the tracker's daily budget, on the
+ * budget's scale so months compare: calm within it, then the distracted colour deepening to red at
+ * twice it. A tap opens that day. Under it, the month's most, and the budget it's set against.
+ */
+@Composable
+private fun MonthHeat(
+    heat: List<HeatDay>,
+    style: app.bedtime.data.HomeStyle,
+    wholePhone: Boolean,
+    onWholePhone: (Boolean) -> Unit,
+    onDay: (LocalDate) -> Unit,
+    onBudget: (Boolean, Int) -> Unit,
+) {
+    val c = Obsidian.colors
+    // Your budget where you have one, on the home screen's tracker or the lock screen's.
+    val widget = listOfNotNull(style.useWidget, style.lockUseWidget).firstOrNull { it.chosen(wholePhone) } ?: style.useWidget
+    // Each against its own budget: the phone's, or the distracting apps'.
+    val budget = widget.allowance(wholePhone) * 60L
+    var settingBudget by remember { mutableStateOf(false) }
+    if (settingBudget) {
+        BudgetDialog(wholePhone, widget.allowance(wholePhone), onDismiss = { settingBudget = false }) { minutes ->
+            settingBudget = false
+            onBudget(wholePhone, minutes)
+        }
+    }
+    val calm = style.hourCalmColor?.let { Color(it) } ?: Within
+    val over = style.hourDistractedColor?.let { Color(it) } ?: Rose
+    fun colour(seconds: Long): Color {
+        val level = UseHeat.level(seconds, budget)
+        return if (level <= 1f) calm.copy(alpha = 0.3f + 0.4f * level) else androidx.compose.ui.graphics.lerp(over, Reddest, (level - 1f) / (UseHeat.REDDEST - 1f))
+    }
+    SectionCard(title = "Each day", subtitle = "Against a day's budget, the same in every month. Tap a day for it") {
+        SegmentedChoice(options = listOf("On the phone", "Distracting"), selected = if (wholePhone) 0 else 1, onSelect = { onWholePhone(it == 0) })
+        Spacer(Modifier.height(8.dp))
+        // The budget it's set against, and a way to choose it; until you have, a nudge to.
+        val what = if (wholePhone) "on the phone" else "in distracting apps"
+        LinkLine(
+            if (widget.chosen(wholePhone)) "Budget: ${formatMinutes(budget / 60)} a day $what"
+            else "No budget chosen yet, so ${formatMinutes(budget / 60)} a day $what is suggested. Choose yours",
+            strong = !widget.chosen(wholePhone),
+        ) { settingBudget = true }
+        Spacer(Modifier.height(8.dp))
+        // Monday first, as the weeks are.
+        Row(Modifier.fillMaxWidth()) {
+            java.time.DayOfWeek.entries.forEach { d ->
+                Text(d.getDisplayName(TextStyle.NARROW, Locale.getDefault()), style = MaterialTheme.typography.labelSmall, color = c.textFaint, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+        val lead = heat.first().date.dayOfWeek.value - 1
+        val cells: List<HeatDay?> = List(lead) { null } + heat
+        cells.chunked(7).forEach { week ->
+            Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                (0 until 7).forEach { i ->
+                    val day = week.getOrNull(i)
+                    Box(Modifier.weight(1f).aspectRatio(1f)) {
+                        if (day != null) {
+                            val seconds = day.seconds
+                            val shape = RoundedCornerShape(8.dp)
+                            Box(
+                                Modifier
+                                    .fillMaxSize()
+                                    .clip(shape)
+                                    .background(if (seconds != null && seconds > 0) colour(seconds) else Color.Transparent)
+                                    .border(1.dp, c.border.copy(alpha = if (seconds == null) 0.4f else 0.8f), shape)
+                                    .then(if (seconds != null) Modifier.clickable(onClickLabel = "open this day") { onDay(day.date) } else Modifier),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text("${day.date.dayOfMonth}", style = MaterialTheme.typography.labelMedium, color = if (seconds == null) c.textFaint else c.textNormal)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(10.dp))
+        val most = UseHeat.most(heat)
+        Text(
+            most?.let { "Most: ${UseWords.short(it.seconds ?: 0)}, " + it.date.format(DateTimeFormatter.ofPattern("EEEE d", Locale.getDefault())) }
+                ?: "Nothing kept for these days yet.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = c.textMuted,
+        )
+        Spacer(Modifier.height(8.dp))
+        // The scale: calm, then over, then twice over.
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Box(Modifier.size(12.dp).clip(RoundedCornerShape(3.dp)).background(colour(budget / 2)))
+            Text("within", style = MaterialTheme.typography.labelSmall, color = c.textFaint)
+            Spacer(Modifier.width(6.dp))
+            Box(Modifier.size(12.dp).clip(RoundedCornerShape(3.dp)).background(colour(budget + budget / 10)))
+            Text("over", style = MaterialTheme.typography.labelSmall, color = c.textFaint)
+            Spacer(Modifier.width(6.dp))
+            Box(Modifier.size(12.dp).clip(RoundedCornerShape(3.dp)).background(colour(budget * 2)))
+            Text("twice or more", style = MaterialTheme.typography.labelSmall, color = c.textFaint)
+        }
+    }
+}
+
+/** A line that leads somewhere, with "›": in the accent when it asks for something still to do ([strong]). */
+@Composable
+private fun LinkLine(text: String, strong: Boolean, onClick: () -> Unit) {
+    val c = Obsidian.colors
+    Text(
+        "$text ›",
+        style = MaterialTheme.typography.bodySmall,
+        color = if (strong) c.accentText else c.textMuted,
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable(onClick = onClick).padding(vertical = 6.dp),
+    )
+}
+
+/** A day's budget, for the whole phone ([wholePhone]) or distracting apps: a few usual amounts, or any other. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun BudgetDialog(wholePhone: Boolean, current: Int, onDismiss: () -> Unit, onSave: (Int) -> Unit) {
+    val c = Obsidian.colors
+    var minutes by remember { mutableStateOf(current) }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = c.bgSecondary,
+        title = { Text(if (wholePhone) "A day on the phone" else "A day in distracting apps") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    (if (wholePhone) UseWords.PHONE_BUDGETS else UseWords.DISTRACTING_BUDGETS).forEach { m ->
+                        val on = m == minutes
+                        Text(
+                            UseWords.compact(m),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = if (on) c.bgPrimary else c.textMuted,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(50))
+                                .background(if (on) c.accent else Color.Transparent)
+                                .border(1.dp, if (on) c.accent else c.border, RoundedCornerShape(50))
+                                .clickable { minutes = m }
+                                .padding(horizontal = 12.dp, vertical = 6.dp),
+                        )
+                    }
+                }
+                app.bedtime.ui.components.NumberStepper(minutes, { minutes = it }, UseWords.BUDGET_RANGE, step = 5, suffix = " min")
+            }
+        },
+        confirmButton = { TextButton(onClick = { onSave(minutes) }) { Text("Save", color = c.accentText) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = c.textMuted) } },
+    )
 }
 
 /** "today", "yesterday", "wednesday 21 october"; "this week", "last week", "19 – 25 october"; "october", "october 2025". */

@@ -267,7 +267,7 @@ private fun BedtimeNavigation(pendingRoute: String?, onRouteConsumed: () -> Unit
         TabShell(tab, onTab = { tab = it }) {
             key(tab) {
                 when (tab) {
-                    Routes.INSIGHTS -> StatsScreen(onBack = null)
+                    Routes.INSIGHTS -> StatsScreen(onBack = null, onOpen = ::push)
                     Routes.LIMITS -> LimitsScreen(
                         onEdit = { id -> push(Routes.LIMIT + id) },
                         onCreate = { push(Routes.LIMIT) },
@@ -311,7 +311,7 @@ private fun BedtimeNavigation(pendingRoute: String?, onRouteConsumed: () -> Unit
             top == Routes.ALWAYS_AVAILABLE -> AlwaysAvailableScreen(onBack = ::pop)
             top == Routes.ONBOARDING -> OnboardingScreen(onDone = ::pop)
             top == Routes.WALKTHROUGH -> WalkthroughScreen(onDone = ::pop)
-            top == Routes.STATS -> StatsScreen(onBack = ::pop)
+            top == Routes.STATS -> StatsScreen(onBack = ::pop, onOpen = ::push)
             top == Routes.QUOTES -> QuotesScreen(onBack = ::pop)
             top == Routes.NOTES -> NotesScreen(onBack = ::pop)
             top == Routes.QUICK_NOTES -> NoteTargetsScreen(onBack = ::pop, onOpenNotes = { push(Routes.NOTES) })

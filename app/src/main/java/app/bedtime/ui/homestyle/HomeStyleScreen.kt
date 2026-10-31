@@ -1028,11 +1028,11 @@ private fun UseWidgetOptions(use: UseWidget, onChange: (UseWidget) -> Unit) {
         )
         SizeLabel("A day's allowance", Modifier.padding(top = 16.dp, bottom = 8.dp))
         val minutes = if (use.budgetWholePhone) UseWords.PHONE_BUDGETS else UseWords.DISTRACTING_BUDGETS
-        val chosen = if (use.budgetWholePhone) use.phoneBudgetMinutes else use.budgetMinutes
+        val chosen = use.allowance(use.budgetWholePhone)
         SegmentedChoice(
             options = minutes.map(UseWords::compact),
             selected = minutes.indexOf(chosen).coerceAtLeast(0),
-            onSelect = { i -> onChange(if (use.budgetWholePhone) use.copy(phoneBudgetMinutes = minutes[i]) else use.copy(budgetMinutes = minutes[i])) },
+            onSelect = { i -> onChange(use.withAllowance(use.budgetWholePhone, minutes[i])) },
         )
     }
 }

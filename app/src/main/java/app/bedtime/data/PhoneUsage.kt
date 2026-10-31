@@ -160,9 +160,20 @@ object PhoneUsage {
     }
 }
 
-/** A month on the phone: seconds in any app and in distracting ones, over the [days] that had any use. "2026-10". */
+/**
+ * A month on the phone: seconds in any app and in distracting ones, over the [days] that had any use.
+ * "2026-10". Each day's two figures are kept too, by day of the month, for the month's heatmap once
+ * the days themselves are gone; months kept before that have none.
+ */
 @kotlinx.serialization.Serializable
-data class UsageMonth(val month: String, val total: Long = 0, val distracting: Long = 0, val days: Int = 0) {
+data class UsageMonth(
+    val month: String,
+    val total: Long = 0,
+    val distracting: Long = 0,
+    val days: Int = 0,
+    val daily: Map<Int, Long> = emptyMap(),
+    val dailyDistracting: Map<Int, Long> = emptyMap(),
+) {
     /** Seconds a day on average, over the days that had any use. */
     val perDay: Long? get() = if (days > 0) total / days else null
     val distractingPerDay: Long? get() = if (days > 0) distracting / days else null
@@ -176,7 +187,14 @@ object UseMonths {
         if (day.total <= 0) return months
         val key = key(day.day)
         val month = months.firstOrNull { it.month == key } ?: UsageMonth(key)
-        val added = month.copy(total = month.total + day.total, distracting = month.distracting + day.distractingTotal, days = month.days + 1)
+        val date = java.time.LocalDate.ofEpochDay(day.day).dayOfMonth
+        val added = month.copy(
+            total = month.total + day.total,
+            distracting = month.distracting + day.distractingTotal,
+            days = month.days + 1,
+            daily = month.daily + (date to day.total),
+            dailyDistracting = month.dailyDistracting + (date to day.distractingTotal),
+        )
         return (months.filterNot { it.month == key } + added).sortedBy { it.month }
     }
 
@@ -201,8 +219,9 @@ object UseMonths {
                 key to UsageMonth(key, list.sumOf { it.seconds }, list.filter { it.pkg in distracting }.sumOf { it.seconds }, days)
             }
 
-    /** Android's months where it has them, refuge's own for the rest. */
-    fun merge(fromAndroid: Map<String, UsageMonth>, own: Map<String, UsageMonth>): Map<String, UsageMonth> = own + fromAndroid
+    /** Android's months where it has them, refuge's own for the rest; Android's keep refuge's days, which it has none of. */
+    fun merge(fromAndroid: Map<String, UsageMonth>, own: Map<String, UsageMonth>): Map<String, UsageMonth> =
+        own + fromAndroid.mapValues { (key, month) -> own[key]?.let { month.copy(daily = it.daily, dailyDistracting = it.dailyDistracting) } ?: month }
 
     /** The [count] months up to [current], oldest first, an empty one for any missing. */
     fun last(months: Map<String, UsageMonth>, current: java.time.YearMonth, count: Int = 6): List<UsageMonth> =

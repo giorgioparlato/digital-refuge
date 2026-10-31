@@ -209,8 +209,8 @@ object WidgetOptions {
                     null
                 },
                 if (use.look == UseLook.BUDGET) {
-                    WidgetOption.Minutes("A day's allowance", if (use.budgetWholePhone) use.phoneBudgetMinutes else use.budgetMinutes, budgets, UseWords.BUDGET_RANGE) {
-                        set(if (use.budgetWholePhone) use.copy(phoneBudgetMinutes = it) else use.copy(budgetMinutes = it))
+                    WidgetOption.Minutes("A day's allowance", use.allowance(use.budgetWholePhone), budgets, UseWords.BUDGET_RANGE) {
+                        set(use.withAllowance(use.budgetWholePhone, it))
                     }
                 } else {
                     null

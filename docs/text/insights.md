@@ -107,8 +107,24 @@ insights
 - Time and opens, and the change against {against}; distracting ones marked
 - Only your distracting apps are counted without usage access
 - Nothing here.
+- No distracting apps chosen yet. Choose them
+- Which apps are distracting
 - Fewer
 - All …
+- Each day
+- Against a day's budget, the same in every month. Tap a day for it
+- On the phone
+- Distracting
+- in distracting apps
+- Budget: … a day {what}
+- No budget chosen yet, so … a day {what} is suggested. Choose yours
+- Nothing kept for these days yet.
+- twice or more
+- {text} ›
+- A day on the phone
+- A day in distracting apps
+- Save
+- Cancel
 - this week
 - last week
 - the day before
@@ -123,7 +139,6 @@ insights
 - your 30-day average
 - your average day this year
 - Compare
-- Cancel
 - ↑ {change}%
 - the same
 

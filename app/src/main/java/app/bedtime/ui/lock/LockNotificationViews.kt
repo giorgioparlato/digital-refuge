@@ -82,8 +82,10 @@ class NoteHandlers(
     val dismiss: (LockNotification) -> Unit = {},
     /** Out of the way until the session ends. */
     val later: (LockNotification) -> Unit = {},
-    /** Its app or conversation off the lock screen until the session ends. */
-    val quiet: (LockNotification) -> Unit = {},
+    /** Its app or conversation off the lock screen until the time chosen ([quietChoices]). */
+    val quiet: (LockNotification, Long) -> Unit = { _, _ -> },
+    /** How long "quiet until…" can last, each with when it ends. */
+    val quietChoices: () -> List<Pair<String, Long>> = { emptyList() },
     /** One of its buttons; a reply carries its text. */
     val act: (LockNotification, NoteAction, String?) -> Unit = { _, _, _ -> },
 )
@@ -262,11 +264,18 @@ private fun NotificationRow(
                     note.body != null -> Text(note.body, style = MaterialTheme.typography.bodySmall, color = p.muted)
                 }
                 val reply = note.actions.firstOrNull { it.isReply }
+                // "Quiet until…" opens its choices in place of the buttons; "‹" goes back to them.
+                var quieting by remember(note.key) { mutableStateOf(false) }
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (reply != null && !replying) NoteChip("Reply", p) { onReply(true) }
-                    note.actions.filterNot { it.isReply }.forEach { action -> NoteChip(action.title, p) { handlers.act(note, action, null) } }
-                    NoteChip("Later", p) { handlers.later(note) }
-                    NoteChip("Quiet until morning", p) { handlers.quiet(note) }
+                    if (quieting) {
+                        NoteChip("‹", p) { quieting = false }
+                        handlers.quietChoices().forEach { (label, until) -> NoteChip(label, p) { handlers.quiet(note, until) } }
+                    } else {
+                        if (reply != null && !replying) NoteChip("Reply", p) { onReply(true) }
+                        note.actions.filterNot { it.isReply }.forEach { action -> NoteChip(action.title, p) { handlers.act(note, action, null) } }
+                        NoteChip("Later", p) { handlers.later(note) }
+                        NoteChip("Quiet until…", p) { quieting = true }
+                    }
                 }
                 if (replying && reply != null) {
                     ReplyBox(p, quickReplies, onSend = { text ->

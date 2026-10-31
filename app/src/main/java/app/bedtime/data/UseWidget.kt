@@ -17,10 +17,41 @@ data class UseWidget(
     val unlocks: Boolean = false,
     /** The budget counts the whole phone, not only distracting apps. */
     val budgetWholePhone: Boolean = false,
-    /** The day's allowance in distracting apps, and on the whole phone, in minutes. */
-    val budgetMinutes: Int = 60,
-    val phoneBudgetMinutes: Int = 180,
-)
+    /** The day's allowance in distracting apps, and on the whole phone, in minutes; read them through [allowance]. */
+    val budgetMinutes: Int = SUGGESTED_DISTRACTING,
+    val phoneBudgetMinutes: Int = SUGGESTED_PHONE,
+    /** Whether you've chosen each allowance yourself; until then it's the one suggested, and you're asked to choose. */
+    val budgetChosen: Boolean = false,
+    val phoneBudgetChosen: Boolean = false,
+) {
+    /**
+     * Whether you've chosen the allowance for the whole phone ([wholePhone]) or distracting apps. Saved
+     * before that was kept: the one the budget bar shows is yours, whatever its amount, and so is any
+     * other than what was suggested then (1 h, 3 h) or now.
+     */
+    fun chosen(wholePhone: Boolean): Boolean = when {
+        if (wholePhone) phoneBudgetChosen else budgetChosen -> true
+        look == UseLook.BUDGET && budgetWholePhone == wholePhone -> true
+        wholePhone -> phoneBudgetMinutes !in setOf(180, SUGGESTED_PHONE)
+        else -> budgetMinutes !in setOf(60, SUGGESTED_DISTRACTING)
+    }
+
+    /** A day's allowance in minutes: yours, or the one suggested, 1 h on the whole phone and 30 min in distracting apps. */
+    fun allowance(wholePhone: Boolean): Int = when {
+        !chosen(wholePhone) -> if (wholePhone) SUGGESTED_PHONE else SUGGESTED_DISTRACTING
+        wholePhone -> phoneBudgetMinutes
+        else -> budgetMinutes
+    }.coerceAtLeast(1)
+
+    /** With your allowance for the whole phone ([wholePhone]) or distracting apps set to [minutes]. */
+    fun withAllowance(wholePhone: Boolean, minutes: Int): UseWidget =
+        if (wholePhone) copy(phoneBudgetMinutes = minutes, phoneBudgetChosen = true) else copy(budgetMinutes = minutes, budgetChosen = true)
+
+    companion object {
+        const val SUGGESTED_DISTRACTING = 30
+        const val SUGGESTED_PHONE = 60
+    }
+}
 
 /** Today so far, as the tracker tells it: seconds on the phone and in distracting apps, unlocks if known, and each distracting app's seconds. */
 data class UseToday(
@@ -90,7 +121,7 @@ object UseWords {
     /** The budget: an allowance up to an hour is told in minutes ("40 of 60 min"), a longer one in hours. */
     fun budget(widget: UseWidget, today: UseToday): UseBudget {
         val used = if (widget.budgetWholePhone) today.total else today.distracting
-        val allowed = (if (widget.budgetWholePhone) widget.phoneBudgetMinutes else widget.budgetMinutes).coerceAtLeast(1) * 60L
+        val allowed = widget.allowance(widget.budgetWholePhone) * 60L
         val amount = if (allowed <= 3_600L) "${used / 60} of ${allowed / 60} min" else "${short(used)} of ${short(allowed)}"
         val over = used > allowed
         return UseBudget(

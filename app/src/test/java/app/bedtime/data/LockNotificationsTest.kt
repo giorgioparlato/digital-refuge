@@ -168,4 +168,20 @@ class LockNotificationsTest {
         assertFalse(LockNotifications.isNavigation(null, ongoing = false, packageName = "com.google.android.apps.maps"))
         assertFalse(LockNotifications.isNavigation("msg", ongoing = true, packageName = "com.whatsapp"))
     }
+
+    @Test
+    fun quietLastsAsLongAsYouChoose() {
+        val zone = java.time.ZoneId.systemDefault()
+        fun at(t: java.time.LocalDateTime) = t.atZone(zone).toInstant().toEpochMilli()
+        val afternoon = java.time.LocalDateTime.of(2026, 10, 31, 14, 0)
+        val choices = LockNotifications.quietChoices(afternoon)
+        assertEquals(listOf("1 hour", "3 hours", "this evening", "tomorrow morning"), choices.map { it.first })
+        assertEquals(at(afternoon.withHour(18)), choices[2].second)
+        assertEquals(at(java.time.LocalDateTime.of(2026, 11, 1, 7, 0)), choices[3].second)
+        // Late in the day, no evening; before 7:00, this morning; in a session, its end too.
+        assertEquals(listOf("1 hour", "3 hours", "tomorrow morning"), LockNotifications.quietChoices(afternoon.withHour(17).withMinute(30)).map { it.first })
+        assertEquals("this morning", LockNotifications.quietChoices(afternoon.withHour(5))[3].first)
+        val sessionEnd = at(afternoon.withHour(16))
+        assertEquals("the session ends" to sessionEnd, LockNotifications.quietChoices(afternoon, sessionEnd).last())
+    }
 }

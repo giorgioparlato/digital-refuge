@@ -27,11 +27,11 @@ class UseWordsTest {
 
     @Test
     fun aBudgetForDistractingAppsOrTheWholePhone() {
-        val under = UseWords.budget(UseWidget(UseLook.BUDGET, budgetMinutes = 60), today.copy(distracting = 2_400))
+        val under = UseWords.budget(UseWidget(UseLook.BUDGET, budgetMinutes = 60, budgetChosen = true), today.copy(distracting = 2_400))
         assertEquals("40 of 60 min distracting", under.line)
         assertEquals("20 min left", under.note)
         assertFalse(under.over)
-        val over = UseWords.budget(UseWidget(UseLook.BUDGET, budgetWholePhone = true, phoneBudgetMinutes = 180), today.copy(total = 12_300))
+        val over = UseWords.budget(UseWidget(UseLook.BUDGET, budgetWholePhone = true, phoneBudgetMinutes = 180, phoneBudgetChosen = true), today.copy(total = 12_300))
         assertEquals("3h 25m of 3h on the phone", over.line)
         assertEquals("25 min over", over.note)
         assertTrue(over.over)
@@ -58,5 +58,28 @@ class UseWordsTest {
     fun everyAppTodayMostFirst() {
         val withAll = today.copy(allApps = today.apps + ("maps" to 3_000L))
         assertEquals(listOf("maps", "ig", "yt", "rd"), UseWords.ranked(withAll).map { it.first })
+    }
+
+    @Test
+    fun anAllowanceNotChosenIsTheSuggestedOne() {
+        val fresh = UseWidget()
+        assertEquals(60, fresh.allowance(wholePhone = true))
+        assertEquals(30, fresh.allowance(wholePhone = false))
+        assertEquals(false, fresh.chosen(true))
+        // Saved before choosing was kept: the old suggestions (3 h, 1 h) weren't chosen; anything else was.
+        assertEquals(60, UseWidget(phoneBudgetMinutes = 180).allowance(true))
+        assertEquals(30, UseWidget(budgetMinutes = 60).allowance(false))
+        assertEquals(45, UseWidget(budgetMinutes = 45).allowance(false))
+        assertEquals(true, UseWidget(budgetMinutes = 45).chosen(false))
+        // The budget bar's own is yours, even at what used to be suggested.
+        assertEquals(true, UseWidget(UseLook.BUDGET, budgetMinutes = 60).chosen(false))
+        assertEquals(60, UseWidget(UseLook.BUDGET, budgetMinutes = 60).allowance(false))
+        assertEquals(180, UseWidget(UseLook.BUDGET, budgetWholePhone = true, phoneBudgetMinutes = 180).allowance(true))
+        assertEquals(false, UseWidget(UseLook.BUDGET, budgetMinutes = 60).chosen(true))
+        // Chosen, even the suggested amount, it's yours and stops asking.
+        val set = fresh.withAllowance(false, 30)
+        assertEquals(true, set.chosen(false))
+        assertEquals(false, set.chosen(true))
+        assertEquals(180, fresh.withAllowance(true, 180).allowance(true))
     }
 }

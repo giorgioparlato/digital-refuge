@@ -587,6 +587,10 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 <sub>[LockScreenActivity.kt](../../app/src/main/java/app/bedtime/ui/lock/LockScreenActivity.kt)</sub>
 
 - that didn't go through
+- not on this Android
+- blocking is off
+- screen off from the lock screen: Android's lock was {asked}, the screen stayed on, so it went black instead
+- coming back over Android's lock screen
 - unlock the phone
 - tap to open
 - timer started
@@ -604,7 +608,7 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 - New notification
 - Reply
 - Later
-- Quiet until morning
+- Quiet until…
 - Write a reply
 - Sending asks for your unlock, then locks again
 - Cancel
