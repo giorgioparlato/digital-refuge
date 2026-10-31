@@ -122,9 +122,9 @@ enum class LockNotes { USUAL, OWN, NONE }
 @Serializable
 enum class AskWhen { OFF, SESSIONS, ALWAYS }
 
-/** What a limit's pause before opening asks: a wait, or typing a little. */
+/** What a limit's pause before opening asks: a wait, typing a little, or "why am I opening this?". */
 @Serializable
-enum class PauseKind { WAIT, TYPING }
+enum class PauseKind { WAIT, TYPING, ASK }
 
 /** What a completed unlock gives: the rest of the session, a set break, or a length chosen there and then. */
 @Serializable
@@ -605,8 +605,12 @@ data class AppSettings(
     val limits: List<AppLimit> = emptyList(),
     /** True once a style still on the old default green has moved to the sage — once, so it can be chosen again. */
     val homeGreenMigrated: Boolean = false,
-    /** Messages you wrote for covers, shared by every schedule, block and limit. */
+    /**
+     * Messages for covers, shared by every schedule, block and limit: until you change the list
+     * ([coverMessagesEdited]), the suggested ones and then these, those you wrote; after, all of them.
+     */
     val customMessages: List<CustomMessage> = emptyList(),
+    val coverMessagesEdited: Boolean = false,
     /** Your own quotes, favourites, hidden ones, and which of them rotate. */
     val quotes: QuotePrefs = QuotePrefs(),
     /** Files quick notes can be added to, besides the app's own notes; at most [Notes.MAX_TARGETS]. */
@@ -635,13 +639,11 @@ data class AppSettings(
     val afterNoteShortcut: AppShortcut? = null,
     /** That shortcut also when you leave Obsidian, so what you wrote there is sent on too. */
     val syncAfterObsidian: Boolean = false,
-    /** "Why am I unlocking my phone right now?" after an unlock, and before a distracting or limited app. */
+    /** "Why am I unlocking my phone right now?" after an unlock; before a limit's apps, it's that limit's pause. */
     val askOnUnlock: AskWhen = AskWhen.OFF,
-    val askOnApps: AskWhen = AskWhen.OFF,
-    /** Your own words for it; null keeps the suggested ones ([Why]). */
-    val whyQuestion: String? = null,
-    val whyNudge: String? = null,
-    val whyTags: List<String>? = null,
+    /** The questions asked in turn after unlocking, and before a limit's apps; null keeps the suggested ones ([Why]). */
+    val whyQuestions: List<String>? = null,
+    val whyAppQuestions: List<String>? = null,
 ) {
     /** Where quick notes and the search can add: the to-do note first, then your files. */
     val quickTargets: List<NoteTarget> get() = listOf(Notes.TODO) + noteTargets

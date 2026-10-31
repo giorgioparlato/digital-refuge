@@ -13,8 +13,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,7 +22,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -34,6 +31,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -46,7 +44,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.lifecycleScope
-import app.bedtime.apps.AppCatalog
 import app.bedtime.data.AppSettings
 import app.bedtime.data.Repository
 import app.bedtime.data.Why
@@ -62,9 +59,9 @@ import kotlinx.coroutines.withContext
 import java.time.LocalDateTime
 
 /**
- * "Why am I unlocking my phone right now?": after an unlock, or before a distracting app opens. A few
- * words and tags if you like, kept in their own note; then put it down, or go on. Back goes on too:
- * it's a pause, not a wall.
+ * "Why am I unlocking my phone right now?", or another question in turn, after an unlock. Write it
+ * down if you like, kept in its own note; then put it down, or go on. Back goes on too: it's a
+ * pause, not a wall.
  */
 class WhyActivity : ComponentActivity() {
     private var settings = AppSettings()
@@ -73,22 +70,20 @@ class WhyActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val pkg = intent.getStringExtra(EXTRA_APP)
-        val appName = pkg?.let { AppCatalog.label(this, it) }
         onBackPressedDispatcher.addCallback(this) { finish() }
         lifecycleScope.launch {
             settings = Repository.get(this@WhyActivity).settings.first()
             setContent {
                 BedtimeTheme {
+                    val question = remember { Why.ask(Why.questions(settings)) }
                     WhyScreen(
-                        question = Why.question(settings, appName),
-                        nudge = Why.nudge(settings),
-                        tags = Why.tags(settings),
-                        onPutDown = { words, tags ->
-                            keep(appName, words, tags, wentOn = false)
+                        question = question,
+                        onPutDown = { words ->
+                            keep(question, words, wentOn = false)
                             putDown(pkg)
                         },
-                        onGoOn = { words, tags ->
-                            keep(appName, words, tags, wentOn = true)
+                        onGoOn = { words ->
+                            keep(question, words, wentOn = true)
                             finish()
                         },
                     )
@@ -98,10 +93,10 @@ class WhyActivity : ComponentActivity() {
     }
 
     /** The answer, in its note, when there's anything to it; written even as the screen goes. */
-    private fun keep(appName: String?, words: String, tags: List<String>, wentOn: Boolean) {
-        if (words.isBlank() && tags.isEmpty()) return
+    private fun keep(question: String, words: String, wentOn: Boolean) {
+        if (words.isBlank()) return
         val repo = Repository.get(applicationContext)
-        val line = Why.line(LocalDateTime.now(), appName ?: "unlocking", tags, words, wentOn)
+        val line = Why.line(LocalDateTime.now(), "unlocking", question, words, wentOn)
         lifecycleScope.launch { withContext(NonCancellable) { repo.addWhy(line) } }
     }
 
@@ -126,18 +121,19 @@ class WhyActivity : ComponentActivity() {
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+/**
+ * The question and a box to write in: then put it down, or go on. [about] sits above the question
+ * ("about to open Instagram"), when there's an app to name.
+ */
 @Composable
 internal fun WhyScreen(
     question: String,
-    nudge: String,
-    tags: List<String>,
-    onPutDown: (String, List<String>) -> Unit,
-    onGoOn: (String, List<String>) -> Unit,
+    onPutDown: (String) -> Unit,
+    onGoOn: (String) -> Unit,
+    about: String? = null,
 ) {
     val c = Obsidian.colors
     var words by rememberSaveable { mutableStateOf("") }
-    var picked by rememberSaveable { mutableStateOf(emptyList<String>()) }
     Column(
         Modifier
             .fillMaxSize()
@@ -148,62 +144,44 @@ internal fun WhyScreen(
             .padding(horizontal = 28.dp, vertical = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Spacer(Modifier.height(48.dp))
+        Spacer(Modifier.height(40.dp))
+        about?.let {
+            Text(it, style = MaterialTheme.typography.labelLarge, color = c.textMuted)
+            Spacer(Modifier.height(10.dp))
+        }
         Text(question, fontSize = 26.sp, color = c.textNormal, textAlign = TextAlign.Center)
         Spacer(Modifier.height(24.dp))
+        // Room to write it out: as much as you like, or nothing.
         BasicTextField(
             value = words,
             onValueChange = { words = it },
             textStyle = MaterialTheme.typography.bodyLarge.copy(color = c.textNormal),
             cursorBrush = SolidColor(c.accent),
-            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None),
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 96.dp)
+                .heightIn(min = 180.dp)
                 .clip(RoundedCornerShape(14.dp))
+                .background(c.bgSecondary)
                 .border(1.dp, c.border, RoundedCornerShape(14.dp))
-                .padding(14.dp),
+                .padding(16.dp),
             decorationBox = { field ->
                 androidx.compose.foundation.layout.Box {
-                    if (words.isEmpty()) Text("A few words, if you want…", style = MaterialTheme.typography.bodyLarge, color = c.textFaint)
+                    if (words.isEmpty()) Text("Write it down, if you want…", style = MaterialTheme.typography.bodyLarge, color = c.textFaint)
                     field()
                 }
             },
         )
-        if (tags.isNotEmpty()) {
-            Spacer(Modifier.height(18.dp))
-            Text("Am I…", style = MaterialTheme.typography.labelLarge, color = c.textMuted)
-            Spacer(Modifier.height(8.dp))
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                tags.forEach { tag ->
-                    val on = tag in picked
-                    Text(
-                        tag,
-                        style = MaterialTheme.typography.labelLarge,
-                        color = if (on) c.bgPrimary else c.textMuted,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(50))
-                            .background(if (on) c.accent else androidx.compose.ui.graphics.Color.Transparent)
-                            .border(1.dp, if (on) c.accent else c.border, RoundedCornerShape(50))
-                            .clickable { picked = if (on) picked - tag else picked + tag }
-                            .padding(horizontal = 14.dp, vertical = 7.dp),
-                    )
-                }
-            }
-        }
-        Spacer(Modifier.height(28.dp))
-        Text(nudge, style = MaterialTheme.typography.bodyLarge, color = c.textMuted, textAlign = TextAlign.Center)
         Spacer(Modifier.height(32.dp))
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(
                 "Not now",
                 style = MaterialTheme.typography.labelLarge,
                 color = c.textMuted,
-                modifier = Modifier.clip(RoundedCornerShape(50)).clickable { onPutDown(words, picked) }.padding(horizontal = 16.dp, vertical = 12.dp),
+                modifier = Modifier.clip(RoundedCornerShape(50)).clickable { onPutDown(words) }.padding(horizontal = 16.dp, vertical = 12.dp),
             )
             Spacer(Modifier.weight(1f))
-            SoftPillButton("Yes, go on", onClick = { onGoOn(words, picked) })
+            SoftPillButton("Yes, go on", onClick = { onGoOn(words) })
         }
-        Spacer(Modifier.width(1.dp))
     }
 }

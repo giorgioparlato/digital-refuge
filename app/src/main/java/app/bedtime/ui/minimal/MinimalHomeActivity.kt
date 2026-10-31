@@ -729,12 +729,7 @@ private fun MinimalHomeScreen(
             onOffer = onResult,
             initial = lookingUp.orEmpty(),
             whole = !lookingUp.isNullOrEmpty(),
-            journal = if (!settings.journalOn) null else JournalWith(app.bedtime.data.Journal.sections(settings.journalSections)) { text, aims ->
-                scope.launch {
-                    repo.addToJournal(java.time.LocalDate.now().toEpochDay(), text, aims)
-                    Toast.makeText(context, "added to today's microjournal", Toast.LENGTH_SHORT).show()
-                }
-            },
+            onJournal = if (settings.journalOn) ({ context.startActivity(app.bedtime.MainActivity.intent(context, app.bedtime.Routes.JOURNAL_TODAY)) }) else null,
         )
     }
     if (appsDetail) {

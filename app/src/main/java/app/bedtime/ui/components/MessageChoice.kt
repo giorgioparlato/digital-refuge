@@ -79,11 +79,12 @@ private fun MessageChoiceDialog(current: CoverMessage, onPick: (CoverMessage) ->
     val repo = remember { Repository.get(context) }
     val scope = rememberCoroutineScope()
     val settings by repo.settings.collectAsStateWithLifecycle(initialValue = null)
-    val custom = settings?.customMessages.orEmpty()
+    // Every message, the suggested ones and yours: one list, each to pick, keep in the mix, or delete.
+    val custom = settings?.let { CoverMessages.all(it) }.orEmpty()
     var draft by rememberSaveable { mutableStateOf("") }
 
     fun updateCustom(transform: (List<CustomMessage>) -> List<CustomMessage>) {
-        scope.launch { repo.updateSettings { it.copy(customMessages = transform(it.customMessages)) } }
+        scope.launch { repo.updateSettings { CoverMessages.edited(it, transform) } }
     }
 
     AlertDialog(
@@ -93,15 +94,11 @@ private fun MessageChoiceDialog(current: CoverMessage, onPick: (CoverMessage) ->
         text = {
             LazyColumn(Modifier.heightIn(max = 480.dp)) {
                 item {
-                    Choice("A different one each time", current.mode != MessageMode.CHOSEN, note = "From the app's and yours that are in the mix") {
+                    Choice("A different one each time", current.mode != MessageMode.CHOSEN, note = "From those in the mix") {
                         onPick(CoverMessage(MessageMode.RANDOM))
                     }
                 }
-                item { Heading("Or always one of these") }
-                CoverMessages.presets.forEach { text ->
-                    item { Choice("“$text”", current.mode == MessageMode.CHOSEN && current.text == text) { onPick(CoverMessage(MessageMode.CHOSEN, text)) } }
-                }
-                if (custom.isNotEmpty()) item { Heading("Yours") }
+                if (custom.isNotEmpty()) item { Heading("Or always one of these") }
                 custom.forEach { message ->
                     item {
                         Row(verticalAlignment = Alignment.CenterVertically) {

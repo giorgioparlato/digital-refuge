@@ -199,7 +199,7 @@ private fun CommitField(value: String, placeholder: String, modifier: Modifier, 
         onValueChange = { text = it },
         placeholder = placeholder,
         singleLine = singleLine,
-        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = if (singleLine) ImeAction.Done else ImeAction.Default),
+        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, imeAction = if (singleLine) ImeAction.Done else ImeAction.Default),
         keyboardActions = KeyboardActions(onDone = { focus.clearFocus() }),
         modifier = modifier.onFocusChanged { state ->
             if (focused && !state.isFocused) commit()

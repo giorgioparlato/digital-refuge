@@ -36,69 +36,69 @@ object Journal {
 
     val SUGGESTED: List<JournalSection> = listOf(
         section(
-            "clarity", "Clarity",
-            "Write every single thought as you have it. In one sitting, or jot each new thought down as it comes. Once you see the words in front of you, they don't look as scary.",
+            "clarity", "clarity",
+            "write every single thought as you have it. in one sitting, or jot each new thought down as it comes. once you see the words in front of you, they don't look as scary.",
         ),
         section(
-            "fixation", "Pattern interrupt",
-            "For when you get fixated on something that you can't think about other stuff.",
-            "Imagine six impossible things and write them down" to "From Lewis Carroll. E.g a camel and his best friend skating over an exploding pigeon.",
-            "How can I make someone else happy right now?" to "You get out of serving yourself and start serving someone else.",
-            "What's something in my immediate environment that I have never noticed?" to "If you're stuck in the past or the future, doing this immediately draws you to the present.",
+            "fixation", "pattern interrupt",
+            "for when you get fixated on something that you can't think about other stuff.",
+            "imagine six impossible things and write them down" to "from lewis carroll. e.g a camel and his best friend skating over an exploding pigeon.",
+            "how can i make someone else happy right now?" to "you get out of serving yourself and start serving someone else.",
+            "what's something in my immediate environment that i have never noticed?" to "if you're stuck in the past or the future, doing this immediately draws you to the present.",
         ),
         section(
-            "reflection", "Daily reflections",
-            "Reflect on your day with the same questions. Do them most days for a month and you'll learn so much about yourself.",
-            "What excited me?" to null,
-            "What drained me of energy?" to null,
-            "What did I learn?" to null,
-            "What are 10 things I'm grateful for?" to null,
-            "How did I move towards what I long for?" to null,
+            "reflection", "daily reflections",
+            "reflect on your day with the same questions. do them most days for a month and you'll learn so much about yourself.",
+            "what excited me?" to null,
+            "what drained me of energy?" to null,
+            "what did i learn?" to null,
+            "what are 10 things i'm grateful for?" to null,
+            "how did i move towards what i long for?" to null,
         ),
         section(
-            "bad", "When bad things happen",
-            "“There is nothing either good or bad, but thinking makes it so.”",
-            "What happened, objectively?" to "Separate what actually happened from the meaning you instinctively gave it.",
-            "What did I make it mean?" to "Here's where you get a glimpse of your cognitive distortions.",
-            "How would I comfort a friend I loved if this happened to them?" to "Instead of beating yourself up, treat yourself like a friend you love, and give yourself a little compassion.",
-            "How is this the best thing that has ever happened to me?" to "This question can be challenging, but finding answers to it can help us reframe how we view events in our life.",
+            "bad", "when bad things happen",
+            "“there is nothing either good or bad, but thinking makes it so.”",
+            "what happened, objectively?" to "separate what actually happened from the meaning you instinctively gave it.",
+            "what did i make it mean?" to "here's where you get a glimpse of your cognitive distortions.",
+            "how would i comfort a friend i loved if this happened to them?" to "instead of beating yourself up, treat yourself like a friend you love, and give yourself a little compassion.",
+            "how is this the best thing that has ever happened to me?" to "this question can be challenging, but finding answers to it can help us reframe how we view events in our life.",
         ),
         section(
-            "anxiety", "Anxieties",
-            "Divide the page into three columns: fears, fixes, and the outcome you'd bet on.",
-            "Will this matter in 10 days time?" to null,
+            "anxiety", "anxieties",
+            "divide the page into three columns: fears, fixes, and the outcome you'd bet on.",
+            "will this matter in 10 days time?" to null,
         ),
         section(
-            "todo", "To-do list and direction",
-            "Start with a full page: a scattered list of all your obligations and the things you'd like to do. Then order it with a few questions, often down to less than 15 points.",
-            "Everything I have to do, and would like to do" to null,
-            "What is non-negotiable? What is exciting?" to "The musts, and the ones you can't wait to do.",
-            "What on my list, if done, would make everything else easier?" to null,
-            "What of these, if taken away from me, would I fight to get back?" to null,
-            "What 20% of activities are producing 80% of the results?" to null,
+            "todo", "to-do list and direction",
+            "start with a full page: a scattered list of all your obligations and the things you'd like to do. then order it with a few questions, often down to less than 15 points.",
+            "everything i have to do, and would like to do" to null,
+            "what is non-negotiable? what is exciting?" to "the musts, and the ones you can't wait to do.",
+            "what on my list, if done, would make everything else easier?" to null,
+            "what of these, if taken away from me, would i fight to get back?" to null,
+            "what 20% of activities are producing 80% of the results?" to null,
         ),
         section(
-            "decision", "Making a decision",
-            "A problem well defined is a problem half solved.",
-            "What is the decision, or the problem? Defined clearly" to null,
-            "What are the options, and are they mutually exclusive?" to null,
-            "If I had to make this decision in 60 seconds, what would I choose?" to "Put a timer on and write your decision: with it ticking down, your intuition speaks up.",
-            "Could I live with this outcome?" to "Ask it of your 60-second answer.",
-            "What would this look like if it were easy?" to null,
+            "decision", "making a decision",
+            "a problem well defined is a problem half solved.",
+            "what is the decision, or the problem? defined clearly" to null,
+            "what are the options, and are they mutually exclusive?" to null,
+            "if i had to make this decision in 60 seconds, what would i choose?" to "put a timer on and write your decision: with it ticking down, your intuition speaks up.",
+            "could i live with this outcome?" to "ask it of your 60-second answer.",
+            "what would this look like if it were easy?" to null,
         ),
         section(
-            "direction", "Direction in life",
-            "Like a graph: one point gives no direction; two give a relationship, and the more points, the clearer the direction.",
-            "What did I want five years ago?" to null,
-            "What do I want now?" to null,
-            "What do I think I'll want in five years' time?" to null,
-            "If I knew I couldn't fail, what would I do?" to null,
+            "direction", "direction in life",
+            "like a graph: one point gives no direction; two give a relationship, and the more points, the clearer the direction.",
+            "what did i want five years ago?" to null,
+            "what do i want now?" to null,
+            "what do i think i'll want in five years' time?" to null,
+            "if i knew i couldn't fail, what would i do?" to null,
         ),
         section(
-            "compassion", "Self compassion",
-            "Two ways in: a short love letter to yourself, or three steps, noticing what you felt, seeing it's human, and answering it with kindness.",
-            "Write a short love letter to yourself" to "As you would to someone you love: what you appreciate, what you forgive, what you wish for them.",
-            "Go over the day, note down anything you've felt bad about, or" to "name what caused the difficult experience, the emotions you felt, and how they felt in the body",
+            "compassion", "self compassion",
+            "two ways in: a short love letter to yourself, or three steps, noticing what you felt, seeing it's human, and answering it with kindness.",
+            "write a short love letter to yourself" to "as you would to someone you love: what you appreciate, what you forgive, what you wish for them.",
+            "go over the day, note down anything you've felt bad about, or" to "name what caused the difficult experience, the emotions you felt, and how they felt in the body",
             "how is this part of being human?" to "think about how that experience is connected to being an imperfect human being",
             "write yourself some kind, gentle words of understanding with a reassuring tone. show yourself some care and kindness." to null,
         ),
@@ -147,7 +147,7 @@ object Journal {
         val before = text.substring(0, at)
         val after = text.substring(at)
         val lead = if (before.isEmpty() || before.endsWith("\n")) "" else "\n"
-        val block = "$lead**${prompt.trim()}**\n"
+        val block = "$lead**${prompt.trim().lowercase()}**\n"
         val trail = if (after.isEmpty() || after.startsWith("\n")) "" else "\n"
         return before + block + trail + after to (before.length + block.length)
     }
@@ -159,13 +159,5 @@ object Journal {
     fun saved(entries: List<JournalEntry>, day: Long, text: String, aims: List<String>, at: Long): List<JournalEntry> {
         val rest = entries.filterNot { it.day == day }
         return if (text.isBlank()) rest else rest + JournalEntry(day, text, aims, at)
-    }
-
-    /** [entries] with [text] added to the end of [day]'s, after a blank line (or starting it), and [aims] joined to its own. */
-    fun added(entries: List<JournalEntry>, day: Long, text: String, aims: List<String>, at: Long): List<JournalEntry> {
-        if (text.isBlank()) return entries
-        val now = entries.firstOrNull { it.day == day }
-        val joined = now?.text?.trimEnd()?.takeIf { it.isNotEmpty() }?.let { "$it\n\n${text.trim()}" } ?: text.trim()
-        return saved(entries, day, joined, (now?.aims.orEmpty() + aims).distinct(), at)
     }
 }

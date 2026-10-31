@@ -8,7 +8,6 @@ import androidx.activity.compose.setContent
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import app.bedtime.data.Journal
 import app.bedtime.data.Notes
 import app.bedtime.data.Repository
 import app.bedtime.ui.components.ProvideAppIcons
@@ -41,12 +40,6 @@ class ShareActivity : ComponentActivity() {
                         onDismiss = { finish() },
                         vault = s.obsidianVault,
                         initial = shared,
-                        journal = if (!s.journalOn) null else JournalWith(Journal.sections(s.journalSections)) { text, aims ->
-                            scope.launch {
-                                repo.addToJournal(java.time.LocalDate.now().toEpochDay(), text, aims)
-                                Toast.makeText(app, "added to today's microjournal", Toast.LENGTH_SHORT).show()
-                            }
-                        },
                     )
                 }
             }

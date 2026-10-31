@@ -308,7 +308,7 @@ private fun ReplyBox(p: HomePalette, quickReplies: List<String>, onSend: (String
             textStyle = MaterialTheme.typography.bodyMedium.copy(color = p.text),
             cursorBrush = SolidColor(p.accent),
             // A message: sentences start with a capital, and the keyboard's own key sends it.
-            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, keyboardType = KeyboardType.Text, imeAction = ImeAction.Send),
+            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, keyboardType = KeyboardType.Text, imeAction = ImeAction.Send),
             keyboardActions = KeyboardActions(onSend = { if (text.isNotBlank()) onSend(text.trim()) }),
             modifier = Modifier
                 .fillMaxWidth()

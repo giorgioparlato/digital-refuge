@@ -180,6 +180,7 @@ internal class LimitTracker(
                             context, pkg, pause.secondsFor(opens), opens, pause.passKey,
                             typing = if (pause.kind == PauseKind.TYPING) pause.textLengthFor(opens) else 0,
                             source = pause.textSource,
+                            ask = pause.kind == PauseKind.ASK,
                         ),
                     )
                     return true

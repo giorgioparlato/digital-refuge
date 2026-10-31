@@ -88,6 +88,7 @@ The steps for more use the same rows as a block's steps: see the editor in focus
 - name this limit
 - … a day
 - … characters to type
+- a question first
 - … pause
 - not set yet
 - no apps yet · choose them below
@@ -102,6 +103,10 @@ The steps for more use the same rows as a block's steps: see the editor in focus
 - None yet · tap to choose
 - Pause before opening
 - Before one of these apps opens, a moment to decide
+- Ask why
+- A question and a box to write in; going on is a tap. What you write goes to its note
+- The questions
+- Asked in turn, shared by every limit that asks
 - Each open in a day makes the wait or the typing longer, up to 8× the wait or 3× the text. A new day starts over
 - Back within
 - every time

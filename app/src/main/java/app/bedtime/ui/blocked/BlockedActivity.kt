@@ -54,6 +54,9 @@ class BlockedActivity : ComponentActivity() {
     private var typing by mutableIntStateOf(0)
     private var typingSource by mutableStateOf(TextSource.WORDS)
 
+    /** The pause asks "why am I opening this?" instead of a wait. */
+    private var asking by mutableStateOf(false)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -65,7 +68,7 @@ class BlockedActivity : ComponentActivity() {
                 val pkg = blockedPackage
                 when {
                     mode == MODE_PAUSE && pkg != null -> key(pkg, opens) {
-                        PauseScreen(pkg, pauseSeconds, opens, passKey ?: pkg, onHome = ::goHome, onFinish = ::finish, typing = typing, source = typingSource)
+                        PauseScreen(pkg, pauseSeconds, opens, passKey ?: pkg, onHome = ::goHome, onFinish = ::finish, typing = typing, source = typingSource, ask = asking)
                     }
                     mode == MODE_LIMIT && pkg != null -> key(pkg, limitId, outOfOpens) {
                         LimitScreen(pkg, limitId.orEmpty(), onHome = ::goHome, onFinish = ::finish, opens = outOfOpens)
@@ -92,6 +95,7 @@ class BlockedActivity : ComponentActivity() {
         passKey = intent.getStringExtra(EXTRA_PASS)
         typing = intent.getIntExtra(EXTRA_TYPING, 0)
         typingSource = intent.getStringExtra(EXTRA_SOURCE)?.let { runCatching { TextSource.valueOf(it) }.getOrNull() } ?: TextSource.WORDS
+        asking = intent.getBooleanExtra(EXTRA_ASK, false)
     }
 
     private fun goHome() {
@@ -110,6 +114,7 @@ class BlockedActivity : ComponentActivity() {
         private const val EXTRA_PASS = "pass"
         private const val EXTRA_TYPING = "typing"
         private const val EXTRA_SOURCE = "source"
+        private const val EXTRA_ASK = "ask"
         private const val MODE_PAUSE = "pause"
         private const val MODE_LIMIT = "limit"
 
@@ -122,10 +127,10 @@ class BlockedActivity : ComponentActivity() {
          * The pause before opening [pkg]: [seconds] to breathe, or [typing] characters to type, then
          * "open" (granting [passKey]) or "never mind".
          */
-        fun pauseIntent(context: Context, pkg: String, seconds: Int, opens: Int, passKey: String, typing: Int = 0, source: TextSource = TextSource.WORDS): Intent =
+        fun pauseIntent(context: Context, pkg: String, seconds: Int, opens: Int, passKey: String, typing: Int = 0, source: TextSource = TextSource.WORDS, ask: Boolean = false): Intent =
             intent(context, pkg).putExtra(EXTRA_MODE, MODE_PAUSE).putExtra(EXTRA_SECONDS, seconds)
                 .putExtra(EXTRA_OPENS, opens).putExtra(EXTRA_PASS, passKey)
-                .putExtra(EXTRA_TYPING, typing).putExtra(EXTRA_SOURCE, source.name)
+                .putExtra(EXTRA_TYPING, typing).putExtra(EXTRA_SOURCE, source.name).putExtra(EXTRA_ASK, ask)
 
         /** [pkg]'s minutes for today are gone under limit [limitId], or with [opens] its opens are. */
         fun limitIntent(context: Context, pkg: String, limitId: String, opens: Boolean = false): Intent =
@@ -152,7 +157,7 @@ private fun BlockedScreen(pkg: String?, guardingSettings: Boolean, onHome: () ->
     // Drawn once each time the cover comes up, so "a different one each time" doesn't change as you read.
     val message = remember(pkg, blocker?.schedule?.id, settings == null) {
         val loaded = settings ?: return@remember null
-        blocker?.let { CoverMessages.pick(it.schedule.message, loaded.customMessages) }
+        blocker?.let { CoverMessages.pick(it.schedule.message, CoverMessages.all(loaded)) }
     }
 
     // Unlocked, schedule ended, or opened without a package: nothing left to cover.

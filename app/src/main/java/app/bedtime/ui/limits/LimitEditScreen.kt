@@ -64,6 +64,8 @@ import app.bedtime.ui.components.Chevron
 import app.bedtime.ui.components.CtaButton
 import app.bedtime.ui.components.NumberStepper
 import app.bedtime.ui.components.ObsidianToggle
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Edit
 import app.bedtime.ui.components.OptionRow
 import app.bedtime.ui.components.QuickChip
 import app.bedtime.ui.components.SegmentedChoice
@@ -338,6 +340,7 @@ internal fun LimitEditContent(
                         rules.dailyMinutes != null -> "${formatMinutes(rules.dailyMinutes.toLong())} a day"
                         rules.dailyOpens != null -> opensADay(rules.dailyOpens)
                         (rules.pauseSeconds ?: 0) > 0 && rules.pauseKind == PauseKind.TYPING -> "${rules.pauseTextLength} characters to type"
+                        (rules.pauseSeconds ?: 0) > 0 && rules.pauseKind == PauseKind.ASK -> "a question first"
                         (rules.pauseSeconds ?: 0) > 0 -> "${formatWaitSeconds(rules.pauseSeconds ?: 0)} pause"
                         else -> "not set yet"
                     },
@@ -400,8 +403,8 @@ internal fun LimitEditContent(
                 }
 
                 SectionLabel("Pause before opening")
-                // The same rows as a block's steps. A pause is one or the other: switching one on switches the
-                // other off, and with both off these apps open straight away.
+                // The same rows as a block's steps. A pause is one of them: switching one on switches the
+                // others off, and with all off these apps open straight away.
                 val paused = (rules.pauseSeconds ?: 0) > 0
                 WaitStep(
                     paused && rules.pauseKind == PauseKind.WAIT,
@@ -426,6 +429,25 @@ internal fun LimitEditContent(
                     step = 10,
                     presets = listOf(20, 40, 60, 100, 150),
                 )
+                // Or a question, a different one each time, and a box to write in.
+                OptionRow(Icons.Default.Info, "Ask why", description = "A question and a box to write in; going on is a tap. What you write goes to its note", enabled = editable) {
+                    ObsidianToggle(
+                        paused && rules.pauseKind == PauseKind.ASK,
+                        { on -> setRules { it.copy(pauseSeconds = if (on) it.pauseSeconds ?: 10 else null, pauseKind = PauseKind.ASK) } },
+                        enabled = editable,
+                    )
+                }
+                var questions by remember { mutableStateOf(false) }
+                if (questions) {
+                    // Over the limit, so nothing set here is lost on the way.
+                    androidx.compose.ui.window.Dialog(
+                        onDismissRequest = { questions = false },
+                        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
+                    ) { app.bedtime.ui.settings.WhyAppQuestionsScreen(onBack = { questions = false }) }
+                }
+                AnimatedVisibility(paused && rules.pauseKind == PauseKind.ASK) {
+                    OptionRow(Icons.Default.Edit, "The questions", description = "Asked in turn, shared by every limit that asks", onClick = { questions = true }) { Chevron() }
+                }
                 AnimatedVisibility(paused) {
                     Column {
                         HarderStep(

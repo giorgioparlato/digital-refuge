@@ -11,7 +11,7 @@ class JournalTest {
     @Test
     fun theSuggestionsUntilYouChangeThem() {
         assertEquals(
-            listOf("Clarity", "Pattern interrupt", "Daily reflections", "When bad things happen", "Anxieties", "To-do list and direction", "Making a decision", "Direction in life", "Self compassion"),
+            listOf("clarity", "pattern interrupt", "daily reflections", "when bad things happen", "anxieties", "to-do list and direction", "making a decision", "direction in life", "self compassion"),
             Journal.sections(null).map { it.name },
         )
         // A question's example is there only where one was written.
@@ -34,10 +34,10 @@ class JournalTest {
         val hard = s.first { it.id == "bad" }
         assertEquals("Hard days", hard.name)
         assertEquals("One at a time.", hard.guide)
-        assertEquals(listOf("What happened?", "How would I comfort a friend I loved if this happened to them?", "How is this the best thing that has ever happened to me?", "What's loud in my head?"), hard.prompts)
+        assertEquals(listOf("What happened?", "how would i comfort a friend i loved if this happened to them?", "how is this the best thing that has ever happened to me?", "What's loud in my head?"), hard.prompts)
         // A reworded question keeps its example; a deleted one takes its own with it.
         assertEquals(Journal.SUGGESTED.first { it.id == "bad" }.hints[first], hard.hints["What happened?"])
-        assertEquals(null, hard.hints["What did I make it mean?"])
+        assertEquals(null, hard.hints["what did i make it mean?"])
         s = Journal.withHint(s, "bad", "What's loud in my head?", "  the meeting tomorrow ")
         assertEquals("the meeting tomorrow", s.first { it.id == "bad" }.hints["What's loud in my head?"])
         s = Journal.withHint(s, "bad", "What's loud in my head?", "")
@@ -58,26 +58,22 @@ class JournalTest {
 
     @Test
     fun aPromptGoesInAtTheCursorOnItsOwnLine() {
-        assertEquals("**What drained me?**\n" to 21, Journal.inserted("", 0, "What drained me?"))
+        assertEquals("**what drained me?**\n" to 21, Journal.inserted("", 0, "What drained me?"))
         val (text, cursor) = Journal.inserted("Long day", 8, "What drained me?")
-        assertEquals("Long day\n**What drained me?**\n", text)
+        assertEquals("Long day\n**what drained me?**\n", text)
         assertEquals(text.length, cursor)
         // Between two lines, it takes a line of its own, with an empty one under it for the answer, the cursor there.
-        assertEquals("a\n**Q**\n\nb" to 8, Journal.inserted("a\nb", 2, "Q"))
-        assertEquals("a\n**Q**\n\nb" to 8, Journal.inserted("a\n\nb", 2, "Q"))
+        assertEquals("a\n**q**\n\nb" to 8, Journal.inserted("a\nb", 2, "Q"))
+        assertEquals("a\n**q**\n\nb" to 8, Journal.inserted("a\n\nb", 2, "Q"))
     }
 
     @Test
     fun entriesAreKeptADayEach() {
         val day = today.toEpochDay()
-        var all = Journal.saved(emptyList(), day, "first", listOf("Vent"), 1)
-        all = Journal.added(all, day, "  more  ", listOf("Gratitude", "Vent"), 2)
-        assertEquals("first\n\nmore", all.single().text)
-        assertEquals(listOf("Vent", "Gratitude"), all.single().aims)
-        all = Journal.added(all, day - 1, "yesterday", emptyList(), 3)
+        var all = Journal.saved(emptyList(), day, "first", listOf("Clarity"), 1)
+        all = Journal.saved(all, day - 1, "yesterday", emptyList(), 3)
         assertEquals(listOf(day, day - 1), Journal.entries(all).map { it.day })
-        // Emptied, an entry goes; nothing added, nothing changes.
+        // Emptied, an entry goes.
         assertNull(Journal.saved(all, day, " ", emptyList(), 4).firstOrNull { it.day == day })
-        assertEquals(all, Journal.added(all, day, "", emptyList(), 5))
     }
 }

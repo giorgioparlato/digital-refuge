@@ -21,18 +21,23 @@ class WhyTest {
     @Test
     fun anAnswerIsOneLineOfItsNote() {
         val at = LocalDateTime.of(2026, 10, 31, 21, 40)
-        assertEquals("- 2026-10-31 21:40 · unlocking · tired, lonely · put it down: wanted to\ncheck mail".replace("\n", " "),
-            Why.line(at, "unlocking", listOf("Tired", "Lonely"), "wanted to\ncheck mail", wentOn = false))
-        assertEquals("- 2026-10-31 21:40 · Instagram · went on", Why.line(at, "Instagram", emptyList(), " ", wentOn = true))
+        assertEquals(
+            "- 2026-10-31 21:40 · unlocking · put it down · what do i actually need right now? sleep, not mail",
+            Why.line(at, "unlocking", "What do I actually need right now?", "sleep,\nnot mail", wentOn = false),
+        )
+        // Nothing written, just when and what came of it.
+        assertEquals("- 2026-10-31 21:40 · instagram · went on", Why.line(at, "Instagram", "Why?", " ", wentOn = true))
     }
 
     @Test
-    fun theWordsAreYoursOrSuggested() {
-        assertEquals(Why.QUESTION, Why.question(AppSettings(), null))
-        assertEquals("Why am I opening Instagram right now?", Why.question(AppSettings(), "Instagram"))
-        assertEquals("What for?", Why.question(AppSettings(whyQuestion = "What for?"), null))
-        assertEquals(Why.TAGS, Why.tags(AppSettings()))
-        assertEquals(emptyList<String>(), Why.tags(AppSettings(whyTags = emptyList())))
+    fun aDifferentQuestionEachTime() {
+        assertEquals(Why.QUESTIONS, Why.questions(AppSettings()))
+        assertEquals(listOf("What for?"), Why.questions(AppSettings(whyQuestions = listOf("What for?"))))
+        // An emptied list still asks something.
+        assertEquals(Why.APP_QUESTIONS, Why.appQuestions(AppSettings(whyAppQuestions = emptyList())))
+        val asked = (1..50).map { Why.next(listOf("a", "b", "c"), "a", kotlin.random.Random(it)) }
+        assertFalse("a" in asked)
+        assertEquals("a", Why.next(listOf("a"), "a"))
         assertEquals(4, Why.words("one two, three — four"))
     }
 

@@ -1,4 +1,6 @@
-"""Copies the microjournal's suggested sections from docs/text/journal.md into data/Journal.kt.
+"""Copies the microjournal's suggested sections from docs/text/journal.md into data/Journal.kt, and the
+"ask why" questions (after unlocking, before a limit's apps) into data/Why.kt, and the cover messages
+into data/CoverMessages.kt.
 
 Run from the project folder: python3 -I docs/text/journal_to_code.py .
 Each "### Name" under "## Microjournal sections" is a section: its "**Guide:**" line, then each
@@ -18,7 +20,8 @@ IDS = {"clarity": "clarity", "pattern interrupt": "fixation", "daily reflections
 
 
 def kt(text):
-    text = text.replace("*", "").strip()
+    # Everything in refuge is lowercase, wherever it's shown or written: whatever the doc's capitals.
+    text = text.replace("*", "").strip().lower()
     return '"' + text.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
@@ -54,3 +57,34 @@ start = code.index("    val SUGGESTED: List<JournalSection> = listOf(")
 end = code.index("\n    )\n", start) + len("\n    )")
 open(path, "w", encoding="utf-8").write(code[:start] + "\n".join(out) + code[end:])
 print(len(sections), "sections,", sum(len(p) for *_, p in sections), "questions")
+
+# "Ask why": the two lists of questions, each a "- question" line under its own heading.
+why_part = md.split('## "Ask why"', 1)[1]
+
+
+def questions(heading):
+    block = why_part.split(heading, 1)[1].split("\n### ", 1)[0]
+    return [line[2:].strip() for line in block.split("\n") if line.startswith("- ")]
+
+
+why_path = f"{root}/app/src/main/java/app/bedtime/data/Why.kt"
+why = open(why_path, encoding="utf-8").read()
+for name, heading in (("QUESTIONS", "### After unlocking"), ("APP_QUESTIONS", "### Before a limit's apps")):
+    start = why.index(f"    val {name} = listOf(")
+    end = why.index("\n    )\n", start) + len("\n    )")
+    body = "\n".join(f"        {kt(q)}," for q in questions(heading))
+    why = why[:start] + f"    val {name} = listOf(\n{body}\n    )" + why[end:]
+open(why_path, "w", encoding="utf-8").write(why)
+print(len(questions("### After unlocking")), "questions after unlocking,", len(questions("### Before a limit's apps")), "before apps")
+
+# Cover messages: the "- message" lines under their heading.
+cover_block = md.split("## Cover messages", 1)[1].split("\n---", 1)[0]
+covers = [line[2:].strip() for line in cover_block.split("\n") if line.startswith("- ")]
+cover_path = f"{root}/app/src/main/java/app/bedtime/data/CoverMessages.kt"
+code = open(cover_path, encoding="utf-8").read()
+start = code.index("    val presets: List<String> = listOf(")
+end = code.index("\n    )\n", start) + len("\n    )")
+body = "\n".join(f"        {kt(m)}," for m in covers)
+code = code[:start] + f"    val presets: List<String> = listOf(\n{body}\n    )" + code[end:]
+open(cover_path, "w", encoding="utf-8").write(code)
+print(len(covers), "cover messages")

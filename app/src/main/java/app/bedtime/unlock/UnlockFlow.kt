@@ -184,7 +184,7 @@ internal fun UnlockSteps(
     val sections = app.bedtime.data.Journal.sections(settings?.journalSections).filter { it.name in config.writeSections }
     // A section with no questions of its own (clarity) is written from its guide.
     val prompts = sections.flatMap { s -> s.prompts.map { it to s.hints[it] }.ifEmpty { listOf(s.guide to null) } }
-        .ifEmpty { listOf("Why do I want to unlock ${name.lowercase()} right now?" to null) }
+        .ifEmpty { listOf("why do i want to unlock ${name.lowercase()} right now?" to null) }
     val writeWords = if (config.escalate) Escalation.textLength(config.writeWords, recentUnlocks, config.escalateFactor) else config.writeWords
     val escalating = config.escalate && recentUnlocks > 0
     val textLength = if (config.escalate) Escalation.textLength(config.textLength, recentUnlocks, config.escalateFactor) else config.textLength
@@ -232,7 +232,7 @@ internal fun UnlockSteps(
                 Challenge.WAIT -> WaitChallengeContent(remaining = remaining, total = waitMs)
                 Challenge.TEXT -> TextChallengeInput(textLength, config.textSource, onPassed = ::passCurrent)
                 Challenge.WRITE -> WriteChallenge(writeWords, prompts) { prompt, text ->
-                    val line = app.bedtime.data.Why.line(java.time.LocalDateTime.now(), "unlocking ${name.lowercase()}", emptyList(), "$prompt $text", wentOn = true)
+                    val line = app.bedtime.data.Why.line(java.time.LocalDateTime.now(), "unlocking ${name.lowercase()}", prompt, text, wentOn = true)
                     scope.launch { withContext(NonCancellable) { repo.addWhy(line) } }
                     passCurrent()
                 }

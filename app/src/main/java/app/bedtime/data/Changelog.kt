@@ -13,6 +13,18 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            78,
+            "0.9.32",
+            listOf(
+                "Ask why now shows after every unlock, however you unlock, with a different question each time and room to write.",
+                "Before a limit's apps, \"ask why\" is a pause each limit can choose, with its own questions.",
+                "Ask why's questions, and cover messages, are all yours to reword, delete or add to; cover messages have new suggestions.",
+                "The quick note's microjournal opens today's entry in your notes.",
+                "Dragging to reorder (habits, widgets, search) stays under your finger.",
+                "No capitals, anywhere: what refuge writes into your notes too.",
+            ),
+        ),
+        ChangelogEntry(
             77,
             "0.9.31",
             listOf(

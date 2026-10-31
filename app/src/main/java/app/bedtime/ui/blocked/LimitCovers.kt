@@ -1,5 +1,7 @@
 package app.bedtime.ui.blocked
 
+import kotlinx.coroutines.launch
+
 import app.bedtime.unlock.TypingChallenge
 import app.bedtime.data.TextSource
 import androidx.compose.foundation.background
@@ -58,17 +60,45 @@ internal fun PauseScreen(
     onFinish: () -> Unit,
     typing: Int = 0,
     source: TextSource = TextSource.WORDS,
+    /** "Why am I opening this?" instead of a wait: answered or not, going on is a tap. */
+    ask: Boolean = false,
 ) {
     val context = LocalContext.current
     val label = remember(pkg) { AppCatalog.label(context, pkg) }
     val settings by Repository.get(context).settings.collectAsStateWithLifecycle(initialValue = null)
+    if (ask) {
+        val loaded = settings ?: return
+        // The answer, if there's anything to it, goes with the others in their note.
+        val question = remember(pkg, opens) { app.bedtime.data.Why.ask(app.bedtime.data.Why.appQuestions(loaded)) }
+        val keep = { words: String, wentOn: Boolean ->
+            if (words.isNotBlank()) {
+                val line = app.bedtime.data.Why.line(java.time.LocalDateTime.now(), label, question, words, wentOn)
+                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch { Repository.get(context).addWhy(line) }
+            }
+        }
+        WhyScreen(
+            question = question,
+            about = "About to open $label",
+            onPutDown = { words ->
+                keep(words, false)
+                onHome()
+            },
+            onGoOn = { words ->
+                keep(words, true)
+                LimitPasses.grant(passKey, System.currentTimeMillis())
+                AppCatalog.launch(context, pkg)
+                onFinish()
+            },
+        )
+        return
+    }
     // The words of the limit whose pause this is: the one asking the longest, as the pause itself is.
     val message = remember(pkg, opens, settings == null) {
         val loaded = settings ?: return@remember null
         Limits.covering(loaded.limits, pkg, LocalDate.now().toEpochDay())
             .filter { (it.rules.pauseSeconds ?: 0) > 0 }
             .maxByOrNull { it.rules.pauseSeconds ?: 0 }
-            ?.let { CoverMessages.pick(it.message, loaded.customMessages) }
+            ?.let { CoverMessages.pick(it.message, CoverMessages.all(loaded)) }
     }
     var left by rememberSaveable(pkg, opens) { mutableIntStateOf(if (typing > 0) 0 else seconds) }
     var typed by rememberSaveable(pkg, opens) { mutableStateOf(typing <= 0) }
@@ -168,7 +198,7 @@ internal fun LimitScreen(pkg: String, limitId: String, onHome: () -> Unit, onFin
     val limit: AppLimit? = settings?.let { s -> Limits.settle(s.limits, today).firstOrNull { it.id == limitId } }
     val message = remember(limitId, limit == null) {
         val loaded = settings ?: return@remember null
-        limit?.let { CoverMessages.pick(it.message, loaded.customMessages) }
+        limit?.let { CoverMessages.pick(it.message, CoverMessages.all(loaded)) }
     }
     // A minute's slack: the last seconds counted may still be on their way to storage.
     val stillOut = limit != null && if (opens) {

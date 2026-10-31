@@ -12,89 +12,89 @@ Credit, shown only in settings › notes › sections and prompts:
 
 > The suggested sections and questions come from [Struthless's video "The Journalling Techniques that Changed My Life"](https://www.youtube.com/watch?v=dArgOrm98Bk).
 
-### Clarity
+### clarity
 
-**Guide:** Write every single thought as you have it. In one sitting, or jot each new thought down as it comes. *Once you see the words in front of you, they don't look as scary.*
+**Guide:** write every single thought as you have it. in one sitting, or jot each new thought down as it comes. *once you see the words in front of you, they don't look as scary.*
 
-### Pattern interrupt
+### pattern interrupt
 
-**Guide:** For when you get fixated on something that you can't think about other stuff.
+**Guide:** for when you get fixated on something that you can't think about other stuff.
 
-- Imagine six impossible things and write them down
-  - *From Lewis Carroll. E.g a camel and his best friend skating over an exploding pigeon.*
-- How can I make someone else happy right now?
-  - *You get out of serving yourself and start serving someone else.*
-- What's something in my immediate environment that I have never noticed?
-  - *If you're stuck in the past or the future, doing this immediately draws you to the present.*
+- imagine six impossible things and write them down
+  - *from lewis carroll. e.g a camel and his best friend skating over an exploding pigeon.*
+- how can i make someone else happy right now?
+  - *you get out of serving yourself and start serving someone else.*
+- what's something in my immediate environment that i have never noticed?
+  - *if you're stuck in the past or the future, doing this immediately draws you to the present.*
 
-### Daily reflections
+### daily reflections
 
-**Guide:** Reflect on your day with the same questions. Do them most days for a month and you'll learn so much about yourself.
+**Guide:** reflect on your day with the same questions. do them most days for a month and you'll learn so much about yourself.
 
-- What excited me?
-- What drained me of energy?
-- What did I learn?
-- What are 10 things I'm grateful for?
-- How did I move towards what I long for?
+- what excited me?
+- what drained me of energy?
+- what did i learn?
+- what are 10 things i'm grateful for?
+- how did i move towards what i long for?
 
-### When bad things happen
+### when bad things happen
 
-**Guide:** “There is nothing either good or bad, but thinking makes it so.”
+**Guide:** “there is nothing either good or bad, but thinking makes it so.”
 
-- What happened, objectively?
-  - *Separate what actually happened from the meaning you instinctively gave it.*
-- What did I make it mean?
-  - *Here's where you get a glimpse of your cognitive distortions.*
-- How would I comfort a friend I loved if this happened to them?
-  - *Instead of beating yourself up, treat yourself like a friend you love, and give yourself a little compassion.*
-- How is this the best thing that has ever happened to me?
-  - *This question can be challenging, but finding answers to it can help us reframe how we view events in our life.*
+- what happened, objectively?
+  - *separate what actually happened from the meaning you instinctively gave it.*
+- what did i make it mean?
+  - *here's where you get a glimpse of your cognitive distortions.*
+- how would i comfort a friend i loved if this happened to them?
+  - *instead of beating yourself up, treat yourself like a friend you love, and give yourself a little compassion.*
+- how is this the best thing that has ever happened to me?
+  - *this question can be challenging, but finding answers to it can help us reframe how we view events in our life.*
 
-### Anxieties
+### anxieties
 
-**Guide:** Divide the page into three columns: fears, fixes, and the outcome you'd bet on.
+**Guide:** divide the page into three columns: fears, fixes, and the outcome you'd bet on.
 
-- Will this matter in 10 days time?
+- will this matter in 10 days time?
 
-### To-do list and direction
+### to-do list and direction
 
-**Guide:** Start with a full page: a scattered list of all your obligations and the things you'd like to do. Then order it with a few questions, often down to less than 15 points.
+**Guide:** start with a full page: a scattered list of all your obligations and the things you'd like to do. then order it with a few questions, often down to less than 15 points.
 
-- Everything I have to do, and would like to do
-- What is non-negotiable? What is exciting?
-  - *The musts, and the ones you can't wait to do.*
-- What on my list, if done, would make everything else easier?
-- What of these, if taken away from me, would I fight to get back?
-- What 20% of activities are producing 80% of the results?
+- everything i have to do, and would like to do
+- what is non-negotiable? what is exciting?
+  - *the musts, and the ones you can't wait to do.*
+- what on my list, if done, would make everything else easier?
+- what of these, if taken away from me, would i fight to get back?
+- what 20% of activities are producing 80% of the results?
 
-### Making a decision
+### making a decision
 
-**Guide:** A problem well defined is a problem half solved.
+**Guide:** a problem well defined is a problem half solved.
 
-- What is the decision, or the problem? Defined clearly
-- What are the options, and are they mutually exclusive?
-- If I had to make this decision in 60 seconds, what would I choose?
-  - *Put a timer on and write your decision: with it ticking down, your intuition speaks up.*
-- Could I live with this outcome?
-  - *Ask it of your 60-second answer.*
-- What would this look like if it were easy?
+- what is the decision, or the problem? defined clearly
+- what are the options, and are they mutually exclusive?
+- if i had to make this decision in 60 seconds, what would i choose?
+  - *put a timer on and write your decision: with it ticking down, your intuition speaks up.*
+- could i live with this outcome?
+  - *ask it of your 60-second answer.*
+- what would this look like if it were easy?
 
-### Direction in life
+### direction in life
 
-**Guide:** Like a graph: one point gives no direction; two give a relationship, and the more points, the clearer the direction.
+**Guide:** like a graph: one point gives no direction; two give a relationship, and the more points, the clearer the direction.
 
-- What did I want five years ago?
-- What do I want now?
-- What do I think I'll want in five years' time?
-- If I knew I couldn't fail, what would I do?
+- what did i want five years ago?
+- what do i want now?
+- what do i think i'll want in five years' time?
+- if i knew i couldn't fail, what would i do?
 
-### Self compassion
+### self compassion
 
-**Guide:** Two ways in: a short love letter to yourself, or three steps, noticing what you felt, seeing it's human, and answering it with kindness.
+**Guide:** two ways in: a short love letter to yourself, or three steps, noticing what you felt, seeing it's human, and answering it with kindness.
 
-- Write a short love letter to yourself
-  - *As you would to someone you love: what you appreciate, what you forgive, what you wish for them.*
-- Go over the day, note down anything you've felt bad about, or 
+- write a short love letter to yourself
+  - *as you would to someone you love: what you appreciate, what you forgive, what you wish for them.*
+- go over the day, note down anything you've felt bad about, or 
  for. The ask, how did it feel?
   - *name what caused the difficult experience, the emotions you felt, and how they felt in the body*
 - how is this part of being human?
@@ -107,21 +107,60 @@ Credit for this section, shown with the other on the settings page:
 
 ---
 
-## "Ask why" (after unlocking, before distracting apps)
+## "Ask why"
 
-Credit, shown only on its settings page:
+### After unlocking (settings › lock screen › ask why)
 
-> The question, the four tags and the nudge come from Struthless.
+Asked in turn, a different one each time:
 
-**Question after unlocking:** Why am I unlocking my phone right now?
+- why am i unlocking my phone right now?
+- what am i hoping to find here?
+- what do i actually need right now?
+- is this a choice, or a habit?
+- how do i want to feel when i put it down?
+- how long do i want to spend on my phone?
+- is there something i'm avoiding?
+- will i be glad i opened it, an hour from now?
+- why do i want to get brainwashed by a trillion dollar addictive panic machine right now?
 
-**Question before an app:** Why am I opening *app name* right now?
+### Before a limit's apps (a limit's pause › ask why › the questions)
 
-**Tags** (shown as "Am I…"): Hungry, Angry, Lonely, Tired
+Shown under "About to open *app name*", in turn:
 
-**Nudge:** Do I want to get brainwashed by a trillion dollar addictive panic machine right now?
+- why am i opening this right now?
+- what am i looking for in here?
+- what am i hoping to find here?
+- what do i actually need right now?
+- is this a choice, or a habit?
+- how long do i want to spend in it?
+- what will i do when i close it?
+- is there something i'm avoiding?
+- will i be glad i opened it, an hour from now?
+- why do i want to get brainwashed by a trillion dollar addictive panic machine right now?
+
+### On both
+
+**Box:** Write it down, if you want…
 
 **Buttons:** Not now · Yes, go on
+
+---
+
+## Cover messages
+
+What a cover says when you open an app a session or a limit holds back: a different one each time, or the one a schedule, block or limit chooses. Anyone can reword, delete or add to these in settings.
+
+- is this what you picked up the phone for?
+- what were you about to do before this?
+- what do you actually need right now?
+- one breath first. then decide.
+- look up for a moment. what's around you?
+- you set this up for a reason. trust that version of you.
+- nothing in here is urgent.
+- the feed never ends. your evening does.
+- boredom is where good ideas start.
+- who would you rather spend this minute with?
+- do i want to get brainwashed by a trillion dollar addictive panic machine right now?
 
 ---
 

@@ -412,7 +412,7 @@ private fun settingsEntries(
                 null,
                 BedtimeIcons.Block,
                 "Cover messages",
-                if (s.customMessages.isEmpty()) "What a blocked app's cover says" else "The app's and ${s.customMessages.size} of yours",
+                "What a blocked app's cover says · ${app.bedtime.data.CoverMessages.all(s).size} messages",
                 "cover message messages words blocked",
                 go(Routes.COVER_MESSAGES),
             ),
@@ -483,7 +483,6 @@ private fun settingsEntries(
 
         // ---------------------------------------------------------------- apps
         val apps = SettingsPlace.APPS
-        add(Entry(apps, Icons.Default.Info, "Ask why before distracting apps", whyWords(s.askOnApps), "why distracting limited apps question journal struthless", go(Routes.WHY)))
         add(
             Entry(
                 apps,
@@ -717,9 +716,9 @@ private fun SettingsSearch(query: String, onQuery: (String) -> Unit, focus: Bool
     }
 }
 
-/** "Off", "During sessions", "Always": when "why?" is asked. */
+/** "Never", "During sessions", "Always": when "why?" is asked. */
 private fun whyWords(mode: app.bedtime.data.AskWhen): String = when (mode) {
-    app.bedtime.data.AskWhen.OFF -> "Off"
+    app.bedtime.data.AskWhen.OFF -> "Never"
     app.bedtime.data.AskWhen.SESSIONS -> "During sessions"
     app.bedtime.data.AskWhen.ALWAYS -> "Always"
 }

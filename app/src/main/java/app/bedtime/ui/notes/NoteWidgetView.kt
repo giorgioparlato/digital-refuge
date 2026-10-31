@@ -132,7 +132,7 @@ fun NoteWidgetView(
                     textStyle = MaterialTheme.typography.bodyLarge.sized().copy(color = text),
                     cursorBrush = SolidColor(accent),
                     visualTransformation = remember(faint, accent) { MarkdownTransformation(faint, accent) },
-                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None),
                     onTextLayout = { layout = it },
                     modifier = Modifier.fillMaxWidth().focusRequester(focus).todoBoxes(value.text, { layout }, text.copy(alpha = 0.18f), accent),
                 )

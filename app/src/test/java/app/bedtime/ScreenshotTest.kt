@@ -642,7 +642,7 @@ class ScreenshotTest {
     @Test
     fun coverMessages() = shot(tall = true, height = 2800) {
         app.bedtime.ui.settings.CoverMessagesContent(
-            custom = listOf(app.bedtime.data.CustomMessage("Read a page instead."), app.bedtime.data.CustomMessage("Call someone.", inRandom = false)),
+            messages = listOf(app.bedtime.data.CustomMessage("read a page instead."), app.bedtime.data.CustomMessage("call someone.", inRandom = false)),
             onChange = {},
             onBack = {},
         )

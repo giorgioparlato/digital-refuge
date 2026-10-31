@@ -82,7 +82,7 @@ class Repository private constructor(context: Context) {
     suspend fun addTodo(words: String, at: Long = System.currentTimeMillis()) = update(NOTES, notesSerializer, emptyList()) { notes ->
         val item = Notes.line(words, LocalDateTime.now(), NoteStyle.TASK, withDate = false)
         if (notes.none { it.id == Notes.TODO_ID }) {
-            listOf(Note(Notes.TODO_ID, "# To-do\n$item\n", at)) + notes
+            listOf(Note(Notes.TODO_ID, "# to-do\n$item\n", at)) + notes
         } else {
             // Above those already done, which gather at the foot.
             notes.map { if (it.id == Notes.TODO_ID) it.copy(text = Todo.added(it.text, item), editedAt = at) else it }
@@ -110,9 +110,6 @@ class Repository private constructor(context: Context) {
     suspend fun saveJournal(day: Long, text: String, aims: List<String>, at: Long = System.currentTimeMillis()) =
         update(JOURNAL, journalSerializer, emptyList()) { Journal.saved(it, day, text, aims, at) }
 
-    /** Adds [text] to the end of [day]'s entry, from the quick note. */
-    suspend fun addToJournal(day: Long, text: String, aims: List<String>, at: Long = System.currentTimeMillis()) =
-        update(JOURNAL, journalSerializer, emptyList()) { Journal.added(it, day, text, aims, at) }
 
     /** A note moved into another, merged with others, pinned or labelled, as [NoteShelf] does it. */
     suspend fun moveNote(from: String, into: String) = update(NOTES, notesSerializer, emptyList()) { NoteShelf.movedInto(it, from, into, System.currentTimeMillis()) }

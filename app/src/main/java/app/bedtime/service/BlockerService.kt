@@ -152,6 +152,8 @@ class BlockerService : AccessibilityService() {
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             if (intent.action == Intent.ACTION_SCREEN_OFF) {
+                // Locked again (or about to be): the next unlock may ask why.
+                lockedSinceOff = true
                 // Nothing is being used with the screen off, whatever was last in front.
                 limitTracker.moveTo(null)
                 limitTracker.flush()
@@ -176,7 +178,7 @@ class BlockerService : AccessibilityService() {
                 releaseScope.launch { Repository.get(this@BlockerService).addUnlock(HourlyUse.today(), java.time.LocalTime.now().hour) }
                 // Sunday evening's look back on the week, if asked for and not yet given.
                 releaseScope.launch { LookBackNotifier.maybePost(applicationContext) }
-                askWhyAfterUnlock()
+                noticedUnlock()
                 // A note added to a file on the lock screen: its sync, now that you're in.
                 releaseScope.launch { app.bedtime.data.Notes.syncIfWaiting(applicationContext, Repository.get(applicationContext)) }
             }
@@ -274,6 +276,8 @@ class BlockerService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
         if (event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
         ensureRun()
+        // A window with the lock gone: unlocked, even if Android's broadcast never came.
+        if (lockedSinceOff && getSystemService(android.app.KeyguardManager::class.java)?.isKeyguardLocked == false) noticedUnlock()
         val pkg = event.packageName?.toString() ?: return
         // A keyboard or the notification shade appearing is not a move to another app, so it must not
         // become what we think is in front: that both bounced people out of apps a session allows and
@@ -418,36 +422,40 @@ class BlockerService : AccessibilityService() {
         distractionClock.moveTo(pkg)
         if (pkg == null) return
         when (Enforcement.decide(pkg, packageName, state, alwaysAllowed, settings.alwaysAvailable, recentsInFront, ::opensAsApp)) {
-            Verdict.LET_THROUGH -> if (arrived) askWhy(pkg)
+            Verdict.LET_THROUGH -> Unit
             Verdict.COVER -> Problems.attempt("covering a blocked app") { startActivity(BlockedActivity.intent(this, pkg)) }
             // In minimal mode the stock launcher and recents are "not allowed" too, so Home lands here.
             Verdict.MINIMAL_HOME -> Problems.attempt("going to the minimal home") { startActivity(MinimalHomeActivity.intent(this)) }
             // Limits hold every day, and inside a session for the apps it lets through.
-            Verdict.CHECK_LIMITS -> if (!limitTracker.check(pkg, arrived) && arrived) askWhy(pkg)
+            Verdict.CHECK_LIMITS -> limitTracker.check(pkg, arrived)
         }
     }
 
-    /** When "why?" was last asked: for each app, and after an unlock. */
-    private val whyAsked = mutableMapOf<String, Long>()
+    /** When "why?" was last asked after an unlock, and whether the phone has been locked since the screen went off. */
     private var whyAfterUnlock = 0L
+    private var lockedSinceOff = false
 
-    /** "Why am I opening this?", before a distracting or limited app, if asked for, and not again for a while. */
-    private fun askWhy(pkg: String) {
-        if (pkg == packageName || !Why.asks(settings.askOnApps, state?.isActive == true)) return
-        if (pkg !in settings.distractingApps && settings.limits.none { pkg in it.rules.apps }) return
-        val now = System.currentTimeMillis()
-        // Just asked after the unlock that led here: once is enough.
-        if (now - whyAfterUnlock < 60_000L || !Why.due(whyAsked[pkg] ?: 0L, now, Why.APP_AGAIN_MS)) return
-        whyAsked[pkg] = now
-        Problems.attempt("asking why") { startActivity(WhyActivity.intent(this, pkg)) }
+    /**
+     * Unlocked, however it was noticed first: Android's "unlocked" broadcast (not always sent), refuge's
+     * lock screen leaving ([from], which then opens the question itself, being in front), or the first
+     * window after the lock has gone. Once each time the screen was off.
+     */
+    fun noticedUnlock(from: android.content.Context? = null) {
+        if (!lockedSinceOff) return
+        lockedSinceOff = false
+        askWhyAfterUnlock(from)
     }
 
     /** "Why am I unlocking my phone right now?", just after an unlock, over whatever it opened to. */
-    private fun askWhyAfterUnlock() {
+    private fun askWhyAfterUnlock(from: android.content.Context?) {
         val now = System.currentTimeMillis()
         if (!Why.asks(settings.askOnUnlock, state?.isActive == true) || !Why.due(whyAfterUnlock, now, Why.UNLOCK_AGAIN_MS)) return
         whyAfterUnlock = now
-        handler.postDelayed({ Problems.attempt("asking why") { startActivity(WhyActivity.intent(this)) } }, 700)
+        if (from != null) {
+            Problems.attempt("asking why") { from.startActivity(WhyActivity.intent(from)) }
+        } else {
+            handler.postDelayed({ Problems.attempt("asking why") { startActivity(WhyActivity.intent(this)) } }, 700)
+        }
     }
 
     /**

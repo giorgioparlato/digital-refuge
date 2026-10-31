@@ -401,9 +401,8 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 
 - What the cover says
 - A different one each time
-- From the app's and yours that are in the mix
+- From those in the mix
 - Or always one of these
-- Yours
 - In the mix · tap the dot to take it out
 - Not in the mix · tap the dot to add it
 - Write your own
@@ -413,13 +412,17 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 
 <sub>[CoverMessages.kt](../../app/src/main/java/app/bedtime/data/CoverMessages.kt)</sub>
 
-- Is this what you came to the phone for?
-- Maybe put the phone down for a bit.
-- What were you about to do before this?
-- This will still be here later.
-- Take a breath. Then decide.
-- Look up for a moment.
-- Do I want to get brainwashed by a trillion dollar addictive panic machine right now?
+- is this what you picked up the phone for?
+- what were you about to do before this?
+- what do you actually need right now?
+- one breath first. then decide.
+- look up for a moment. what's around you?
+- you set this up for a reason. trust that version of you.
+- nothing in here is urgent.
+- the feed never ends. your evening does.
+- boredom is where good ideas start.
+- who would you rather spend this minute with?
+- do i want to get brainwashed by a trillion dollar addictive panic machine right now?
 - A different one each time
 
 ## leave early
@@ -432,13 +435,12 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 - Password
 - the rest of the block
 - the rest of the session
-- Why do I want to unlock … right now?
+- why do i want to unlock … right now?
 - … unlock today \u00b7 the steps are longer
 - Unlock
 - Continue
 - Waiting\u2026
 - unlocking …
-- {prompt} {text}
 - {outcome} The timer only runs while this screen is open, and starts over if you back out.
 - {outcome} Spaces and punctuation fill themselves in; pasting and typos are rejected.
 - This ends the block.
@@ -512,7 +514,6 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 - couldn't run that
 - Hold an app in the full list to add it here.
 - no calendar app opened it
-- added to today's microjournal
 - more for …
 - nothing to open right now. enjoy the quiet.
 - favourite or hide this quote
@@ -654,7 +655,6 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 
 - that didn't go through
 - coming back over Android's lock screen
-- added to today's microjournal
 - unlock the phone
 - tap to open
 - timer started

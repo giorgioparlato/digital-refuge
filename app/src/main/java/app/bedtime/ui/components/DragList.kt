@@ -17,7 +17,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -28,6 +27,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import app.bedtime.ui.theme.Obsidian
@@ -43,7 +44,9 @@ fun <T> DragList(items: List<T>, key: (T) -> String, onMoved: (List<T>) -> Unit,
     var local by remember(items) { mutableStateOf(items) }
     var dragging by remember { mutableStateOf<String?>(null) }
     var offset by remember { mutableFloatStateOf(0f) }
-    var rowHeight by remember { mutableIntStateOf(1) }
+    // Each row's height and where it's laid out, by key: rows can differ, and there can be room between them.
+    val heights = remember { mutableMapOf<String, Int>() }
+    val tops = remember { mutableMapOf<String, Float>() }
     local.forEach { item ->
         val id = key(item)
         key(id) {
@@ -53,20 +56,28 @@ fun <T> DragList(items: List<T>, key: (T) -> String, onMoved: (List<T>) -> Unit,
             val cancel = { dragging = null; offset = 0f; local = items }
             val move = { dy: Float ->
                 offset += dy
-                // Past half a row, it trades places with its neighbour.
+                // Past half its neighbour, it trades places with it; the row's new place is made up for below.
                 val at = local.indexOfFirst { key(it) == id }
-                if (offset > rowHeight / 2f && at < local.lastIndex) {
+                val below = local.getOrNull(at + 1)?.let { heights[key(it)] }
+                val above = local.getOrNull(at - 1)?.let { heights[key(it)] }
+                if (below != null && offset > below / 2f) {
                     local = local.toMutableList().apply { add(at + 1, removeAt(at)) }
-                    offset -= rowHeight
-                } else if (offset < -rowHeight / 2f && at > 0) {
+                } else if (above != null && offset < -above / 2f) {
                     local = local.toMutableList().apply { add(at - 1, removeAt(at)) }
-                    offset += rowHeight
                 }
             }
             Row(
                 Modifier
+                    // Where it's laid out, before it's lifted: when it trades places, it's held under the
+                    // finger by taking the distance it moved off what it's dragged by.
+                    .onPlaced { coords ->
+                        val top = coords.positionInParent().y
+                        val was = tops[id]
+                        if (lifted && was != null && was != top) offset -= top - was
+                        tops[id] = top
+                    }
                     .fillMaxWidth()
-                    .onSizeChanged { rowHeight = it.height.coerceAtLeast(1) }
+                    .onSizeChanged { heights[id] = it.height.coerceAtLeast(1) }
                     .zIndex(if (lifted) 1f else 0f)
                     .graphicsLayer {
                         translationY = if (lifted) offset else 0f

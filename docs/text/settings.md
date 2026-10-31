@@ -79,8 +79,7 @@ Home screen, lock screen, apps, shortcuts and about & backup are lists of rows f
 - What it offers, keywords, contacts, folders, the calendar
 - search keyword keywords web maps contacts messaging whatsapp signal telegram alarm timer calculator settings pages files folder obsidian spotify blocks calendar events dictionary dictionaries look up definition meaning
 - Cover messages
-- What a blocked app's cover says
-- The app's and … of yours
+- What a blocked app's cover says · … messages
 - cover message messages words blocked
 - Everyday launcher
 - Off · only in minimal sessions. Switched on in setup
@@ -138,6 +137,7 @@ Home screen, lock screen, apps, shortcuts and about & backup are lists of rows f
 - quick settings tile
 - Edit your quick settings and add the “refuge” tile. Tapping it starts:
 - Find a setting: keyword, weather, colour…
+- Never
 - During sessions
 - Always
 
@@ -682,15 +682,17 @@ One file serves the look, widgets, gestures and notifications pages, for both sc
 
 <sub>[CoverMessagesScreen.kt](../../app/src/main/java/app/bedtime/ui/settings/CoverMessagesScreen.kt)</sub>
 
+- Back to the suggested ones?
+- This list is replaced by the suggested messages; any you wrote go.
+- Replace
+- Cancel
 - Cover messages
-- What a cover says when you open an app a session or a limit holds back. Each schedule, block and limit picks one, or a different one each time.
-- Yours
-- Switched on, it's in the mix of a different one each time
-- None yet.
+- What a cover says when you open an app a session or a limit holds back. Each schedule, block and limit picks one, or a different one each time from those in the mix.
+- The messages
+- Reword any, delete some, add your own. Switched on, it's in the mix
 - Write your own
 - Add
-- The app's own
-- Always in the mix
+- Back to the suggested ones
 
 ## recent problems
 

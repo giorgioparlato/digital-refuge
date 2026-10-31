@@ -69,7 +69,7 @@ internal fun WriteChallenge(words: Int, prompts: List<Pair<String, String?>>, on
             onValueChange = { if (Why.typed(text, it)) text = it },
             textStyle = MaterialTheme.typography.bodyLarge.copy(color = c.textNormal),
             cursorBrush = SolidColor(c.accent),
-            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None),
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 140.dp, max = 280.dp)
