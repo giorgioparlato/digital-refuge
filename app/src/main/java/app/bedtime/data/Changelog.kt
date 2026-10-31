@@ -13,6 +13,17 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            75,
+            "0.9.29",
+            listOf(
+                "Insights › phone › month opens with a heatmap: each day against your daily budget, green within it, rose over, red at twice it, the same scale every month.",
+                "The whole phone first, distracting apps a tap away; tap a day to open it, Back returns to the month.",
+                "No budget chosen yet? The heatmap suggests 1 h on the phone, 30 min distracting, and lets you choose yours right there.",
+                "Lock-screen notifications: \"Quiet until…\" offers an hour, three, this evening, tomorrow morning, or the session's end.",
+                "Each day's total is now kept with its month, so older months fill in the heatmap as time goes on.",
+            ),
+        ),
+        ChangelogEntry(
             74,
             "0.9.28",
             listOf(
