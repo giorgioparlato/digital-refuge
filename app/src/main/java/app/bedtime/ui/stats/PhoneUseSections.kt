@@ -108,7 +108,8 @@ internal fun PhoneStats(
     /** What you last chose to compare with; a week or a month falls back to the one before for a day's choices. */
     chosenVersus: Versus = Versus.LAST,
     onVersus: (Versus) -> Unit = {},
-    initialPeriod: UsePeriod = UsePeriod.DAY,
+    /** The month first: its heatmap, then any day a tap away. */
+    initialPeriod: UsePeriod = UsePeriod.MONTH,
     /** The tracker's budget and colours, for the month's heatmap. */
     homeStyle: app.bedtime.data.HomeStyle = app.bedtime.data.HomeStyle(),
     /** Sets the day's allowance for the whole phone (true) or distracting apps. */
@@ -204,6 +205,7 @@ internal fun PhoneStats(
             onWholePhone = { wholePhone = it },
             onDay = openDay,
             onBudget = onBudget,
+            today = today,
         )
     }
 
@@ -240,7 +242,12 @@ internal fun PhoneStats(
         }
     }
 
-    SectionCard(
+    // A month's days are on the heatmap; under its figures, how it sits among the months before.
+    if (period == UsePeriod.MONTH) {
+        SectionCard(title = "The last six months", subtitle = "A day on average: all of it, and the part in distracting apps") {
+            MonthBars(UseMonths.last(months, YearMonth.from(start)))
+        }
+    } else SectionCard(
         title = if (period == UsePeriod.DAY) "By the hour" else "By the day",
         subtitle = buildString {
             append("All of it, and the part in distracting apps")
@@ -279,12 +286,6 @@ internal fun PhoneStats(
                 height = 56,
                 onPick = { i -> startDay = weeks[i].toEpochDay() },
             )
-        }
-        if (period == UsePeriod.MONTH) {
-            Spacer(Modifier.height(16.dp))
-            Text("The last six months, a day on average", style = MaterialTheme.typography.labelMedium, color = c.textMuted)
-            Spacer(Modifier.height(8.dp))
-            MonthBars(UseMonths.last(months, YearMonth.from(start)))
         }
     }
 
@@ -341,6 +342,7 @@ private fun MonthHeat(
     onWholePhone: (Boolean) -> Unit,
     onDay: (LocalDate) -> Unit,
     onBudget: (Boolean, Int) -> Unit,
+    today: LocalDate,
 ) {
     val c = Obsidian.colors
     // Your budget where you have one, on the home screen's tracker or the lock screen's.
@@ -388,16 +390,23 @@ private fun MonthHeat(
                         if (day != null) {
                             val seconds = day.seconds
                             val shape = RoundedCornerShape(8.dp)
+                            // Today stands out, outlined in the accent, and always opens.
+                            val isToday = day.date == today
                             Box(
                                 Modifier
                                     .fillMaxSize()
                                     .clip(shape)
                                     .background(if (seconds != null && seconds > 0) colour(seconds) else Color.Transparent)
-                                    .border(1.dp, c.border.copy(alpha = if (seconds == null) 0.4f else 0.8f), shape)
-                                    .then(if (seconds != null) Modifier.clickable(onClickLabel = "open this day") { onDay(day.date) } else Modifier),
+                                    .border(if (isToday) 2.dp else 1.dp, if (isToday) c.accent else c.border.copy(alpha = if (seconds == null) 0.4f else 0.8f), shape)
+                                    .then(if (seconds != null || isToday) Modifier.clickable(onClickLabel = "open this day") { onDay(day.date) } else Modifier),
                                 contentAlignment = Alignment.Center,
                             ) {
-                                Text("${day.date.dayOfMonth}", style = MaterialTheme.typography.labelMedium, color = if (seconds == null) c.textFaint else c.textNormal)
+                                Text(
+                                    "${day.date.dayOfMonth}",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = if (isToday) androidx.compose.ui.text.font.FontWeight.Bold else null,
+                                    color = if (seconds == null && !isToday) c.textFaint else c.textNormal,
+                                )
                             }
                         }
                     }
@@ -405,6 +414,10 @@ private fun MonthHeat(
             }
         }
         Spacer(Modifier.height(10.dp))
+        // Today, so far: a way into its page.
+        heat.firstOrNull { it.date == today }?.let { day ->
+            LinkLine("Today so far: ${UseWords.short(day.seconds ?: 0)} of ${formatMinutes(budget / 60)}", strong = true) { onDay(today) }
+        }
         val most = UseHeat.most(heat)
         Text(
             most?.let { "Most: ${UseWords.short(it.seconds ?: 0)}, " + it.date.format(DateTimeFormatter.ofPattern("EEEE d", Locale.getDefault())) }

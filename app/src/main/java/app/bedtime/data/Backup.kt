@@ -15,6 +15,8 @@ data class Backup(
     val settings: AppSettings = AppSettings(),
     val history: List<SessionLog> = emptyList(),
     val notes: List<Note> = emptyList(),
+    /** The microjournal's entries. Empty in older files. */
+    val journal: List<JournalEntry> = emptyList(),
     val habitMarks: List<HabitMark> = emptyList(),
     /** Phone use, a day per entry, and the months the oldest days were folded into. Empty in older files. */
     val usage: List<UsageDay> = emptyList(),

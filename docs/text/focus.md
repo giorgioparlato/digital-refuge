@@ -104,6 +104,8 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 - Written in Markdown, kept on this phone
 - new note
 - Nothing yet. Type in the minimal home's search and pick “save in refuge notes”, or start one with +.
+- Microjournal
+- A few lines a day, with prompts if you want them
 - New note
 - Note
 - # A title  - a list - [ ] a to-do
@@ -447,6 +449,7 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 - couldn't run that
 - Hold an app in the full list to add it here.
 - no calendar app opened it
+- added to today's microjournal
 - more for …
 - nothing to open right now. enjoy the quiet.
 - favourite or hide this quote
@@ -587,10 +590,8 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 <sub>[LockScreenActivity.kt](../../app/src/main/java/app/bedtime/ui/lock/LockScreenActivity.kt)</sub>
 
 - that didn't go through
-- not on this Android
-- blocking is off
-- screen off from the lock screen: Android's lock was {asked}, the screen stayed on, so it went black instead
 - coming back over Android's lock screen
+- added to today's microjournal
 - unlock the phone
 - tap to open
 - timer started

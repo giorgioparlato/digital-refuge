@@ -1,5 +1,8 @@
 package app.bedtime.ui.minimal
 
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
+
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.filled.Add
@@ -96,6 +99,7 @@ internal fun QuickNoteDialog(
     onOffer: (DrawerResult) -> Unit = {},
     initial: String = "",
     whole: Boolean = false,
+    journal: JournalWith? = null,
 ) {
     var words by remember { mutableStateOf(initial) }
     // A swipe puts it away only while there's no more than a word in it, so a note isn't lost to one.
@@ -109,8 +113,9 @@ internal fun QuickNoteDialog(
             onOffer = { onOffer(it); onDismiss() },
             onClose = onDismiss,
             whole = whole,
-            words = words,
+            initial = initial,
             onWords = { words = it },
+            journal = journal?.let { j -> JournalWith(j.sections) { text, aims -> j.onSave(text, aims); onDismiss() } },
         )
     }
 }
@@ -127,19 +132,28 @@ internal fun QuickNoteContent(
     offers: (String) -> List<DrawerResult> = { emptyList() },
     onOffer: (DrawerResult) -> Unit = {},
     whole: Boolean = false,
-    words: String? = null,
+    /** Hears the words as they change: the dialog, to know whether a swipe may close it. */
     onWords: ((String) -> Unit)? = null,
     /** An × at the top, to put it away. */
     onClose: (() -> Unit)? = null,
+    /** The microjournal, when it's on: a chip turns the box into today's entry, with its prompts. */
+    journal: JournalWith? = null,
 ) {
     val context = LocalContext.current
     val p = style.palette()
-    // The words are kept by the dialog when it has them, so it knows whether a swipe may close it.
-    var own by remember { mutableStateOf(initial) }
-    val text = words ?: own
+    // The words with the cursor, so a prompt goes in where you're writing.
+    var field by remember { mutableStateOf(TextFieldValue(initial, TextRange(initial.length))) }
+    val text = field.text
     /** The words looked up before this one by tapping, to go back through. */
     var back by remember { mutableStateOf(emptyList<String>()) }
-    val setText: (String) -> Unit = { onWords?.invoke(it) ?: run { own = it } }
+    val setField: (TextFieldValue) -> Unit = {
+        field = it
+        onWords?.invoke(it.text)
+    }
+    val setText: (String) -> Unit = { setField(TextFieldValue(it, TextRange(it.length))) }
+    // Writing in the microjournal instead: today's entry, and the sections picked for it.
+    var journaling by remember { mutableStateOf(false) }
+    var aims by remember { mutableStateOf(emptyList<String>()) }
     var reading by remember { mutableStateOf<FoundNote?>(null) }
     val focusRequester = remember { FocusRequester() }
     if (focus) LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
@@ -164,17 +178,35 @@ internal fun QuickNoteContent(
             return@Column
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("A quick note", style = MaterialTheme.typography.titleMedium, color = p.text, modifier = Modifier.weight(1f))
+            Text(if (journaling) "Microjournal · today" else "A quick note", style = MaterialTheme.typography.titleMedium, color = p.text, modifier = Modifier.weight(1f))
+            if (journal != null) {
+                Text(
+                    if (journaling) "‹ note" else "microjournal ›",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = p.accent,
+                    modifier = Modifier.clip(RoundedCornerShape(50)).clickable { journaling = !journaling }.padding(horizontal = 8.dp, vertical = 6.dp),
+                )
+            }
             if (onClose != null) {
                 Box(Modifier.size(36.dp).clip(RoundedCornerShape(50)).clickable(onClickLabel = "close", onClick = onClose), contentAlignment = Alignment.Center) {
                     Icon(Icons.Default.Close, contentDescription = null, tint = p.faint, modifier = Modifier.size(20.dp))
                 }
             }
         }
+        if (journaling && journal != null) {
+            app.bedtime.ui.notes.JournalPrompts(
+                journal.sections, aims, onPick = { aims = it },
+                onPrompt = { prompt ->
+                    val (written, cursor) = app.bedtime.data.Journal.inserted(field.text, field.selection.start, prompt)
+                    setField(TextFieldValue(written, TextRange(cursor)))
+                },
+                text = p.text, faint = p.faint, accent = p.accent, background = p.background,
+            )
+        }
         BasicTextField(
-            value = text,
+            value = field,
             onValueChange = {
-                setText(it)
+                setField(it)
                 back = emptyList()
             },
             textStyle = MaterialTheme.typography.bodyLarge.copy(color = p.text),
@@ -189,7 +221,17 @@ internal fun QuickNoteContent(
                 .padding(12.dp),
             decorationBox = { field ->
                 Box {
-                    if (text.isEmpty()) Text(if (hasDictionaries) "What's on your mind, or a word to look up" else "What's on your mind", style = MaterialTheme.typography.bodyLarge, color = p.faint)
+                    if (text.isEmpty()) {
+                        Text(
+                            when {
+                                journaling -> "A few lines for today"
+                                hasDictionaries -> "What's on your mind, or a word to look up"
+                                else -> "What's on your mind"
+                            },
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = p.faint,
+                        )
+                    }
                     field()
                 }
             },
@@ -204,6 +246,19 @@ internal fun QuickNoteContent(
                     back = back.dropLast(1)
                 }.padding(vertical = 2.dp),
             )
+        }
+        // In the microjournal, it only ever goes to today's entry: no look-ups, no offers, no other places.
+        if (journaling && journal != null) {
+            val ready = text.isNotBlank()
+            Row(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable(enabled = ready) { journal.onSave(text.trim(), aims) }.padding(vertical = 10.dp, horizontal = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Default.Edit, contentDescription = null, tint = p.accent.copy(alpha = if (ready) 1f else 0.5f), modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(14.dp))
+                Text("Add to today's microjournal", style = MaterialTheme.typography.bodyLarge, color = if (ready) p.text else p.faint)
+            }
+            return@Column
         }
         // What the words say to do, first: a timer, an event, a block, a sum.
         remember(text) { offers(text) }.forEach { offer -> OfferRow(offer, style) { onOffer(offer) } }
@@ -283,3 +338,6 @@ private fun OfferRow(offer: DrawerResult, style: HomeStyle, onClick: () -> Unit)
         Text(label, style = MaterialTheme.typography.bodyLarge, color = p.accent)
     }
 }
+
+/** The microjournal as the quick note reaches it: your sections, and where today's words go, with the sections picked. */
+internal class JournalWith(val sections: List<app.bedtime.data.JournalSection>, val onSave: (String, List<String>) -> Unit)

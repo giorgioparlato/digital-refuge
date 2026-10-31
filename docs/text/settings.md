@@ -642,6 +642,10 @@ One file serves the look, widgets, gestures and notifications pages, for both sc
 - Refuge notes
 - Your notes
 - Kept on this phone, written in Markdown
+- Microjournal
+- An entry a day in your notes, and from the quick note, with prompts to write from if you want them
+- Sections and prompts
+- Start from the suggestions; change, delete or add your own
 - Your files
 - Up to …. Each note is added at the end; tap one to change how
 - your words

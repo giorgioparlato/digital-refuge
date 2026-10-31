@@ -102,6 +102,17 @@ class Repository private constructor(context: Context) {
         update(HABIT_MARKS, habitMarksSerializer, emptyList()) { marks -> marks.filterNot { it.habit == id } }
     }
 
+    /** The microjournal's entries, a day each. */
+    val journal: Flow<List<JournalEntry>> = observe(JOURNAL, journalSerializer, emptyList())
+
+    /** Sets [day]'s entry; one left empty goes. */
+    suspend fun saveJournal(day: Long, text: String, aims: List<String>, at: Long = System.currentTimeMillis()) =
+        update(JOURNAL, journalSerializer, emptyList()) { Journal.saved(it, day, text, aims, at) }
+
+    /** Adds [text] to the end of [day]'s entry, from the quick note. */
+    suspend fun addToJournal(day: Long, text: String, aims: List<String>, at: Long = System.currentTimeMillis()) =
+        update(JOURNAL, journalSerializer, emptyList()) { Journal.added(it, day, text, aims, at) }
+
     suspend fun deleteNote(id: String) = update(NOTES, notesSerializer, emptyList()) { notes -> notes.filterNot { it.id == id } }
 
     /** The latest weather Breezy Weather sent, if any. */
@@ -354,6 +365,7 @@ class Repository private constructor(context: Context) {
         settings = settings.first(),
         history = history.first(),
         notes = notes.first(),
+        journal = journal.first(),
         habitMarks = habitMarks.first(),
         usage = usage.first(),
         usageMonths = usageMonths.first(),
@@ -374,6 +386,11 @@ class Repository private constructor(context: Context) {
         }
         days.edit { prefs ->
             if (backup.notes.isNotEmpty()) prefs[NOTES] = AppJson.encodeToString(notesSerializer, backup.notes)
+            // The microjournal, joined with this phone's: a day in both keeps this phone's.
+            if (backup.journal.isNotEmpty()) {
+                val here = decode(prefs[JOURNAL], journalSerializer, emptyList())
+                prefs[JOURNAL] = AppJson.encodeToString(journalSerializer, (backup.journal.associateBy { it.day } + here.associateBy { it.day }).values.sortedBy { it.day })
+            }
             if (backup.habitMarks.isNotEmpty()) prefs[HABIT_MARKS] = AppJson.encodeToString(habitMarksSerializer, backup.habitMarks)
             // Phone use, only from files that have it, joined with what this phone has counted since.
             if (backup.usage.isNotEmpty()) {
@@ -411,13 +428,15 @@ class Repository private constructor(context: Context) {
         private val monthsSerializer = ListSerializer(UsageMonth.serializer())
         private const val MONTHS_KEPT = 24
         private val NOTES = stringPreferencesKey("notes")
+        private val JOURNAL = stringPreferencesKey("journal")
+        private val journalSerializer = ListSerializer(JournalEntry.serializer())
         private val WEATHER = stringPreferencesKey("weather")
         private val notesSerializer = ListSerializer(Note.serializer())
         private val HABIT_MARKS = stringPreferencesKey("habit_marks")
         private val habitMarksSerializer = ListSerializer(HabitMark.serializer())
 
         /** The keys kept in the day-to-day file rather than with the settings. */
-        internal val DAY_KEYS: Set<Preferences.Key<String>> by lazy { setOf(USAGE, USAGE_MONTHS, NOTES, HABIT_MARKS, WEATHER, TIMERS, LOCK_QUIET) }
+        internal val DAY_KEYS: Set<Preferences.Key<String>> by lazy { setOf(USAGE, USAGE_MONTHS, NOTES, JOURNAL, HABIT_MARKS, WEATHER, TIMERS, LOCK_QUIET) }
         private val quietSerializer = MapSerializer(String.serializer(), Long.serializer())
         private val timersSerializer = ListSerializer(Long.serializer())
         /** About three years of nightly sessions, or several months of a busy mix: still a small file. */

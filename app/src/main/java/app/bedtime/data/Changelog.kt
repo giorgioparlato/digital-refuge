@@ -13,6 +13,17 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            76,
+            "0.9.30",
+            listOf(
+                "A microjournal, if you want one: switch it on in settings › notes. An entry a day in your notes, and from the quick note.",
+                "Prompts while you write: pick sections (vent, obligations, mindset, gratitude, ideation, trajectory, after the journalling system by Struthless) and tap a prompt to write from it.",
+                "The sections and prompts are only a start: change, delete or add your own.",
+                "Insights opens on the month's heatmap, with today outlined: tap it for today.",
+                "Turning the screen off from the lock screen goes black at once, Android's bar at the foot too.",
+            ),
+        ),
+        ChangelogEntry(
             75,
             "0.9.29",
             listOf(

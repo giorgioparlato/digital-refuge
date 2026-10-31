@@ -617,6 +617,10 @@ data class AppSettings(
     val lookBackPutAway: Long = 0L,
     /** The dictionary looked in when you have several, by name; null for all of them. */
     val lookUpDictionary: String? = null,
+    /** The microjournal in refuge notes, and in the quick note: only once you switch it on. */
+    val journalOn: Boolean = false,
+    /** Your journalling sections; null until you change one, so the suggested ones ([Journal.SUGGESTED]). */
+    val journalSections: List<JournalSection>? = null,
     /** Whether looking up on the lock screen finds your notes too, to read there without unlocking. */
     val lookUpNotes: Boolean = false,
     /** An app's shortcut run after a quick note goes into one of your files, e.g. a sync app's "Sync now". */

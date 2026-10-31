@@ -622,11 +622,13 @@ fun ObsidianTextField(
     leadingIcon: (@Composable () -> Unit)? = null,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     textStyle: TextStyle = LocalTextStyle.current,
+    keyboardActions: androidx.compose.foundation.text.KeyboardActions = androidx.compose.foundation.text.KeyboardActions.Default,
 ) {
     val c = Obsidian.colors
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
+        keyboardActions = keyboardActions,
         modifier = modifier.fillMaxWidth(),
         enabled = enabled,
         textStyle = textStyle,

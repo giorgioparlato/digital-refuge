@@ -73,12 +73,19 @@ fun NotesScreen(onBack: () -> Unit, initialOpen: String? = null) {
     val repo = remember { Repository.get(context) }
     val scope = rememberCoroutineScope()
     val notes by repo.notes.collectAsStateWithLifecycle(initialValue = null)
+    val settings by repo.settings.collectAsStateWithLifecycle(initialValue = null)
+    var journal by rememberSaveable { mutableStateOf(false) }
+    if (journal) {
+        JournalContent(onBack = { journal = false })
+        return
+    }
     NotesContent(
         notes = notes ?: return,
         onSave = { id, text -> scope.launch { repo.saveNote(id, text) } },
         onDelete = { id -> scope.launch { repo.deleteNote(id) } },
         onBack = onBack,
         initialOpen = initialOpen,
+        onJournal = if (settings?.journalOn == true) ({ journal = true }) else null,
     )
 }
 
@@ -93,6 +100,8 @@ internal fun NotesContent(
     onDelete: (String) -> Unit,
     onBack: () -> Unit,
     initialOpen: String? = null,
+    /** The microjournal, when it's switched on: a row of its own at the top. */
+    onJournal: (() -> Unit)? = null,
 ) {
     // The note open to edit, by id; a new one gets its id as it opens.
     var open by rememberSaveable { mutableStateOf(initialOpen) }
@@ -123,7 +132,7 @@ internal fun NotesContent(
         topBar = { ObsidianTopBar("Notes", onBack = onBack, subtitle = "Written in Markdown, kept on this phone") },
         floatingActionButton = { AddCircleButton("new note", onClick = { open = java.util.UUID.randomUUID().toString() }) },
     ) { padding ->
-        if (notes.isEmpty()) {
+        if (notes.isEmpty() && onJournal == null) {
             Text(
                 "Nothing yet. Type in the minimal home's search and pick “save in refuge notes”, or start one with +.",
                 style = MaterialTheme.typography.bodyMedium,
@@ -136,6 +145,20 @@ internal fun NotesContent(
             Modifier.fillMaxSize().padding(padding).padding(horizontal = PageGutter),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
+            onJournal?.let { openJournal ->
+                item(key = "journal") {
+                    Row(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(CardRadius)).background(c.bgSecondary).clickable(onClick = openJournal).padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Microjournal", style = MaterialTheme.typography.titleSmall, color = c.textNormal)
+                            Text("A few lines a day, with prompts if you want them", style = MaterialTheme.typography.bodySmall, color = c.textMuted)
+                        }
+                        app.bedtime.ui.components.Chevron()
+                    }
+                }
+            }
             // The to-do note stays at the top.
             items(notes.sortedBy { it.id != Notes.TODO_ID }, key = { it.id }) { note ->
                 SwipeToDelete(onDelete = { onDelete(note.id) }) {
@@ -167,21 +190,36 @@ internal fun NotesContent(
     }
 }
 
-/** One note, styled as Markdown as you type, with a few marks a tap away; saved when you go back. */
+/**
+ * One note, styled as Markdown as you type, with a few marks a tap away; saved when you go back. A
+ * [title] of its own, more buttons at the top ([actions]), and a [panel] above the text, which can
+ * put words in where the cursor is, serve the microjournal; a change to [saveWith] saves too.
+ */
 @Composable
-private fun NoteEditor(initial: String, isNew: Boolean, onSave: (String) -> Unit, onDone: (String) -> Unit, onDelete: (() -> Unit)?) {
+internal fun NoteEditor(
+    initial: String,
+    isNew: Boolean,
+    onSave: (String) -> Unit,
+    onDone: (String) -> Unit,
+    onDelete: (() -> Unit)?,
+    title: String? = null,
+    actions: @Composable () -> Unit = {},
+    panel: (@Composable (insert: (String) -> Unit) -> Unit)? = null,
+    saveWith: Any? = null,
+) {
     val c = Obsidian.colors
     var value by remember { mutableStateOf(TextFieldValue(initial, TextRange(initial.length))) }
     BackHandler { onDone(value.text) }
     // Saved a moment after you pause typing.
-    LaunchedEffect(value.text) {
+    LaunchedEffect(value.text, saveWith) {
         delay(600)
         onSave(value.text)
     }
     Scaffold(
         containerColor = c.bgPrimary,
         topBar = {
-            ObsidianTopBar(if (isNew) "New note" else "Note", onBack = { onDone(value.text) }) {
+            ObsidianTopBar(title ?: if (isNew) "New note" else "Note", onBack = { onDone(value.text) }) {
+                actions()
                 if (onDelete != null) {
                     IconButton(onClick = onDelete) { Icon(Icons.Default.Delete, contentDescription = "delete", tint = c.textMuted) }
                 }
@@ -189,6 +227,10 @@ private fun NoteEditor(initial: String, isNew: Boolean, onSave: (String) -> Unit
         },
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).imePadding()) {
+            panel?.invoke { prompt ->
+                val (text, cursor) = app.bedtime.data.Journal.inserted(value.text, value.selection.start, prompt)
+                value = TextFieldValue(text, TextRange(cursor))
+            }
             var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
             // The note grows inside a scrolling page, so its boxes can be drawn where its lines are.
             Box(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = PageGutter)) {

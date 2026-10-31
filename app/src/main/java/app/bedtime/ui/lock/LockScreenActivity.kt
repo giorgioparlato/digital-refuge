@@ -1,5 +1,10 @@
 package app.bedtime.ui.lock
 
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
+
 import app.bedtime.ui.minimal.habitsSlot
 import app.bedtime.ui.minimal.noteSlots
 
@@ -140,7 +145,7 @@ class LockScreenActivity : ComponentActivity() {
         override fun onReceive(context: Context, intent: Intent) = finish()
     }
 
-    /** Black and at the lowest brightness, for phones that won't turn the screen off while locked. */
+    /** Black and at the lowest brightness: "screen off" from here, as the phone is already locked. */
     private val blackout = mutableStateOf(false)
 
     /** Whether the quick note (and its look-up) is open, so leaving it by Android's swipe can bring this screen back. */
@@ -280,32 +285,29 @@ class LockScreenActivity : ComponentActivity() {
     }
 
     /**
-     * The screen off, as Android's own lock does. Some phones ignore that while already locked, so if the
-     * screen is still on a moment later it goes black at the lowest brightness until it sleeps as usual;
-     * a touch brings it back.
+     * The screen as good as off: black, at the lowest brightness and without Android's bars, until it
+     * sleeps as usual; a touch brings it back.
      */
     private fun screenOff() {
-        // Android's own lock, as the power button: through the accessibility service, no other permission.
-        val asked = when {
-            Build.VERSION.SDK_INT < Build.VERSION_CODES.P -> "not on this Android"
-            BlockingState.service == null -> "blocking is off"
-            BlockingState.service?.performGlobalAction(AccessibilityService.GLOBAL_ACTION_LOCK_SCREEN) == true -> "taken"
-            else -> "refused"
-        }
-        lifecycleScope.launch {
-            delay(600)
-            if (getSystemService(PowerManager::class.java).isInteractive) {
-                // Noted, to see on the phone whether Android's lock ever turns the screen off from here.
-                Problems.note("screen off from the lock screen: Android's lock was $asked, the screen stayed on, so it went black instead")
-                blackout.value = true
-                window.attributes = window.attributes.apply { screenBrightness = 0f }
-            }
-        }
+        // Android's own lock does nothing on a phone already locked, so straight to black.
+        blackout.value = true
+        window.attributes = window.attributes.apply { screenBrightness = 0f }
+        // Android's bars go too, the swipe bar at the foot with them, so nothing is left lit.
+        val bars = WindowCompat.getInsetsController(window, window.decorView)
+        statusBarShown = ViewCompat.getRootWindowInsets(window.decorView)?.isVisible(WindowInsetsCompat.Type.statusBars()) ?: false
+        bars.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        bars.hide(WindowInsetsCompat.Type.systemBars())
     }
+
+    /** Whether the status bar showed before the screen went black, to bring it back as it was. */
+    private var statusBarShown = false
 
     private fun wake() {
         blackout.value = false
         window.attributes = window.attributes.apply { screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE }
+        val bars = WindowCompat.getInsetsController(window, window.decorView)
+        bars.show(WindowInsetsCompat.Type.navigationBars())
+        if (statusBarShown) bars.show(WindowInsetsCompat.Type.statusBars())
     }
 
     override fun onStop() {
@@ -551,6 +553,13 @@ private fun LockScreen(
             ),
             offers = { words -> app.bedtime.ui.minimal.AppDrawer.noteOffers(words, settings, blocks, LocalDateTime.now()) },
             onOffer = { offer -> runOffer(context, repo, scope, settings, offer) },
+            // Only added to here: nothing already written in it shows on the lock screen.
+            journal = if (!settings.journalOn) null else app.bedtime.ui.minimal.JournalWith(app.bedtime.data.Journal.sections(settings.journalSections)) { text, aims ->
+                scope.launch {
+                    repo.addToJournal(java.time.LocalDate.now().toEpochDay(), text, aims)
+                    Toast.makeText(context, "added to today's microjournal", Toast.LENGTH_SHORT).show()
+                }
+            },
         )
     }
     // The list folds back to its summary line whenever the screen goes off.

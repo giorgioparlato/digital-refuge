@@ -77,7 +77,7 @@ import kotlinx.coroutines.launch
 
 /** Where the minimal home's search sends notes: your files, or the app's notes. Events are on the search page. */
 @Composable
-fun NoteTargetsScreen(onBack: () -> Unit, onOpenNotes: () -> Unit) {
+fun NoteTargetsScreen(onBack: () -> Unit, onOpenNotes: () -> Unit, onOpenJournalPrompts: () -> Unit = {}) {
     val context = LocalContext.current
     val repo = remember { Repository.get(context) }
     val scope = rememberCoroutineScope()
@@ -150,6 +150,9 @@ fun NoteTargetsScreen(onBack: () -> Unit, onOpenNotes: () -> Unit) {
         onBack = onBack,
         afterNote = current.afterNoteShortcut,
         onPickAfterNote = { choosingShortcut = true },
+        journalOn = current.journalOn,
+        onJournalOn = { on -> scope.launch { repo.updateSettings { it.copy(journalOn = on) } } },
+        onJournalPrompts = onOpenJournalPrompts,
     )
     if (choosingShortcut) {
         ShortcutDialog(
@@ -215,6 +218,10 @@ internal fun NoteTargetsContent(
     /** An app's shortcut run after a note goes into a file, and the choice of it. */
     afterNote: AppShortcut? = null,
     onPickAfterNote: () -> Unit = {},
+    /** The microjournal, off until you want it, and its sections and prompts. */
+    journalOn: Boolean = false,
+    onJournalOn: (Boolean) -> Unit = {},
+    onJournalPrompts: () -> Unit = {},
 ) {
     val c = Obsidian.colors
     Scaffold(containerColor = c.bgPrimary, topBar = { ObsidianTopBar("Quick notes", onBack = onBack, subtitle = "From the minimal home's search") }) { padding ->
@@ -229,6 +236,12 @@ internal fun NoteTargetsContent(
             Spacer(Modifier.height(16.dp))
             SectionCard(title = "Refuge notes") {
                 OptionRow(Icons.Default.Edit, "Your notes", description = "Kept on this phone, written in Markdown", onClick = onOpenNotes) { Chevron() }
+                OptionRow(Icons.Default.DateRange, "Microjournal", description = "An entry a day in your notes, and from the quick note, with prompts to write from if you want them") {
+                    ObsidianToggle(journalOn, onJournalOn)
+                }
+                if (journalOn) {
+                    OptionRow(Icons.Default.Edit, "Sections and prompts", description = "Start from the suggestions; change, delete or add your own", onClick = onJournalPrompts) { Chevron() }
+                }
             }
             Spacer(Modifier.height(16.dp))
             SectionCard(

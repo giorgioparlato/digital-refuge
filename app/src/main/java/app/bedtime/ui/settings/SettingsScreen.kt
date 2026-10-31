@@ -405,6 +405,8 @@ private fun settingsEntries(
         )
         add(Entry(null, BedtimeIcons.Grid, "Apps", "Groups · always available · distracting", "apps", go(SettingsPlace.APPS.route)))
         add(Entry(null, Icons.Default.Edit, "Notes", "Where quick notes go, and the to-do", "notes note quick to-do todo obsidian daily file", go(Routes.QUICK_NOTES)))
+        add(Entry(null, Icons.Default.Edit, "Microjournal", "An entry a day, with prompts by section", "journal journalling microjournal prompts struthless vent gratitude mindset diary", go(Routes.QUICK_NOTES), searchOnly = true))
+        add(Entry(null, Icons.Default.Edit, "Journal sections and prompts", "Change, delete or add your own", "journal prompts sections struthless vent obligations mindset gratitude ideation trajectory", go(Routes.JOURNAL_PROMPTS), searchOnly = true))
         add(
             Entry(
                 null,

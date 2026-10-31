@@ -95,6 +95,8 @@ insights
 -  · nothing to compare with
 - , so far
 - a day you pick…
+- The last six months
+- A day on average: all of it, and the part in distracting apps
 - By the hour
 - By the day
 - All of it, and the part in distracting apps
@@ -102,7 +104,6 @@ insights
 - . The dots are unlocks
 - . Tap a day for its hours
 - The last eight weeks
-- The last six months, a day on average
 - Apps
 - Time and opens, and the change against {against}; distracting ones marked
 - Only your distracting apps are counted without usage access
@@ -118,6 +119,7 @@ insights
 - in distracting apps
 - Budget: … a day {what}
 - No budget chosen yet, so … a day {what} is suggested. Choose yours
+- Today so far: … of …
 - Nothing kept for these days yet.
 - twice or more
 - {text} ›
