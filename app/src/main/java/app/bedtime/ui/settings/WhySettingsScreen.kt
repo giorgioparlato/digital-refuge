@@ -1,5 +1,6 @@
 package app.bedtime.ui.settings
 
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -65,7 +66,6 @@ fun WhySettingsScreen(onBack: () -> Unit, onOpenAnswers: () -> Unit) {
     val s = settings ?: return
     val change = { update: (AppSettings) -> AppSettings -> scope.launch { repo.updateSettings(update) } }
     val c = Obsidian.colors
-    val modes = AskWhen.entries
     Scaffold(containerColor = c.bgPrimary, topBar = { ObsidianTopBar("Ask why", onBack = onBack, subtitle = "A question after you unlock") }) { padding ->
         Column(
             Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = PageGutter, vertical = 4.dp),
@@ -76,9 +76,23 @@ fun WhySettingsScreen(onBack: () -> Unit, onOpenAnswers: () -> Unit) {
                 style = MaterialTheme.typography.bodyMedium,
                 color = c.textMuted,
             )
-            SectionCard(title = "Ask after unlocking", subtitle = "“Sessions”: only while a session runs. Never again within a few minutes") {
-                // Short, so each fits on one line at any text size.
-                SegmentedChoice(options = listOf("Never", "Sessions", "Always"), selected = modes.indexOf(s.askOnUnlock), onSelect = { i -> change { it.copy(askOnUnlock = modes[i]) } })
+            SectionCard(title = "Ask after unlocking", subtitle = "Every unlock, however you unlock; not again within a few minutes") {
+                SegmentedChoice(
+                    options = listOf("Never", "Always"),
+                    selected = if (s.askOnUnlock == AskWhen.ALWAYS) 1 else 0,
+                    onSelect = { i -> change { it.copy(askOnUnlock = if (i == 1) AskWhen.ALWAYS else AskWhen.OFF) } },
+                )
+            }
+            SectionCard(title = "Moods", subtitle = "Tap how you feel when answering, and in the microjournal; insights show them over time") {
+                OptionRow(Icons.Default.Edit, "Moods to tap") { app.bedtime.ui.components.ObsidianToggle(s.moodsOn, { on -> change { it.copy(moodsOn = on) } }) }
+                if (s.moodsOn) {
+                    MoodList(
+                        Why.moods(s),
+                        changed = s.moodTags != null,
+                        onChange = { list -> change { it.copy(moodTags = list) } },
+                        onReset = { change { it.copy(moodTags = null) } },
+                    )
+                }
             }
             SectionCard(title = "The questions", subtitle = "Asked in turn. Change any, delete some, add your own") {
                 QuestionList(
@@ -125,6 +139,40 @@ fun WhyAppQuestionsScreen(onBack: () -> Unit) {
                 )
             }
             Spacer(Modifier.height(24.dp))
+        }
+    }
+}
+
+/** Moods as chips, each with an × to take it out, a box to add one, and, once changed, back to the suggested ones. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun MoodList(moods: List<String>, changed: Boolean, onChange: (List<String>) -> Unit, onReset: () -> Unit) {
+    val c = Obsidian.colors
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(top = 8.dp)) {
+        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            moods.forEach { mood ->
+                Row(
+                    Modifier.clip(RoundedCornerShape(50)).border(1.dp, c.border, RoundedCornerShape(50)).padding(start = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(mood, style = MaterialTheme.typography.labelLarge, color = c.textNormal)
+                    Icon(
+                        Icons.Default.Clear,
+                        contentDescription = "take $mood out",
+                        tint = c.textFaint,
+                        modifier = Modifier.size(32.dp).clip(RoundedCornerShape(50)).clickable { onChange(moods - mood) }.padding(8.dp),
+                    )
+                }
+            }
+        }
+        Committed("", "Add a mood", clearAfter = true) { typed -> typed.trim().lowercase().takeIf { it.isNotEmpty() && it !in moods }?.let { onChange(moods + it) } }
+        if (changed) {
+            Text(
+                "Back to the suggested moods",
+                style = MaterialTheme.typography.labelLarge,
+                color = c.accentText,
+                modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onReset).padding(vertical = 6.dp),
+            )
         }
     }
 }

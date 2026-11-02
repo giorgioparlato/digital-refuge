@@ -48,6 +48,7 @@ class LookBackTest {
         assertEquals("insta" to 1800L, week.topApp)
         assertEquals(2, week.habitDaysKept)
         assertEquals(7, week.habitDays)
+        assertEquals(listOf(9), week.distractedHours)
     }
 
     @Test

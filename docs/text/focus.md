@@ -310,6 +310,13 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 - Its own
 - While it runs, the … shows your usual widgets.
 - While it runs, these instead, in this order. If another session with its own starts later, its own win.
+- Ask why
+- Not while it runs
+- After each unlock · at least … words
+- After each unlock
+- Ask why after each unlock
+- While it runs: a question, a box to write in and how you feel; going on is a tap
+- Words, at least
 - How hard to leave
 - The steps, in this order
 - What unlocking gets you
@@ -530,7 +537,7 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 
 - see the week ahead
 - {scheduleName} · until {until}
-- open the weather
+- today's rain by the hour
 - — {credit}
 
 <sub>[EmergencyContent.kt](../../app/src/main/java/app/bedtime/ui/minimal/EmergencyContent.kt)</sub>
@@ -582,6 +589,7 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 
 <sub>[WidgetSheet.kt](../../app/src/main/java/app/bedtime/ui/minimal/WidgetSheet.kt)</sub>
 
+- Open the … app
 - Other…
 - Custom
 - Show on the home screen

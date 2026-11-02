@@ -109,4 +109,15 @@ class WeatherTest {
         assertEquals(WeatherIcon.CLEAR, Weather.icon(null, "Sunny"))
         assertNull(Weather.icon(null, "Windy"))
     }
+
+    @Test
+    fun todaysRainFromThisHourOn() {
+        val zone = java.time.ZoneOffset.UTC
+        fun at(day: Int, hour: Int) = java.time.LocalDateTime.of(2026, 11, day, hour, 0).toInstant(zone).toEpochMilli()
+        val hours = (0..47).map { RainHour(at(2 + it / 24, it % 24), it) }
+        // From the hour now, to midnight.
+        assertEquals((14..23).map { it to it }, Weather.rainByHour(hours, at(2, 14) + 25 * 60_000, zone))
+        // Late in the evening, at least six hours ahead.
+        assertEquals(listOf(22 to 22, 23 to 23, 0 to 24, 1 to 25, 2 to 26, 3 to 27), Weather.rainByHour(hours, at(2, 22), zone))
+    }
 }

@@ -34,6 +34,7 @@ insights
 - On the phone
 - In distracting apps
 - Most of that
+- Most distracted
 - Habits
 - … of … days kept
 - … in refuge
@@ -54,6 +55,7 @@ insights
 - Phone
 - Sessions
 - Habits
+- Moods
 - add a habit
 - in refuge in the last seven days
 - kept in a row
@@ -103,6 +105,8 @@ insights
 - ; outlined, {against}
 - . The dots are unlocks
 - . Tap a day for its hours
+- Most distracted
+- this day
 - The last eight weeks
 - Apps
 - Time and opens, and the change against {against}; distracting ones marked

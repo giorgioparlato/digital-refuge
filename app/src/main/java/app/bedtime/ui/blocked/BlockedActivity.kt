@@ -56,6 +56,7 @@ class BlockedActivity : ComponentActivity() {
 
     /** The pause asks "why am I opening this?" instead of a wait. */
     private var asking by mutableStateOf(false)
+    private var askWords by mutableIntStateOf(0)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -68,7 +69,7 @@ class BlockedActivity : ComponentActivity() {
                 val pkg = blockedPackage
                 when {
                     mode == MODE_PAUSE && pkg != null -> key(pkg, opens) {
-                        PauseScreen(pkg, pauseSeconds, opens, passKey ?: pkg, onHome = ::goHome, onFinish = ::finish, typing = typing, source = typingSource, ask = asking)
+                        PauseScreen(pkg, pauseSeconds, opens, passKey ?: pkg, onHome = ::goHome, onFinish = ::finish, typing = typing, source = typingSource, ask = asking, askWords = askWords)
                     }
                     mode == MODE_LIMIT && pkg != null -> key(pkg, limitId, outOfOpens) {
                         LimitScreen(pkg, limitId.orEmpty(), onHome = ::goHome, onFinish = ::finish, opens = outOfOpens)
@@ -96,6 +97,7 @@ class BlockedActivity : ComponentActivity() {
         typing = intent.getIntExtra(EXTRA_TYPING, 0)
         typingSource = intent.getStringExtra(EXTRA_SOURCE)?.let { runCatching { TextSource.valueOf(it) }.getOrNull() } ?: TextSource.WORDS
         asking = intent.getBooleanExtra(EXTRA_ASK, false)
+        askWords = intent.getIntExtra(EXTRA_ASK_WORDS, 0)
     }
 
     private fun goHome() {
@@ -115,6 +117,7 @@ class BlockedActivity : ComponentActivity() {
         private const val EXTRA_TYPING = "typing"
         private const val EXTRA_SOURCE = "source"
         private const val EXTRA_ASK = "ask"
+        private const val EXTRA_ASK_WORDS = "askWords"
         private const val MODE_PAUSE = "pause"
         private const val MODE_LIMIT = "limit"
 
@@ -127,10 +130,10 @@ class BlockedActivity : ComponentActivity() {
          * The pause before opening [pkg]: [seconds] to breathe, or [typing] characters to type, then
          * "open" (granting [passKey]) or "never mind".
          */
-        fun pauseIntent(context: Context, pkg: String, seconds: Int, opens: Int, passKey: String, typing: Int = 0, source: TextSource = TextSource.WORDS, ask: Boolean = false): Intent =
+        fun pauseIntent(context: Context, pkg: String, seconds: Int, opens: Int, passKey: String, typing: Int = 0, source: TextSource = TextSource.WORDS, ask: Boolean = false, askWords: Int = 0): Intent =
             intent(context, pkg).putExtra(EXTRA_MODE, MODE_PAUSE).putExtra(EXTRA_SECONDS, seconds)
                 .putExtra(EXTRA_OPENS, opens).putExtra(EXTRA_PASS, passKey)
-                .putExtra(EXTRA_TYPING, typing).putExtra(EXTRA_SOURCE, source.name).putExtra(EXTRA_ASK, ask)
+                .putExtra(EXTRA_TYPING, typing).putExtra(EXTRA_SOURCE, source.name).putExtra(EXTRA_ASK, ask).putExtra(EXTRA_ASK_WORDS, askWords)
 
         /** [pkg]'s minutes for today are gone under limit [limitId], or with [opens] its opens are. */
         fun limitIntent(context: Context, pkg: String, limitId: String, opens: Boolean = false): Intent =

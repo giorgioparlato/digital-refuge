@@ -90,7 +90,7 @@ internal fun WriteChallenge(words: Int, prompts: List<Pair<String, String?>>, on
 }
 
 /** A text toolbar that never shows: no paste, so what's written is typed here. */
-private object NoPasting : androidx.compose.ui.platform.TextToolbar {
+internal object NoPasting : androidx.compose.ui.platform.TextToolbar {
     override val status = androidx.compose.ui.platform.TextToolbarStatus.Hidden
 
     override fun showMenu(

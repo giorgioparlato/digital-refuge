@@ -39,6 +39,11 @@ object Why {
     )
 
 
+    /** How you might feel, to tap when answering, or in the microjournal: for the mood tracker. */
+    val MOODS = listOf("hungry", "angry", "lonely", "tired", "bored", "happy", "anxious")
+
+    fun moods(settings: AppSettings): List<String> = if (!settings.moodsOn) emptyList() else settings.moodTags ?: MOODS
+
     /** Not asked again for the same app this soon after, nor again after an unlock. */
     const val APP_AGAIN_MS = 10 * 60_000L
     const val UNLOCK_AGAIN_MS = 3 * 60_000L
@@ -58,20 +63,32 @@ object Why {
     fun ask(questions: List<String>): String = next(questions, lastAsked).also { lastAsked = it }
 
 
-    /** Whether [mode] asks now, with a session running or not. */
-    fun asks(mode: AskWhen, inSession: Boolean): Boolean = mode == AskWhen.ALWAYS || (mode == AskWhen.SESSIONS && inSession)
+    /**
+     * Whether to ask after an unlock, and with at least how many words: a running session's own "ask
+     * why" first (the most words any asks for), otherwise [mode] when it's always. Null for no question.
+     * ("During sessions", from before sessions chose for themselves, counts as never.)
+     */
+    fun afterUnlock(mode: AskWhen, sessions: List<Schedule>): Int? =
+        sessions.filter { it.askWhy }.maxOfOrNull { it.askWhyWords } ?: 0.takeIf { mode == AskWhen.ALWAYS }
 
     /** Whether it's been long enough since [last] (0 for never) to ask again, at [now]. */
     fun due(last: Long, now: Long, again: Long): Boolean = last == 0L || now - last >= again
 
-    private val stamp = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+
+    private val clock = DateTimeFormatter.ofPattern("HH:mm")
 
     /**
-     * An answer as a line of the note: "- 2026-10-31 21:40 · unlocking · put it down · What do I actually
-     * need right now? sleep". [what] is "unlocking" or the app's name; [wentOn], whether you went on.
+     * An answer as a line of the day's microjournal entry: "- 21:40 · unlocking · put it down · tired,
+     * bored · what do i actually need right now? sleep". [what] is "unlocking" or the app's name;
+     * [wentOn], whether you went on.
      */
-    fun line(at: LocalDateTime, what: String, question: String, words: String, wentOn: Boolean): String =
-        listOf("- ${stamp.format(at)}", what.lowercase(), if (wentOn) "went on" else "put it down").joinToString(" · ") +
+    fun line(at: LocalDateTime, what: String, question: String, words: String, wentOn: Boolean, moods: List<String> = emptyList()): String =
+        listOfNotNull(
+            "- ${clock.format(at)}",
+            what.lowercase(),
+            if (wentOn) "went on" else "put it down",
+            moods.joinToString(", ") { it.lowercase() }.takeIf { it.isNotEmpty() },
+        ).joinToString(" · ") +
             words.trim().replace(Regex("\\s*\\n\\s*"), " ").takeIf { it.isNotEmpty() }?.let { " · ${question.lowercase()} $it" }.orEmpty()
 
     /** The most one change may add while writing: a word or two at a time, as typing, swiping or a suggestion gives them. */

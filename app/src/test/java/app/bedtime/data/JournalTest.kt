@@ -76,4 +76,29 @@ class JournalTest {
         // Emptied, an entry goes.
         assertNull(Journal.saved(all, day, " ", emptyList(), 4).firstOrNull { it.day == day })
     }
+
+    @Test
+    fun answersToWhyGoUnderTheirHeadingNewestFirst() {
+        val day = today.toEpochDay()
+        var all = Journal.answered(emptyList(), day, "- 09:00 · unlocking · went on", listOf("bored"), 1)
+        assertEquals("${Journal.WHY_HEADING}\n- 09:00 · unlocking · went on\n", all.single().text)
+        all = Journal.saved(all, day, "slept badly\n\n" + all.single().text, listOf("Clarity"), 2)
+        all = Journal.answered(all, day, "- 10:00 · instagram · put it down", listOf("tired"), 3)
+        assertEquals("slept badly\n\n${Journal.WHY_HEADING}\n- 10:00 · instagram · put it down\n- 09:00 · unlocking · went on\n", all.single().text)
+        // What was written stays, and the moods with it.
+        assertEquals(listOf("bored", "tired"), all.single().moods.map { it.mood })
+        assertEquals(listOf("Clarity"), all.single().aims)
+        assertEquals("saturday 31 october · clarity · bored, tired", Journal.title(all.single(), today))
+    }
+
+    @Test
+    fun aMoodIsTappedOnAndOff() {
+        val day = today.toEpochDay()
+        var all = Journal.moodToggled(emptyList(), day, "happy", 5)
+        assertEquals(listOf(MoodMark(5, "happy")), all.single().moods)
+        // Saving the text keeps it; tapped off with nothing written, the entry goes.
+        all = Journal.saved(all, day, "", emptyList(), 6)
+        assertEquals(1, all.size)
+        assertEquals(emptyList<JournalEntry>(), Journal.moodToggled(all, day, "happy", 7))
+    }
 }

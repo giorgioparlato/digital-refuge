@@ -446,7 +446,21 @@ internal fun LimitEditContent(
                     ) { app.bedtime.ui.settings.WhyAppQuestionsScreen(onBack = { questions = false }) }
                 }
                 AnimatedVisibility(paused && rules.pauseKind == PauseKind.ASK) {
-                    OptionRow(Icons.Default.Edit, "The questions", description = "Asked in turn, shared by every limit that asks", onClick = { questions = true }) { Chevron() }
+                    Column {
+                        SubOptionRow("Words, at least") {
+                            NumberStepper(
+                                rules.askWords,
+                                { v -> setRules { it.copy(askWords = v) } },
+                                0..300,
+                                step = 5,
+                                enabled = editable,
+                                presets = listOf(0, 10, 20, 30, 50),
+                                title = "words",
+                                format = { if (it == 0) "none" else "$it" },
+                            )
+                        }
+                        OptionRow(Icons.Default.Edit, "The questions", description = "Asked in turn, shared by every limit that asks", onClick = { questions = true }) { Chevron() }
+                    }
                 }
                 AnimatedVisibility(paused) {
                     Column {

@@ -60,8 +60,9 @@ internal fun PauseScreen(
     onFinish: () -> Unit,
     typing: Int = 0,
     source: TextSource = TextSource.WORDS,
-    /** "Why am I opening this?" instead of a wait: answered or not, going on is a tap. */
+    /** "Why am I opening this?" instead of a wait: answered or not, going on is a tap; with [askWords], after that many words. */
     ask: Boolean = false,
+    askWords: Int = 0,
 ) {
     val context = LocalContext.current
     val label = remember(pkg) { AppCatalog.label(context, pkg) }
@@ -70,21 +71,23 @@ internal fun PauseScreen(
         val loaded = settings ?: return
         // The answer, if there's anything to it, goes with the others in their note.
         val question = remember(pkg, opens) { app.bedtime.data.Why.ask(app.bedtime.data.Why.appQuestions(loaded)) }
-        val keep = { words: String, wentOn: Boolean ->
-            if (words.isNotBlank()) {
-                val line = app.bedtime.data.Why.line(java.time.LocalDateTime.now(), label, question, words, wentOn)
-                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch { Repository.get(context).addWhy(line) }
+        val keep = { words: String, moods: List<String>, wentOn: Boolean ->
+            if (words.isNotBlank() || moods.isNotEmpty()) {
+                val line = app.bedtime.data.Why.line(java.time.LocalDateTime.now(), label, question, words, wentOn, moods)
+                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch { Repository.get(context).addWhy(line, moods) }
             }
         }
         WhyScreen(
             question = question,
             about = "About to open $label",
-            onPutDown = { words ->
-                keep(words, false)
+            moods = app.bedtime.data.Why.moods(loaded),
+            minWords = askWords,
+            onPutDown = { words, moods ->
+                keep(words, moods, false)
                 onHome()
             },
-            onGoOn = { words ->
-                keep(words, true)
+            onGoOn = { words, moods ->
+                keep(words, moods, true)
                 LimitPasses.grant(passKey, System.currentTimeMillis())
                 AppCatalog.launch(context, pkg)
                 onFinish()

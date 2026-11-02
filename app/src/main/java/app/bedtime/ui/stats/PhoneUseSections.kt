@@ -272,6 +272,17 @@ internal fun PhoneStats(
             dots = period == UsePeriod.DAY,
             onPick = if (period == UsePeriod.DAY) null else { i -> openDay(dates[i]) },
         )
+        if (period == UsePeriod.DAY) {
+            // The day's worst hours, and those of what it's set against: the average day this year from the days kept.
+            val here = UsePeriods.mostDistracted(totals.slots.map { it.second })
+            val there = UsePeriods.mostDistracted(if (versus == Versus.YEAR_AVG) UsePeriods.yearHours(use.days, start) else comparison?.distracted.orEmpty())
+            if (here.isNotEmpty() || there.isNotEmpty()) {
+                Spacer(Modifier.height(12.dp))
+                Text("Most distracted", style = MaterialTheme.typography.labelMedium, color = c.textMuted)
+                if (here.isNotEmpty()) HoursLine(if (start == today) "today" else "this day", here)
+                if (there.isNotEmpty()) HoursLine(against, there)
+            }
+        }
         if (period == UsePeriod.WEEK) {
             Spacer(Modifier.height(16.dp))
             Text("The last eight weeks", style = MaterialTheme.typography.labelMedium, color = c.textMuted)
@@ -319,6 +330,16 @@ internal fun PhoneStats(
                 modifier = Modifier.padding(top = 8.dp).clip(RoundedCornerShape(8.dp)).clickable { everything = !everything }.padding(vertical = 6.dp),
             )
         }
+    }
+}
+
+/** Whose hours, and which: "today · 9–10 and 20–21". */
+@Composable
+private fun HoursLine(whose: String, hours: List<Int>) {
+    val c = Obsidian.colors
+    Row(Modifier.fillMaxWidth().padding(top = 6.dp)) {
+        Text(whose, style = MaterialTheme.typography.bodyMedium, color = c.textFaint, modifier = Modifier.weight(1f).padding(end = 12.dp))
+        Text(UsePeriods.hourWords(hours), style = MaterialTheme.typography.bodyMedium, color = c.textNormal)
     }
 }
 

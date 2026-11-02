@@ -6,6 +6,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxSize
@@ -59,7 +61,7 @@ internal val JOURNAL_CREDITS = listOf(
  * An entry opens in the note editor, with your sections' prompts a toggle away.
  */
 @Composable
-internal fun JournalContent(onBack: () -> Unit, openToday: Boolean = false) {
+internal fun JournalContent(onBack: () -> Unit, openToday: Boolean = false, openDay: Long? = null) {
     val context = LocalContext.current
     val repo = remember { Repository.get(context) }
     val scope = rememberCoroutineScope()
@@ -67,7 +69,7 @@ internal fun JournalContent(onBack: () -> Unit, openToday: Boolean = false) {
     val settings by repo.settings.collectAsStateWithLifecycle(initialValue = null)
     val sections = Journal.sections(settings?.journalSections)
     val today = LocalDate.now()
-    var open by rememberSaveable { mutableStateOf(if (openToday) today.toEpochDay() else null) }
+    var open by rememberSaveable { mutableStateOf(openDay ?: if (openToday) today.toEpochDay() else null) }
     val all = entries ?: return
     open?.let { day ->
         val entry = all.firstOrNull { it.day == day }
@@ -78,6 +80,8 @@ internal fun JournalContent(onBack: () -> Unit, openToday: Boolean = false) {
             onSave = { text, aims -> scope.launch { repo.saveJournal(day, text, aims) } },
             onDone = { open = null },
             promptsOpen = openToday,
+            moods = app.bedtime.data.Why.moods(settings ?: app.bedtime.data.AppSettings()),
+            onMood = { mood -> scope.launch { repo.toggleMood(day, mood) } },
         )
         return
     }
@@ -114,7 +118,17 @@ internal fun JournalContent(onBack: () -> Unit, openToday: Boolean = false) {
 
 /** A day's entry in the note editor, with the prompts above it once toggled on; the sections picked are the entry's own. */
 @Composable
-private fun JournalEditor(entry: JournalEntry, sections: List<JournalSection>, today: LocalDate, onSave: (String, List<String>) -> Unit, onDone: () -> Unit, promptsOpen: Boolean = false) {
+private fun JournalEditor(
+    entry: JournalEntry,
+    sections: List<JournalSection>,
+    today: LocalDate,
+    onSave: (String, List<String>) -> Unit,
+    onDone: () -> Unit,
+    promptsOpen: Boolean = false,
+    /** How you feel, to tap at the top: the moods of this day filled. */
+    moods: List<String> = emptyList(),
+    onMood: (String) -> Unit = {},
+) {
     val c = Obsidian.colors
     var aims by remember { mutableStateOf(entry.aims) }
     var prompting by rememberSaveable { mutableStateOf(promptsOpen) }
@@ -131,9 +145,13 @@ private fun JournalEditor(entry: JournalEntry, sections: List<JournalSection>, t
         actions = {
             TextButton(onClick = { prompting = !prompting }) { Text(if (prompting) "Hide prompts" else "Prompts", color = c.accentText) }
         },
-        panel = if (!prompting) null else { insert ->
-            Column(Modifier.heightIn(max = 280.dp).verticalScroll(rememberScrollState()).padding(horizontal = PageGutter, vertical = 8.dp)) {
-                JournalPrompts(sections, aims, onPick = { aims = it }, onPrompt = insert, text = c.textNormal, faint = c.textFaint, accent = c.accent, background = c.bgPrimary)
+        panel = if (!prompting && moods.isEmpty()) null else { insert ->
+            Column(Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState()).padding(horizontal = PageGutter, vertical = 8.dp)) {
+                if (moods.isNotEmpty()) {
+                    app.bedtime.ui.blocked.MoodChips(moods, entry.moods.map { it.mood }.distinct(), onTap = onMood)
+                    if (prompting) Spacer(Modifier.height(12.dp))
+                }
+                if (prompting) JournalPrompts(sections, aims, onPick = { aims = it }, onPrompt = insert, text = c.textNormal, faint = c.textFaint, accent = c.accent, background = c.bgPrimary)
             }
         },
         saveWith = aims,

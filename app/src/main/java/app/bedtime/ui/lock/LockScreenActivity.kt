@@ -472,6 +472,10 @@ private fun LockScreen(
         )
     }
     var hoursDetail by remember { mutableStateOf(false) }
+    var rainOpen by remember { mutableStateOf(false) }
+    if (rainOpen) {
+        app.bedtime.ui.minimal.RainDialog(lockStyle, onDismiss = { rainOpen = false }, onOpenApp = breezy?.let { app -> { rainOpen = false; onOpenApp(app) } })
+    }
     var appsDetail by remember { mutableStateOf(false) }
     if (appsDetail) {
         app.bedtime.ui.components.UseAppsDialog(useToday, lockStyle, onDismiss = { appsDetail = false }, onStats = { onOpenRoute(app.bedtime.Routes.STATS) })
@@ -520,6 +524,7 @@ private fun LockScreen(
                 },
                 open = onOpenRoute,
                 habitShown = { id, shown -> onConfirmed { scope.launch { repo.updateSettings { s -> s.copy(habits = s.habits.map { if (it.id == id) it.withShownOn(Screen.LOCK, shown) else it }) } } } },
+                openApp = breezy?.takeIf { module == Module.WEATHER }?.let { app -> { onOpenApp(app) } },
             ),
             onDismiss = { holding = null },
             notes = allNotes,
@@ -629,7 +634,8 @@ private fun LockScreen(
         // The dots open today by the hour; the other looks, today by app.
         onHours = { if (style.useWidgetFor(Screen.LOCK).look == app.bedtime.data.UseLook.DOTS) hoursDetail = true else appsDetail = true },
         weather = rememberWeather(style, now, Screen.LOCK),
-        onWeather = breezy?.let { app -> { onOpenApp(app) } },
+        // A tap: today's rain right here; held, the widget's options and the weather app, once unlocked.
+        onWeather = { rainOpen = true },
         hours = todayHours.takeIf { Modules.isOn(style, Screen.LOCK, Module.HOURS) && HourlyUse.counting(settings) }
             ?.let { HourlyUse.states(it, now.hour, HourlyUse.rule(settings)) },
         useToday = useToday.takeIf { Modules.isOn(style, Screen.LOCK, Module.HOURS) },
@@ -679,7 +685,7 @@ internal fun LockScreenContent(
     /** The week ahead, from a tap on the next event (or its icon). */
     onCalendar: (() -> Unit)? = null,
     weather: WeatherView? = null,
-    /** Opens the weather app after the usual unlock. */
+    /** Today's rain, from a tap on the weather. */
     onWeather: (() -> Unit)? = null,
     /** Today by the hour, when it's shown here. */
     hours: List<HourState>? = null,

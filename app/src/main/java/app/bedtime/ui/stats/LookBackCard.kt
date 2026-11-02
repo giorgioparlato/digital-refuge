@@ -73,6 +73,7 @@ internal object LookBackLines {
         week.phone?.let { add("On the phone" to formatMinutes(it / 60) + versus(it, week.phoneBefore)) }
         week.distracting?.takeIf { it > 0 }?.let { add("In distracting apps" to formatMinutes(it / 60) + versus(it, week.distractingBefore)) }
         week.topApp?.let { (pkg, seconds) -> add("Most of that" to "${appLabel(pkg)}, ${formatMinutes(seconds / 60)}") }
+        if (week.distractedHours.isNotEmpty()) add("Most distracted" to app.bedtime.data.UsePeriods.hourWords(week.distractedHours))
         if (week.habitDays > 0) add("Habits" to "${week.habitDaysKept} of ${week.habitDays} days kept")
     }
 

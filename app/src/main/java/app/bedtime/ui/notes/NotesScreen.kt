@@ -95,7 +95,7 @@ import java.util.Locale
 
 /** Your notes, kept in the app: quick ones from the minimal home's search, and any you write here. */
 @Composable
-fun NotesScreen(onBack: () -> Unit, initialOpen: String? = null, onSettings: (() -> Unit)? = null, openJournal: Boolean = false) {
+fun NotesScreen(onBack: () -> Unit, initialOpen: String? = null, onSettings: (() -> Unit)? = null, openJournal: Boolean = false, journalDay: Long? = null) {
     val context = LocalContext.current
     val repo = remember { Repository.get(context) }
     val scope = rememberCoroutineScope()
@@ -103,9 +103,10 @@ fun NotesScreen(onBack: () -> Unit, initialOpen: String? = null, onSettings: (()
     val settings by repo.settings.collectAsStateWithLifecycle(initialValue = null)
     val trash by repo.trash.collectAsStateWithLifecycle(initialValue = emptyList())
     // Straight into today's microjournal, prompts showing, when that's what was asked for (from the lock screen).
-    var journal by rememberSaveable { mutableStateOf(openJournal) }
+    var journal by rememberSaveable { mutableStateOf(openJournal || journalDay != null) }
+    val journalEntries by repo.journal.collectAsStateWithLifecycle(initialValue = emptyList())
     if (journal) {
-        JournalContent(onBack = { journal = false }, openToday = openJournal)
+        JournalContent(onBack = { journal = false }, openToday = openJournal, openDay = journalDay)
         return
     }
     NotesContent(
@@ -114,7 +115,8 @@ fun NotesScreen(onBack: () -> Unit, initialOpen: String? = null, onSettings: (()
         onDelete = { id -> scope.launch { repo.deleteNote(id) } },
         onBack = onBack,
         initialOpen = initialOpen,
-        onJournal = if (settings?.journalOn == true) ({ journal = true }) else null,
+        // The microjournal's row once it's on, or once there's anything in it (your answers to "why?").
+        onJournal = if (settings?.journalOn == true || journalEntries.isNotEmpty()) ({ journal = true }) else null,
         onSettings = onSettings,
         trash = trash,
         shelf = ShelfHandlers(

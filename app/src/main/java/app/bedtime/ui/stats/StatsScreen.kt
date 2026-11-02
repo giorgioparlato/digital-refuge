@@ -103,6 +103,7 @@ fun StatsScreen(onBack: (() -> Unit)?, initialSection: Int = 0, onOpen: (String)
     val history by repo.history.collectAsStateWithLifecycle(initialValue = emptyList())
     val settings by repo.settings.collectAsStateWithLifecycle(initialValue = null)
     val usage by repo.usage.collectAsStateWithLifecycle(initialValue = emptyList())
+    val journal by repo.journal.collectAsStateWithLifecycle(initialValue = emptyList())
     val (habits, habitMarks) = rememberHabits()
     val zone = ZoneId.systemDefault()
     var editingHabit by remember { mutableStateOf<Habit?>(null) }
@@ -149,6 +150,11 @@ fun StatsScreen(onBack: (() -> Unit)?, initialSection: Int = 0, onOpen: (String)
             }
         },
         onOpen = onOpen,
+        moods = settings?.takeIf { it.moodsOn }?.let { s ->
+            {
+                MoodStats(journal, app.bedtime.data.Why.moods(s), java.time.LocalDate.now()) { day -> onOpen(app.bedtime.Routes.journalDay(day.toEpochDay())) }
+            }
+        },
         habits = {
             HabitsBody(
                 habits, habitMarks, HourlyUse.today(), editingHabit, { editingHabit = it },
@@ -190,6 +196,8 @@ internal fun StatsContent(
     homeStyle: app.bedtime.data.HomeStyle = app.bedtime.data.HomeStyle(),
     onBudget: (Boolean, Int) -> Unit = { _, _ -> },
     onOpen: (String) -> Unit = {},
+    /** Your moods, as a section of their own when they're on. */
+    moods: (@Composable () -> Unit)? = null,
     /** Your habits, as their third section, and the round + that adds one there; without them, two sections. */
     habits: (@Composable () -> Unit)? = null,
     onAddHabit: (() -> Unit)? = null,
@@ -207,11 +215,12 @@ internal fun StatsContent(
     val bySchedule = Stats.bySchedule(history, now)
     val today = java.time.Instant.ofEpochMilli(now).atZone(zone).toLocalDate().toEpochDay()
     // Phone use, sessions and habits, one at a time: what the phone took, how your sessions held, what you kept.
-    val sections = listOfNotNull("Phone".takeIf { use != null }, "Sessions", "Habits".takeIf { habits != null })
+    val sections = listOfNotNull("Phone".takeIf { use != null }, "Sessions", "Habits".takeIf { habits != null }, "Moods".takeIf { moods != null })
     var shown by rememberSaveable { mutableStateOf(sections.getOrElse(initialSection) { sections.first() }) }
     val section = when (shown) {
         "Phone" -> 0
         "Habits" -> 2
+        "Moods" -> 3
         else -> 1
     }
     Scaffold(
@@ -231,6 +240,11 @@ internal fun StatsContent(
             if (section == 2 && habits != null) {
                 habits()
                 Spacer(Modifier.height(96.dp))
+                return@Column
+            }
+            if (section == 3 && moods != null) {
+                moods()
+                Spacer(Modifier.height(48.dp))
                 return@Column
             }
             if (use != null && section == 0) {

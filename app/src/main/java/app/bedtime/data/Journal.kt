@@ -21,7 +21,18 @@ data class JournalSection(
 
 /** A day's microjournal entry: what was written, and the sections it drew on, by name, as they were then. */
 @Serializable
-data class JournalEntry(val day: Long, val text: String, val aims: List<String> = emptyList(), val editedAt: Long = 0L)
+data class JournalEntry(
+    val day: Long,
+    val text: String,
+    val aims: List<String> = emptyList(),
+    val editedAt: Long = 0L,
+    /** How you felt, each time you said, for the mood tracker as well as the entry's title. */
+    val moods: List<MoodMark> = emptyList(),
+)
+
+/** A mood tapped, and when. */
+@Serializable
+data class MoodMark(val at: Long, val mood: String)
 
 /**
  * The microjournal: an entry a day, and sections of prompts to write from. The suggested sections come
@@ -134,11 +145,42 @@ object Journal {
     fun withHint(sections: List<JournalSection>, id: String, prompt: String, hint: String) =
         sections.changed(id) { s -> s.copy(hints = if (hint.isBlank()) s.hints - prompt else s.hints + (prompt to hint.trim())) }
 
-    /** "saturday 31 october · vent, mindset"; just the day without any sections, and the year when it isn't this one. */
+    /**
+     * "saturday 31 october · clarity · tired, bored": the day, the sections written from, and the moods
+     * of the day; the year too when it isn't this one.
+     */
     fun title(entry: JournalEntry, today: LocalDate): String {
         val date = LocalDate.ofEpochDay(entry.day)
         val day = date.format(DateTimeFormatter.ofPattern(if (date.year == today.year) "EEEE d MMMM" else "EEEE d MMMM yyyy", Locale.getDefault())).lowercase()
-        return if (entry.aims.isEmpty()) day else "$day · " + entry.aims.joinToString(", ") { it.lowercase() }
+        val moods = entry.moods.map { it.mood.lowercase() }.distinct()
+        return listOf(day, entry.aims.joinToString(", ") { it.lowercase() }, moods.joinToString(", ")).filter { it.isNotEmpty() }.joinToString(" · ")
+    }
+
+    /** Where the answers to "why?" go in a day's entry: under this, at its end, the newest first. */
+    const val WHY_HEADING = "### why i picked up the phone"
+
+    /** [text] with [line] as the newest answer under [WHY_HEADING], the heading added at the end if it isn't there. */
+    fun withWhy(text: String, line: String): String {
+        val lines = text.trimEnd().lines().toMutableList()
+        val at = lines.indexOfFirst { it.trim() == WHY_HEADING }
+        if (at < 0) return (if (text.isBlank()) "" else text.trimEnd() + "\n\n") + "$WHY_HEADING\n$line\n"
+        lines.add(at + 1, line)
+        return lines.joinToString("\n") + "\n"
+    }
+
+    /** [entries] with an answer to "why?" in [day]'s entry, and the moods tapped with it. */
+    fun answered(entries: List<JournalEntry>, day: Long, line: String, moods: List<String>, at: Long): List<JournalEntry> {
+        val now = entries.firstOrNull { it.day == day } ?: JournalEntry(day, "")
+        val updated = now.copy(text = withWhy(now.text, line), editedAt = at, moods = now.moods + moods.map { MoodMark(at, it) })
+        return entries.filterNot { it.day == day } + updated
+    }
+
+    /** [entries] with [mood] on [day] taken off if it's there, or added, at [at]. */
+    fun moodToggled(entries: List<JournalEntry>, day: Long, mood: String, at: Long): List<JournalEntry> {
+        val now = entries.firstOrNull { it.day == day } ?: JournalEntry(day, "")
+        val moods = if (now.moods.any { it.mood == mood }) now.moods.filterNot { it.mood == mood } else now.moods + MoodMark(at, mood)
+        val updated = now.copy(moods = moods)
+        return entries.filterNot { it.day == day } + listOfNotNull(updated.takeIf { it.text.isNotBlank() || it.moods.isNotEmpty() })
     }
 
     /** [text] with [prompt] put in at [cursor] in bold, on a line of its own, and where to write next: the line under it. */
@@ -155,9 +197,10 @@ object Journal {
     /** [entries] newest first. */
     fun entries(entries: List<JournalEntry>): List<JournalEntry> = entries.sortedByDescending { it.day }
 
-    /** [entries] with [day]'s set to [text] and [aims]; an entry left empty goes. */
+    /** [entries] with [day]'s set to [text] and [aims], its moods kept; an entry left with nothing goes. */
     fun saved(entries: List<JournalEntry>, day: Long, text: String, aims: List<String>, at: Long): List<JournalEntry> {
+        val moods = entries.firstOrNull { it.day == day }?.moods.orEmpty()
         val rest = entries.filterNot { it.day == day }
-        return if (text.isBlank()) rest else rest + JournalEntry(day, text, aims, at)
+        return if (text.isBlank() && moods.isEmpty()) rest else rest + JournalEntry(day, text, aims, at, moods)
     }
 }

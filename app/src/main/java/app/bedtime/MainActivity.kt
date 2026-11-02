@@ -132,6 +132,9 @@ object Routes {
     const val JOURNAL_PROMPTS = "quicknotes/journal"
     const val WHY = "settings/why"
     const val JOURNAL_TODAY = "notes/journal"
+
+    /** A day's microjournal entry, from the moods in insights. */
+    fun journalDay(day: Long) = "notes/journal/$day"
     /** Settings' own pages, one per place ([app.bedtime.ui.settings.SettingsPlace]), and those under them. */
     const val SETTINGS_HOME = "settings/home"
     const val SETTINGS_LOCK = "settings/lock"
@@ -319,6 +322,7 @@ private fun BedtimeNavigation(pendingRoute: String?, onRouteConsumed: () -> Unit
             top == Routes.QUOTES -> QuotesScreen(onBack = ::pop)
             top == Routes.NOTES -> NotesScreen(onBack = ::pop, onSettings = { push(Routes.QUICK_NOTES) })
             top == Routes.JOURNAL_TODAY -> NotesScreen(onBack = ::pop, onSettings = { push(Routes.QUICK_NOTES) }, openJournal = true)
+            top.startsWith(Routes.JOURNAL_TODAY + "/") -> NotesScreen(onBack = ::pop, onSettings = { push(Routes.QUICK_NOTES) }, journalDay = top.substringAfterLast('/').toLongOrNull())
             top == Routes.QUICK_NOTES -> NoteTargetsScreen(onBack = ::pop, onOpenNotes = { push(Routes.NOTES) }, onOpenJournalPrompts = { push(Routes.JOURNAL_PROMPTS) })
             top == Routes.JOURNAL_PROMPTS -> app.bedtime.ui.notes.JournalPromptsScreen(onBack = ::pop)
             top == Routes.WHY -> app.bedtime.ui.settings.WhySettingsScreen(onBack = ::pop, onOpenAnswers = { push(Routes.note(app.bedtime.data.Why.NOTE_ID)) })

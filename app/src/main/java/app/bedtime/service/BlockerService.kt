@@ -449,12 +449,14 @@ class BlockerService : AccessibilityService() {
     /** "Why am I unlocking my phone right now?", just after an unlock, over whatever it opened to. */
     private fun askWhyAfterUnlock(from: android.content.Context?) {
         val now = System.currentTimeMillis()
-        if (!Why.asks(settings.askOnUnlock, state?.isActive == true) || !Why.due(whyAfterUnlock, now, Why.UNLOCK_AGAIN_MS)) return
+        // A running session's own "ask why" first, with its words; otherwise only if it's always asked.
+        val words = Why.afterUnlock(settings.askOnUnlock, state?.active.orEmpty().map { it.schedule }) ?: return
+        if (!Why.due(whyAfterUnlock, now, Why.UNLOCK_AGAIN_MS)) return
         whyAfterUnlock = now
         if (from != null) {
-            Problems.attempt("asking why") { from.startActivity(WhyActivity.intent(from)) }
+            Problems.attempt("asking why") { from.startActivity(WhyActivity.intent(from, words = words)) }
         } else {
-            handler.postDelayed({ Problems.attempt("asking why") { startActivity(WhyActivity.intent(this)) } }, 700)
+            handler.postDelayed({ Problems.attempt("asking why") { startActivity(WhyActivity.intent(this, words = words)) } }, 700)
         }
     }
 

@@ -412,6 +412,7 @@ private const val SECTION_DOES = "does"
 private const val SECTION_LEAVING = "leaving"
 private const val SECTION_SCREENS = "screens"
 private const val SECTION_AROUND = "around"
+private const val SECTION_WHY = "why"
 
 /** The line "what it does" shows while it is shut. */
 internal fun whatItDoesSummary(draft: Schedule): String = buildList {
@@ -793,6 +794,36 @@ internal fun ScheduleEditContent(
                         modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
                     )
                     if (own != null) ModuleListEditor(own, enabled = editable, onChange = { setOwn(it) })
+                }
+
+                // ---------------------------------------------------------------- ask why
+                FoldSection(
+                    title = "Ask why",
+                    summary = when {
+                        !draft.askWhy -> "Not while it runs"
+                        draft.askWhyWords > 0 -> "After each unlock · at least ${draft.askWhyWords} words"
+                        else -> "After each unlock"
+                    },
+                    open = open == SECTION_WHY,
+                    onToggle = { toggle(SECTION_WHY) },
+                ) {
+                    OptionRow(Icons.Default.Info, "Ask why after each unlock", description = "While it runs: a question, a box to write in and how you feel; going on is a tap", enabled = editable) {
+                        ObsidianToggle(draft.askWhy, { on -> onDraftChange(draft.copy(askWhy = on)) }, enabled = editable)
+                    }
+                    AnimatedVisibility(draft.askWhy) {
+                        SubOptionRow("Words, at least") {
+                            NumberStepper(
+                                draft.askWhyWords,
+                                { v -> onDraftChange(draft.copy(askWhyWords = v)) },
+                                0..300,
+                                step = 5,
+                                enabled = editable,
+                                presets = listOf(0, 10, 20, 30, 50),
+                                title = "words",
+                                format = { if (it == 0) "none" else "$it" },
+                            )
+                        }
+                    }
                 }
 
                 // ---------------------------------------------------------------- how hard to leave

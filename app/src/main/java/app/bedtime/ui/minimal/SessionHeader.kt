@@ -91,6 +91,7 @@ internal fun SessionHeader(
     onClockTap: (() -> Unit)? = null,
     /** A double tap on the clock: its own gesture, or the screen's double tap. */
     onClockDoubleTap: (() -> Unit)? = null,
+    /** A long press on the weather: the weather app, where it's given; otherwise the widget's sheet. */
 ) {
     val hold: (Module) -> (() -> Unit)? = { m -> onHold?.let { { it(m) } } }
     // Long-pressing a widget that has no tap of its own.
@@ -236,7 +237,7 @@ private fun WeatherInline(weather: WeatherView, style: HomeStyle, onWeather: (()
     Row(
         Modifier
             .clip(RoundedCornerShape(10.dp))
-            .tapAndHold("open the weather", onWeather, onWeatherHold)
+            .tapAndHold("today's rain by the hour", onWeather, onWeatherHold)
             .padding(vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -279,7 +280,7 @@ private fun WeatherBeside(weather: WeatherView, style: HomeStyle, onWeather: (()
         Modifier
             .padding(start = 10.dp)
             .clip(RoundedCornerShape(14.dp))
-            .tapAndHold("open the weather", onWeather, onWeatherHold)
+            .tapAndHold("today's rain by the hour", onWeather, onWeatherHold)
             .padding(horizontal = 4.dp, vertical = 2.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -299,7 +300,7 @@ private fun WeatherDetail(weather: WeatherView, style: HomeStyle, onWeather: (()
         Modifier
             .padding(start = start)
             .clip(RoundedCornerShape(10.dp))
-            .tapAndHold("open the weather", onWeather, onWeatherHold)
+            .tapAndHold("today's rain by the hour", onWeather, onWeatherHold)
             .padding(horizontal = 4.dp, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -323,7 +324,7 @@ private fun WeatherWeek(weather: WeatherView, style: HomeStyle, now: LocalDateTi
             .fillMaxWidth()
             .padding(top = 10.dp)
             .clip(RoundedCornerShape(12.dp))
-            .tapAndHold("open the weather", onWeather, onWeatherHold)
+            .tapAndHold("today's rain by the hour", onWeather, onWeatherHold)
             .padding(vertical = 4.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {

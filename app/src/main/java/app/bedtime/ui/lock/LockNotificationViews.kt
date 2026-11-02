@@ -369,7 +369,10 @@ private fun Modifier.pullDown(enabled: Boolean, onPull: () -> Unit): Modifier =
                 // Movement as the finger made it, even if something else has claimed it already.
                 travel += change.position - change.previousPosition
                 val slop = viewConfiguration.touchSlop
-                if (travel.y > slop && travel.y > abs(travel.x)) {
+                // Only once it has gone clearly downward: a swipe aside often starts a little down, and
+                // must stay a swipe, to clear the notification.
+                if (travel.getDistance() < slop) continue
+                if (travel.y > abs(travel.x) * 1.5f) {
                     change.consume()
                     onPull()
                     // The rest of this drag is spent.
@@ -379,7 +382,7 @@ private fun Modifier.pullDown(enabled: Boolean, onPull: () -> Unit): Modifier =
                     } while (rest.changes.any { it.pressed })
                     break
                 }
-                if (abs(travel.x) > slop || travel.y < -slop) break
+                break
             }
         }
     }

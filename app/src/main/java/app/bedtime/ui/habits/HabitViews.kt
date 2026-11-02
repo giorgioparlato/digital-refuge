@@ -74,14 +74,16 @@ fun HabitsWidget(
     /** A long press on a line: the widget's own sheet; without one, it opens the habit as a tap does. */
     onHold: (() -> Unit)? = null,
 ) {
+    // With any count among them, every line keeps room for its figure, so all the days line up.
+    val counts = habits.any { it.kind == HabitKind.COUNT }
     Column(modifier.fillMaxWidth()) {
-        habits.forEach { habit -> HabitLine(habit, marks[habit.id].orEmpty(), today, text, faint, habit.tint(accent), { onTap(habit) }, { onOpen(habit) }, onHold) }
+        habits.forEach { habit -> HabitLine(habit, marks[habit.id].orEmpty(), today, text, faint, habit.tint(accent), { onTap(habit) }, { onOpen(habit) }, onHold, counts) }
     }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun HabitLine(habit: Habit, marks: Map<Long, Int>, today: Long, text: Color, faint: Color, accent: Color, onTap: () -> Unit, onOpen: () -> Unit, onHold: (() -> Unit)?) {
+private fun HabitLine(habit: Habit, marks: Map<Long, Int>, today: Long, text: Color, faint: Color, accent: Color, onTap: () -> Unit, onOpen: () -> Unit, onHold: (() -> Unit)?, roomForCount: Boolean) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -102,7 +104,9 @@ private fun HabitLine(habit: Habit, marks: Map<Long, Int>, today: Long, text: Co
             ) { HabitDot(Habits.day(habit, marks, day), isToday, text, accent, 11) }
         }
         if (habit.kind == HabitKind.COUNT) {
-            Text("${marks[today] ?: 0}/${habit.target}", style = MaterialTheme.typography.labelSmall, color = faint, modifier = Modifier.padding(start = 4.dp).width(34.dp))
+            Text("${marks[today] ?: 0}/${habit.target}", style = MaterialTheme.typography.labelSmall, color = faint, maxLines = 1, modifier = Modifier.padding(start = 4.dp).width(34.dp))
+        } else if (roomForCount) {
+            Spacer(Modifier.padding(start = 4.dp).width(34.dp))
         }
     }
 }

@@ -56,6 +56,8 @@ class WidgetHandlers(
     val open: (String) -> Unit = {},
     /** A habit in the habits widget, or not. */
     val habitShown: (habitId: String, shown: Boolean) -> Unit = { _, _ -> },
+    /** The app behind the widget, such as the weather app, when there is one. */
+    val openApp: (() -> Unit)? = null,
 )
 
 /**
@@ -100,6 +102,7 @@ internal fun WidgetSheetContent(
             .padding(vertical = 18.dp),
     ) {
         Text(module.label, style = MaterialTheme.typography.titleMedium, color = p.text, modifier = Modifier.padding(horizontal = 22.dp).padding(bottom = 6.dp))
+        handlers.openApp?.let { open -> Action(Icons.AutoMirrored.Filled.KeyboardArrowRight, "Open the ${module.label.lowercase()} app", p) { open(); onDone() } }
         // The same options, in the same order, as on the Widgets page; hints are left to that page.
         val options = WidgetOptions.of(module, style, screen, handlers.change, notes, habits, handlers.habitShown)
         Column(Modifier.heightIn(max = 460.dp).verticalScroll(rememberScrollState())) {

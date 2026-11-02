@@ -22,6 +22,8 @@ data class PauseRule(
     val textLength: Int = 40,
     val textSource: TextSource = TextSource.WORDS,
     val growth: Int = 0,
+    /** With [kind] asking why: at least this many words. */
+    val askWords: Int = 0,
 ) {
     /** The wait for the [opens]th open today (1 = the first), grown by [growth] per open before it, at most 8×. */
     fun secondsFor(opens: Int): Int = if (growth <= 0) seconds else Escalation.waitSeconds(seconds, (opens - 1).coerceAtLeast(0), 1 + growth / 100f)
@@ -121,6 +123,7 @@ object Limits {
             textLength = strictest.rules.pauseTextLength,
             textSource = strictest.rules.pauseTextSource,
             growth = strictest.rules.pauseGrowth,
+            askWords = strictest.rules.askWords,
         )
     }
 

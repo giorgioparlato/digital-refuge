@@ -13,6 +13,19 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            79,
+            "0.9.33",
+            listOf(
+                "Your answers to \"why\" go into that day's microjournal entry, the newest on top.",
+                "Moods are back, yours to change: tap how you feel when answering why, or in the microjournal. Insights shows them on a calendar.",
+                "Ask why can need a few words at least, in limits and in schedules; whether a session asks is now in each schedule's settings.",
+                "Tap the weather for today's rain hour by hour; hold it for its options and the weather app.",
+                "The player shows where it's playing, a tap to switch, and the app's own like button, such as Spotify's.",
+                "Your most distracted hours, in your week and under a day's hours, for the day and for what you compare it with.",
+                "Count habits line up with the others, and lock-screen notifications swipe away without opening.",
+            ),
+        ),
+        ChangelogEntry(
             78,
             "0.9.32",
             listOf(

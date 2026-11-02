@@ -181,6 +181,7 @@ internal class LimitTracker(
                             typing = if (pause.kind == PauseKind.TYPING) pause.textLengthFor(opens) else 0,
                             source = pause.textSource,
                             ask = pause.kind == PauseKind.ASK,
+                            askWords = pause.askWords,
                         ),
                     )
                     return true

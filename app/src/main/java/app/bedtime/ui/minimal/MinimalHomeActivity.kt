@@ -242,6 +242,7 @@ private fun MinimalHomeScreen(
     var quickNote by rememberSaveable { mutableStateOf(false) }
     /** The word being looked up, or null with the dictionary closed. */
     var lookingUp by rememberSaveable { mutableStateOf<String?>(null) }
+    var rainOpen by remember { mutableStateOf(false) }
     var hoursDetail by remember { mutableStateOf(false) }
     var appsDetail by remember { mutableStateOf(false) }
     val (todayHours, useToday) = rememberUseToday()
@@ -633,9 +634,13 @@ private fun MinimalHomeScreen(
             // The dots open today by the hour; the other looks, today by app.
             onHours = { if (style.useWidgetFor(Screen.HOME).look == app.bedtime.data.UseLook.DOTS) hoursDetail = true else appsDetail = true },
             weather = rememberWeather(style, now),
-            onWeather = breezy?.let { app -> { AppCatalog.launch(context, app) } },
+            // A tap: today's rain, hour by hour; held, the widget's options and the weather app.
+            onWeather = { rainOpen = true },
             onNextQuote = { quoteOffset++ },
         )
+    }
+    if (rainOpen) {
+        RainDialog(style, onDismiss = { rainOpen = false }, onOpenApp = breezy?.let { app -> { rainOpen = false; AppCatalog.launch(context, app) } })
     }
     week?.let {
         CalendarWeekDialog(it, style, onDismiss = { week = null }, onOpenEvent = { event ->
@@ -678,6 +683,7 @@ private fun MinimalHomeScreen(
                 },
                 open = { route -> runCatching { context.startActivity(app.bedtime.MainActivity.intent(context, route)) } },
                 habitShown = { id, shown -> scope.launch { repo.updateSettings { s -> s.copy(habits = s.habits.map { if (it.id == id) it.withShownOn(Screen.HOME, shown) else it }) } } },
+                openApp = breezy?.takeIf { module == Module.WEATHER }?.let { app -> { AppCatalog.launch(context, app) } },
             ),
             onDismiss = { holding = null },
             notes = allNotes,
@@ -817,7 +823,7 @@ internal fun MinimalHomeContent(
     onCalendar: (() -> Unit)? = null,
     /** The weather beside the clock, when it's on. */
     weather: WeatherView? = null,
-    /** Opens the weather app, from a tap on the weather. */
+    /** Today's rain, from a tap on the weather. */
     onWeather: (() -> Unit)? = null,
     /** Opens every available app with search, from a swipe up or the handle at the foot. */
     onOpenDrawer: () -> Unit = {},

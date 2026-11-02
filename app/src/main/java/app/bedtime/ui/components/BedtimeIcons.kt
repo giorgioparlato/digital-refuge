@@ -85,6 +85,18 @@ object BedtimeIcons {
         }
     }
 
+    val Phone: ImageVector by lazy {
+        icon("Phone") {
+            path("M8,2 H16 A2,2 0 0,1 18,4 V20 A2,2 0 0,1 16,22 H8 A2,2 0 0,1 6,20 V4 A2,2 0 0,1 8,2 Z M8,5 V18 H16 V5 Z", evenOdd = true)
+        }
+    }
+
+    val Speaker: ImageVector by lazy {
+        icon("Speaker") {
+            path("M7,2 H17 A2,2 0 0,1 19,4 V20 A2,2 0 0,1 17,22 H7 A2,2 0 0,1 5,20 V4 A2,2 0 0,1 7,2 Z M12,10 A4,4 0 1,0 12,18 A4,4 0 1,0 12,10 Z M12,4.5 A1.5,1.5 0 1,0 12,7.5 A1.5,1.5 0 1,0 12,4.5 Z", evenOdd = true)
+        }
+    }
+
     val Book: ImageVector by lazy {
         icon("Book") {
             path("M3,5 H9 A3,3 0 0,1 11.2,6 V20 A2.5,2.5 0 0,0 9,19 H3 Z M21,5 H15 A3,3 0 0,0 12.8,6 V20 A2.5,2.5 0 0,1 15,19 H21 Z")

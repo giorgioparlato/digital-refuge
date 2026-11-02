@@ -45,7 +45,15 @@ data class UseTotals(
 )
 
 /** The period on show against its comparison: each figure then, the slots then for the faint outlines, and each app then. */
-data class UseComparison(val total: Long, val distracting: Long, val unlocks: Int?, val slots: List<Long>, val apps: Map<String, Long>)
+data class UseComparison(
+    val total: Long,
+    val distracting: Long,
+    val unlocks: Int?,
+    val slots: List<Long>,
+    val apps: Map<String, Long>,
+    /** A day's comparison only: seconds in distracting apps by hour then, for its most distracted hours. */
+    val distracted: List<Long> = emptyList(),
+)
 
 object UsePeriods {
     /** The first day of the [period] that holds [date]. */
@@ -137,7 +145,31 @@ object UsePeriods {
         val slotCount = compared.maxOf { it.second.slots.size }
         val slots = (0 until slotCount).map { i -> compared.sumOf { it.second.slots.getOrNull(i)?.first ?: 0L } / n }
         val apps = parts.flatMap { it.apps.keys }.toSet().associateWith { pkg -> parts.sumOf { it.apps[pkg] ?: 0L } / n }
-        return UseComparison(parts.sumOf { it.total } / n, parts.sumOf { it.distracting } / n, unlocks, slots, apps)
+        val distracted = if (byHour) (0 until slotCount).map { i -> compared.sumOf { it.second.slots.getOrNull(i)?.second ?: 0L } / n } else emptyList()
+        return UseComparison(parts.sumOf { it.total } / n, parts.sumOf { it.distracting } / n, unlocks, slots, apps, distracted)
+    }
+
+    /**
+     * Seconds in distracting apps by hour on your average day of [before]'s year, before it: from the days
+     * still kept, as the months keep no hours. Empty without any.
+     */
+    fun yearHours(days: Map<Long, UseDay>, before: LocalDate): List<Long> {
+        val kept = days.values.filter { it.total > 0 && it.day < before.toEpochDay() && LocalDate.ofEpochDay(it.day).year == before.year }
+        if (kept.isEmpty()) return emptyList()
+        return (0 until 24).map { h -> kept.sumOf { it.distracting[h] ?: 0L } / kept.size }
+    }
+
+    /** At least this many seconds in an hour to count among the most distracted. */
+    const val DISTRACTED_SECONDS = 60L
+
+    /** The [count] hours with most time in distracting apps among [byHour], in the order of the day. */
+    fun mostDistracted(byHour: List<Long>, count: Int = 2): List<Int> =
+        byHour.withIndex().filter { it.value >= DISTRACTED_SECONDS }.sortedByDescending { it.value }.take(count).map { it.index }.sorted()
+
+    /** "9–10 and 20–21". */
+    fun hourWords(hours: List<Int>): String {
+        val spans = hours.map { "$it–${(it + 1) % 24}" }
+        return if (spans.size <= 1) spans.joinToString() else spans.dropLast(1).joinToString(", ") + " and " + spans.last()
     }
 
     /**

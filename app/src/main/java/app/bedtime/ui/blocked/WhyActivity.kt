@@ -13,6 +13,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -60,7 +62,7 @@ import java.time.LocalDateTime
 
 /**
  * "Why am I unlocking my phone right now?", or another question in turn, after an unlock. Write it
- * down if you like, kept in its own note; then put it down, or go on. Back goes on too: it's a
+ * down and say how you feel if you like, kept in today's microjournal entry; then put it down, or go on. Back goes on too: it's a
  * pause, not a wall.
  */
 class WhyActivity : ComponentActivity() {
@@ -78,12 +80,14 @@ class WhyActivity : ComponentActivity() {
                     val question = remember { Why.ask(Why.questions(settings)) }
                     WhyScreen(
                         question = question,
-                        onPutDown = { words ->
-                            keep(question, words, wentOn = false)
+                        moods = Why.moods(settings),
+                        minWords = intent.getIntExtra(EXTRA_WORDS, 0),
+                        onPutDown = { words, moods ->
+                            keep(question, words, moods, wentOn = false)
                             putDown(pkg)
                         },
-                        onGoOn = { words ->
-                            keep(question, words, wentOn = true)
+                        onGoOn = { words, moods ->
+                            keep(question, words, moods, wentOn = true)
                             finish()
                         },
                     )
@@ -92,12 +96,12 @@ class WhyActivity : ComponentActivity() {
         }
     }
 
-    /** The answer, in its note, when there's anything to it; written even as the screen goes. */
-    private fun keep(question: String, words: String, wentOn: Boolean) {
-        if (words.isBlank()) return
+    /** The answer, in today's microjournal entry, when there's anything to it; written even as the screen goes. */
+    private fun keep(question: String, words: String, moods: List<String>, wentOn: Boolean) {
+        if (words.isBlank() && moods.isEmpty()) return
         val repo = Repository.get(applicationContext)
-        val line = Why.line(LocalDateTime.now(), "unlocking", question, words, wentOn)
-        lifecycleScope.launch { withContext(NonCancellable) { repo.addWhy(line) } }
+        val line = Why.line(LocalDateTime.now(), "unlocking", question, words, wentOn, moods)
+        lifecycleScope.launch { withContext(NonCancellable) { repo.addWhy(line, moods) } }
     }
 
     /** Not now: after an unlock the phone locks again; before an app, home instead. */
@@ -112,28 +116,36 @@ class WhyActivity : ComponentActivity() {
 
     companion object {
         private const val EXTRA_APP = "app"
+        private const val EXTRA_WORDS = "words"
 
-        /** The question after an unlock, or before [app] opens. */
-        fun intent(context: Context, app: String? = null): Intent =
+        /** The question after an unlock, or before [app] opens; with [words], at least that many before going on. */
+        fun intent(context: Context, app: String? = null, words: Int = 0): Intent =
             Intent(context, WhyActivity::class.java)
                 .apply { app?.let { putExtra(EXTRA_APP, it) } }
+                .putExtra(EXTRA_WORDS, words)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
     }
 }
 
 /**
- * The question and a box to write in: then put it down, or go on. [about] sits above the question
- * ("about to open Instagram"), when there's an app to name.
+ * The question and a box to write in, and how you feel ([moods]), if you like: then put it down, or go
+ * on. [about] sits above the question ("about to open Instagram"), when there's an app to name. With
+ * [minWords], going on waits for that many words, typed here: pasting doesn't count.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun WhyScreen(
     question: String,
-    onPutDown: (String) -> Unit,
-    onGoOn: (String) -> Unit,
+    onPutDown: (String, List<String>) -> Unit,
+    onGoOn: (String, List<String>) -> Unit,
     about: String? = null,
+    moods: List<String> = emptyList(),
+    minWords: Int = 0,
 ) {
     val c = Obsidian.colors
     var words by rememberSaveable { mutableStateOf("") }
+    var picked by rememberSaveable { mutableStateOf(emptyList<String>()) }
+    val written = Why.words(words)
     Column(
         Modifier
             .fillMaxSize()
@@ -150,38 +162,77 @@ internal fun WhyScreen(
             Spacer(Modifier.height(10.dp))
         }
         Text(question, fontSize = 26.sp, color = c.textNormal, textAlign = TextAlign.Center)
-        Spacer(Modifier.height(24.dp))
-        // Room to write it out: as much as you like, or nothing.
-        BasicTextField(
-            value = words,
-            onValueChange = { words = it },
-            textStyle = MaterialTheme.typography.bodyLarge.copy(color = c.textNormal),
-            cursorBrush = SolidColor(c.accent),
-            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None),
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 180.dp)
-                .clip(RoundedCornerShape(14.dp))
-                .background(c.bgSecondary)
-                .border(1.dp, c.border, RoundedCornerShape(14.dp))
-                .padding(16.dp),
-            decorationBox = { field ->
-                androidx.compose.foundation.layout.Box {
-                    if (words.isEmpty()) Text("Write it down, if you want…", style = MaterialTheme.typography.bodyLarge, color = c.textFaint)
-                    field()
-                }
-            },
-        )
+        if (moods.isNotEmpty()) {
+            Spacer(Modifier.height(18.dp))
+            MoodChips(moods, picked) { mood -> picked = if (mood in picked) picked - mood else picked + mood }
+        }
+        Spacer(Modifier.height(20.dp))
+        // Room to write it out: as much as you like, or nothing; with a minimum, typed rather than pasted.
+        androidx.compose.runtime.CompositionLocalProvider(
+            androidx.compose.ui.platform.LocalTextToolbar provides if (minWords > 0) app.bedtime.unlock.NoPasting else androidx.compose.ui.platform.LocalTextToolbar.current,
+        ) {
+            BasicTextField(
+                value = words,
+                onValueChange = { if (minWords <= 0 || Why.typed(words, it)) words = it },
+                textStyle = MaterialTheme.typography.bodyLarge.copy(color = c.textNormal),
+                cursorBrush = SolidColor(c.accent),
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 180.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(c.bgSecondary)
+                    .border(1.dp, c.border, RoundedCornerShape(14.dp))
+                    .padding(16.dp),
+                decorationBox = { field ->
+                    androidx.compose.foundation.layout.Box {
+                        if (words.isEmpty()) Text(if (minWords > 0) "At least $minWords words…" else "Write it down, if you want…", style = MaterialTheme.typography.bodyLarge, color = c.textFaint)
+                        field()
+                    }
+                },
+            )
+        }
+        if (minWords > 0) {
+            Text(
+                if (written >= minWords) "$written words · enough" else "$written of $minWords words",
+                style = MaterialTheme.typography.labelMedium,
+                color = if (written >= minWords) c.accentText else c.textFaint,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+        }
         Spacer(Modifier.height(32.dp))
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(
                 "Not now",
                 style = MaterialTheme.typography.labelLarge,
                 color = c.textMuted,
-                modifier = Modifier.clip(RoundedCornerShape(50)).clickable { onPutDown(words) }.padding(horizontal = 16.dp, vertical = 12.dp),
+                modifier = Modifier.clip(RoundedCornerShape(50)).clickable { onPutDown(words, picked) }.padding(horizontal = 16.dp, vertical = 12.dp),
             )
             Spacer(Modifier.weight(1f))
-            SoftPillButton("Yes, go on", onClick = { onGoOn(words) })
+            SoftPillButton("Yes, go on", onClick = { onGoOn(words, picked) }, enabled = written >= minWords)
+        }
+    }
+}
+
+/** Moods to tap, one or several: the ones picked filled. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun MoodChips(moods: List<String>, picked: List<String>, onTap: (String) -> Unit) {
+    val c = Obsidian.colors
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        moods.forEach { mood ->
+            val on = mood in picked
+            Text(
+                mood,
+                style = MaterialTheme.typography.labelLarge,
+                color = if (on) c.bgPrimary else c.textMuted,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50))
+                    .background(if (on) c.accent else androidx.compose.ui.graphics.Color.Transparent)
+                    .border(1.dp, if (on) c.accent else c.border, RoundedCornerShape(50))
+                    .clickable { onTap(mood) }
+                    .padding(horizontal = 14.dp, vertical = 7.dp),
+            )
         }
     }
 }

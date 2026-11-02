@@ -146,6 +146,19 @@ object Weather {
         )
     }
 
+    /**
+     * The chance of rain hour by hour, from the hour [now] is in to the end of the day; late in the
+     * evening, on into the night, so there are always a few hours to see. Each with its hour of day.
+     */
+    fun rainByHour(hours: List<RainHour>, now: Long, zone: java.time.ZoneId): List<Pair<Int, Int>> {
+        val start = java.time.Instant.ofEpochMilli(now).atZone(zone).withMinute(0).withSecond(0).withNano(0)
+        val endOfDay = start.toLocalDate().plusDays(1).atStartOfDay(zone)
+        val end = maxOf(endOfDay, start.plusHours(6))
+        return hours.filter { it.at >= start.toInstant().toEpochMilli() && it.at < end.toInstant().toEpochMilli() }
+            .sortedBy { it.at }
+            .map { java.time.Instant.ofEpochMilli(it.at).atZone(zone).hour to it.chance }
+    }
+
     /** The sky for an OpenWeatherMap condition code, as Gadgetbridge passes them on; else read from its words. */
     fun icon(code: Int?, words: String? = null): WeatherIcon? = when (code) {
         in 200..299 -> WeatherIcon.STORM

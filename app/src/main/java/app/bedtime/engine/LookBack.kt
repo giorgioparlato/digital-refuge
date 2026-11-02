@@ -5,6 +5,7 @@ import app.bedtime.data.HabitDay
 import app.bedtime.data.Habits
 import app.bedtime.data.SessionLog
 import app.bedtime.data.UseDay
+import app.bedtime.data.UsePeriods
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -31,6 +32,8 @@ data class LookBack(
     /** Days kept across your habits, of the days there were to keep. */
     val habitDaysKept: Int,
     val habitDays: Int,
+    /** The hours of the day with most time in distracting apps, over the week. */
+    val distractedHours: List<Int> = emptyList(),
 ) {
     val weekEnd: LocalDate get() = weekStart.plusDays(6)
 }
@@ -94,6 +97,7 @@ object LookBacks {
             topApp = top,
             habitDaysKept = keptDays,
             habitDays = habits.size * 7,
+            distractedHours = UsePeriods.mostDistracted((0 until 24).map { h -> use.sumOf { it.distracting[h] ?: 0L } }),
         )
     }
 }

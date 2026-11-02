@@ -120,14 +120,13 @@ class Repository private constructor(context: Context) {
 
     suspend fun remindNote(id: String, at: Long?) = update(NOTES, notesSerializer, emptyList()) { NoteShelf.reminded(it, id, at) }
 
-    /** An answer to "why?", added to its own note, which starts pinned at the top. */
-    suspend fun addWhy(line: String, at: Long = System.currentTimeMillis()) = update(NOTES, notesSerializer, emptyList()) { notes ->
-        if (notes.none { it.id == Why.NOTE_ID }) {
-            listOf(Note(Why.NOTE_ID, "${Why.NOTE_TITLE}\n$line\n", at, pinned = true)) + notes
-        } else {
-            notes.map { if (it.id == Why.NOTE_ID) it.copy(text = Notes.appended(it.text, line), editedAt = at) else it }
-        }
-    }
+    /** An answer to "why?", in today's microjournal entry under its heading, newest first, with the moods tapped. */
+    suspend fun addWhy(line: String, moods: List<String> = emptyList(), at: Long = System.currentTimeMillis()) =
+        update(JOURNAL, journalSerializer, emptyList()) { Journal.answered(it, java.time.LocalDate.now().toEpochDay(), line, moods, at) }
+
+    /** A mood tapped in the microjournal, or tapped off again. */
+    suspend fun toggleMood(day: Long, mood: String, at: Long = System.currentTimeMillis()) =
+        update(JOURNAL, journalSerializer, emptyList()) { Journal.moodToggled(it, day, mood, at) }
 
     /** Notes deleted in the last month, newest first. */
     val trash: Flow<List<TrashedNote>> = observe(NOTES_TRASH, trashSerializer, emptyList()).map { NoteShelf.keptTrash(it, System.currentTimeMillis()).sortedByDescending { t -> t.deletedAt } }

@@ -109,4 +109,28 @@ class UsePeriodsTest {
         // A year back comes last, after the averages and a day you pick.
         assertEquals(Versus.YEAR, Versus.options(UsePeriod.DAY).last())
     }
+
+    @Test
+    fun theMostDistractedHours() {
+        val byHour = List(24) { 0L }.toMutableList().apply { this[9] = 1_200L; this[20] = 2_400L; this[13] = 600L; this[3] = 30L }
+        // The two with most, in the order of the day; a few seconds don't count.
+        assertEquals(listOf(9, 20), UsePeriods.mostDistracted(byHour))
+        assertEquals(emptyList<Int>(), UsePeriods.mostDistracted(List(24) { 30L }))
+        assertEquals("9–10 and 20–21", UsePeriods.hourWords(listOf(9, 20)))
+        assertEquals("23–0", UsePeriods.hourWords(listOf(23)))
+    }
+
+    @Test
+    fun theComparisonsDistractedHours() {
+        val days = mapOf(
+            day(wed.minusWeeks(1), mapOf(21 to 900L), distracting = mapOf(21 to 900L)),
+            day(wed.minusWeeks(2), mapOf(21 to 300L, 8 to 600L), distracting = mapOf(21 to 300L, 8 to 600L)),
+        )
+        val usual = UsePeriods.compare(days, UsePeriod.DAY, wed, Versus.USUAL, today = wed, nowHour = 12)!!
+        assertEquals(600L, usual.distracted[21])
+        assertEquals(listOf(8, 21), UsePeriods.mostDistracted(usual.distracted))
+        // The average day this year comes from the days kept before it.
+        assertEquals(300L, UsePeriods.yearHours(days, wed)[8])
+        assertEquals(emptyList<Long>(), UsePeriods.yearHours(days, LocalDate.of(2026, 1, 1)))
+    }
 }

@@ -59,6 +59,9 @@ data class Schedule(
     val pauseEnabled: Boolean = true,
     /** Allow editing right after an early unlock. Off keeps settings shut until the session would have ended. */
     val editAfterUnlock: Boolean = false,
+    /** While this runs, "why am i unlocking my phone right now?" after each unlock; with [askWhyWords], at least that many words. */
+    val askWhy: Boolean = false,
+    val askWhyWords: Int = 0,
     /** How long each of those breaks lasts, in minutes (at least 1). */
     val breakMinutes: Int = 1,
     /** Hours outside which this can't be changed at all; null means it can be changed any time. */
@@ -644,6 +647,9 @@ data class AppSettings(
     /** The questions asked in turn after unlocking, and before a limit's apps; null keeps the suggested ones ([Why]). */
     val whyQuestions: List<String>? = null,
     val whyAppQuestions: List<String>? = null,
+    /** Moods to tap when answering and in the microjournal, for the mood tracker; null keeps the suggested ones. */
+    val moodsOn: Boolean = true,
+    val moodTags: List<String>? = null,
 ) {
     /** Where quick notes and the search can add: the to-do note first, then your files. */
     val quickTargets: List<NoteTarget> get() = listOf(Notes.TODO) + noteTargets
@@ -712,6 +718,8 @@ data class LimitRules(
     val pauseTextSource: TextSource = TextSource.WORDS,
     /** Each open today makes the pause this much longer than the one before, in percent; 0 keeps it the same. */
     val pauseGrowth: Int = 0,
+    /** With the pause asking why: at least this many words before the app opens; 0 for none. */
+    val askWords: Int = 0,
     /** After "open anyway", how long you can be away and come back without the pause; 0 = every open. */
     val graceMinutes: Int = 2,
     /** Whether "open anyway" on one of the apps lets you into all of them, rather than only that one. */
