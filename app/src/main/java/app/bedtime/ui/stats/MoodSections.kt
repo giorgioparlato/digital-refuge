@@ -25,6 +25,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -60,7 +61,17 @@ private fun colourOf(mood: String, moods: List<String>): Color = MoodColours.get
  * microjournal entry; then how often each came up, and when in the day.
  */
 @Composable
-internal fun MoodStats(entries: List<JournalEntry>, moods: List<String>, today: LocalDate, onDay: (LocalDate) -> Unit) {
+internal fun MoodStats(
+    entries: List<JournalEntry>,
+    moods: List<String>,
+    today: LocalDate,
+    onDay: (LocalDate) -> Unit,
+    onMoods: () -> Unit = {},
+    /** Phone use by day, habits and their marks, for the patterns: each set beside the moods. */
+    days: Map<Long, app.bedtime.data.UseDay> = emptyMap(),
+    habits: List<app.bedtime.data.Habit> = emptyList(),
+    habitMarks: Map<String, Map<Long, Int>> = emptyMap(),
+) {
     val c = Obsidian.colors
     val zone = ZoneId.systemDefault()
     var monthDay by rememberSaveable { mutableLongStateOf(today.withDayOfMonth(1).toEpochDay()) }
@@ -125,13 +136,20 @@ internal fun MoodStats(entries: List<JournalEntry>, moods: List<String>, today: 
             }
         }
     }
-    SectionCard(title = "How often", subtitle = "Each mood this month, and when in the day it came up most") {
+    var chosen by rememberSaveable { mutableStateOf<String?>(null) }
+    SectionCard(title = "How often", subtitle = "Each mood this month, and when in the day it came up most. Tap one for its lines") {
         val counts = Moods.counts(marks)
         if (counts.isEmpty()) {
             Text("No moods yet this month: tap how you feel when answering “why”, or in the microjournal.", style = MaterialTheme.typography.bodyMedium, color = c.textMuted)
         }
         counts.forEach { (mood, count) ->
-            Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
+                    .background(if (mood == chosen) c.bgSecondary else Color.Transparent)
+                    .clickable(onClickLabel = "this mood's lines") { chosen = if (mood == chosen) null else mood }
+                    .padding(vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Box(Modifier.size(12.dp).clip(CircleShape).background(colourOf(mood, moods)))
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
@@ -141,5 +159,119 @@ internal fun MoodStats(entries: List<JournalEntry>, moods: List<String>, today: 
                 Text(if (count == 1) "once" else "$count times", style = MaterialTheme.typography.labelLarge, color = c.textMuted)
             }
         }
+        Text(
+            "Your moods ›",
+            style = MaterialTheme.typography.labelLarge,
+            color = c.accentText,
+            modifier = Modifier.padding(top = 8.dp).clip(RoundedCornerShape(8.dp)).clickable(onClick = onMoods).padding(vertical = 6.dp),
+        )
+    }
+    // Sixty days or so back, for what needs more than a month to say anything.
+    val zone8 = ZoneId.systemDefault()
+    val recent = Moods.between(entries, today.minusWeeks(8), today, zone8)
+    chosen?.let { mood -> MoodDetail(mood, entries, month, recent, days, zone8) { chosen = null } }
+    MoodPatterns(recent, days, habits, habitMarks, zone8)
+
+}
+
+/** One mood: when in the week it comes, what "why?" saw come after it, the phone on its days, and its lines this month. */
+@Composable
+private fun MoodDetail(
+    mood: String,
+    entries: List<JournalEntry>,
+    month: YearMonth,
+    recent: List<app.bedtime.data.MoodMark>,
+    days: Map<Long, app.bedtime.data.UseDay>,
+    zone: ZoneId,
+    onClose: () -> Unit,
+) {
+    val c = Obsidian.colors
+    SectionCard(title = mood, subtitle = "When in the week, over the last eight weeks; then its lines this month") {
+        // Weekdays across, the parts of the day down: the more, the stronger.
+        val grid = Moods.grid(recent, mood, zone)
+        val most = grid.values.maxOrNull() ?: 0
+        val parts = listOf("mornings", "afternoons", "evenings", "nights")
+        Row(Modifier.fillMaxWidth()) {
+            Spacer(Modifier.width(76.dp))
+            DayOfWeek.entries.forEach { d ->
+                Text(d.getDisplayName(TextStyle.NARROW, Locale.getDefault()), style = MaterialTheme.typography.labelSmall, color = c.textFaint, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
+            }
+        }
+        parts.forEach { part ->
+            Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(part, style = MaterialTheme.typography.labelSmall, color = c.textFaint, modifier = Modifier.width(76.dp))
+                DayOfWeek.entries.forEach { d ->
+                    val n = grid[d to part] ?: 0
+                    Box(Modifier.weight(1f).padding(2.dp).height(18.dp).clip(RoundedCornerShape(4.dp)).background(if (n == 0) c.bgSecondary else c.accent.copy(alpha = 0.25f + 0.75f * n / most)))
+                }
+            }
+        }
+        Spacer(Modifier.height(10.dp))
+        Moods.next(recent, mood)?.let { next ->
+            PatternLine(
+                "When “why?” asked",
+                "put it down ${next.putDown} of ${next.of} times" + (next.app?.let { " · mostly opened $it" } ?: ""),
+            )
+        }
+        Moods.useOnDays(recent, days, mood, zone)?.let { (with, without) ->
+            PatternLine("In distracting apps", "${app.bedtime.data.UseWords.short(with)} on its days, against ${app.bedtime.data.UseWords.short(without)} on others")
+        }
+        val lines = Moods.linesWith(entries, month, mood)
+        if (lines.isEmpty()) Text("No lines with it this month.", style = MaterialTheme.typography.bodySmall, color = c.textFaint, modifier = Modifier.padding(top = 6.dp))
+        var all by rememberSaveable(mood) { mutableStateOf(false) }
+        (if (all) lines else lines.take(12)).forEach { (day, line) ->
+            Row(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                Text(day.format(DateTimeFormatter.ofPattern("d MMM", Locale.getDefault())), style = MaterialTheme.typography.labelSmall, color = c.textFaint, modifier = Modifier.width(52.dp).padding(top = 2.dp))
+                app.bedtime.ui.components.VerbatimText(line, style = MaterialTheme.typography.bodySmall, color = c.textMuted)
+            }
+        }
+        if (lines.size > 12) {
+            Text(
+                if (all) "Fewer" else "All ${lines.size}",
+                style = MaterialTheme.typography.labelLarge,
+                color = c.accentText,
+                modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { all = !all }.padding(vertical = 6.dp),
+            )
+        }
+        Text("Close", style = MaterialTheme.typography.labelLarge, color = c.textMuted, modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onClose).padding(vertical = 6.dp))
+    }
+}
+
+/**
+ * The moods beside the rest of the last eight weeks: where they're tapped, mornings after a late night
+ * on the phone, the days you kept a habit, and how a stretch on the phone left you. Each only once
+ * there's enough to say it; and only "on days you…", never why.
+ */
+@Composable
+private fun MoodPatterns(
+    recent: List<app.bedtime.data.MoodMark>,
+    days: Map<Long, app.bedtime.data.UseDay>,
+    habits: List<app.bedtime.data.Habit>,
+    habitMarks: Map<String, Map<Long, Int>>,
+    zone: ZoneId,
+) {
+    val c = Obsidian.colors
+    val (atUnlock, own) = Moods.whereFrom(recent)
+    val nights = Moods.afterLateNights(recent, days, zone).take(2)
+    val kept = Moods.withHabits(recent, habits, habitMarks, zone).take(3)
+    val after = Moods.afterwards(recent).take(3)
+    SectionCard(title = "Patterns", subtitle = "The last eight weeks, once there's enough to say something") {
+        if (atUnlock.isEmpty() && own.isEmpty() && nights.isEmpty() && kept.isEmpty() && after.isEmpty()) {
+            Text("Nothing yet: these show after a few weeks of moods.", style = MaterialTheme.typography.bodyMedium, color = c.textMuted)
+        }
+        if (atUnlock.isNotEmpty()) PatternLine("When “why?” asks after an unlock", atUnlock.joinToString(", "))
+        if (own.isNotEmpty()) PatternLine("In what you write yourself", own.joinToString(", "))
+        nights.forEach { o -> PatternLine("Mornings after a late night on the phone", "${o.mood} ${o.with} of ${o.days}, against ${o.otherWith} of ${o.others} after the others") }
+        kept.forEach { (habit, o) -> PatternLine("Days you kept “${habit.name}”", "${o.mood} ${o.with} of ${o.days}, against ${o.otherWith} of ${o.others} on the others") }
+        if (after.isNotEmpty()) PatternLine("After a stretch on the phone", after.joinToString(", ") { (mood, n) -> if (n == 1) mood else "$mood ($n)" })
+    }
+}
+
+@Composable
+private fun PatternLine(what: String, how: String) {
+    val c = Obsidian.colors
+    Column(Modifier.fillMaxWidth().padding(vertical = 5.dp)) {
+        Text(what, style = MaterialTheme.typography.bodySmall, color = c.textFaint)
+        Text(how, style = MaterialTheme.typography.bodyMedium, color = c.textNormal)
     }
 }

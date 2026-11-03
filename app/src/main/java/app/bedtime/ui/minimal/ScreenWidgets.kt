@@ -5,6 +5,8 @@ import app.bedtime.data.Notes
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import app.bedtime.data.Habit
@@ -94,4 +96,29 @@ internal fun habitsSlot(
             onHold = onHold,
         )
     }
+}
+
+/**
+ * Today's microjournal as one quiet line: how many lines and the latest's time, never what they say,
+ * so it can sit on the lock screen too. A tap to write; held, its sheet.
+ */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@Composable
+internal fun JournalWidget(style: HomeStyle, entry: app.bedtime.data.JournalEntry?, onTap: () -> Unit, onHold: (() -> Unit)?) {
+    val p = style.palette()
+    val (count, last) = app.bedtime.data.Journal.glance(entry)
+    app.bedtime.ui.components.Text(
+        when (count) {
+            0 -> "microjournal · a line for today ›"
+            1 -> "microjournal · 1 line today, at $last ›"
+            else -> "microjournal · $count lines today · last $last ›"
+        },
+        style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
+        color = p.muted,
+        modifier = Modifier
+            .padding(top = 12.dp)
+            .clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+            .combinedClickable(onClickLabel = "write in the microjournal", onLongClick = onHold, onClick = onTap)
+            .padding(vertical = 6.dp),
+    )
 }

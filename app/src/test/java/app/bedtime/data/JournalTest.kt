@@ -57,14 +57,50 @@ class JournalTest {
     }
 
     @Test
-    fun aPromptGoesInAtTheCursorOnItsOwnLine() {
-        assertEquals("**what drained me?**\n" to 21, Journal.inserted("", 0, "What drained me?"))
-        val (text, cursor) = Journal.inserted("Long day", 8, "What drained me?")
-        assertEquals("Long day\n**what drained me?**\n", text)
-        assertEquals(text.length, cursor)
-        // Between two lines, it takes a line of its own, with an empty one under it for the answer, the cursor there.
-        assertEquals("a\n**q**\n\nb" to 8, Journal.inserted("a\nb", 2, "Q"))
-        assertEquals("a\n**q**\n\nb" to 8, Journal.inserted("a\n\nb", 2, "Q"))
+    fun aPromptGoesOnTheEmptyLineOrANewOne() {
+        assertEquals("- 14:32 · **what drained me?** " to 31, Journal.prompted("- 14:32 · ", 10, "What drained me?", "14:40"))
+        val (text, cursor) = Journal.prompted("- 14:32 · long day\n- 15:00 · tea", 5, "Q", "15:10")
+        assertEquals("- 14:32 · long day\n- 15:10 · **q** \n- 15:00 · tea", text)
+        assertEquals(35, cursor)
+    }
+
+    @Test
+    fun aLineAtATimeEachWithItsTime() {
+        // Opened, a fresh line at the foot; left empty, it isn't kept.
+        assertEquals("- 14:32 · " to 10, Journal.opened("", "14:32"))
+        assertEquals("- 09:00 · coffee\n- 14:32 · " to 27, Journal.opened("- 09:00 · coffee\n", "14:32"))
+        assertEquals("- 09:00 · coffee", Journal.tidy("- 09:00 · coffee\n- 14:32 · "))
+        // A new line after a timed one is timed now; a new line on an empty one ends them.
+        assertEquals("- 09:00 · coffee\n- 09:05 · " to 27, Journal.typed("- 09:00 · coffee", "- 09:00 · coffee\n", 17, "09:05"))
+        assertEquals("- 09:00 · coffee\n" to 17, Journal.typed("- 09:00 · coffee\n- 09:05 · ", "- 09:00 · coffee\n- 09:05 · \n", 28, "09:06"))
+        // The first words on a line take the time they're written; after that, it's plain typing.
+        assertEquals("- 09:20 · t" to 11, Journal.typed("- 09:05 · ", "- 09:05 · t", 11, "09:20"))
+        assertNull(Journal.typed("- 09:20 · t", "- 09:20 · te", 12, "09:21"))
+        assertNull(Journal.typed("plain", "plain\n", 6, "09:21"))
+    }
+
+    @Test
+    fun aMoodGoesOnTheLineYoureOn() {
+        val moods = listOf("tired", "bored")
+        val (once, at, on) = Journal.withMood("- 09:00 · slept badly", 21, "tired", moods, "09:10")
+        assertEquals("- 09:00 · tired · slept badly", once)
+        assertEquals(29, at)
+        assertEquals(true, on)
+        assertEquals("- 09:00 · tired, bored · slept badly", Journal.withMood(once, at, "bored", moods, "09:10").first)
+        assertEquals(listOf("tired"), Journal.moodsAt(once, 3, moods))
+        // Tapped again, it comes off.
+        val (off, _, wasOn) = Journal.withMood(once, at, "tired", moods, "09:10")
+        assertEquals("- 09:00 · slept badly" to false, off to wasOn)
+        // On an empty line it waits for the words; off a timed line, it begins one.
+        assertEquals("- 09:00 · tired · ", Journal.withMood("- 09:00 · ", 10, "tired", moods, "09:10").first)
+        assertEquals("notes\n- 09:10 · tired · ", Journal.withMood("notes", 2, "tired", moods, "09:10").first)
+    }
+
+    @Test
+    fun todayAtAGlance() {
+        assertEquals(0 to null, Journal.glance(null))
+        assertEquals(2 to "14:32", Journal.glance(JournalEntry(1, "- 09:00 · coffee\nmore\n- 14:32 · walk\n- 15:00 · ")))
+        assertEquals("- 21:40 · tired · slept badly woke early", Journal.line("21:40", "slept badly\nwoke early", listOf("tired")))
     }
 
     @Test
@@ -78,13 +114,13 @@ class JournalTest {
     }
 
     @Test
-    fun answersToWhyGoUnderTheirHeadingNewestFirst() {
+    fun answersToWhyGoAtTheFootNewestLast() {
         val day = today.toEpochDay()
         var all = Journal.answered(emptyList(), day, "- 09:00 · unlocking · went on", listOf("bored"), 1)
-        assertEquals("${Journal.WHY_HEADING}\n- 09:00 · unlocking · went on\n", all.single().text)
-        all = Journal.saved(all, day, "slept badly\n\n" + all.single().text, listOf("Clarity"), 2)
+        assertEquals("- 09:00 · unlocking · went on", all.single().text)
+        all = Journal.saved(all, day, all.single().text + "\n- 09:30 · slept badly", listOf("Clarity"), 2)
         all = Journal.answered(all, day, "- 10:00 · instagram · put it down", listOf("tired"), 3)
-        assertEquals("slept badly\n\n${Journal.WHY_HEADING}\n- 10:00 · instagram · put it down\n- 09:00 · unlocking · went on\n", all.single().text)
+        assertEquals("- 09:00 · unlocking · went on\n- 09:30 · slept badly\n- 10:00 · instagram · put it down", all.single().text)
         // What was written stays, and the moods with it.
         assertEquals(listOf("bored", "tired"), all.single().moods.map { it.mood })
         assertEquals(listOf("Clarity"), all.single().aims)
@@ -92,13 +128,18 @@ class JournalTest {
     }
 
     @Test
-    fun aMoodIsTappedOnAndOff() {
+    fun eachMoodTapIsKeptWithItsTime() {
         val day = today.toEpochDay()
-        var all = Journal.moodToggled(emptyList(), day, "happy", 5)
-        assertEquals(listOf(MoodMark(5, "happy")), all.single().moods)
-        // Saving the text keeps it; tapped off with nothing written, the entry goes.
+        var all = Journal.moodAdded(emptyList(), day, "happy", 5)
+        all = Journal.moodAdded(all, day, "happy", 9)
+        assertEquals(listOf(MoodMark(5, "happy"), MoodMark(9, "happy")), all.single().moods)
+        // Saving the text keeps them; one taken back leaves the other.
         all = Journal.saved(all, day, "", emptyList(), 6)
-        assertEquals(1, all.size)
-        assertEquals(emptyList<JournalEntry>(), Journal.moodToggled(all, day, "happy", 7))
+        all = Journal.moodRemoved(all, day, MoodMark(5, "happy"))
+        assertEquals(listOf(MoodMark(9, "happy")), all.single().moods)
+        // With nothing written and no moods left, the entry goes.
+        assertEquals(emptyList<JournalEntry>(), Journal.moodRemoved(all, day, MoodMark(9, "happy")))
+        // A mood renamed is renamed on the days it was tapped.
+        assertEquals("glad", Journal.moodRenamed(all, "happy", "glad").single().moods.single().mood)
     }
 }

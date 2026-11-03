@@ -81,6 +81,8 @@ internal fun SessionHeader(
     habits: (@Composable () -> Unit)? = null,
     nowPlaying: (@Composable () -> Unit)? = null,
     note: (@Composable () -> Unit)? = null,
+    /** Today's microjournal, as a line: how many and when, never what. */
+    journal: (@Composable () -> Unit)? = null,
     /** The note, small, beside the clock instead of in the list (only offered with a small clock and no weather there). */
     noteBeside: (@Composable () -> Unit)? = null,
     /** A long press on a widget: its own sheet, to hide or change it. */
@@ -195,6 +197,7 @@ internal fun SessionHeader(
                 Module.HABITS -> habits?.let { Column(held(Module.HABITS)) { it() } }
                 Module.NOW_PLAYING -> nowPlaying?.let { Column(held(Module.NOW_PLAYING)) { it() } }
                 Module.NOTE -> if (besideHead == 0) note?.let { Column(held(Module.NOTE)) { it() } }
+                Module.JOURNAL -> journal?.invoke()
             }
             if (at == pillAfter && at >= besideHead) SessionPill(scheduleName, until, scheduleIcon, style)
     }

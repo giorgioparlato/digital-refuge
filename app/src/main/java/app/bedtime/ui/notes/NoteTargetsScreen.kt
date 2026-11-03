@@ -77,7 +77,7 @@ import kotlinx.coroutines.launch
 
 /** Where the minimal home's search sends notes: your files, or the app's notes. Events are on the search page. */
 @Composable
-fun NoteTargetsScreen(onBack: () -> Unit, onOpenNotes: () -> Unit, onOpenJournalPrompts: () -> Unit = {}) {
+fun NoteTargetsScreen(onBack: () -> Unit, onOpenNotes: () -> Unit, onOpenJournalPrompts: () -> Unit = {}, onOpenMoods: () -> Unit = {}) {
     val context = LocalContext.current
     val repo = remember { Repository.get(context) }
     val scope = rememberCoroutineScope()
@@ -155,6 +155,10 @@ fun NoteTargetsScreen(onBack: () -> Unit, onOpenNotes: () -> Unit, onOpenJournal
         journalOn = current.journalOn,
         onJournalOn = { on -> scope.launch { repo.updateSettings { it.copy(journalOn = on) } } },
         onJournalPrompts = onOpenJournalPrompts,
+        prompts = current.journalPrompts,
+        onPrompts = { on -> scope.launch { repo.updateSettings { it.copy(journalPrompts = on) } } },
+        moods = app.bedtime.ui.settings.moodsWords(current),
+        onMoods = onOpenMoods,
     )
     if (choosingShortcut) {
         ShortcutDialog(
@@ -226,6 +230,12 @@ internal fun NoteTargetsContent(
     journalOn: Boolean = false,
     onJournalOn: (Boolean) -> Unit = {},
     onJournalPrompts: () -> Unit = {},
+    /** The prompts a button away while writing, or no button at all. */
+    prompts: Boolean = true,
+    onPrompts: (Boolean) -> Unit = {},
+    /** The moods to tap in an entry, in a few words, and their page. */
+    moods: String = "",
+    onMoods: () -> Unit = {},
 ) {
     val c = Obsidian.colors
     Scaffold(containerColor = c.bgPrimary, topBar = { ObsidianTopBar("Quick notes", onBack = onBack, subtitle = "From the minimal home's search") }) { padding ->
@@ -240,11 +250,17 @@ internal fun NoteTargetsContent(
             Spacer(Modifier.height(16.dp))
             SectionCard(title = "Refuge notes") {
                 OptionRow(Icons.Default.Edit, "Your notes", description = "Kept on this phone, written in Markdown", onClick = onOpenNotes) { Chevron() }
-                OptionRow(Icons.Default.DateRange, "Microjournal", description = "An entry a day in your notes, and from the quick note, with prompts to write from if you want them") {
+                OptionRow(Icons.Default.DateRange, "Microjournal", description = "An entry a day in your notes, a line at a time, each with its time; from the quick note and the share menu too") {
                     ObsidianToggle(journalOn, onJournalOn)
                 }
                 if (journalOn) {
-                    OptionRow(Icons.Default.Edit, "Sections and prompts", description = "Start from the suggestions; change, delete or add your own", onClick = onJournalPrompts) { Chevron() }
+                    OptionRow(Icons.Default.Edit, "Prompts while writing", description = "A button away, hidden until you ask; off, no button at all") {
+                        ObsidianToggle(prompts, onPrompts)
+                    }
+                    if (prompts) {
+                        OptionRow(Icons.Default.Edit, "Sections and prompts", description = "Start from the suggestions; change, delete or add your own", onClick = onJournalPrompts) { Chevron() }
+                    }
+                    OptionRow(Icons.Default.Edit, "Moods", description = moods, onClick = onMoods) { Chevron() }
                 }
             }
             Spacer(Modifier.height(16.dp))

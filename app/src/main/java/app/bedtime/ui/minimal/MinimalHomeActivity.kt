@@ -375,6 +375,7 @@ private fun MinimalHomeScreen(
             HomeActions.NOTE, HomeActions.LOOKUP -> quickNote = true
             HomeActions.SEARCH -> drawer = true
             HomeActions.NOTES -> notesOpen = true
+            HomeActions.JOURNAL -> runCatching { context.startActivity(app.bedtime.MainActivity.intent(context, app.bedtime.Routes.JOURNAL_TODAY)) }
             HomeActions.WEEK -> scope.launch { week = loadCalendarWeek(context, LocalDateTime.now()) }
             HomeActions.BLOCKS -> blocksOpen = true
             HomeActions.CAMERA -> runCatching {
@@ -516,6 +517,8 @@ private fun MinimalHomeScreen(
             is DrawerResult.Shortcut -> if (Shortcuts.start(context, result.shortcut)) closeDrawer() else Toast.makeText(context, "couldn't run that", Toast.LENGTH_SHORT).show()
         }
     }
+    val journalEntries by repo.journal.collectAsStateWithLifecycle(initialValue = emptyList())
+    val journalToday = journalEntries.firstOrNull { it.day == java.time.LocalDate.now().toEpochDay() }
     val homeNote = noteSlots(style, Screen.HOME, widgetNote, onWrite = { n, text -> scope.launch { repo.editNote(n.id, text) } }, onHold = { holding = Module.NOTE })
     when {
         notesOpen -> {
@@ -616,6 +619,9 @@ private fun MinimalHomeScreen(
             onWidgetHold = { holding = it },
             onScreenHold = { screenSheet = true },
             note = homeNote.inList,
+            journal = if (!Modules.isOn(style, Screen.HOME, Module.JOURNAL)) null else ({
+                JournalWidget(style, journalToday, onTap = { runCatching { context.startActivity(app.bedtime.MainActivity.intent(context, app.bedtime.Routes.JOURNAL_TODAY)) } }, onHold = { holding = Module.JOURNAL })
+            }),
             // Small, beside the clock, where you've asked and it fits.
             noteBeside = homeNote.beside,
             nowPlaying = nowPlaying?.takeIf { Modules.isOn(style, Screen.HOME, Module.NOW_PLAYING) }?.let { playing ->
@@ -735,7 +741,7 @@ private fun MinimalHomeScreen(
             onOffer = onResult,
             initial = lookingUp.orEmpty(),
             whole = !lookingUp.isNullOrEmpty(),
-            onJournal = if (settings.journalOn) ({ context.startActivity(app.bedtime.MainActivity.intent(context, app.bedtime.Routes.JOURNAL_TODAY)) }) else null,
+            journal = app.bedtime.ui.minimal.journalWith(context, repo, scope, settings),
         )
     }
     if (appsDetail) {
@@ -856,6 +862,7 @@ internal fun MinimalHomeContent(
     habits: (@Composable () -> Unit)? = null,
     nowPlaying: (@Composable () -> Unit)? = null,
     note: (@Composable () -> Unit)? = null,
+    journal: (@Composable () -> Unit)? = null,
     noteBeside: (@Composable () -> Unit)? = null,
     preview: Boolean = false,
 ) {
@@ -925,6 +932,7 @@ internal fun MinimalHomeContent(
                 habits = habits,
                 nowPlaying = nowPlaying,
                 note = note,
+                journal = journal,
                 noteBeside = noteBeside,
                 onHold = onWidgetHold,
                 onClockDoubleTap = { onGesture(HomeGesture.CLOCK_DOUBLE_TAP) },

@@ -128,6 +128,15 @@
             android:taskAffinity="app.bedtime.why"
             android:windowSoftInputMode="adjustResize" />
 
+        <!-- "How do you feel now?" once a stretch on the phone is over, when asked for. -->
+        <activity
+            android:name=".ui.blocked.MoodAfterActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity="app.bedtime.mood"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
         <activity
             android:name=".ui.blocked.NudgeActivity"
             android:excludeFromRecents="true"
@@ -229,6 +238,20 @@
                 <data android:mimeType="text/plain" />
             </intent-filter>
         </activity>
+
+        <!-- The same, straight to today's microjournal: in the share menu only while the microjournal is on. -->
+        <activity-alias
+            android:name=".ui.minimal.JournalShare"
+            android:enabled="false"
+            android:exported="true"
+            android:label="@string/share_to_journal"
+            android:targetActivity=".ui.minimal.ShareActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity-alias>
 
         <receiver
             android:name=".service.UndoStartReceiver"

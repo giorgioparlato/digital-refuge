@@ -18,10 +18,10 @@ import kotlinx.coroutines.launch
 import java.time.LocalDate
 
 /**
- * "Open anyway" passes from the pause before opening: an app you chose to open stays open, and
- * coming back to it within its grace doesn't ask again. A pass is kept under a key: the app's own
- * package, or a whole limit's when "open anyway" lets you into all of its apps. Kept in memory only:
- * a restart asks afresh.
+ * "Open anyway" passes from the pause before opening: for a set time from then, coming and going as you
+ * like, or, without one, until you leave (back within a minute is the same visit). A pass is kept under
+ * a key: the app's own package, or a whole limit's when "open anyway" lets you into all of its apps.
+ * Kept in memory only: a restart asks afresh.
  */
 object LimitPasses {
     private class Pass(val grantedAt: Long, var leftAt: Long? = null, var entered: Boolean = false)
@@ -36,13 +36,17 @@ object LimitPasses {
         passes[key] = Pass(now)
     }
 
-    /** An app under [key] just came to the front: whether it may, without the pause. */
+    /** Back this soon after leaving, without a set time open, is the same visit. */
+    const val SAME_VISIT_MS = 60_000L
+
+    /** An app under [key] just came to the front: whether it may, without the pause; [openMs] the time it's open for, or null. */
     @Synchronized
-    fun admit(key: String, graceMs: Long, now: Long): Boolean {
+    fun admit(key: String, openMs: Long?, now: Long): Boolean {
         val pass = passes[key] ?: return false
         val left = pass.leftAt
         val ok = when {
-            left != null -> now - left <= graceMs
+            openMs != null -> now - pass.grantedAt < openMs
+            left != null -> now - left <= SAME_VISIT_MS
             !pass.entered -> now - pass.grantedAt < ON_ITS_WAY_MS
             else -> true
         }
@@ -55,7 +59,11 @@ object LimitPasses {
         return ok
     }
 
-    /** The app that came in under [key] went to the background; its grace starts now. */
+    /** When [key]'s time open, [openMs] long, is over; null without a pass. */
+    @Synchronized
+    fun endsAt(key: String, openMs: Long): Long? = passes[key]?.let { it.grantedAt + openMs }
+
+    /** The app that came in under [key] went to the background; the minute to come back starts now. */
     @Synchronized
     fun left(key: String, now: Long) {
         passes[key]?.takeIf { it.entered }?.leftAt = now
@@ -125,6 +133,52 @@ internal class LimitTracker(
      * [pkg] is now in front, or nothing is (the screen went off). Returns true if it's a different
      * app from the one before, which is when the pause before opening is due.
      */
+    private var closing: Runnable? = null
+
+    /**
+     * Once [key]'s time open is over: the pause again over whichever of its apps is in front, and "how do
+     * you feel now?" where one of [pkg]'s limits asks it.
+     */
+    private fun closeWhenOver(pkg: String, key: String, openMs: Long, minutes: Int) {
+        val end = LimitPasses.endsAt(key, openMs) ?: return
+        closing?.let(handler::removeCallbacks)
+        closing = Runnable {
+            closing = null
+            val inFront = current
+            if (inFront != null && inFront in currentPassApps) {
+                // As a new arrival: the pass has run out, so it's the pause.
+                letIn = null
+                check(inFront, arrived = true)
+            }
+            if (limits.any { pkg in it.rules.apps && it.rules.moodAfter && it.rules.openMinutes != null }) onLeft?.invoke(pkg, minutes)
+        }.also { handler.postDelayed(it, (end - System.currentTimeMillis()).coerceAtLeast(0L)) }
+    }
+
+    /** An app with a limit left after a while in it, and for how many minutes: for "how do you feel now?". */
+    var onLeft: ((pkg: String, minutes: Int) -> Unit)? = null
+
+    /** Time in the apps of limits that ask, across going between them and coming back within their grace. */
+    private var moodSpent = 0L
+    private var moodLater: Runnable? = null
+    private var moodApps = emptySet<String>()
+
+    /**
+     * "How do you feel now?" about [pkg], a minute after leaving the [asking] limits' apps, unless
+     * you're back first: back that soon, it's the same visit.
+     */
+    private fun askOnceClosed(pkg: String, asking: List<AppLimit>) {
+        val minutes = (moodSpent / 60_000L).coerceAtLeast(1).toInt()
+        val grace = LimitPasses.SAME_VISIT_MS / 60_000L
+        moodApps = asking.flatMap { it.rules.apps }.toSet()
+        moodLater?.let(handler::removeCallbacks)
+        moodLater = Runnable {
+            moodLater = null
+            moodApps = emptySet()
+            moodSpent = 0L
+            onLeft?.invoke(pkg, minutes)
+        }.also { handler.postDelayed(it, grace * 60_000L) }
+    }
+
     fun moveTo(pkg: String?): Boolean {
         val previous = current
         if (pkg == previous) return false
@@ -135,8 +189,27 @@ internal class LimitTracker(
             currentPass = null
             currentPassApps = emptySet()
         }
+        // Back in a limit's apps before its "back within" ran out: the same stretch, so not asked yet.
+        if (pkg != null && pkg in moodApps) moodLater?.let {
+            handler.removeCallbacks(it)
+            moodLater = null
+        }
         // Only a visit that was let in can be "back within a minute"; one stopped at a cover wasn't an open.
-        if (previous != null && previous == letIn) lastLeft[previous] = SystemClock.elapsedRealtime()
+        if (previous != null && previous == letIn) {
+            lastLeft[previous] = SystemClock.elapsedRealtime()
+            // With a time open, it's asked when that's over instead.
+            val asking = limits.filter { previous in it.rules.apps && it.rules.moodAfter && it.rules.openMinutes == null }
+            if (asking.isNotEmpty()) {
+                moodSpent += SystemClock.elapsedRealtime() - since
+                when {
+                    // The phone put down: the stretch is over, and there's no one to ask.
+                    pkg == null -> moodSpent = 0L
+                    limited(pkg) -> Unit
+                    moodSpent < AFTER_MS -> moodSpent = 0L
+                    else -> askOnceClosed(previous, asking)
+                }
+            }
+        }
         letIn = null
         current = pkg
         since = SystemClock.elapsedRealtime()
@@ -168,9 +241,11 @@ internal class LimitTracker(
             }
             val pause = Limits.pauseFor(limits, pkg, day.day)
             if (pause != null) {
-                if (LimitPasses.admit(pause.passKey, pause.graceMinutes * 60_000L, System.currentTimeMillis())) {
+                val openMs = pause.openMinutes?.let { it * 60_000L }
+                if (LimitPasses.admit(pause.passKey, openMs, System.currentTimeMillis())) {
                     currentPass = pause.passKey
                     currentPassApps = pause.group
+                    if (openMs != null) closeWhenOver(pkg, pause.passKey, openMs, pause.openMinutes ?: 0)
                 } else {
                     writeScope.launch { repo.recordOpen(day.day, pkg) }
                     // A pass for the whole limit counts its apps' openings together, too.
@@ -265,6 +340,9 @@ internal class LimitTracker(
     private companion object {
         /** Coming back to an app sooner than this after leaving it isn't counted as opening it again. */
         const val OPEN_AGAIN_MS = 60_000L
+
+        /** At least this long in a limit's apps, for leaving them to ask "how do you feel now?", where the limit does. */
+        const val AFTER_MS = 60_000L
     }
 
     private fun cover(intent: android.content.Intent) {

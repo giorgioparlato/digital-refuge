@@ -152,8 +152,9 @@ class BlockerService : AccessibilityService() {
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             if (intent.action == Intent.ACTION_SCREEN_OFF) {
-                // Locked again (or about to be): the next unlock may ask why.
+                // Locked again (or about to be): the next unlock may ask why, and the stretch on the phone is over.
                 lockedSinceOff = true
+                handler.removeCallbacks(longStretch)
                 // Nothing is being used with the screen off, whatever was last in front.
                 limitTracker.moveTo(null)
                 limitTracker.flush()
@@ -240,6 +241,8 @@ class BlockerService : AccessibilityService() {
 
         val repo = Repository.get(this)
         limitTracker.start()
+        // A while in an app with a limit, and gone from it: how do you feel now?
+        limitTracker.onLeft = { pkg, minutes -> askMoodAfter("after $minutes min on ${AppCatalog.label(this, pkg).lowercase()}") }
         // Your blocks on the app icon's long press, kept as they change.
         scope.launch { repo.schedules.collect { BlockShortcuts.update(this@BlockerService, it) } }
         scope.launch {
@@ -377,6 +380,21 @@ class BlockerService : AccessibilityService() {
         Problems.attempt("showing the lock screen") { startActivity(LockScreenActivity.intent(this)) }
     }
 
+    /** When "how do you feel now?" was last asked, so it's never asked twice in a row. */
+    private var moodAskedAt = 0L
+
+    /** "How do you feel now?", about [what], when you've asked for it and there are moods to tap; not twice within a while. */
+    fun askMoodAfter(what: String, delayMs: Long = 700) {
+        handler.postDelayed({
+            val now = System.currentTimeMillis()
+            val awake = getSystemService(android.os.PowerManager::class.java)?.isInteractive == true
+            if (Why.moods(settings).isNotEmpty() && awake && Why.due(moodAskedAt, now, MOOD_AGAIN_MS)) {
+                moodAskedAt = now
+                Problems.attempt("asking how you feel") { startActivity(app.bedtime.ui.blocked.MoodAfterActivity.intent(this, what)) }
+            }
+        }, delayMs)
+    }
+
     private fun notice(message: String) {
         Toast.makeText(this, message.lowercase(), Toast.LENGTH_SHORT).show()
     }
@@ -444,7 +462,12 @@ class BlockerService : AccessibilityService() {
         if (!lockedSinceOff) return
         lockedSinceOff = false
         askWhyAfterUnlock(from)
+        // A long while on the phone in one go, if you've asked to hear about it: until the screen goes off.
+        handler.removeCallbacks(longStretch)
+        settings.moodAfterMinutes.takeIf { it > 0 }?.let { handler.postDelayed(longStretch, it * 60_000L) }
     }
+
+    private val longStretch = Runnable { askMoodAfter("after ${settings.moodAfterMinutes} min on the phone", delayMs = 0) }
 
     /** "Why am I unlocking my phone right now?", just after an unlock, over whatever it opened to. */
     private fun askWhyAfterUnlock(from: android.content.Context?) {
@@ -557,6 +580,9 @@ class BlockerService : AccessibilityService() {
     private companion object {
         /** Long enough to let a flashed window be replaced by the app underneath, short enough not to be seen. */
         const val SETTLE_MS = 250L
+
+        /** "How do you feel now?" at most this often. */
+        const val MOOD_AGAIN_MS = 15 * 60_000L
 
         /** How often, at most, the system's packages are read again without an app having changed. */
         const val PACKAGES_EVERY_MS = 10 * 60_000L

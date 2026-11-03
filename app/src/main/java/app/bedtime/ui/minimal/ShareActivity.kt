@@ -31,6 +31,12 @@ class ShareActivity : ComponentActivity() {
                     val app = applicationContext
                     val settings by repo.settings.collectAsStateWithLifecycle(initialValue = null)
                     val s = settings ?: return@ProvideAppIcons
+                    val journal = journalWith(app, repo, scope, s)
+                    // Shared straight to the microjournal: how you feel, or skip, and it's in.
+                    if (intent.component?.className == JOURNAL_SHARE && journal != null) {
+                        JournalShareDialog(shared, s.homeStyle, journal, onDismiss = { finish() })
+                        return@ProvideAppIcons
+                    }
                     QuickNoteDialog(
                         s.homeStyle,
                         s.quickTargets,
@@ -40,8 +46,22 @@ class ShareActivity : ComponentActivity() {
                         onDismiss = { finish() },
                         vault = s.obsidianVault,
                         initial = shared,
+                        journal = journal,
                     )
                 }
+            }
+        }
+    }
+
+    companion object {
+        /** The share menu's "add to microjournal", an alias of this activity. */
+        const val JOURNAL_SHARE = "app.bedtime.ui.minimal.JournalShare"
+
+        /** "Add to microjournal" in the share menu while the microjournal is on, and gone while it's off. */
+        fun syncJournalShare(context: android.content.Context, on: Boolean) {
+            val state = if (on) android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED else android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+            runCatching {
+                context.packageManager.setComponentEnabledSetting(android.content.ComponentName(context, JOURNAL_SHARE), state, android.content.pm.PackageManager.DONT_KILL_APP)
             }
         }
     }

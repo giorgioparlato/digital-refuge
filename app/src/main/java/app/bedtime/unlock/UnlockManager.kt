@@ -21,6 +21,10 @@ object UnlockManager {
         val now = System.currentTimeMillis()
         repo.updateRuntime { applied(it, occurrence, minutes, now) }
         repo.recordUnlock(occurrence, endedEarly = minutes == null, at = now)
+        // Once the break is over, how do you feel now? Where the schedule asks it.
+        if (minutes != null && occurrence.schedule.moodAfterUnlock) {
+            app.bedtime.service.BlockingState.service?.askMoodAfter("after the $minutes-minute break", minutes * 60_000L + 1_500L)
+        }
     }
 
     /**

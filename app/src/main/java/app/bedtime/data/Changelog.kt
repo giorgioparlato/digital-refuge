@@ -13,6 +13,19 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            80,
+            "0.9.34",
+            listOf(
+                "The microjournal is a line at a time, each with its time, the newest at the foot; a mood tapped goes on the line you're on. Prompts wait until you ask, or can go for good.",
+                "The microjournal is one more place for a quick note, with how you feel if you like; and a gesture, a widget, and \"add to microjournal\" in the share menu.",
+                "Moods: rename yours, add one while writing; in insights, each mood's lines, its week, what came after it, and patterns over eight weeks.",
+                "\"How do you feel now?\", where you choose: after a while on the phone, after a schedule's break, when a limit's time open is over.",
+                "Limits: \"back within\" is now \"after the pause, open for\": a time to come and go as you like, or until you leave.",
+                "Notifications: each swipe does what you choose (clear, later, mark as read, quiet, reply); the summary line swipes all of them; replied ones go.",
+                "A day on the month's heatmap shows its time and top apps at a glance.",
+            ),
+        ),
+        ChangelogEntry(
             79,
             "0.9.33",
             listOf(

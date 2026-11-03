@@ -109,16 +109,17 @@ The steps for more use the same rows as a block's steps: see the editor in focus
 - The questions
 - Asked in turn, shared by every limit that asks
 - Each open in a day makes the wait or the typing longer, up to 8× the wait or 3× the text. A new day starts over
-- Back within
-- every time
+- After the pause, open for
+- time open
+- until you leave
 - {it} min
-- Opening one anyway lets you into
+- Getting through the pause opens
 - Just that app
 - All of them
-- Getting through the pause once opens all of these apps, until you leave them for something else.
-- Getting through the pause once opens the way to all of these apps. Leaving them and coming back within … min doesn't ask again.
-- The pause comes every time you open one of them.
-- After you open one anyway, leaving and coming back within … min doesn't ask again.
+- Getting through the pause once opens all of these apps until you leave them. Back within a minute is the same visit.
+- The pause comes each time you open one. Back within a minute is the same visit.
+- Getting through the pause once opens all of these apps for {open} min, coming and going as you like. Then the pause again.
+- Each app opens for {open} min after its pause, coming and going as you like. Then the pause again.
 - Daily budget
 - Minutes a day
 - Once they're used, the apps step aside until tomorrow
@@ -148,6 +149,9 @@ The steps for more use the same rows as a block's steps: see the editor in focus
 - The steps for more, in this order
 - What it says
 - What the cover says
+- Afterwards
+- How do you feel now?
+- Your moods to tap, once the time open after the pause is over; without one, a minute after you leave these apps
 - When it can be changed
 - Changeable only at certain hours
 - Outside them it can't be edited or deleted

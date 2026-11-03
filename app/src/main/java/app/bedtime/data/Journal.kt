@@ -30,9 +30,12 @@ data class JournalEntry(
     val moods: List<MoodMark> = emptyList(),
 )
 
-/** A mood tapped, and when. */
+/**
+ * A mood tapped, and when; with "why?", what it was asked about ([from]: "unlocking", or the app) and
+ * whether you went on; [after] for "how do you feel now?" once a stretch on the phone is over.
+ */
 @Serializable
-data class MoodMark(val at: Long, val mood: String)
+data class MoodMark(val at: Long, val mood: String, val from: String? = null, val wentOn: Boolean? = null, val after: Boolean = false)
 
 /**
  * The microjournal: an entry a day, and sections of prompts to write from. The suggested sections come
@@ -156,43 +159,143 @@ object Journal {
         return listOf(day, entry.aims.joinToString(", ") { it.lowercase() }, moods.joinToString(", ")).filter { it.isNotEmpty() }.joinToString(" · ")
     }
 
-    /** Where the answers to "why?" go in a day's entry: under this, at its end, the newest first. */
-    const val WHY_HEADING = "### why i picked up the phone"
+    /** How each line of an entry starts: "- 14:32 · ", the time it was begun. */
+    fun bullet(time: String): String = "- $time · "
 
-    /** [text] with [line] as the newest answer under [WHY_HEADING], the heading added at the end if it isn't there. */
-    fun withWhy(text: String, line: String): String {
-        val lines = text.trimEnd().lines().toMutableList()
-        val at = lines.indexOfFirst { it.trim() == WHY_HEADING }
-        if (at < 0) return (if (text.isBlank()) "" else text.trimEnd() + "\n\n") + "$WHY_HEADING\n$line\n"
-        lines.add(at + 1, line)
-        return lines.joinToString("\n") + "\n"
-    }
+    private val TIMED = Regex("""^- (\d{1,2}:\d{2}) ·(?: (.*))?$""")
+    private val EMPTY = Regex("""^- \d{1,2}:\d{2} · ?$""")
 
-    /** [entries] with an answer to "why?" in [day]'s entry, and the moods tapped with it. */
-    fun answered(entries: List<JournalEntry>, day: Long, line: String, moods: List<String>, at: Long): List<JournalEntry> {
+    /** "- 14:32 · tired · slept badly": a line from [text] at [time], with the [moods] picked for it, on one line. */
+    fun line(time: String, text: String, moods: List<String> = emptyList()): String =
+        bullet(time) + listOf(moods.joinToString(", "), text.trim().replace(Regex("\\s*\\n\\s*"), " ")).filter { it.isNotEmpty() }.joinToString(" · ")
+
+    /** [text] with [line] at its foot: the newest last, as you'd write them. */
+    fun withLine(text: String, line: String): String = (text.trimEnd().takeIf { it.isNotEmpty() }?.plus("\n") ?: "") + line
+
+    /** [entries] with [line] at the foot of [day]'s entry, an answer to "why?" or a quick note, and the moods tapped with it. */
+    fun answered(
+        entries: List<JournalEntry>,
+        day: Long,
+        line: String,
+        moods: List<String>,
+        at: Long,
+        from: String? = null,
+        wentOn: Boolean? = null,
+        after: Boolean = false,
+    ): List<JournalEntry> {
         val now = entries.firstOrNull { it.day == day } ?: JournalEntry(day, "")
-        val updated = now.copy(text = withWhy(now.text, line), editedAt = at, moods = now.moods + moods.map { MoodMark(at, it) })
+        val updated = now.copy(text = withLine(now.text, line), editedAt = at, moods = now.moods + moods.map { MoodMark(at, it, from, wentOn, after) })
         return entries.filterNot { it.day == day } + updated
     }
 
-    /** [entries] with [mood] on [day] taken off if it's there, or added, at [at]. */
-    fun moodToggled(entries: List<JournalEntry>, day: Long, mood: String, at: Long): List<JournalEntry> {
+    /** [text] opened to write in: a fresh line at its foot, begun at [time], and the cursor on it. */
+    fun opened(text: String, time: String): Pair<String, Int> {
+        val lines = text.trimEnd().lines()
+        if (lines.isNotEmpty() && EMPTY.matches(lines.last())) return text.trimEnd() + " " to text.trimEnd().length + 1
+        val out = withLine(text, bullet(time))
+        return out to out.length
+    }
+
+    /** What's kept of [text]: without lines begun and left empty. */
+    fun tidy(text: String): String = text.lines().filterNot { EMPTY.matches(it) }.joinToString("\n").trimEnd()
+
+    /**
+     * Writing in an entry, from [old] to [new] with the cursor at [cursor]: a new line after a timed one
+     * starts timed at [time], and a new line on an empty one ends the run; the first words on an empty
+     * line take the time they're written. Null when it's plain typing.
+     */
+    fun typed(old: String, new: String, cursor: Int, time: String): Pair<String, Int>? {
+        val at = cursor - 1
+        if (at >= 0 && new.length == old.length + 1 && new[at] == '\n' && new.removeRange(at, at + 1) == old) {
+            val start = new.lastIndexOf('\n', at - 1) + 1
+            val line = new.substring(start, at)
+            if (EMPTY.matches(line)) return new.removeRange(start, at + 1) to start
+            if (!TIMED.matches(line)) return null
+            val begun = bullet(time)
+            return new.replaceRange(at + 1, at + 1, begun) to at + 1 + begun.length
+        }
+        if (cursor < 0 || cursor > new.length || new.length <= old.length) return null
+        val start = new.lastIndexOf('\n', cursor - 1) + 1
+        val end = new.indexOf('\n', start).let { if (it < 0) new.length else it }
+        val oldEnd = old.indexOf('\n', start).let { if (it < 0) old.length else it }
+        if (start > old.length || !EMPTY.matches(old.substring(start, oldEnd))) return null
+        val m = TIMED.matchEntire(new.substring(start, end)) ?: return null
+        if (m.groupValues[2].isBlank() || m.groupValues[1] == time) return null
+        return new.replaceRange(start + 2, start + 2 + m.groupValues[1].length, time) to cursor + time.length - m.groupValues[1].length
+    }
+
+    /** The moods named at the start of the timed line at [cursor] in [text], of [moods]. */
+    fun moodsAt(text: String, cursor: Int, moods: List<String>): List<String> {
+        val (start, end) = lineAt(text, cursor)
+        val rest = TIMED.matchEntire(text.substring(start, end))?.groupValues?.get(2) ?: return emptyList()
+        return moodPart(rest, moods)
+    }
+
+    private fun lineAt(text: String, cursor: Int): Pair<Int, Int> {
+        val at = cursor.coerceIn(0, text.length)
+        val start = text.lastIndexOf('\n', at - 1) + 1
+        return start to text.indexOf('\n', at).let { if (it < 0) text.length else it }
+    }
+
+    private fun moodPart(rest: String, moods: List<String>): List<String> =
+        rest.substringBefore(" · ").split(", ").map { it.trim() }.takeIf { part -> part.isNotEmpty() && part.all { it in moods } }.orEmpty()
+
+    /**
+     * [mood] put on the timed line at [cursor], or taken off it if it's there: the moods follow its time.
+     * Off a timed line, a new one begins at [time] with it. The text, the cursor, and whether it went on.
+     */
+    fun withMood(text: String, cursor: Int, mood: String, moods: List<String>, time: String): Triple<String, Int, Boolean> {
+        val (start, end) = lineAt(text, cursor)
+        val m = TIMED.matchEntire(text.substring(start, end))
+        if (m == null) {
+            val out = withLine(text, bullet(time) + "$mood · ")
+            return Triple(out, out.length, true)
+        }
+        val rest = m.groupValues[2]
+        val named = moodPart(rest, moods + mood)
+        val words = if (named.isEmpty()) rest else rest.substringAfter(" · ", "")
+        val on = mood !in named
+        val now = if (on) named + mood else named - mood
+        val line = bullet(m.groupValues[1]) + listOf(now.joinToString(", "), words).filter { it.isNotEmpty() }.joinToString(" · ") + if (words.isEmpty() && now.isNotEmpty()) " · " else ""
+        val out = text.replaceRange(start, end, line)
+        return Triple(out, (cursor + line.length - (end - start)).coerceIn(start, start + line.length), on)
+    }
+
+    /** [prompt] in bold on the timed line at [cursor] if it's empty, or on a new one begun at [time]; the cursor after it. */
+    fun prompted(text: String, cursor: Int, prompt: String, time: String): Pair<String, Int> {
+        val (start, end) = lineAt(text, cursor)
+        val asked = "**${prompt.trim().lowercase()}** "
+        if (EMPTY.matches(text.substring(start, end))) {
+            val line = text.substring(start, end).trimEnd() + " " + asked
+            return text.replaceRange(start, end, line) to start + line.length
+        }
+        val line = bullet(time) + asked
+        val out = text.substring(0, end) + "\n" + line + text.substring(end)
+        return out to end + 1 + line.length
+    }
+
+    /** Today's lines at a glance: how many, and the time of the latest. */
+    fun glance(entry: JournalEntry?): Pair<Int, String?> {
+        val timed = entry?.text.orEmpty().lines().mapNotNull { TIMED.matchEntire(it)?.takeIf { m -> m.groupValues[2].isNotBlank() } }
+        return timed.size to timed.maxOfOrNull { it.groupValues[1].padStart(5, '0') }
+    }
+
+    /** [entries] with [mood] tapped on [day] at [at]: each tap is kept, with its time. */
+    fun moodAdded(entries: List<JournalEntry>, day: Long, mood: String, at: Long): List<JournalEntry> {
         val now = entries.firstOrNull { it.day == day } ?: JournalEntry(day, "")
-        val moods = if (now.moods.any { it.mood == mood }) now.moods.filterNot { it.mood == mood } else now.moods + MoodMark(at, mood)
-        val updated = now.copy(moods = moods)
+        return entries.filterNot { it.day == day } + now.copy(moods = now.moods + MoodMark(at, mood))
+    }
+
+    /** [entries] without one tap, [mark], on [day]; an entry left with nothing goes. */
+    fun moodRemoved(entries: List<JournalEntry>, day: Long, mark: MoodMark): List<JournalEntry> {
+        val now = entries.firstOrNull { it.day == day } ?: return entries
+        val updated = now.copy(moods = now.moods - mark)
         return entries.filterNot { it.day == day } + listOfNotNull(updated.takeIf { it.text.isNotBlank() || it.moods.isNotEmpty() })
     }
 
-    /** [text] with [prompt] put in at [cursor] in bold, on a line of its own, and where to write next: the line under it. */
-    fun inserted(text: String, cursor: Int, prompt: String): Pair<String, Int> {
-        val at = cursor.coerceIn(0, text.length)
-        val before = text.substring(0, at)
-        val after = text.substring(at)
-        val lead = if (before.isEmpty() || before.endsWith("\n")) "" else "\n"
-        val block = "$lead**${prompt.trim().lowercase()}**\n"
-        val trail = if (after.isEmpty() || after.startsWith("\n")) "" else "\n"
-        return before + block + trail + after to (before.length + block.length)
-    }
+    /** [entries] with every [old] mood called [new], as when a mood is renamed. */
+    fun moodRenamed(entries: List<JournalEntry>, old: String, new: String): List<JournalEntry> =
+        entries.map { e -> if (e.moods.none { it.mood == old }) e else e.copy(moods = e.moods.map { if (it.mood == old) it.copy(mood = new) else it }) }
 
     /** [entries] newest first. */
     fun entries(entries: List<JournalEntry>): List<JournalEntry> = entries.sortedByDescending { it.day }

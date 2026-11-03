@@ -229,6 +229,7 @@ object WidgetOptions {
             WidgetOption.Link("Your habits: add, change or remove", Routes.HABITS),
         )
         Module.GREETING, Module.DATE, Module.NOW_PLAYING -> emptyList()
+        Module.JOURNAL -> listOf(WidgetOption.Link("The microjournal's settings", Routes.QUICK_NOTES))
     }
 }
 

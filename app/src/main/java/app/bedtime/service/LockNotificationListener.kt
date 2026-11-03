@@ -160,9 +160,12 @@ class LockNotificationListener : NotificationListenerService(), LockNotification
             val title = a.title?.toString()?.takeIf { it.isNotBlank() } ?: return@mapIndexedNotNull null
             val reply = a.remoteInputs?.any { it.allowFreeFormInput } == true
             val auth = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && a.isAuthenticationRequired
-            NoteAction(title, i, reply, LockNotifications.needsUnlock(auth, reply))
+            val read = LockNotifications.marksRead(Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && a.semanticAction == Notification.Action.SEMANTIC_ACTION_MARK_AS_READ, title)
+            NoteAction(title, i, reply, LockNotifications.needsUnlock(auth, reply), isMarkRead = read)
         }
-        return all.filter { it.isReply }.take(1) + all.filterNot { it.isReply }.take(3)
+        // "Mark as read" stays even past the first three, for a swipe to use.
+        val others = all.filterNot { it.isReply }
+        return all.filter { it.isReply }.take(1) + others.take(3) + others.drop(3).filter { it.isMarkRead }
     }
 
     /** Android's own lock-screen settings: not public, so null when this phone won't say. */

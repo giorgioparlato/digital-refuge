@@ -117,7 +117,7 @@ insights
 - Fewer
 - All …
 - Each day
-- Against a day's budget, the same in every month. Tap a day for it
+- Against a day's budget, the same in every month. Tap a day for its time and top apps
 - On the phone
 - Distracting
 - in distracting apps
@@ -127,6 +127,13 @@ insights
 - Nothing kept for these days yet.
 - twice or more
 - {text} ›
+-  on the phone
+-  in distracting apps
+- … of it distracting
+- Only the day's total is kept this far back.
+- No app took a minute.
+- The whole day ›
+- Close
 - A day on the phone
 - A day in distracting apps
 - Save

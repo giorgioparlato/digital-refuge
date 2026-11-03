@@ -68,6 +68,7 @@ import app.bedtime.data.LockNotification
 import app.bedtime.data.LockNotifications
 import app.bedtime.data.NoteAction
 import app.bedtime.data.NoteDetail
+import app.bedtime.data.NoteSwipe
 import app.bedtime.ui.components.AppIcon
 import app.bedtime.ui.components.Text
 import app.bedtime.ui.formatTime
@@ -124,15 +125,60 @@ internal fun NotificationArea(
     }
     Column(modifier.verticalScroll(scroll), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         if (!listOpen) {
-            SummaryLine(LockNotifications.summary(notes), p) { onListOpen(true) }
+            // Swiped aside, the line does to all of them what that way does to one; quieting or answering opens the list.
+            val all = rememberSwipeToDismissBoxState(
+                confirmValueChange = { value ->
+                    if (value == SwipeToDismissBoxValue.Settled) return@rememberSwipeToDismissBoxState true
+                    val wanted = if (value == SwipeToDismissBoxValue.StartToEnd) style.lockSwipeRight else style.lockSwipeLeft
+                    when (wanted) {
+                        NoteSwipe.CLEAR -> notes.forEach(handlers.dismiss)
+                        NoteSwipe.LATER -> notes.forEach(handlers.later)
+                        NoteSwipe.MARK_READ -> notes.forEach { note ->
+                            if (LockNotifications.swiped(wanted, note) == NoteSwipe.MARK_READ) handlers.act(note, note.actions.first { it.isMarkRead }, null) else handlers.dismiss(note)
+                        }
+                        NoteSwipe.QUIET, NoteSwipe.REPLY -> {
+                            onListOpen(true)
+                            return@rememberSwipeToDismissBoxState false
+                        }
+                    }
+                    true
+                },
+            )
+            SwipeToDismissBox(all, backgroundContent = {}) {
+                SummaryLine(LockNotifications.summary(notes), p) { onListOpen(true) }
+            }
             return@Column
         }
         val shown = if (replying != null) notes.filter { it.key == replying } else notes.take(MAX_NOTIFICATIONS)
+        // "Quiet until…" open on one of them, by its chip or a swipe.
+        var quieting by remember { mutableStateOf<String?>(null) }
         shown.forEach { note ->
             key(note.key) {
+                // Each way does what you chose; those that open something in place spring back.
                 val swipe = rememberSwipeToDismissBoxState(
                     confirmValueChange = { value ->
-                        if (value != SwipeToDismissBoxValue.Settled) handlers.dismiss(note)
+                        if (value == SwipeToDismissBoxValue.Settled) return@rememberSwipeToDismissBoxState true
+                        val wanted = if (value == SwipeToDismissBoxValue.StartToEnd) style.lockSwipeRight else style.lockSwipeLeft
+                        when (LockNotifications.swiped(wanted, note)) {
+                            NoteSwipe.CLEAR -> handlers.dismiss(note)
+                            NoteSwipe.LATER -> handlers.later(note)
+                            // Taken off once the button has gone, which may first ask for the unlock.
+                            NoteSwipe.MARK_READ -> handlers.act(note, note.actions.first { it.isMarkRead }, null)
+                            NoteSwipe.QUIET -> {
+                                onExpand(note.key)
+                                quieting = note.key
+                                return@rememberSwipeToDismissBoxState false
+                            }
+                            NoteSwipe.REPLY -> {
+                                onExpand(note.key)
+                                onReply(note.key)
+                                return@rememberSwipeToDismissBoxState false
+                            }
+                            null -> {
+                                onExpand(note.key)
+                                return@rememberSwipeToDismissBoxState false
+                            }
+                        }
                         true
                     },
                 )
@@ -148,6 +194,8 @@ internal fun NotificationArea(
                         replying = replying == note.key,
                         onReply = { on -> onReply(if (on) note.key else null) },
                         quickReplies = quickReplies,
+                        quieting = quieting == note.key,
+                        onQuieting = { on -> quieting = if (on) note.key else null },
                     )
                 }
             }
@@ -202,6 +250,8 @@ private fun NotificationRow(
     replying: Boolean,
     onReply: (Boolean) -> Unit,
     quickReplies: List<String>,
+    quieting: Boolean = false,
+    onQuieting: (Boolean) -> Unit = {},
 ) {
     val more = note.messages.isNotEmpty() || note.body != null
     // Opened, by the arrow or a drag, it scrolls itself fully into view.
@@ -265,16 +315,15 @@ private fun NotificationRow(
                 }
                 val reply = note.actions.firstOrNull { it.isReply }
                 // "Quiet until…" opens its choices in place of the buttons; "‹" goes back to them.
-                var quieting by remember(note.key) { mutableStateOf(false) }
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (quieting) {
-                        NoteChip("‹", p) { quieting = false }
+                        NoteChip("‹", p) { onQuieting(false) }
                         handlers.quietChoices().forEach { (label, until) -> NoteChip(label, p) { handlers.quiet(note, until) } }
                     } else {
                         if (reply != null && !replying) NoteChip("Reply", p) { onReply(true) }
                         note.actions.filterNot { it.isReply }.forEach { action -> NoteChip(action.title, p) { handlers.act(note, action, null) } }
                         NoteChip("Later", p) { handlers.later(note) }
-                        NoteChip("Quiet until…", p) { quieting = true }
+                        NoteChip("Quiet until…", p) { onQuieting(true) }
                     }
                 }
                 if (replying && reply != null) {

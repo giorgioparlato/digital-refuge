@@ -74,7 +74,7 @@ internal fun PauseScreen(
         val keep = { words: String, moods: List<String>, wentOn: Boolean ->
             if (words.isNotBlank() || moods.isNotEmpty()) {
                 val line = app.bedtime.data.Why.line(java.time.LocalDateTime.now(), label, question, words, wentOn, moods)
-                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch { Repository.get(context).addWhy(line, moods) }
+                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch { Repository.get(context).addWhy(line, moods, label.lowercase(), wentOn) }
             }
         }
         WhyScreen(

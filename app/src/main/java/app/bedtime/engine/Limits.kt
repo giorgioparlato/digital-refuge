@@ -15,7 +15,8 @@ import app.bedtime.data.UsageDay
  */
 data class PauseRule(
     val seconds: Int,
-    val graceMinutes: Int,
+    /** How long the pass lasts once granted; null until you leave the apps. */
+    val openMinutes: Int? = null,
     val passKey: String,
     val group: Set<String>,
     val kind: PauseKind = PauseKind.WAIT,
@@ -107,7 +108,7 @@ object Limits {
         covering(limits, pkg, usage.day).mapNotNull { secondsLeft(it, pkg, usage, unsaved) }.minOrNull()
 
     /**
-     * The pause before opening [pkg] if any limit asks for one: the longest pause, the shortest grace,
+     * The pause before opening [pkg] if any limit asks for one: the longest pause, with its time open,
      * and the pass that "open anyway" grants — for the app alone, or for all of the strictest limit's
      * apps when it says so.
      */
@@ -116,7 +117,7 @@ object Limits {
         val strictest = pausing.maxByOrNull { it.rules.pauseSeconds ?: 0 } ?: return null
         return PauseRule(
             seconds = strictest.rules.pauseSeconds ?: 0,
-            graceMinutes = pausing.minOf { it.rules.graceMinutes },
+            openMinutes = strictest.rules.openMinutes,
             passKey = if (strictest.rules.pauseForGroup) "limit:${strictest.id}" else pkg,
             group = if (strictest.rules.pauseForGroup) strictest.rules.apps else setOf(pkg),
             kind = strictest.rules.pauseKind,
@@ -151,7 +152,7 @@ object Limits {
     fun isLooser(old: LimitRules, new: LimitRules): Boolean =
         !new.apps.containsAll(old.apps) ||
             (new.pauseSeconds ?: 0) < (old.pauseSeconds ?: 0) ||
-            ((old.pauseSeconds ?: 0) > 0 && new.graceMinutes > old.graceMinutes) ||
+            ((old.pauseSeconds ?: 0) > 0 && old.openMinutes != null && (new.openMinutes ?: Int.MAX_VALUE) > old.openMinutes) ||
             ((old.pauseSeconds ?: 0) > 0 && !old.pauseForGroup && new.pauseForGroup) ||
             ((old.pauseSeconds ?: 0) > 0 && pauseLooser(old, new)) ||
             budgetLooser(old, new) ||

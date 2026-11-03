@@ -869,6 +869,15 @@ internal fun ScheduleEditContent(
                             )
                         }
                     }
+                    AnimatedVisibility(draft.unlockAction.mode == UnlockMode.PAUSE) {
+                        Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text("How do you feel now?", style = MaterialTheme.typography.bodyMedium, color = c.textNormal)
+                                Text("Your moods to tap, once the break is over", style = MaterialTheme.typography.bodySmall, color = c.textMuted)
+                            }
+                            ObsidianToggle(draft.moodAfterUnlock, { on -> onDraftChange(draft.copy(moodAfterUnlock = on)) })
+                        }
+                    }
                 }
 
                 // ---------------------------------------------------------------- the ways around it

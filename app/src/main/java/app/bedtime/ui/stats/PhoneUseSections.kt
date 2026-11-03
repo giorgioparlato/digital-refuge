@@ -62,6 +62,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.bedtime.data.UseComparison
+import app.bedtime.data.UseDay
 import app.bedtime.data.UseMonths
 import app.bedtime.data.UseWords
 import app.bedtime.data.UsePeriod
@@ -198,12 +199,32 @@ internal fun PhoneStats(
     if (period == UsePeriod.MONTH) {
         // The whole phone first; distracting apps a tap away.
         var wholePhone by rememberSaveable { mutableStateOf(true) }
+        val heat = UseHeat.month(YearMonth.from(start), use.days, months[UseMonths.key(start.toEpochDay())], wholePhone, today)
+        // A day tapped: its total and top apps at a glance, the month still behind; the whole day a tap further.
+        var glance by rememberSaveable { mutableStateOf<Long?>(null) }
+        glance?.let(LocalDate::ofEpochDay)?.let { date ->
+            DayGlance(
+                date,
+                use.days[date.toEpochDay()],
+                heat.firstOrNull { it.date == date }?.seconds,
+                wholePhone,
+                labels,
+                use.distractingApps,
+                limitedApps,
+                today,
+                onOpen = {
+                    glance = null
+                    openDay(date)
+                },
+                onDismiss = { glance = null },
+            )
+        }
         MonthHeat(
-            UseHeat.month(YearMonth.from(start), use.days, months[UseMonths.key(start.toEpochDay())], wholePhone, today),
+            heat,
             homeStyle,
             wholePhone = wholePhone,
             onWholePhone = { wholePhone = it },
-            onDay = openDay,
+            onDay = { glance = it.toEpochDay() },
             onBudget = onBudget,
             today = today,
         )
@@ -383,7 +404,7 @@ private fun MonthHeat(
         val level = UseHeat.level(seconds, budget)
         return if (level <= 1f) calm.copy(alpha = 0.3f + 0.4f * level) else androidx.compose.ui.graphics.lerp(over, Reddest, (level - 1f) / (UseHeat.REDDEST - 1f))
     }
-    SectionCard(title = "Each day", subtitle = "Against a day's budget, the same in every month. Tap a day for it") {
+    SectionCard(title = "Each day", subtitle = "Against a day's budget, the same in every month. Tap a day for its time and top apps") {
         SegmentedChoice(options = listOf("On the phone", "Distracting"), selected = if (wholePhone) 0 else 1, onSelect = { onWholePhone(it == 0) })
         Spacer(Modifier.height(8.dp))
         // The budget it's set against, and a way to choose it; until you have, a nudge to.
@@ -419,7 +440,7 @@ private fun MonthHeat(
                                     .clip(shape)
                                     .background(if (seconds != null && seconds > 0) colour(seconds) else Color.Transparent)
                                     .border(if (isToday) 2.dp else 1.dp, if (isToday) c.accent else c.border.copy(alpha = if (seconds == null) 0.4f else 0.8f), shape)
-                                    .then(if (seconds != null || isToday) Modifier.clickable(onClickLabel = "open this day") { onDay(day.date) } else Modifier),
+                                    .then(if (seconds != null || isToday) Modifier.clickable(onClickLabel = "this day at a glance") { onDay(day.date) } else Modifier),
                                 contentAlignment = Alignment.Center,
                             ) {
                                 Text(
@@ -470,6 +491,57 @@ private fun LinkLine(text: String, strong: Boolean, onClick: () -> Unit) {
         style = MaterialTheme.typography.bodySmall,
         color = if (strong) c.accentText else c.textMuted,
         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable(onClick = onClick).padding(vertical = 6.dp),
+    )
+}
+
+/**
+ * A day from the month at a glance: its time on the phone or in distracting apps ([wholePhone]), and
+ * the five apps that took most of it; then the whole day, if you want it. Days older than those kept
+ * have only their total.
+ */
+@Composable
+private fun DayGlance(
+    date: LocalDate,
+    day: UseDay?,
+    total: Long?,
+    wholePhone: Boolean,
+    labels: Map<String, String>,
+    distractingApps: Set<String>,
+    limitedApps: Set<String>,
+    today: LocalDate,
+    onOpen: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val c = Obsidian.colors
+    val top = day?.apps.orEmpty().filter { (pkg, seconds) -> seconds >= 60 && (wholePhone || pkg in distractingApps) }
+        .toList().sortedByDescending { it.second }.take(5)
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = c.bgSecondary,
+        title = { Text(periodLabel(UsePeriod.DAY, date, today)) },
+        text = {
+            Column {
+                val seconds = day?.let { if (wholePhone) it.total else it.distractingTotal } ?: total ?: 0L
+                Text(
+                    UseWords.short(seconds) + if (wholePhone) " on the phone" else " in distracting apps",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = c.textNormal,
+                )
+                if (wholePhone && day != null && day.distractingTotal > 0) {
+                    Text("${UseWords.short(day.distractingTotal)} of it distracting", style = MaterialTheme.typography.bodySmall, color = c.textMuted)
+                }
+                Spacer(Modifier.height(12.dp))
+                when {
+                    day == null -> Text("Only the day's total is kept this far back.", style = MaterialTheme.typography.bodySmall, color = c.textFaint)
+                    top.isEmpty() -> Text("No app took a minute.", style = MaterialTheme.typography.bodySmall, color = c.textFaint)
+                    else -> top.forEach { (pkg, s) ->
+                        AppRow(labels[pkg] ?: pkg, s, day.opens[pkg] ?: 0, then = null, distracting = pkg in distractingApps, limited = pkg in limitedApps)
+                    }
+                }
+            }
+        },
+        confirmButton = { if (day != null) TextButton(onClick = onOpen) { Text("The whole day ›", color = c.accentText) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Close", color = c.textMuted) } },
     )
 }
 

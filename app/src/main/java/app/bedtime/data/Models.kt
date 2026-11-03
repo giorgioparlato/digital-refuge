@@ -62,6 +62,8 @@ data class Schedule(
     /** While this runs, "why am i unlocking my phone right now?" after each unlock; with [askWhyWords], at least that many words. */
     val askWhy: Boolean = false,
     val askWhyWords: Int = 0,
+    /** "How do you feel now?" once an unlock's break is over. */
+    val moodAfterUnlock: Boolean = false,
     /** How long each of those breaks lasts, in minutes (at least 1). */
     val breakMinutes: Int = 1,
     /** Hours outside which this can't be changed at all; null means it can be changed any time. */
@@ -219,6 +221,10 @@ data class LockLook(
     val calendarTomorrow: Boolean? = null,
 )
 
+/** A lock-screen notification swiped aside: cleared, kept for later, marked read, quieted for a while, or answered. */
+@Serializable
+enum class NoteSwipe { CLEAR, LATER, MARK_READ, QUIET, REPLY }
+
 /** Look of the minimal home screen. Colours are ARGB. */
 @Serializable
 data class HomeStyle(
@@ -255,6 +261,9 @@ data class HomeStyle(
     val circles: List<Circle>? = null,
     /** Ready-made replies to a message from the lock screen; typing your own works too. */
     val quickReplies: List<String> = DEFAULT_QUICK_REPLIES,
+    /** What swiping a notification aside does, one way and the other. */
+    val lockSwipeLeft: NoteSwipe = NoteSwipe.CLEAR,
+    val lockSwipeRight: NoteSwipe = NoteSwipe.CLEAR,
     /** The weather after the date, as Breezy Weather sends it. */
     val showWeather: Boolean = false,
     /** The row of today's 24 hours on the minimal screen, and on the lock screen. */
@@ -525,6 +534,7 @@ object HomeActions {
     const val WEEK = "week"
     const val BLOCKS = "blocks"
     const val LOOKUP = "lookup"
+    const val JOURNAL = "journal"
     const val CAMERA = GESTURE_CAMERA
 
     /** In the order they're offered, with how each reads. The look-up is in the quick note now, so it isn't offered of its own. */
@@ -534,6 +544,7 @@ object HomeActions {
         NOTE to "Write a note or look up a word",
         SEARCH to "Search",
         NOTES to "Your notes",
+        JOURNAL to "Microjournal: a line for today",
         WEEK to "The week ahead",
         BLOCKS to "Your blocks, to start one",
         CAMERA to "Camera",
@@ -636,6 +647,10 @@ data class AppSettings(
     val journalOn: Boolean = false,
     /** Your journalling sections; null until you change one, so the suggested ones ([Journal.SUGGESTED]). */
     val journalSections: List<JournalSection>? = null,
+    /** "How do you feel now?" after this many minutes on the phone in one go; 0 never. Schedules and limits have their own. */
+    val moodAfterMinutes: Int = 0,
+    /** The prompts a button away while writing (hidden until asked for); off, no button at all. */
+    val journalPrompts: Boolean = true,
     /** Whether looking up on the lock screen finds your notes too, to read there without unlocking. */
     val lookUpNotes: Boolean = false,
     /** An app's shortcut run after a quick note goes into one of your files, e.g. a sync app's "Sync now". */
@@ -720,10 +735,15 @@ data class LimitRules(
     val pauseGrowth: Int = 0,
     /** With the pause asking why: at least this many words before the app opens; 0 for none. */
     val askWords: Int = 0,
-    /** After "open anyway", how long you can be away and come back without the pause; 0 = every open. */
-    val graceMinutes: Int = 2,
+    /**
+     * After the pause, how long its apps stay open, coming and going as you like; then the pause again.
+     * Null: until you leave them (back within a minute is the same visit).
+     */
+    val openMinutes: Int? = null,
     /** Whether "open anyway" on one of the apps lets you into all of them, rather than only that one. */
     val pauseForGroup: Boolean = false,
+    /** "How do you feel now?" once the time open after the pause is over, or a minute after leaving them. */
+    val moodAfter: Boolean = false,
     /** Minutes a day in these apps; null means no budget. */
     val dailyMinutes: Int? = null,
     /** Times a day these apps can be opened; null means no count. Each "more" gives one more. */

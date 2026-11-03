@@ -51,6 +51,7 @@ import app.bedtime.data.FolderIndex
 import app.bedtime.data.Notes
 import app.bedtime.ui.components.AppIcon
 import app.bedtime.ui.components.BedtimeIcons
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
@@ -99,8 +100,8 @@ internal fun QuickNoteDialog(
     onOffer: (DrawerResult) -> Unit = {},
     initial: String = "",
     whole: Boolean = false,
-    /** Today's microjournal entry, in your notes, when the microjournal is on. */
-    onJournal: (() -> Unit)? = null,
+    /** The microjournal as one more place for it, when the microjournal is on. */
+    journal: JournalWith? = null,
 ) {
     var words by remember { mutableStateOf(initial) }
     // A swipe puts it away only while there's no more than a word in it, so a note isn't lost to one.
@@ -116,7 +117,7 @@ internal fun QuickNoteDialog(
             whole = whole,
             initial = initial,
             onWords = { words = it },
-            onJournal = onJournal?.let { open -> { open(); onDismiss() } },
+            journal = journal?.let { j -> JournalWith(j.moods) { text, moods -> j.onSave(text, moods); onDismiss() } },
         )
     }
 }
@@ -137,8 +138,8 @@ internal fun QuickNoteContent(
     onWords: ((String) -> Unit)? = null,
     /** An × at the top, to put it away. */
     onClose: (() -> Unit)? = null,
-    /** The microjournal, when it's on: a chip opens today's entry in your notes. */
-    onJournal: (() -> Unit)? = null,
+    /** The microjournal, when it's on: a line in today's entry, with how you feel if you like. */
+    journal: JournalWith? = null,
 ) {
     val context = LocalContext.current
     val p = style.palette()
@@ -153,6 +154,7 @@ internal fun QuickNoteContent(
     }
     val setText: (String) -> Unit = { setField(TextFieldValue(it, TextRange(it.length))) }
     var reading by remember { mutableStateOf<FoundNote?>(null) }
+    var feeling by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
     if (focus) LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
     val hasDictionaries by produceState(false, lookUp) {
@@ -177,14 +179,6 @@ internal fun QuickNoteContent(
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("A quick note", style = MaterialTheme.typography.titleMedium, color = p.text, modifier = Modifier.weight(1f))
-            if (onJournal != null) {
-                Text(
-                    "microjournal ›",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = p.accent,
-                    modifier = Modifier.clip(RoundedCornerShape(50)).clickable(onClick = onJournal).padding(horizontal = 8.dp, vertical = 6.dp),
-                )
-            }
             if (onClose != null) {
                 Box(Modifier.size(36.dp).clip(RoundedCornerShape(50)).clickable(onClickLabel = "close", onClick = onClose), contentAlignment = Alignment.Center) {
                     Icon(Icons.Default.Close, contentDescription = null, tint = p.faint, modifier = Modifier.size(20.dp))
@@ -252,7 +246,17 @@ internal fun QuickNoteContent(
             Box(Modifier.fillMaxWidth().padding(vertical = 2.dp).height(1.dp).background(p.faint.copy(alpha = 0.25f)))
         }
         val ready = text.isNotBlank()
-        (listOf<NoteTarget?>(null) + targets).forEach { target ->
+        // Going to the microjournal: how you feel first, if you like, or straight in.
+        if (journal != null && feeling) {
+            JournalMoods(journal.moods, style, onDone = { moods -> journal.onSave(text.trim(), moods) }, onBack = { feeling = false })
+            return@Column
+        }
+        (listOf<NoteTarget?>(null) + targets).forEachIndexed { i, target ->
+            if (i == 1 && journal != null) {
+                TargetRow(BedtimeIcons.Book, "Add to today's microjournal", ready, style) {
+                    if (journal.moods.isEmpty()) journal.onSave(text.trim(), emptyList()) else feeling = true
+                }
+            }
             Row(
                 Modifier
                     .fillMaxWidth()
@@ -278,6 +282,105 @@ internal fun QuickNoteContent(
                 )
             }
         }
+        if (targets.isEmpty() && journal != null) {
+            TargetRow(BedtimeIcons.Book, "Add to today's microjournal", ready, style) {
+                if (journal.moods.isEmpty()) journal.onSave(text.trim(), emptyList()) else feeling = true
+            }
+        }
+    }
+}
+
+/** The microjournal as one more place for a quick note: the moods to offer first, and saving with those picked. */
+class JournalWith(val moods: List<String>, val onSave: (text: String, moods: List<String>) -> Unit)
+
+/** The microjournal for the quick note when it's on: the line goes in today's entry, and says so. */
+internal fun journalWith(context: android.content.Context, repo: app.bedtime.data.Repository, scope: kotlinx.coroutines.CoroutineScope, settings: app.bedtime.data.AppSettings): JournalWith? =
+    if (!settings.journalOn) null else JournalWith(app.bedtime.data.Why.moods(settings)) { text, moods ->
+        scope.launch {
+            repo.addJournalLine(text, moods)
+            android.widget.Toast.makeText(context, "added to today's microjournal", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
+
+/** One more place a note can go, in the same look as the others. */
+@Composable
+private fun TargetRow(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, ready: Boolean, style: HomeStyle, onClick: () -> Unit) {
+    val p = style.palette()
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable(enabled = ready, onClick = onClick).padding(vertical = 10.dp, horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(22.dp).alpha(if (ready) 1f else 0.5f), contentAlignment = Alignment.Center) {
+            Icon(icon, contentDescription = null, tint = p.accent, modifier = Modifier.size(20.dp))
+        }
+        Spacer(Modifier.width(14.dp))
+        Text(label, style = MaterialTheme.typography.bodyLarge, color = if (ready) p.text else p.faint)
+    }
+}
+
+/** Something shared straight to the microjournal: what it is, then how you feel, or skip. */
+@Composable
+internal fun JournalShareDialog(text: String, style: HomeStyle, journal: JournalWith, onDismiss: () -> Unit) {
+    val p = style.palette()
+    if (journal.moods.isEmpty()) {
+        LaunchedEffect(Unit) {
+            journal.onSave(text, emptyList())
+            onDismiss()
+        }
+        return
+    }
+    TopPanel(onDismiss) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(24.dp))
+                .background(p.background)
+                .border(1.dp, p.faint.copy(alpha = 0.25f), RoundedCornerShape(24.dp))
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text("To today's microjournal", style = MaterialTheme.typography.titleMedium, color = p.text)
+            app.bedtime.ui.components.VerbatimText(text.take(300), style = MaterialTheme.typography.bodyMedium, color = p.faint)
+            JournalMoods(journal.moods, style, onDone = { moods ->
+                journal.onSave(text, moods)
+                onDismiss()
+            }, onBack = onDismiss)
+        }
+    }
+}
+
+/** How you feel, before a line goes in the microjournal: tap any, or skip. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun JournalMoods(moods: List<String>, style: HomeStyle, onDone: (List<String>) -> Unit, onBack: () -> Unit) {
+    val p = style.palette()
+    var picked by remember { mutableStateOf(emptyList<String>()) }
+    Text("How do you feel?", style = MaterialTheme.typography.bodyLarge, color = p.text)
+    androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        moods.forEach { mood ->
+            val on = mood in picked
+            Text(
+                mood,
+                style = MaterialTheme.typography.labelLarge,
+                color = if (on) p.background else p.text,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50))
+                    .background(if (on) p.accent else p.background)
+                    .border(1.dp, if (on) p.accent else p.faint.copy(alpha = 0.5f), RoundedCornerShape(50))
+                    .clickable { picked = if (on) picked - mood else picked + mood }
+                    .padding(horizontal = 14.dp, vertical = 7.dp),
+            )
+        }
+    }
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text("‹", style = MaterialTheme.typography.titleMedium, color = p.faint, modifier = Modifier.clip(RoundedCornerShape(50)).clickable(onClick = onBack).padding(horizontal = 12.dp, vertical = 8.dp))
+        Spacer(Modifier.weight(1f))
+        Text(
+            if (picked.isEmpty()) "Skip, just add it" else "Add it",
+            style = MaterialTheme.typography.labelLarge,
+            color = p.accent,
+            modifier = Modifier.clip(RoundedCornerShape(50)).clickable { onDone(picked) }.padding(horizontal = 12.dp, vertical = 8.dp),
+        )
     }
 }
 

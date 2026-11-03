@@ -9,6 +9,7 @@ import app.bedtime.ui.settings.CircleScreen
 import app.bedtime.data.Circles
 
 import app.bedtime.data.Circle
+import app.bedtime.data.NoteSwipe
 import app.bedtime.data.RainAlert
 
 import app.bedtime.data.ModuleChoice
@@ -527,7 +528,7 @@ internal fun HomeStyleContent(
                         description = if (style.lockNotifications && !notificationAccess) {
                             "Notification access is off, so none can show. Switch this on again to allow it"
                         } else {
-                            "Drag one down to read it; tap to unlock and open it, or swipe it aside to clear it"
+                            "Drag one down to read it, tap to unlock and open it, or swipe it aside: each way does what you choose below"
                         },
                     ) { ObsidianToggle(style.lockNotifications && notificationAccess, onLockNotifications) }
                     if (style.lockNotifications && notificationAccess) {
@@ -548,6 +549,8 @@ internal fun HomeStyleContent(
                             description = "${style.quickReplies.size} ready to send with a tap. Typing your own works too",
                             onClick = { editingReplies = true },
                         ) { Chevron() }
+                        SwipeChoiceRow("Swipe left", style.lockSwipeLeft) { onChange(style.copy(lockSwipeLeft = it)) }
+                        SwipeChoiceRow("Swipe right", style.lockSwipeRight) { onChange(style.copy(lockSwipeRight = it)) }
                     }
                 }
                 SectionCard(title = "Your week", subtitle = "Time in refuge, how sessions held, the phone and habits, against the week before") {
@@ -791,6 +794,7 @@ private fun SwipeTargetDialog(swipe: Swipe, apps: List<AppEntry>, onDismiss: () 
             },
             GESTURE_CAMERA to "Camera, without unlocking",
             HomeActions.NOTE to "Write a note or look up a word, without unlocking",
+            HomeActions.JOURNAL to "Microjournal: a line for today, once unlocked",
             HomeActions.NOTIFICATIONS to "Show notifications",
             HomeActions.LOCK to "Turn the screen off",
         ),
@@ -1034,5 +1038,35 @@ private fun UseWidgetOptions(use: UseWidget, onChange: (UseWidget) -> Unit) {
             selected = minutes.indexOf(chosen).coerceAtLeast(0),
             onSelect = { i -> onChange(use.withAllowance(use.budgetWholePhone, minutes[i])) },
         )
+    }
+}
+
+/** What each swipe does, in a few words. */
+private fun swipeWords(swipe: NoteSwipe): String = when (swipe) {
+    NoteSwipe.CLEAR -> "Clear it"
+    NoteSwipe.LATER -> "Later: back when the session ends"
+    NoteSwipe.MARK_READ -> "Mark as read, where the app has the button; cleared otherwise"
+    NoteSwipe.QUIET -> "Quiet until…: its app or conversation, for a while"
+    NoteSwipe.REPLY -> "Reply, to a message; anything else opens to read"
+}
+
+/** One swipe's action, chosen from a menu under its row. */
+@Composable
+private fun SwipeChoiceRow(title: String, chosen: NoteSwipe, onChoose: (NoteSwipe) -> Unit) {
+    val c = Obsidian.colors
+    var open by remember { mutableStateOf(false) }
+    Box {
+        OptionRow(Icons.Default.Notifications, title, description = swipeWords(chosen), onClick = { open = true }) { Chevron() }
+        androidx.compose.material3.DropdownMenu(expanded = open, onDismissRequest = { open = false }, containerColor = c.bgSecondary) {
+            NoteSwipe.entries.forEach { option ->
+                androidx.compose.material3.DropdownMenuItem(
+                    text = { Text(swipeWords(option), color = if (option == chosen) c.accentText else c.textNormal) },
+                    onClick = {
+                        open = false
+                        onChoose(option)
+                    },
+                )
+            }
+        }
     }
 }

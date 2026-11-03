@@ -24,11 +24,13 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -100,8 +102,8 @@ class WhyActivity : ComponentActivity() {
     private fun keep(question: String, words: String, moods: List<String>, wentOn: Boolean) {
         if (words.isBlank() && moods.isEmpty()) return
         val repo = Repository.get(applicationContext)
-        val line = Why.line(LocalDateTime.now(), "unlocking", question, words, wentOn, moods)
-        lifecycleScope.launch { withContext(NonCancellable) { repo.addWhy(line, moods) } }
+        val line = Why.line(LocalDateTime.now(), app.bedtime.data.Moods.UNLOCKING, question, words, wentOn, moods)
+        lifecycleScope.launch { withContext(NonCancellable) { repo.addWhy(line, moods, app.bedtime.data.Moods.UNLOCKING, wentOn) } }
     }
 
     /** Not now: after an unlock the phone locks again; before an app, home instead. */
@@ -164,7 +166,17 @@ internal fun WhyScreen(
         Text(question, fontSize = 26.sp, color = c.textNormal, textAlign = TextAlign.Center)
         if (moods.isNotEmpty()) {
             Spacer(Modifier.height(18.dp))
-            MoodChips(moods, picked) { mood -> picked = if (mood in picked) picked - mood else picked + mood }
+            // A mood of your own joins the others for next time, and is picked now.
+            val context = androidx.compose.ui.platform.LocalContext.current
+            val scope = androidx.compose.runtime.rememberCoroutineScope()
+            MoodChips(
+                (moods + picked).distinct(),
+                picked,
+                onAdd = { mood ->
+                    if (mood !in picked) picked = picked + mood
+                    scope.launch { Repository.get(context).addMoodTag(mood) }
+                },
+            ) { mood -> picked = if (mood in picked) picked - mood else picked + mood }
         }
         Spacer(Modifier.height(20.dp))
         // Room to write it out: as much as you like, or nothing; with a minimum, typed rather than pasted.
@@ -214,25 +226,57 @@ internal fun WhyScreen(
     }
 }
 
-/** Moods to tap, one or several: the ones picked filled. */
+/**
+ * Moods to tap, one or several: the ones picked filled. With [onAdd], a "+" to type a mood of your
+ * own, which stays among them from then on.
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun MoodChips(moods: List<String>, picked: List<String>, onTap: (String) -> Unit) {
+internal fun MoodChips(moods: List<String>, picked: List<String>, onAdd: ((String) -> Unit)? = null, onTap: (String) -> Unit) {
     val c = Obsidian.colors
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        moods.forEach { mood ->
-            val on = mood in picked
-            Text(
-                mood,
-                style = MaterialTheme.typography.labelLarge,
-                color = if (on) c.bgPrimary else c.textMuted,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(50))
-                    .background(if (on) c.accent else androidx.compose.ui.graphics.Color.Transparent)
-                    .border(1.dp, if (on) c.accent else c.border, RoundedCornerShape(50))
-                    .clickable { onTap(mood) }
-                    .padding(horizontal = 14.dp, vertical = 7.dp),
+    var adding by remember { mutableStateOf(false) }
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            moods.forEach { mood -> MoodChip(mood, mood in picked) { onTap(mood) } }
+            if (onAdd != null && !adding) MoodChip("+", false) { adding = true }
+        }
+        if (onAdd != null && adding) {
+            var name by remember { mutableStateOf("") }
+            val done = {
+                name.trim().lowercase().takeIf { it.isNotEmpty() }?.let(onAdd)
+                adding = false
+            }
+            Spacer(Modifier.height(10.dp))
+            app.bedtime.ui.components.ObsidianTextField(
+                value = name,
+                onValueChange = { name = it },
+                placeholder = "a mood of your own",
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, imeAction = androidx.compose.ui.text.input.ImeAction.Done),
+                keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = { done() }),
+                modifier = Modifier.fillMaxWidth(),
             )
+            Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.End) {
+                Text("Cancel", style = MaterialTheme.typography.labelLarge, color = c.textMuted, modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { adding = false }.padding(10.dp))
+                Text("Add", style = MaterialTheme.typography.labelLarge, color = c.accentText, modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = done).padding(10.dp))
+            }
         }
     }
 }
+
+@Composable
+private fun MoodChip(label: String, on: Boolean, onClick: () -> Unit) {
+    val c = Obsidian.colors
+    Text(
+        label,
+        style = MaterialTheme.typography.labelLarge,
+        color = if (on) c.bgPrimary else c.textMuted,
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(if (on) c.accent else androidx.compose.ui.graphics.Color.Transparent)
+            .border(1.dp, if (on) c.accent else c.border, RoundedCornerShape(50))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 7.dp),
+    )
+}
+

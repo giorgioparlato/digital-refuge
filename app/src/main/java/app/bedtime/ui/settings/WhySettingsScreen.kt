@@ -58,7 +58,7 @@ import kotlinx.coroutines.launch
  * in turn, and where the answers are. A limit's own "ask why" is set in that limit.
  */
 @Composable
-fun WhySettingsScreen(onBack: () -> Unit, onOpenAnswers: () -> Unit) {
+fun WhySettingsScreen(onBack: () -> Unit, onOpenAnswers: () -> Unit, onOpenMoods: () -> Unit = {}) {
     val context = LocalContext.current
     val repo = remember { Repository.get(context) }
     val scope = rememberCoroutineScope()
@@ -83,16 +83,8 @@ fun WhySettingsScreen(onBack: () -> Unit, onOpenAnswers: () -> Unit) {
                     onSelect = { i -> change { it.copy(askOnUnlock = if (i == 1) AskWhen.ALWAYS else AskWhen.OFF) } },
                 )
             }
-            SectionCard(title = "Moods", subtitle = "Tap how you feel when answering, and in the microjournal; insights show them over time") {
-                OptionRow(Icons.Default.Edit, "Moods to tap") { app.bedtime.ui.components.ObsidianToggle(s.moodsOn, { on -> change { it.copy(moodsOn = on) } }) }
-                if (s.moodsOn) {
-                    MoodList(
-                        Why.moods(s),
-                        changed = s.moodTags != null,
-                        onChange = { list -> change { it.copy(moodTags = list) } },
-                        onReset = { change { it.copy(moodTags = null) } },
-                    )
-                }
+            SectionCard {
+                OptionRow(Icons.Default.Edit, "Moods", description = moodsWords(s), onClick = onOpenMoods) { Chevron() }
             }
             SectionCard(title = "The questions", subtitle = "Asked in turn. Change any, delete some, add your own") {
                 QuestionList(
@@ -103,7 +95,75 @@ fun WhySettingsScreen(onBack: () -> Unit, onOpenAnswers: () -> Unit) {
                 )
             }
             SectionCard {
-                OptionRow(Icons.Default.Edit, "Your answers", description = "Whatever you write, in one note at the top of your notes", onClick = onOpenAnswers) { Chevron() }
+                OptionRow(Icons.Default.Edit, "Your answers", description = "In the microjournal: a line in that day's entry, with its time", onClick = onOpenAnswers) { Chevron() }
+            }
+            Spacer(Modifier.height(24.dp))
+        }
+    }
+}
+
+/** "hungry, angry, tired and 4 more", or off. */
+internal fun moodsWords(s: AppSettings): String {
+    if (!s.moodsOn) return "Off"
+    val moods = Why.moods(s)
+    return if (moods.size <= 3) moods.joinToString(", ") else moods.take(3).joinToString(", ") + " and ${moods.size - 3} more"
+}
+
+/**
+ * The moods to tap, when answering why and in the microjournal: on or off, and yours to rename, take
+ * out or add to. Insights shows them over time.
+ */
+@Composable
+fun MoodsScreen(onBack: () -> Unit) {
+    val context = LocalContext.current
+    val repo = remember { Repository.get(context) }
+    val scope = rememberCoroutineScope()
+    val settings by repo.settings.collectAsStateWithLifecycle(initialValue = null)
+    val s = settings ?: return
+    val change = { update: (AppSettings) -> AppSettings -> scope.launch { repo.updateSettings(update) } }
+    val c = Obsidian.colors
+    Scaffold(containerColor = c.bgPrimary, topBar = { ObsidianTopBar("Moods", onBack = onBack, subtitle = "How you feel, a tap away") }) { padding ->
+        Column(
+            Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = PageGutter, vertical = 4.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Text(
+                "Tap how you feel when answering why, and in the microjournal: each tap is kept with its time. Insights shows them over the month.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = c.textMuted,
+            )
+            SectionCard {
+                OptionRow(Icons.Default.Edit, "Moods to tap") { app.bedtime.ui.components.ObsidianToggle(s.moodsOn, { on -> change { it.copy(moodsOn = on) } }) }
+            }
+            if (s.moodsOn) {
+                SectionCard(title = "How do you feel now?", subtitle = "Your moods to tap after a stretch on the phone, to see how it leaves you") {
+                    app.bedtime.ui.components.SubOptionRow("After this long on the phone") {
+                        app.bedtime.ui.components.NumberStepper(
+                            s.moodAfterMinutes,
+                            { v -> change { it.copy(moodAfterMinutes = v) } },
+                            0..180,
+                            step = 5,
+                            presets = listOf(0, 15, 30, 45, 60, 90),
+                            title = "minutes on the phone",
+                            format = { if (it == 0) "never" else "$it min" },
+                        )
+                    }
+                    Text(
+                        "In one go, until the screen goes off. Schedules and blocks can ask once an unlock's break is over, and limits once their time open after the pause is over: each in its own settings. Never more than every 15 minutes.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = c.textMuted,
+                        modifier = Modifier.padding(top = 6.dp),
+                    )
+                }
+                SectionCard(title = "Your moods", subtitle = "Tap one to rename it; the days it was tapped follow. × takes it out") {
+                    MoodList(
+                        Why.moods(s),
+                        changed = s.moodTags != null,
+                        onChange = { list -> change { it.copy(moodTags = list) } },
+                        onRename = { old, new -> scope.launch { repo.renameMoodTag(old, new) } },
+                        onReset = { change { it.copy(moodTags = null) } },
+                    )
+                }
             }
             Spacer(Modifier.height(24.dp))
         }
@@ -143,11 +203,39 @@ fun WhyAppQuestionsScreen(onBack: () -> Unit) {
     }
 }
 
-/** Moods as chips, each with an × to take it out, a box to add one, and, once changed, back to the suggested ones. */
+/**
+ * Moods as chips, each a tap from renaming and with an × to take it out, a box to add one, and, once
+ * changed, back to the suggested ones.
+ */
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
-private fun MoodList(moods: List<String>, changed: Boolean, onChange: (List<String>) -> Unit, onReset: () -> Unit) {
+private fun MoodList(moods: List<String>, changed: Boolean, onChange: (List<String>) -> Unit, onRename: (String, String) -> Unit, onReset: () -> Unit) {
     val c = Obsidian.colors
+    var renaming by remember { mutableStateOf<String?>(null) }
+    renaming?.let { old ->
+        var name by remember(old) { mutableStateOf(old) }
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { renaming = null },
+            containerColor = c.bgSecondary,
+            title = { Text("Rename $old", color = c.textNormal) },
+            text = {
+                ObsidianTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    placeholder = old,
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, imeAction = ImeAction.Done),
+                )
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = {
+                    name.trim().lowercase().takeIf { it.isNotEmpty() && it != old }?.let { onRename(old, it) }
+                    renaming = null
+                }) { Text("Rename", color = c.accentText) }
+            },
+            dismissButton = { androidx.compose.material3.TextButton(onClick = { renaming = null }) { Text("Cancel", color = c.textMuted) } },
+        )
+    }
     Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(top = 8.dp)) {
         androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             moods.forEach { mood ->
@@ -155,7 +243,7 @@ private fun MoodList(moods: List<String>, changed: Boolean, onChange: (List<Stri
                     Modifier.clip(RoundedCornerShape(50)).border(1.dp, c.border, RoundedCornerShape(50)).padding(start = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(mood, style = MaterialTheme.typography.labelLarge, color = c.textNormal)
+                    Text(mood, style = MaterialTheme.typography.labelLarge, color = c.textNormal, modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClickLabel = "rename $mood") { renaming = mood }.padding(vertical = 6.dp))
                     Icon(
                         Icons.Default.Clear,
                         contentDescription = "take $mood out",

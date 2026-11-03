@@ -479,7 +479,8 @@ private fun settingsEntries(
             ),
         )
         add(Entry(lock, Icons.Default.KeyboardArrowUp, "Gestures", "An app, the camera, screen off…", "gesture gestures swipe double tap lock camera screen off", go(Routes.STYLE_SWIPES)))
-        add(Entry(lock, Icons.Default.Info, "Ask why after unlocking", whyWords(s.askOnUnlock), "why unlock unlocking question journal struthless hungry angry lonely tired halt", go(Routes.WHY)))
+        add(Entry(lock, Icons.Default.Info, "Ask why after unlocking", whyWords(s.askOnUnlock), "why unlock unlocking question journal struthless", go(Routes.WHY)))
+        add(Entry(lock, Icons.Default.Info, "Moods", moodsWords(s), "mood moods feeling feelings tag tags hungry angry lonely tired bored happy anxious", go(Routes.MOODS)))
 
         // ---------------------------------------------------------------- apps
         val apps = SettingsPlace.APPS

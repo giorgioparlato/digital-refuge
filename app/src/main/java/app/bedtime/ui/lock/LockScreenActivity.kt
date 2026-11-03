@@ -286,6 +286,9 @@ class LockScreenActivity : ComponentActivity() {
                 }
                 runCatching { a.actionIntent.send(this, 0, fill, null, null, null, sendOptions()) }.isSuccess
             } == true
+            // Answered or marked read, it's dealt with: off the lock screen. A reply that failed stays, to try again.
+            if (sent && reply != null) LockNotifications.answered(note, reply)
+            if (action.isMarkRead) LockNotifications.dismiss(note)
             Toast.makeText(this, if (!sent) "that didn't go through" else if (reply != null) "sent" else "done", Toast.LENGTH_SHORT).show()
         }
         if (action.needsUnlock) unlockActLock(send) else send()
@@ -441,6 +444,8 @@ private fun LockScreen(
             HomeActions.NOTE, HomeActions.LOOKUP -> quickNote = true
             HomeActions.NOTIFICATIONS -> BlockingState.globalAction(context, AccessibilityService.GLOBAL_ACTION_NOTIFICATIONS)
             HomeActions.LOCK -> onScreenOff()
+            // Today's entry needs the room, and the privacy, of the unlocked phone.
+            HomeActions.JOURNAL -> onOpenRoute(app.bedtime.Routes.JOURNAL_TODAY)
             else -> onOpenApp(action)
         }
     }
@@ -565,8 +570,8 @@ private fun LockScreen(
             ),
             offers = { words -> app.bedtime.ui.minimal.AppDrawer.noteOffers(words, settings, blocks, LocalDateTime.now()) },
             onOffer = { offer -> runOffer(context, repo, scope, settings, offer) },
-            // Today's entry, with its prompts, once you've unlocked: they need the room of the full page.
-            onJournal = if (settings.journalOn) ({ onOpenRoute(app.bedtime.Routes.JOURNAL_TODAY) }) else null,
+            // A line added to today's entry without unlocking: nothing already written shows here.
+            journal = app.bedtime.ui.minimal.journalWith(context, repo, scope, settings),
         )
     }
     // The list folds back to its summary line whenever the screen goes off.
@@ -598,6 +603,8 @@ private fun LockScreen(
     // "Later" lasts until the session ends, or an hour outside one; "quiet" until the time you choose.
     val laterUntil = occurrence?.end ?: (System.currentTimeMillis() + 60 * 60_000L)
     // Like a quick note, writing in it here saves as you go.
+    val journalEntries by repo.journal.collectAsStateWithLifecycle(initialValue = emptyList())
+    val journalToday = journalEntries.firstOrNull { it.day == java.time.LocalDate.now().toEpochDay() }
     val lockNote = noteSlots(style, Screen.LOCK, widgetNote, onWrite = { n, text -> scope.launch { repo.editNote(n.id, text) } }, onHold = { holding = Module.NOTE })
     LockScreenContent(
         now = now,
@@ -611,6 +618,10 @@ private fun LockScreen(
         // Ticking, or saving what was typed, asks for the usual unlock, then locks again; a tap on the title opens it after unlocking.
         // Like a quick note, writing in it here saves as you go.
         note = lockNote.inList,
+        // A tap opens the quick note, where a line goes in today's entry without unlocking.
+        journal = if (!Modules.isOn(style, Screen.LOCK, Module.JOURNAL)) null else ({
+            app.bedtime.ui.minimal.JournalWidget(style, journalToday, onTap = { quickNote = true }, onHold = { holding = Module.JOURNAL })
+        }),
         noteBeside = lockNote.beside,
         // Ticking from here asks for the usual unlock first, then locks again, as a reply does.
         habits = habitsSlot(
@@ -718,6 +729,7 @@ internal fun LockScreenContent(
     /** A long press on an empty spot: this screen's widgets, and the way to their settings. */
     onScreenHold: (() -> Unit)? = null,
     note: (@Composable () -> Unit)? = null,
+    journal: (@Composable () -> Unit)? = null,
     noteBeside: (@Composable () -> Unit)? = null,
 ) {
     var expanded by remember { mutableStateOf(initialExpanded) }
@@ -778,6 +790,7 @@ internal fun LockScreenContent(
                     habits = habits,
                     nowPlaying = nowPlaying,
                     note = note,
+                    journal = journal,
                     noteBeside = noteBeside,
                     onHold = onWidgetHold,
                     screen = Screen.LOCK,

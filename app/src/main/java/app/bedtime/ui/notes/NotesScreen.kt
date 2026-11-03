@@ -771,8 +771,13 @@ internal fun NoteEditor(
     onDelete: (() -> Unit)?,
     title: String? = null,
     actions: @Composable () -> Unit = {},
-    panel: (@Composable (insert: (String) -> Unit) -> Unit)? = null,
+    /** Above the text: it reads the text with its cursor, and changes it there. */
+    panel: (@Composable (value: TextFieldValue, edit: ((TextFieldValue) -> TextFieldValue) -> Unit) -> Unit)? = null,
     saveWith: Any? = null,
+    /** Typing read first by the note's own rules (the microjournal's timed lines); null leaves it to the lists'. */
+    onType: ((old: TextFieldValue, new: TextFieldValue) -> TextFieldValue?)? = null,
+    /** The keyboard up as it opens, ready to write. */
+    focus: Boolean = false,
     /** A box ticked or unticked at a line: the text it leaves, when the note does more than tick it (the to-do's). */
     onTick: ((text: String, line: Int) -> String)? = null,
     /** Under the text, scrolling with it: the to-do's done ones; it can set the text, and read it. */
@@ -794,6 +799,8 @@ internal fun NoteEditor(
         value = new
     }
     BackHandler { onDone(value.text) }
+    val focusText = remember { androidx.compose.ui.focus.FocusRequester() }
+    if (focus) LaunchedEffect(Unit) { runCatching { focusText.requestFocus() } }
     // Saved a moment after you pause typing.
     LaunchedEffect(value.text, saveWith) {
         delay(600)
@@ -811,10 +818,7 @@ internal fun NoteEditor(
         },
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).imePadding()) {
-            panel?.invoke { prompt ->
-                val (text, cursor) = app.bedtime.data.Journal.inserted(value.text, value.selection.start, prompt)
-                edit(TextFieldValue(text, TextRange(cursor)), true)
-            }
+            panel?.invoke(value) { change -> edit(change(value), true) }
             var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
             // The note grows inside a scrolling page, so its boxes can be drawn where its lines are.
             Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = PageGutter)) {
@@ -834,14 +838,15 @@ internal fun NoteEditor(
                             redo = emptyList()
                         }
                         ticked != null -> edit(ticked, true)
-                        else -> edit(Markdown.continueList(value, new), false)
+                        else -> edit(onType?.invoke(value, new) ?: Markdown.continueList(value, new), false)
                     }
                 },
                 textStyle = MaterialTheme.typography.bodyLarge.copy(color = c.textNormal),
                 cursorBrush = SolidColor(c.accent),
                 visualTransformation = remember(c.textFaint, c.accent) { MarkdownTransformation(c.textFaint, c.accent) },
                 onTextLayout = { layout = it },
-                modifier = Modifier.fillMaxWidth().heightIn(min = if (below != null) 160.dp else 400.dp).todoBoxes(value.text, { layout }, c.textNormal.copy(alpha = 0.18f), c.accent),
+                modifier = Modifier.fillMaxWidth().heightIn(min = if (below != null) 160.dp else 400.dp).todoBoxes(value.text, { layout }, c.textNormal.copy(alpha = 0.18f), c.accent)
+                    .then(if (focus) Modifier.focusRequester(focusText) else Modifier),
                 decorationBox = { field ->
                     Box(contentAlignment = Alignment.TopStart) {
                         if (value.text.isEmpty()) VerbatimText("# A title\n\n- a list\n- [ ] a to-do", style = MaterialTheme.typography.bodyLarge, color = c.textFaint)

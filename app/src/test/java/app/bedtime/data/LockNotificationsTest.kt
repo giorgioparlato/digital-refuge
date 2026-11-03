@@ -184,4 +184,32 @@ class LockNotificationsTest {
         val sessionEnd = at(afternoon.withHour(16))
         assertEquals("the session ends" to sessionEnd, LockNotifications.quietChoices(afternoon, sessionEnd).last())
     }
+
+    @Test
+    fun aSwipeDoesWhatYouChoseWhereItCan() {
+        val reply = NoteAction("Reply", 0, isReply = true, needsUnlock = true)
+        val read = NoteAction("Mark as read", 1, isReply = false, needsUnlock = false, isMarkRead = true)
+        val message = note("a").copy(actions = listOf(reply, read))
+        val plain = note("b")
+        assertEquals(NoteSwipe.MARK_READ, LockNotifications.swiped(NoteSwipe.MARK_READ, message))
+        assertEquals(NoteSwipe.REPLY, LockNotifications.swiped(NoteSwipe.REPLY, message))
+        // Without the buttons: cleared instead of marked read, opened in place instead of answered.
+        assertEquals(NoteSwipe.CLEAR, LockNotifications.swiped(NoteSwipe.MARK_READ, plain))
+        assertEquals(null, LockNotifications.swiped(NoteSwipe.REPLY, plain))
+        assertEquals(NoteSwipe.QUIET, LockNotifications.swiped(NoteSwipe.QUIET, plain))
+        assertTrue(LockNotifications.marksRead(false, "Mark as read"))
+        assertTrue(LockNotifications.marksRead(true, "Gelesen"))
+        assertFalse(LockNotifications.marksRead(false, "Mute"))
+    }
+
+    @Test
+    fun answeredStaysAwayUntilSomeoneWritesAgain() {
+        val asked = note("a").copy(messages = listOf(NoteLine("anna", "dinner?")))
+        val answered = setOf("dinner?", "yes!")
+        // The app's update, with or without the reply, isn't news.
+        assertTrue(LockNotifications.stillAnswered(asked, answered))
+        assertTrue(LockNotifications.stillAnswered(asked.copy(messages = asked.messages + NoteLine(null, "yes!")), answered))
+        assertFalse(LockNotifications.stillAnswered(asked.copy(messages = asked.messages + NoteLine("anna", "at 8?")), answered))
+        assertFalse(LockNotifications.stillAnswered(asked, null))
+    }
 }

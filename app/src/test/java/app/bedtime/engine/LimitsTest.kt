@@ -53,17 +53,17 @@ class LimitsTest {
     }
 
     @Test
-    fun strictestPauseAndShortestGraceWin() {
-        val other = AppLimit(id = "x", rules = LimitRules(apps = setOf("a"), pauseSeconds = 30, graceMinutes = 0))
-        assertEquals(PauseRule(30, 0, "a", setOf("a")), Limits.pauseFor(listOf(social, other), "a", today))
-        assertEquals(PauseRule(10, 2, "b", setOf("b")), Limits.pauseFor(listOf(social, other), "b", today))
+    fun strictestPauseWinsWithItsTimeOpen() {
+        val other = AppLimit(id = "x", rules = LimitRules(apps = setOf("a"), pauseSeconds = 30, openMinutes = 10))
+        assertEquals(PauseRule(30, 10, "a", setOf("a")), Limits.pauseFor(listOf(social, other), "a", today))
+        assertEquals(PauseRule(10, null, "b", setOf("b")), Limits.pauseFor(listOf(social, other), "b", today))
         assertNull(Limits.pauseFor(listOf(social), "c", today))
     }
 
     @Test
     fun aGroupPassCoversEveryAppOfItsLimit() {
         val group = social.copy(rules = social.rules.copy(pauseForGroup = true))
-        assertEquals(PauseRule(10, 2, "limit:social", setOf("a", "b")), Limits.pauseFor(listOf(group), "b", today))
+        assertEquals(PauseRule(10, null, "limit:social", setOf("a", "b")), Limits.pauseFor(listOf(group), "b", today))
         assertTrue(Limits.isLooser(social.rules, group.rules))
         assertFalse(Limits.isLooser(group.rules, social.rules))
     }
@@ -84,7 +84,11 @@ class LimitsTest {
         assertTrue(Limits.isLooser(rules, rules.copy(apps = setOf("a"))))
         assertTrue(Limits.isLooser(rules, rules.copy(pauseSeconds = 5)))
         assertTrue(Limits.isLooser(rules, rules.copy(pauseSeconds = null)))
-        assertTrue(Limits.isLooser(rules, rules.copy(graceMinutes = 5)))
+        // Longer open after the pause, or until you leave, is looser; a time where there was none isn't.
+        val timed = rules.copy(openMinutes = 10)
+        assertTrue(Limits.isLooser(timed, timed.copy(openMinutes = 20)))
+        assertTrue(Limits.isLooser(timed, rules))
+        assertFalse(Limits.isLooser(rules, timed))
         assertTrue(Limits.isLooser(rules, rules.copy(dailyMinutes = 45)))
         assertTrue(Limits.isLooser(rules, rules.copy(dailyMinutes = null)))
         assertTrue(Limits.isLooser(rules, rules.copy(shared = false)))
@@ -146,13 +150,13 @@ class LimitsTest {
 
     @Test
     fun thePauseGrowsWithEachOpenToday() {
-        val wait = PauseRule(seconds = 10, graceMinutes = 2, passKey = "x", group = setOf("x"), growth = 50)
+        val wait = PauseRule(seconds = 10, passKey = "x", group = setOf("x"), growth = 50)
         assertEquals(10, wait.secondsFor(1))
         assertEquals(15, wait.secondsFor(2))
         assertEquals(23, wait.secondsFor(3))
         // Never more than eight times the start.
         assertEquals(80, wait.secondsFor(20))
-        val typing = PauseRule(seconds = 10, graceMinutes = 2, passKey = "x", group = setOf("x"), kind = app.bedtime.data.PauseKind.TYPING, textLength = 40, growth = 100)
+        val typing = PauseRule(seconds = 10, passKey = "x", group = setOf("x"), kind = app.bedtime.data.PauseKind.TYPING, textLength = 40, growth = 100)
         assertEquals(40, typing.textLengthFor(1))
         assertEquals(80, typing.textLengthFor(2))
         // Never more than three times as much to type.

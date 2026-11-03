@@ -239,12 +239,14 @@ One file serves the look, widgets, gestures and notifications pages, for both sc
 - Tap one for its options; drag by the handle to change the order
 - Notifications
 - Notification access is off, so none can show. Switch this on again to allow it
-- Drag one down to read it; tap to unlock and open it, or swipe it aside to clear it
+- Drag one down to read it, tap to unlock and open it, or swipe it aside: each way does what you choose below
 - From these apps
 - None yet. Pick the apps you want to hear from
 -  and … more
 - Quick replies
 - … ready to send with a tap. Typing your own works too
+- Swipe left
+- Swipe right
 - Your week
 - Time in refuge, how sessions held, the phone and habits, against the week before
 - A note on Sunday evening
@@ -284,8 +286,6 @@ One file serves the look, widgets, gestures and notifications pages, for both sc
 - Lock-screen notifications
 - Those the session lets through, from the apps you choose, as private as Android's own lock screen.
 - Swipe down
-- Swipe left
-- Swipe right
 - Double tap
 - Double tap on the clock
 - … does
@@ -297,6 +297,7 @@ One file serves the look, widgets, gestures and notifications pages, for both sc
 - Nothing, it just unlocks
 - Camera, without unlocking
 - Write a note or look up a word, without unlocking
+- Microjournal: a line for today, once unlocked
 - Open an app, once unlocked
 - + your own font
 - + another
@@ -324,6 +325,11 @@ One file serves the look, widgets, gestures and notifications pages, for both sc
 - Distracting apps
 - The whole phone
 - A day's allowance
+- Clear it
+- Later: back when the session ends
+- Mark as read, where the app has the button; cleared otherwise
+- Quiet until…: its app or conversation, for a while
+- Reply, to a message; anything else opens to read
 
 <sub>[WidgetOptions.kt](../../app/src/main/java/app/bedtime/ui/homestyle/WidgetOptions.kt)</sub>
 
@@ -645,9 +651,12 @@ One file serves the look, widgets, gestures and notifications pages, for both sc
 - Your notes
 - Kept on this phone, written in Markdown
 - Microjournal
-- An entry a day in your notes, and from the quick note, with prompts to write from if you want them
+- An entry a day in your notes, a line at a time, each with its time; from the quick note and the share menu too
+- Prompts while writing
+- A button away, hidden until you ask; off, no button at all
 - Sections and prompts
 - Start from the suggestions; change, delete or add your own
+- Moods
 - Your files
 - Up to …. Each note is added at the end; tap one to change how
 - your words

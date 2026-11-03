@@ -121,12 +121,39 @@ class Repository private constructor(context: Context) {
     suspend fun remindNote(id: String, at: Long?) = update(NOTES, notesSerializer, emptyList()) { NoteShelf.reminded(it, id, at) }
 
     /** An answer to "why?", in today's microjournal entry under its heading, newest first, with the moods tapped. */
-    suspend fun addWhy(line: String, moods: List<String> = emptyList(), at: Long = System.currentTimeMillis()) =
-        update(JOURNAL, journalSerializer, emptyList()) { Journal.answered(it, java.time.LocalDate.now().toEpochDay(), line, moods, at) }
+    /** An answer to "why?", about [from] ("unlocking", or the app), with whether you [wentOn], for the moods' insights. */
+    suspend fun addWhy(line: String, moods: List<String> = emptyList(), from: String? = null, wentOn: Boolean? = null, at: Long = System.currentTimeMillis()) =
+        update(JOURNAL, journalSerializer, emptyList()) { Journal.answered(it, java.time.LocalDate.now().toEpochDay(), line, moods, at, from, wentOn) }
 
     /** A mood tapped in the microjournal, or tapped off again. */
-    suspend fun toggleMood(day: Long, mood: String, at: Long = System.currentTimeMillis()) =
-        update(JOURNAL, journalSerializer, emptyList()) { Journal.moodToggled(it, day, mood, at) }
+    suspend fun addMood(day: Long, mood: String, at: Long = System.currentTimeMillis()) =
+        update(JOURNAL, journalSerializer, emptyList()) { Journal.moodAdded(it, day, mood, at) }
+
+    /** [mood] taken off a line again: its latest tap on [day] goes. */
+    suspend fun removeLatestMood(day: Long, mood: String) =
+        update(JOURNAL, journalSerializer, emptyList()) { entries ->
+            entries.firstOrNull { it.day == day }?.moods?.filter { it.mood == mood }?.maxByOrNull { it.at }
+                ?.let { Journal.moodRemoved(entries, day, it) } ?: entries
+        }
+
+    /** A quick note as a line at the foot of today's microjournal entry, timed now, with the moods picked for it. */
+    suspend fun addJournalLine(text: String, moods: List<String>, after: Boolean = false, at: Long = System.currentTimeMillis()) {
+        val time = java.time.Instant.ofEpochMilli(at).atZone(java.time.ZoneId.systemDefault())
+        val line = Journal.line(time.toLocalTime().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm")), text, moods)
+        update(JOURNAL, journalSerializer, emptyList()) { Journal.answered(it, time.toLocalDate().toEpochDay(), line, moods, at, after = after) }
+    }
+
+    /** A mood of your own among those to tap, from now on. */
+    suspend fun addMoodTag(mood: String) = updateSettings { s ->
+        val moods = s.moodTags ?: Why.MOODS
+        if (mood in moods) s else s.copy(moodTags = moods + mood)
+    }
+
+    /** A mood renamed, in the moods to tap and in every entry that has it. */
+    suspend fun renameMoodTag(old: String, new: String) {
+        updateSettings { s -> s.copy(moodTags = (s.moodTags ?: Why.MOODS).map { if (it == old) new else it }.distinct()) }
+        update(JOURNAL, journalSerializer, emptyList()) { Journal.moodRenamed(it, old, new) }
+    }
 
     /** Notes deleted in the last month, newest first. */
     val trash: Flow<List<TrashedNote>> = observe(NOTES_TRASH, trashSerializer, emptyList()).map { NoteShelf.keptTrash(it, System.currentTimeMillis()).sortedByDescending { t -> t.deletedAt } }

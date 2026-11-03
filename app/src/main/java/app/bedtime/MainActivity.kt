@@ -66,6 +66,8 @@ import app.bedtime.ui.groups.GroupsScreen
 import app.bedtime.ui.settings.AlwaysAvailableScreen
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import app.bedtime.ui.components.BedtimeIcons
 import app.bedtime.ui.components.LocalSettingsSearch
@@ -131,6 +133,7 @@ object Routes {
     const val QUICK_NOTES = "quicknotes"
     const val JOURNAL_PROMPTS = "quicknotes/journal"
     const val WHY = "settings/why"
+    const val MOODS = "settings/moods"
     const val JOURNAL_TODAY = "notes/journal"
 
     /** A day's microjournal entry, from the moods in insights. */
@@ -152,7 +155,7 @@ object Routes {
         setOf(
             SETTINGS_HOME, SETTINGS_LOCK, SETTINGS_APPS, SETTINGS_SHORTCUTS, SETTINGS_ABOUT, APP_LIST, COVER_MESSAGES, PROBLEMS,
             HOME_STYLE, HOME_STYLE_LOCK, STYLE_SHOWN, STYLE_SHOWN_LOCK, STYLE_SWIPES, STYLE_NOTIFICATIONS, STYLE_GESTURES,
-            SEARCH, DISTRACTION, GROUPS, ALWAYS_AVAILABLE, QUICK_NOTES, JOURNAL_PROMPTS, WHY, QUOTES, SETUP,
+            SEARCH, DISTRACTION, GROUPS, ALWAYS_AVAILABLE, QUICK_NOTES, JOURNAL_PROMPTS, WHY, MOODS, QUOTES, SETUP,
         )
     }
 
@@ -169,6 +172,11 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         // Your blocks on the app icon's long press, kept as they change (the blocking service does it too).
         lifecycleScope.launch { app.bedtime.data.Repository.get(this@MainActivity).schedules.collect { app.bedtime.service.BlockShortcuts.update(this@MainActivity, it) } }
+        // "Add to microjournal" in the share menu, as the microjournal is switched on or off.
+        lifecycleScope.launch {
+            app.bedtime.data.Repository.get(this@MainActivity).settings.map { it.journalOn }.distinctUntilChanged()
+                .collect { app.bedtime.ui.minimal.ShareActivity.syncJournalShare(this@MainActivity, it) }
+        }
         if (savedInstanceState == null) pendingRoute.value = intent.getStringExtra(EXTRA_ROUTE)
         setContent {
             BedtimeTheme {
@@ -323,9 +331,10 @@ private fun BedtimeNavigation(pendingRoute: String?, onRouteConsumed: () -> Unit
             top == Routes.NOTES -> NotesScreen(onBack = ::pop, onSettings = { push(Routes.QUICK_NOTES) })
             top == Routes.JOURNAL_TODAY -> NotesScreen(onBack = ::pop, onSettings = { push(Routes.QUICK_NOTES) }, openJournal = true)
             top.startsWith(Routes.JOURNAL_TODAY + "/") -> NotesScreen(onBack = ::pop, onSettings = { push(Routes.QUICK_NOTES) }, journalDay = top.substringAfterLast('/').toLongOrNull())
-            top == Routes.QUICK_NOTES -> NoteTargetsScreen(onBack = ::pop, onOpenNotes = { push(Routes.NOTES) }, onOpenJournalPrompts = { push(Routes.JOURNAL_PROMPTS) })
+            top == Routes.QUICK_NOTES -> NoteTargetsScreen(onBack = ::pop, onOpenNotes = { push(Routes.NOTES) }, onOpenJournalPrompts = { push(Routes.JOURNAL_PROMPTS) }, onOpenMoods = { push(Routes.MOODS) })
             top == Routes.JOURNAL_PROMPTS -> app.bedtime.ui.notes.JournalPromptsScreen(onBack = ::pop)
-            top == Routes.WHY -> app.bedtime.ui.settings.WhySettingsScreen(onBack = ::pop, onOpenAnswers = { push(Routes.note(app.bedtime.data.Why.NOTE_ID)) })
+            top == Routes.WHY -> app.bedtime.ui.settings.WhySettingsScreen(onBack = ::pop, onOpenAnswers = { push(Routes.JOURNAL_TODAY) }, onOpenMoods = { push(Routes.MOODS) })
+            top == Routes.MOODS -> app.bedtime.ui.settings.MoodsScreen(onBack = ::pop)
             top.startsWith(Routes.EDIT) -> ScheduleEditScreen(
                 scheduleId = top.removePrefix(Routes.EDIT).ifEmpty { null },
                 template = null,

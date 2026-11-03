@@ -14,7 +14,7 @@ enum class NoteDetail { HIDE, APP_ONLY, FULL }
 data class NoteLine(val sender: String?, val text: String)
 
 /** One of the notification's own buttons. [index] is its place in the notification's actions. */
-data class NoteAction(val title: String, val index: Int, val isReply: Boolean, val needsUnlock: Boolean)
+data class NoteAction(val title: String, val index: Int, val isReply: Boolean, val needsUnlock: Boolean, val isMarkRead: Boolean = false)
 
 /**
  * A notification as the session lock screen shows it. With [NoteDetail.APP_ONLY], [title] and [text]
@@ -91,10 +91,29 @@ object LockNotifications {
     /** Swiped away, by key and post time: gone at once, and an update to the same one can still show. */
     private val dismissed = mutableSetOf<Pair<String, Long>>()
 
+    /** Answered from here, by key: the last line then and the reply. An update ending in either isn't news; the next message is. */
+    private val replied = mutableMapOf<String, Set<String>>()
+
     internal fun publish(list: List<LockNotification>) {
         synchronized(dismissed) {
             dismissed.retainAll { gone -> list.any { it.key == gone.first } }
-            _current.value = list.filterNot { (it.key to it.postedAt) in dismissed }
+            replied.keys.retainAll { key -> list.any { it.key == key } }
+            _current.value = list.filterNot { (it.key to it.postedAt) in dismissed || stillAnswered(it, replied[it.key]) }
+        }
+    }
+
+    /** Whether [note] still ends with one of [lines], the message answered from here or the answer: nothing newer since. */
+    fun stillAnswered(note: LockNotification, lines: Set<String>?): Boolean =
+        lines != null && lastLine(note).let { it.isEmpty() || it in lines }
+
+    private fun lastLine(note: LockNotification): String = (note.messages.lastOrNull()?.text ?: note.text).orEmpty().trim()
+
+    /** Answered from here: off the lock screen, the app's own update with the reply too, until someone writes again. */
+    fun answered(note: LockNotification, reply: String) {
+        synchronized(dismissed) {
+            dismissed += note.key to note.postedAt
+            replied[note.key] = setOf(lastLine(note), reply.trim())
+            _current.value = _current.value.filterNot { it.key == note.key }
         }
     }
 
@@ -127,6 +146,20 @@ object LockNotifications {
 
     /** Replies always ask for the unlock; other buttons only when their app says so, as on Android's lock screen. */
     fun needsUnlock(authenticationRequired: Boolean, isReply: Boolean): Boolean = authenticationRequired || isReply
+
+    /** A button that marks it read: so the app says, or so its title reads. */
+    fun marksRead(semantic: Boolean, title: String): Boolean =
+        semantic || title.lowercase().let { "mark as read" in it || "mark read" in it }
+
+    /**
+     * What swiping [note] aside does, [wanted] where it can: marking read and replying need its own
+     * buttons, so without one it's cleared, or opened in place for its other buttons (null).
+     */
+    fun swiped(wanted: NoteSwipe, note: LockNotification): NoteSwipe? = when (wanted) {
+        NoteSwipe.MARK_READ -> if (note.actions.any { it.isMarkRead }) wanted else NoteSwipe.CLEAR
+        NoteSwipe.REPLY -> if (note.actions.any { it.isReply }) wanted else null
+        else -> wanted
+    }
 
     /** What "quiet until morning" quiets: just the conversation if there is one, otherwise the whole app. */
     fun quietKey(note: LockNotification): String = note.conversation?.let { "${note.packageName}/$it" } ?: note.packageName

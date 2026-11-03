@@ -472,20 +472,21 @@ internal fun LimitEditContent(
                             editable,
                             description = "Each open in a day makes the wait or the typing longer, up to 8× the wait or 3× the text. A new day starts over",
                         )
-                        SubOptionRow("Back within") {
+                        SubOptionRow("After the pause, open for") {
                             NumberStepper(
-                                rules.graceMinutes,
-                                { v -> setRules { it.copy(graceMinutes = v) } },
-                                0..60,
-                                presets = listOf(0, 1, 2, 5, 10, 15),
-                                title = "grace",
+                                rules.openMinutes ?: 0,
+                                { v -> setRules { it.copy(openMinutes = v.takeIf { m -> m > 0 }) } },
+                                0..120,
+                                step = 5,
+                                presets = listOf(0, 5, 10, 15, 20, 30),
+                                title = "time open",
                                 enabled = editable,
-                                format = { if (it == 0) "every time" else "$it min" },
+                                format = { if (it == 0) "until you leave" else "$it min" },
                             )
                         }
                         if (rules.apps.size > 1) {
                             Text(
-                                "Opening one anyway lets you into",
+                                "Getting through the pause opens",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = c.textMuted,
                                 modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
@@ -497,18 +498,19 @@ internal fun LimitEditContent(
                                 enabled = editable,
                             )
                         }
+                        val all = rules.apps.size > 1 && rules.pauseForGroup
                         Text(
-                            if (rules.apps.size > 1 && rules.pauseForGroup) {
-                                if (rules.graceMinutes == 0) {
-                                    "Getting through the pause once opens all of these apps, until you leave them for something else."
+                            when (val open = rules.openMinutes) {
+                                null -> if (all) {
+                                    "Getting through the pause once opens all of these apps until you leave them. Back within a minute is the same visit."
                                 } else {
-                                    "Getting through the pause once opens the way to all of these apps. Leaving them and coming back " +
-                                        "within ${rules.graceMinutes} min doesn't ask again."
+                                    "The pause comes each time you open one. Back within a minute is the same visit."
                                 }
-                            } else if (rules.graceMinutes == 0) {
-                                "The pause comes every time you open one of them."
-                            } else {
-                                "After you open one anyway, leaving and coming back within ${rules.graceMinutes} min doesn't ask again."
+                                else -> if (all) {
+                                    "Getting through the pause once opens all of these apps for $open min, coming and going as you like. Then the pause again."
+                                } else {
+                                    "Each app opens for $open min after its pause, coming and going as you like. Then the pause again."
+                                }
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = c.textMuted,
@@ -665,6 +667,13 @@ internal fun LimitEditContent(
                     { onDraftChange(draft.copy(message = it)) },
                     enabled = editable,
                 )
+
+                SectionLabel("Afterwards")
+                OptionRow(
+                    Icons.Default.Edit,
+                    "How do you feel now?",
+                    description = "Your moods to tap, once the time open after the pause is over; without one, a minute after you leave these apps",
+                ) { ObsidianToggle(rules.moodAfter, { on -> setRules { it.copy(moodAfter = on) } }) }
 
                 SectionLabel("When it can be changed")
                 OptionRow(

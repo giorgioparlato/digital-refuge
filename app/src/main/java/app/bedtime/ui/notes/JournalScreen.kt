@@ -79,9 +79,10 @@ internal fun JournalContent(onBack: () -> Unit, openToday: Boolean = false, open
             today,
             onSave = { text, aims -> scope.launch { repo.saveJournal(day, text, aims) } },
             onDone = { open = null },
-            promptsOpen = openToday,
+            prompts = settings?.journalPrompts != false,
             moods = app.bedtime.data.Why.moods(settings ?: app.bedtime.data.AppSettings()),
-            onMood = { mood -> scope.launch { repo.toggleMood(day, mood) } },
+            onMood = { mood, on -> scope.launch { if (on) repo.addMood(day, mood) else repo.removeLatestMood(day, mood) } },
+            onAddMood = { mood -> scope.launch { repo.addMoodTag(mood) } },
         )
         return
     }
@@ -116,7 +117,11 @@ internal fun JournalContent(onBack: () -> Unit, openToday: Boolean = false, open
     }
 }
 
-/** A day's entry in the note editor, with the prompts above it once toggled on; the sections picked are the entry's own. */
+/**
+ * A day's entry in the note editor, a line at a time: today's opens on a fresh line begun at the time,
+ * each new line timed in turn, and a mood tapped goes on the line you're on. The prompts stay a button
+ * away, when you want them at all.
+ */
 @Composable
 private fun JournalEditor(
     entry: JournalEntry,
@@ -124,37 +129,74 @@ private fun JournalEditor(
     today: LocalDate,
     onSave: (String, List<String>) -> Unit,
     onDone: () -> Unit,
-    promptsOpen: Boolean = false,
-    /** How you feel, to tap at the top: the moods of this day filled. */
+    /** The prompts a button away; off, no button at all. */
+    prompts: Boolean = true,
+    /** How you feel, each tap kept with its time: on (true) or taken off the line again. */
     moods: List<String> = emptyList(),
-    onMood: (String) -> Unit = {},
+    onMood: (String, Boolean) -> Unit = { _, _ -> },
+    /** A mood of your own, kept among them from now on. */
+    onAddMood: (String) -> Unit = {},
 ) {
     val c = Obsidian.colors
     var aims by remember { mutableStateOf(entry.aims) }
-    var prompting by rememberSaveable { mutableStateOf(promptsOpen) }
+    var prompting by rememberSaveable { mutableStateOf(false) }
+    val clock = remember { java.time.format.DateTimeFormatter.ofPattern("HH:mm") }
+    val now = { java.time.LocalTime.now().format(clock) }
+    // Only today's opens on a fresh line; another day's is read, and changed, as it is.
+    val isToday = entry.day == today.toEpochDay()
     NoteEditor(
-        initial = remember { entry.text },
+        initial = remember { if (isToday) Journal.opened(entry.text, now()).first else entry.text },
         isNew = entry.text.isEmpty(),
-        onSave = { text -> if (text != entry.text || aims != entry.aims) onSave(text, aims) },
+        onSave = { text -> Journal.tidy(text).let { kept -> if (kept != entry.text || aims != entry.aims) onSave(kept, aims) } },
         onDone = { text ->
-            onSave(text, aims)
+            onSave(Journal.tidy(text), aims)
             onDone()
         },
         onDelete = null,
         title = Journal.title(entry.copy(aims = aims), today),
         actions = {
-            TextButton(onClick = { prompting = !prompting }) { Text(if (prompting) "Hide prompts" else "Prompts", color = c.accentText) }
+            if (prompts) TextButton(onClick = { prompting = !prompting }) { Text(if (prompting) "Hide prompts" else "Prompts", color = c.accentText) }
         },
-        panel = if (!prompting && moods.isEmpty()) null else { insert ->
+        panel = if (!prompting && moods.isEmpty()) null else { value, edit ->
+            val tap = { mood: String, all: List<String> ->
+                val (text, cursor, on) = Journal.withMood(value.text, value.selection.start, mood, all, now())
+                edit { androidx.compose.ui.text.input.TextFieldValue(text, androidx.compose.ui.text.TextRange(cursor)) }
+                onMood(mood, on)
+            }
             Column(Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState()).padding(horizontal = PageGutter, vertical = 8.dp)) {
                 if (moods.isNotEmpty()) {
-                    app.bedtime.ui.blocked.MoodChips(moods, entry.moods.map { it.mood }.distinct(), onTap = onMood)
+                    app.bedtime.ui.blocked.MoodChips(
+                        moods,
+                        Journal.moodsAt(value.text, value.selection.start, moods),
+                        onAdd = { mood ->
+                            onAddMood(mood)
+                            tap(mood, moods + mood)
+                        },
+                        onTap = { mood -> tap(mood, moods) },
+                    )
                     if (prompting) Spacer(Modifier.height(12.dp))
                 }
-                if (prompting) JournalPrompts(sections, aims, onPick = { aims = it }, onPrompt = insert, text = c.textNormal, faint = c.textFaint, accent = c.accent, background = c.bgPrimary)
+                if (prompting && prompts) {
+                    JournalPrompts(
+                        sections, aims, onPick = { aims = it },
+                        onPrompt = { prompt ->
+                            edit { v ->
+                                val (text, cursor) = Journal.prompted(v.text, v.selection.start, prompt, now())
+                                androidx.compose.ui.text.input.TextFieldValue(text, androidx.compose.ui.text.TextRange(cursor))
+                            }
+                        },
+                        text = c.textNormal, faint = c.textFaint, accent = c.accent, background = c.bgPrimary,
+                    )
+                }
             }
         },
         saveWith = aims,
+        onType = if (!isToday) null else { old, new ->
+            Journal.typed(old.text, new.text, new.selection.start, now())?.let { (text, cursor) ->
+                androidx.compose.ui.text.input.TextFieldValue(text, androidx.compose.ui.text.TextRange(cursor))
+            }
+        },
+        focus = isToday,
     )
 }
 

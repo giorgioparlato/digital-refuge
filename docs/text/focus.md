@@ -333,6 +333,8 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 -  The steps are the same either way.
 - How long the break lasts
 - break length
+- How do you feel now?
+- Your moods to tap, once the break is over
 - The ways around it
 - Every way around a session has a switch of its own.
 - Emergency break
