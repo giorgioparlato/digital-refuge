@@ -19,6 +19,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -150,12 +152,12 @@ fun StatsScreen(onBack: (() -> Unit)?, initialSection: Int = 0, onOpen: (String)
             }
         },
         onOpen = onOpen,
-        moods = settings?.takeIf { it.moodsOn }?.let { s ->
+        moods = settings?.takeIf { it.moodsOn && it.insightsMoods }?.let { s ->
             {
                 MoodStats(journal, app.bedtime.data.Why.moods(s), java.time.LocalDate.now(), onDay = { day -> onOpen(app.bedtime.Routes.journalDay(day.toEpochDay())) }, onMoods = { onOpen(app.bedtime.Routes.MOODS) }, days = use.days, habits = habits, habitMarks = habitMarks)
             }
         },
-        habits = {
+        habits = if (settings?.insightsHabits == false) null else ({
             HabitsBody(
                 habits, habitMarks, HourlyUse.today(), editingHabit, { editingHabit = it },
                 onMark = { habit, day, value -> scope.launch { repo.markHabit(habit.id, day, value) } },
@@ -169,8 +171,13 @@ fun StatsScreen(onBack: (() -> Unit)?, initialSection: Int = 0, onOpen: (String)
                 onMove = { moved -> scope.launch { repo.updateSettings { it.copy(habits = moved) } } },
                 onDelete = { habit -> scope.launch { repo.deleteHabit(habit.id) } },
             )
-        },
+        }),
         onAddHabit = { editingHabit = Habit() },
+        // Habits and moods for those who use them: switched off here, they leave insights.
+        sectionsShown = settings?.let { s -> listOf(s.insightsHabits, s.insightsMoods && s.moodsOn) },
+        onSectionsShown = { habitsOn, moodsOn -> scope.launch { repo.updateSettings { it.copy(insightsHabits = habitsOn, insightsMoods = moodsOn, moodsOn = it.moodsOn || moodsOn) } } },
+        heatScale = settings?.heatScale ?: app.bedtime.data.HeatScale.GREEN,
+        onHeatScale = { scale -> scope.launch { repo.updateSettings { it.copy(heatScale = scale) } } },
         initialSection = initialSection,
     )
 }
@@ -194,6 +201,12 @@ internal fun StatsContent(
     onVersus: (app.bedtime.data.Versus) -> Unit = {},
     /** Your home screen's look: the tracker's budget and colours, for the month's heatmap. */
     homeStyle: app.bedtime.data.HomeStyle = app.bedtime.data.HomeStyle(),
+    /** Whether habits and moods have sections here, and the menu that switches them. */
+    sectionsShown: List<Boolean>? = null,
+    onSectionsShown: (habits: Boolean, moods: Boolean) -> Unit = { _, _ -> },
+    /** The month heatmap's colours. */
+    heatScale: app.bedtime.data.HeatScale = app.bedtime.data.HeatScale.GREEN,
+    onHeatScale: (app.bedtime.data.HeatScale) -> Unit = {},
     onBudget: (Boolean, Int) -> Unit = { _, _ -> },
     onOpen: (String) -> Unit = {},
     /** Your moods, as a section of their own when they're on. */
@@ -225,7 +238,11 @@ internal fun StatsContent(
     }
     Scaffold(
         containerColor = c.bgPrimary,
-        topBar = { ObsidianTopBar("insights", onBack = onBack) },
+        topBar = {
+            ObsidianTopBar("insights", onBack = onBack) {
+                sectionsShown?.let { (habitsOn, moodsOn) -> SectionsMenu(habitsOn, moodsOn, onSectionsShown) }
+            }
+        },
         floatingActionButton = { if (section == 2 && onAddHabit != null) AddCircleButton("add a habit", onClick = onAddHabit) },
     ) { padding ->
         Column(
@@ -256,6 +273,8 @@ internal fun StatsContent(
                     onVersus = onVersus,
                     homeStyle = homeStyle,
                     onBudget = onBudget,
+                    heatScale = heatScale,
+                    onHeatScale = onHeatScale,
                     onOpen = onOpen,
                 )
                 Spacer(Modifier.height(16.dp))
@@ -453,5 +472,26 @@ private fun LegendKey(colour: Color, label: String) {
         Box(Modifier.size(width = 10.dp, height = 10.dp).clip(RoundedCornerShape(2.dp)).background(colour))
         Spacer(Modifier.width(6.dp))
         Text(label, style = MaterialTheme.typography.labelMedium, color = c.textMuted)
+    }
+}
+
+/** Which of habits and moods insights shows, for those who don't use them: a menu at the top. */
+@Composable
+private fun SectionsMenu(habits: Boolean, moods: Boolean, onChange: (Boolean, Boolean) -> Unit) {
+    val c = app.bedtime.ui.theme.Obsidian.colors
+    var open by remember { mutableStateOf(false) }
+    Box {
+        androidx.compose.material3.IconButton(onClick = { open = true }) {
+            androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Default.MoreVert, contentDescription = "what insights shows", tint = c.textMuted)
+        }
+        androidx.compose.material3.DropdownMenu(expanded = open, onDismissRequest = { open = false }, containerColor = c.bgSecondary) {
+            listOf("Habits" to habits, "Moods" to moods).forEach { (name, on) ->
+                androidx.compose.material3.DropdownMenuItem(
+                    text = { Text(name, color = c.textNormal) },
+                    trailingIcon = { if (on) androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Default.Check, contentDescription = "shown", tint = c.accent) },
+                    onClick = { if (name == "Habits") onChange(!habits, moods) else onChange(habits, !moods) },
+                )
+            }
+        }
     }
 }

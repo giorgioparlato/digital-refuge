@@ -1,0 +1,189 @@
+package app.bedtime.voice
+
+import android.Manifest
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import kotlinx.coroutines.launch
+import androidx.lifecycle.lifecycleScope
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.bedtime.data.Voice
+import app.bedtime.ui.components.SoftPillButton
+import app.bedtime.ui.components.Text
+import app.bedtime.ui.theme.BedtimeTheme
+import app.bedtime.ui.theme.Obsidian
+import kotlinx.coroutines.delay
+
+/**
+ * Making a voice note: the time so far and a way to stop, over the lock screen too, without unlocking:
+ * it only ever adds. Leaving it keeps recording; its notification brings it back, or stops it.
+ */
+class RecordActivity : ComponentActivity() {
+    private val askMic = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) VoiceRecorder.start(this) else finish()
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        // Over the lock screen, as refuge's own lock screen is.
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O_MR1) {
+            setShowWhenLocked(true)
+        } else {
+            @Suppress("DEPRECATION")
+            window.addFlags(android.view.WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED)
+        }
+        val repo = app.bedtime.data.Repository.get(this)
+        val fromJournal = intent.getBooleanExtra(EXTRA_JOURNAL, false)
+        val starting = savedInstanceState == null && intent.getBooleanExtra(EXTRA_START, true) && VoiceRecorder.state.value == VoiceRecorder.State.Idle
+        // From the microjournal, it goes there; from anywhere else, where you last chose (a note, without the microjournal).
+        if (starting && fromJournal) VoiceRecorder.to.value = app.bedtime.data.VoiceTo.JOURNAL
+        if (starting) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                VoiceRecorder.start(this)
+            } else {
+                askMic.launch(Manifest.permission.RECORD_AUDIO)
+            }
+        }
+        setContent {
+            BedtimeTheme {
+                val c = Obsidian.colors
+                val state by VoiceRecorder.state.collectAsStateWithLifecycle()
+                val settings by repo.settings.collectAsStateWithLifecycle(initialValue = null)
+                val to by VoiceRecorder.to.collectAsStateWithLifecycle()
+                val choosing = !fromJournal && settings?.journalOn == true
+                LaunchedEffect(settings == null) {
+                    val s = settings ?: return@LaunchedEffect
+                    if (starting && !fromJournal) VoiceRecorder.to.value = if (s.journalOn) s.voiceTo else app.bedtime.data.VoiceTo.NOTE
+                }
+                var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+                var begun by remember { mutableLongStateOf(0L) }
+                LaunchedEffect(state) {
+                    when (state) {
+                        is VoiceRecorder.State.Recording -> while (true) {
+                            now = System.currentTimeMillis()
+                            delay(250)
+                        }
+                        // Kept: it goes on in the background, and this can go.
+                        VoiceRecorder.State.Saving -> {
+                            delay(1_200)
+                            finish()
+                        }
+                        VoiceRecorder.State.Idle -> if (begun > 0) finish()
+                    }
+                }
+                Box(
+                    Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.5f)).clickable(onClickLabel = "leave it recording") { finish() }.safeDrawingPadding(),
+                    contentAlignment = Alignment.BottomCenter,
+                ) {
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp)
+                            .clip(RoundedCornerShape(24.dp))
+                            .background(c.bgPrimary)
+                            .clickable(enabled = false) {}
+                            .padding(24.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        when (val s = state) {
+                            is VoiceRecorder.State.Recording -> {
+                                begun = s.since
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    Box(Modifier.size(12.dp).clip(CircleShape).background(Color(0xFFD7263D)))
+                                    Text("recording", style = MaterialTheme.typography.titleMedium, color = c.textNormal)
+                                }
+                                Text(Voice.length(((now - s.since) / 1000L).toInt().coerceAtLeast(0)), fontSize = 40.sp, color = c.textNormal)
+                                if (choosing) {
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        listOf(app.bedtime.data.VoiceTo.JOURNAL to "microjournal", app.bedtime.data.VoiceTo.NOTE to "new note").forEach { (where, name) ->
+                                            val on = where == to
+                                            Text(
+                                                name,
+                                                style = MaterialTheme.typography.labelLarge,
+                                                color = if (on) c.bgPrimary else c.textMuted,
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(50))
+                                                    .background(if (on) c.accent else Color.Transparent)
+                                                    .border(1.dp, if (on) c.accent else c.border, RoundedCornerShape(50))
+                                                    .clickable {
+                                                        VoiceRecorder.to.value = where
+                                                        lifecycleScope.launch { repo.updateSettings { it.copy(voiceTo = where) } }
+                                                    }
+                                                    .padding(horizontal = 14.dp, vertical = 7.dp),
+                                            )
+                                        }
+                                    }
+                                }
+                                Text(
+                                    (if (to == app.bedtime.data.VoiceTo.JOURNAL) "It goes in today's microjournal" else "It goes in a new note") +
+                                        "; the words follow once Whisper has heard them. Leave this and it keeps recording.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = c.textMuted,
+                                )
+                                SoftPillButton("Stop", onClick = { VoiceRecorder.stop(this@RecordActivity) })
+                            }
+                            VoiceRecorder.State.Saving -> Text(
+                                if (to == app.bedtime.data.VoiceTo.JOURNAL) "Kept. The words follow in the microjournal." else "Kept. The words follow in your notes.",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = c.textNormal,
+                            )
+                            VoiceRecorder.State.Idle -> Text("Starting…", style = MaterialTheme.typography.bodyLarge, color = c.textMuted)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    companion object {
+        private const val EXTRA_START = "start"
+        private const val EXTRA_JOURNAL = "journal"
+        const val ACTION = "app.bedtime.RECORD"
+
+        /** A new recording from a gesture, once voice notes are set up; until then, where to set them up. */
+        fun startIfReady(context: Context, settings: app.bedtime.data.AppSettings) {
+            if (app.bedtime.data.Voice.ready(settings)) context.startActivity(intent(context))
+            else android.widget.Toast.makeText(context, "set up voice notes first: settings › quick notes", android.widget.Toast.LENGTH_SHORT).show()
+        }
+
+        /**
+         * The recording screen; with [start], a new recording begins if none is going. From the
+         * microjournal ([journal]) it goes there; from anywhere else, you choose: it or a new note.
+         */
+        fun intent(context: Context, start: Boolean = true, journal: Boolean = false): Intent =
+            Intent(context, RecordActivity::class.java).setAction(ACTION).putExtra(EXTRA_START, start).putExtra(EXTRA_JOURNAL, journal)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+    }
+}

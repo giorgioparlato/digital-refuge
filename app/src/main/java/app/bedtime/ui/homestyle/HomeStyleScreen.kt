@@ -230,6 +230,7 @@ fun HomeStyleScreen(
         return
     }
     HomeStyleContent(
+        voiceReady = app.bedtime.data.Voice.ready(current),
         style = current.homeStyle,
         onChange = { style -> scope.launch { repo.updateSettings { it.copy(homeStyle = style) } } },
         previewApps = allApps.take(4),
@@ -303,6 +304,8 @@ fun HomeStyleScreen(
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun HomeStyleContent(
+    /** Voice notes set up, so a gesture can record one. */
+    voiceReady: Boolean = false,
     style: HomeStyle,
     onChange: (HomeStyle) -> Unit,
     previewApps: List<AppEntry>,
@@ -361,6 +364,7 @@ internal fun HomeStyleContent(
     pickingGesture?.let { gesture ->
         HomeGestureDialog(
             gesture = gesture,
+            voice = voiceReady,
             apps = allApps,
             onDismiss = { pickingGesture = null },
             onPick = { action ->
@@ -376,6 +380,7 @@ internal fun HomeStyleContent(
     pickingSwipe?.let { swipe ->
         SwipeTargetDialog(
             swipe = swipe,
+            voice = voiceReady,
             apps = allApps,
             onDismiss = { pickingSwipe = null },
             onPick = { target ->
@@ -691,11 +696,12 @@ private fun HomeGesture.label(): String = when (this) {
 
 /** What a home-screen gesture does: nothing, one of the app's own actions, or opening any app. */
 @Composable
-private fun HomeGestureDialog(gesture: HomeGesture, apps: List<AppEntry>, onDismiss: () -> Unit, onPick: (String?) -> Unit) {
+private fun HomeGestureDialog(gesture: HomeGesture, apps: List<AppEntry>, onDismiss: () -> Unit, onPick: (String?) -> Unit, voice: Boolean = false) {
     GestureDialog(
         title = "${gesture.label()} does",
         actions = listOf<Pair<String?, String>>(null to if (gesture == HomeGesture.CLOCK_DOUBLE_TAP) "Same as a double tap" else "Nothing") +
-            HomeActions.all.map { (action, label) -> action to label },
+            // A voice note only once they're set up.
+            HomeActions.all.filter { voice || it.first != HomeActions.VOICE }.map { (action, label) -> action to label },
         appsTitle = "Open an app",
         apps = apps,
         onDismiss = onDismiss,
@@ -783,7 +789,7 @@ private fun Swipe.icon(): ImageVector = when (this) {
 
 /** What a lock-screen gesture does: nothing (a swipe just unlocks), an action right here, or an app once unlocked. */
 @Composable
-private fun SwipeTargetDialog(swipe: Swipe, apps: List<AppEntry>, onDismiss: () -> Unit, onPick: (String?) -> Unit) {
+private fun SwipeTargetDialog(swipe: Swipe, apps: List<AppEntry>, onDismiss: () -> Unit, onPick: (String?) -> Unit, voice: Boolean = false) {
     GestureDialog(
         title = "${swipe.label()} does",
         actions = listOf(
@@ -795,6 +801,9 @@ private fun SwipeTargetDialog(swipe: Swipe, apps: List<AppEntry>, onDismiss: () 
             GESTURE_CAMERA to "Camera, without unlocking",
             HomeActions.NOTE to "Write a note or look up a word, without unlocking",
             HomeActions.JOURNAL to "Microjournal: a line for today, once unlocked",
+        ) + listOfNotNull(
+            (HomeActions.VOICE to "Record a voice note, without unlocking").takeIf { voice },
+        ) + listOf(
             HomeActions.NOTIFICATIONS to "Show notifications",
             HomeActions.LOCK to "Turn the screen off",
         ),

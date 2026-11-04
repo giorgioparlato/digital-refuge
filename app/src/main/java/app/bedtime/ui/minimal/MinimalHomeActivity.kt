@@ -375,6 +375,7 @@ private fun MinimalHomeScreen(
             HomeActions.NOTE, HomeActions.LOOKUP -> quickNote = true
             HomeActions.SEARCH -> drawer = true
             HomeActions.NOTES -> notesOpen = true
+            HomeActions.VOICE -> app.bedtime.voice.RecordActivity.startIfReady(context, settings)
             HomeActions.JOURNAL -> runCatching { context.startActivity(app.bedtime.MainActivity.intent(context, app.bedtime.Routes.JOURNAL_TODAY)) }
             HomeActions.WEEK -> scope.launch { week = loadCalendarWeek(context, LocalDateTime.now()) }
             HomeActions.BLOCKS -> blocksOpen = true
@@ -742,6 +743,7 @@ private fun MinimalHomeScreen(
             initial = lookingUp.orEmpty(),
             whole = !lookingUp.isNullOrEmpty(),
             journal = app.bedtime.ui.minimal.journalWith(context, repo, scope, settings),
+            onRecord = if (app.bedtime.data.Voice.ready(settings)) ({ context.startActivity(app.bedtime.voice.RecordActivity.intent(context)) }) else null,
         )
     }
     if (appsDetail) {

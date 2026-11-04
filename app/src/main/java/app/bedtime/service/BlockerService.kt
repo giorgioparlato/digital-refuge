@@ -3,6 +3,9 @@ package app.bedtime.service
 import app.bedtime.ui.blocked.WhyActivity
 
 import app.bedtime.data.Why
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import app.bedtime.data.Voice
 
 import app.bedtime.data.Shortcuts
 
@@ -244,7 +247,10 @@ class BlockerService : AccessibilityService() {
         // A while in an app with a limit, and gone from it: how do you feel now?
         limitTracker.onLeft = { pkg, minutes -> askMoodAfter("after $minutes min on ${AppCatalog.label(this, pkg).lowercase()}") }
         // Your blocks on the app icon's long press, kept as they change.
-        scope.launch { repo.schedules.collect { BlockShortcuts.update(this@BlockerService, it) } }
+        scope.launch {
+            kotlinx.coroutines.flow.combine(repo.schedules, repo.settings.map { Voice.ready(it) }.distinctUntilChanged()) { s, v -> s to v }
+                .collect { (schedules, voice) -> BlockShortcuts.update(this@BlockerService, schedules, voice) }
+        }
         scope.launch {
             repo.settings.collect {
                 val nudgeChanged = it.runNudgeMinutes != settings.runNudgeMinutes

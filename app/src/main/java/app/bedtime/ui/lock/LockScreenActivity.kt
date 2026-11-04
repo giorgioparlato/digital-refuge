@@ -446,6 +446,8 @@ private fun LockScreen(
             HomeActions.LOCK -> onScreenOff()
             // Today's entry needs the room, and the privacy, of the unlocked phone.
             HomeActions.JOURNAL -> onOpenRoute(app.bedtime.Routes.JOURNAL_TODAY)
+            // Over the lock screen: a recording only adds.
+            HomeActions.VOICE -> app.bedtime.voice.RecordActivity.startIfReady(context, settings)
             else -> onOpenApp(action)
         }
     }
@@ -572,6 +574,8 @@ private fun LockScreen(
             onOffer = { offer -> runOffer(context, repo, scope, settings, offer) },
             // A line added to today's entry without unlocking: nothing already written shows here.
             journal = app.bedtime.ui.minimal.journalWith(context, repo, scope, settings),
+            // Over the lock screen, without unlocking: a recording only adds.
+            onRecord = if (app.bedtime.data.Voice.ready(settings)) ({ context.startActivity(app.bedtime.voice.RecordActivity.intent(context)) }) else null,
         )
     }
     // The list folds back to its summary line whenever the screen goes off.

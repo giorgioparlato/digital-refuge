@@ -650,6 +650,8 @@ One file serves the look, widgets, gestures and notifications pages, for both sc
 - Refuge notes
 - Your notes
 - Kept on this phone, written in Markdown
+- A notes tab
+- Your notes and microjournal at refuge's foot, beside insights
 - Microjournal
 - An entry a day in your notes, a line at a time, each with its time; from the quick note and the share menu too
 - Prompts while writing

@@ -221,6 +221,10 @@ data class LockLook(
     val calendarTomorrow: Boolean? = null,
 )
 
+/** The month heatmap's scale: calm green, or cream, through amber at the budget to red at twice it. */
+@Serializable
+enum class HeatScale { GREEN, CREAM }
+
 /** A lock-screen notification swiped aside: cleared, kept for later, marked read, quieted for a while, or answered. */
 @Serializable
 enum class NoteSwipe { CLEAR, LATER, MARK_READ, QUIET, REPLY }
@@ -535,6 +539,7 @@ object HomeActions {
     const val BLOCKS = "blocks"
     const val LOOKUP = "lookup"
     const val JOURNAL = "journal"
+    const val VOICE = "voice"
     const val CAMERA = GESTURE_CAMERA
 
     /** In the order they're offered, with how each reads. The look-up is in the quick note now, so it isn't offered of its own. */
@@ -545,6 +550,7 @@ object HomeActions {
         SEARCH to "Search",
         NOTES to "Your notes",
         JOURNAL to "Microjournal: a line for today",
+        VOICE to "Record a voice note",
         WEEK to "The week ahead",
         BLOCKS to "Your blocks, to start one",
         CAMERA to "Camera",
@@ -649,6 +655,25 @@ data class AppSettings(
     val journalSections: List<JournalSection>? = null,
     /** "How do you feel now?" after this many minutes on the phone in one go; 0 never. Schedules and limits have their own. */
     val moodAfterMinutes: Int = 0,
+    /** Voice notes, off until switched on; they show anywhere only once a folder and a model are chosen too ([Voice.ready]). */
+    val voiceOn: Boolean = false,
+    /** Voice notes: the folder their files go in (a document tree); none until chosen, and none means no recording. */
+    val voiceFolder: String? = null,
+    /** The Whisper model's file name, as chosen; the file itself is copied into refuge's own storage. */
+    val voiceModel: String? = null,
+    /** Where a voice note from the quick note, the notes tab, a gesture or the app's icon goes, as last chosen. */
+    val voiceTo: VoiceTo = VoiceTo.JOURNAL,
+    /** What Whisper listens for: "auto", or a language's code. */
+    val voiceLanguage: String = "auto",
+    /** Your notes as a tab of their own at refuge's foot, beside insights. */
+    val notesTab: Boolean = false,
+    /** Insights' habits and moods sections, for those who use them. */
+    val insightsHabits: Boolean = true,
+    val insightsMoods: Boolean = true,
+    /** The month heatmap's colours, from little use to twice the budget. */
+    val heatScale: HeatScale = HeatScale.GREEN,
+    /** The mood chips open over the microjournal as you write, or folded to one line. */
+    val journalMoodsShown: Boolean = true,
     /** The prompts a button away while writing (hidden until asked for); off, no button at all. */
     val journalPrompts: Boolean = true,
     /** Whether looking up on the lock screen finds your notes too, to read there without unlocking. */

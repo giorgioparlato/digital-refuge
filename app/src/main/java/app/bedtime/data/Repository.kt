@@ -136,6 +136,18 @@ class Repository private constructor(context: Context) {
                 ?.let { Journal.moodRemoved(entries, day, it) } ?: entries
         }
 
+    /** A voice note's line at the foot of [day]'s entry, its words to follow. */
+    suspend fun addVoiceLine(day: Long, line: String) =
+        update(JOURNAL, journalSerializer, emptyList()) { Journal.answered(it, day, line, emptyList(), System.currentTimeMillis()) }
+
+    /** The words of the voice note [file] in [day]'s entry, once heard; none leaves just the recording. */
+    suspend fun voiceTranscribed(day: Long, file: String, words: String?) =
+        update(JOURNAL, journalSerializer, emptyList()) { entries -> entries.map { if (it.day == day) it.copy(text = Voice.transcribed(it.text, file, words)) else it } }
+
+    /** The words of the voice note [file] in the note made for it, once heard. */
+    suspend fun voiceNoteTranscribed(file: String, words: String?) =
+        update(NOTES, notesSerializer, emptyList()) { notes -> notes.map { if (file in it.text) it.copy(text = Voice.transcribed(it.text, file, words)) else it } }
+
     /** A quick note as a line at the foot of today's microjournal entry, timed now, with the moods picked for it. */
     suspend fun addJournalLine(text: String, moods: List<String>, after: Boolean = false, at: Long = System.currentTimeMillis()) {
         val time = java.time.Instant.ofEpochMilli(at).atZone(java.time.ZoneId.systemDefault())

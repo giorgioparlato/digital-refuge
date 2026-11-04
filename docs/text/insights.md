@@ -123,6 +123,9 @@ insights
 - in distracting apps
 - Budget: … a day {what}
 - No budget chosen yet, so … a day {what} is suggested. Choose yours
+- twice it
+- green to red
+- cream to red
 - Today so far: … of …
 - Nothing kept for these days yet.
 - twice or more

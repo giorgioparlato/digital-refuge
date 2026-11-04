@@ -76,6 +76,9 @@
 
     <!-- The status-bar lotus while a session runs; asked for in Setup (Android 13+). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Voice notes, only once switched on and only while recording. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
 
     <!-- The full-screen takeover shown if blocking is switched off mid-session. -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
@@ -127,6 +130,20 @@
             android:launchMode="singleTask"
             android:taskAffinity="app.bedtime.why"
             android:windowSoftInputMode="adjustResize" />
+
+        <!-- Making a voice note, over the lock screen too; and the recording itself, in the foreground. -->
+        <activity
+            android:name=".voice.RecordActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity="app.bedtime.voice"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
+        <service
+            android:name=".voice.VoiceRecorder"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
 
         <!-- "How do you feel now?" once a stretch on the phone is over, when asked for. -->
         <activity

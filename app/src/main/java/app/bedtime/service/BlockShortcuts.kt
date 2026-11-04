@@ -26,15 +26,25 @@ object BlockShortcuts {
     const val ACTION = "app.bedtime.START_BLOCK"
     const val EXTRA_ID = "block"
 
-    fun update(context: Context, schedules: List<Schedule>) {
+    /** Your blocks, and with [voice] (voice notes set up) a voice note first. */
+    fun update(context: Context, schedules: List<Schedule>, voice: Boolean = false) {
         val manager = context.getSystemService(ShortcutManager::class.java) ?: return
-        val shortcuts = schedules.filter { it.isBlock && it.enabled }.take(MAX).mapIndexed { i, block ->
+        val record = if (!voice) emptyList() else listOf(
+            ShortcutInfo.Builder(context, "voice")
+                .setShortLabel("Voice note")
+                .setLongLabel("Record a voice note")
+                .setIcon(Icon.createWithResource(context, R.mipmap.ic_launcher))
+                .setIntent(app.bedtime.voice.RecordActivity.intent(context))
+                .setRank(0)
+                .build(),
+        )
+        val shortcuts = record + schedules.filter { it.isBlock && it.enabled }.take(MAX - record.size).mapIndexed { i, block ->
             ShortcutInfo.Builder(context, "block:${block.id}")
                 .setShortLabel(block.name.ifBlank { "A block" })
                 .setLongLabel("Start ${block.name.ifBlank { "a block" }} · ${formatMinutes(block.durationMinutes.toLong())}")
                 .setIcon(Icon.createWithResource(context, R.mipmap.ic_launcher))
                 .setIntent(Intent(context, StartBlockActivity::class.java).setAction(ACTION).putExtra(EXTRA_ID, block.id))
-                .setRank(i)
+                .setRank(i + record.size)
                 .build()
         }
         runCatching { manager.dynamicShortcuts = shortcuts }

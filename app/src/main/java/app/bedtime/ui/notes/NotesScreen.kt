@@ -95,7 +95,7 @@ import java.util.Locale
 
 /** Your notes, kept in the app: quick ones from the minimal home's search, and any you write here. */
 @Composable
-fun NotesScreen(onBack: () -> Unit, initialOpen: String? = null, onSettings: (() -> Unit)? = null, openJournal: Boolean = false, journalDay: Long? = null) {
+fun NotesScreen(onBack: (() -> Unit)?, initialOpen: String? = null, onSettings: (() -> Unit)? = null, openJournal: Boolean = false, journalDay: Long? = null) {
     val context = LocalContext.current
     val repo = remember { Repository.get(context) }
     val scope = rememberCoroutineScope()
@@ -119,6 +119,8 @@ fun NotesScreen(onBack: () -> Unit, initialOpen: String? = null, onSettings: (()
         onJournal = if (settings?.journalOn == true || journalEntries.isNotEmpty()) ({ journal = true }) else null,
         onSettings = onSettings,
         trash = trash,
+        // A voice note's recordings, a tap from your audio player.
+        onPlay = settings?.voiceFolder?.let { folder -> { file -> scope.launch { app.bedtime.voice.VoicePlayer.open(context, folder, file) } } },
         shelf = ShelfHandlers(
             move = { from, into -> scope.launch { repo.moveNote(from, into) } },
             merge = { ids -> scope.launch { repo.mergeNotes(ids) } },
@@ -158,7 +160,9 @@ internal fun NotesContent(
     notes: List<Note>,
     onSave: (id: String, text: String) -> Unit,
     onDelete: (String) -> Unit,
-    onBack: () -> Unit,
+    onBack: (() -> Unit)?,
+    /** One of a note's recordings, by file, opened in your audio player. */
+    onPlay: ((String) -> Unit)? = null,
     initialOpen: String? = null,
     /** The microjournal, when it's switched on: a row of its own at the top. */
     onJournal: (() -> Unit)? = null,
@@ -202,6 +206,8 @@ internal fun NotesContent(
         NoteEditor(
             initial = initial,
             isNew = note == null && initial.isEmpty(),
+            // A new note opens ready to write.
+            focus = note == null && initial.isEmpty(),
             onSave = { text -> whole(text).let { if (it.isNotBlank() && it != note?.text) onSave(editing, it) } },
             onDone = { text ->
                 val all = whole(text)
@@ -221,6 +227,11 @@ internal fun NotesContent(
                 }
             },
             saveWith = done,
+            panel = if (onPlay == null || app.bedtime.data.Voice.recordings(initial).isEmpty()) null else { value, _ ->
+                Column(Modifier.padding(horizontal = PageGutter, vertical = 8.dp)) {
+                    RecordingChips(app.bedtime.data.Voice.recordings(value.text), onPlay)
+                }
+            },
             onTick = if (!todo) null else { text, line ->
                 val (rest, nowDone) = Todo.split(Todo.toggled(Todo.join(text, done), line, today))
                 done = nowDone

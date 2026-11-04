@@ -65,6 +65,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.bedtime.data.NoteTarget
 import app.bedtime.data.Notes
 import app.bedtime.data.Repository
+import app.bedtime.ui.components.BedtimeIcons
 import app.bedtime.ui.components.Chevron
 import app.bedtime.ui.components.ObsidianTextField
 import app.bedtime.ui.components.ObsidianTopBar
@@ -158,6 +159,9 @@ fun NoteTargetsScreen(onBack: () -> Unit, onOpenNotes: () -> Unit, onOpenJournal
         prompts = current.journalPrompts,
         onPrompts = { on -> scope.launch { repo.updateSettings { it.copy(journalPrompts = on) } } },
         moods = app.bedtime.ui.settings.moodsWords(current),
+        notesTab = current.notesTab,
+        onNotesTab = { on -> scope.launch { repo.updateSettings { it.copy(notesTab = on) } } },
+        voice = { app.bedtime.voice.VoiceSettingsCard() },
         onMoods = onOpenMoods,
     )
     if (choosingShortcut) {
@@ -236,6 +240,11 @@ internal fun NoteTargetsContent(
     /** The moods to tap in an entry, in a few words, and their page. */
     moods: String = "",
     onMoods: () -> Unit = {},
+    /** Notes as a tab of their own at refuge's foot. */
+    notesTab: Boolean = false,
+    onNotesTab: (Boolean) -> Unit = {},
+    /** Voice notes' own settings, drawn by the screen. */
+    voice: (@Composable () -> Unit)? = null,
 ) {
     val c = Obsidian.colors
     Scaffold(containerColor = c.bgPrimary, topBar = { ObsidianTopBar("Quick notes", onBack = onBack, subtitle = "From the minimal home's search") }) { padding ->
@@ -250,6 +259,9 @@ internal fun NoteTargetsContent(
             Spacer(Modifier.height(16.dp))
             SectionCard(title = "Refuge notes") {
                 OptionRow(Icons.Default.Edit, "Your notes", description = "Kept on this phone, written in Markdown", onClick = onOpenNotes) { Chevron() }
+                OptionRow(BedtimeIcons.Book, "A notes tab", description = "Your notes and microjournal at refuge's foot, beside insights") {
+                    ObsidianToggle(notesTab, onNotesTab)
+                }
                 OptionRow(Icons.Default.DateRange, "Microjournal", description = "An entry a day in your notes, a line at a time, each with its time; from the quick note and the share menu too") {
                     ObsidianToggle(journalOn, onJournalOn)
                 }
@@ -262,6 +274,10 @@ internal fun NoteTargetsContent(
                     }
                     OptionRow(Icons.Default.Edit, "Moods", description = moods, onClick = onMoods) { Chevron() }
                 }
+            }
+            voice?.let {
+                Spacer(Modifier.height(16.dp))
+                it()
             }
             Spacer(Modifier.height(16.dp))
             SectionCard(

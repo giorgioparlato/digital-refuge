@@ -83,6 +83,11 @@ internal fun JournalContent(onBack: () -> Unit, openToday: Boolean = false, open
             moods = app.bedtime.data.Why.moods(settings ?: app.bedtime.data.AppSettings()),
             onMood = { mood, on -> scope.launch { if (on) repo.addMood(day, mood) else repo.removeLatestMood(day, mood) } },
             onAddMood = { mood -> scope.launch { repo.addMoodTag(mood) } },
+            onRecord = settings?.takeIf { app.bedtime.data.Voice.ready(it) }?.let { { context.startActivity(app.bedtime.voice.RecordActivity.intent(context, journal = true)) } },
+            // Its recordings, a tap from your player: wherever they were kept, even with voice notes off since.
+            moodsShown = settings?.journalMoodsShown != false,
+            onMoodsShown = { shown -> scope.launch { repo.updateSettings { it.copy(journalMoodsShown = shown) } } },
+            onPlay = settings?.voiceFolder?.let { folder -> { file -> scope.launch { app.bedtime.voice.VoicePlayer.open(context, folder, file) } } },
         )
         return
     }
@@ -136,6 +141,13 @@ private fun JournalEditor(
     onMood: (String, Boolean) -> Unit = { _, _ -> },
     /** A mood of your own, kept among them from now on. */
     onAddMood: (String) -> Unit = {},
+    /** A voice note, once they're set up: its line, and then its words, come in below. */
+    onRecord: (() -> Unit)? = null,
+    /** One of the entry's recordings, by file, opened in your audio player. */
+    onPlay: ((String) -> Unit)? = null,
+    /** The mood chips open, or folded to one line that says the line's moods. */
+    moodsShown: Boolean = true,
+    onMoodsShown: (Boolean) -> Unit = {},
 ) {
     val c = Obsidian.colors
     var aims by remember { mutableStateOf(entry.aims) }
@@ -155,16 +167,38 @@ private fun JournalEditor(
         onDelete = null,
         title = Journal.title(entry.copy(aims = aims), today),
         actions = {
+            if (onRecord != null) {
+                androidx.compose.material3.IconButton(onClick = onRecord) {
+                    androidx.compose.material3.Icon(app.bedtime.ui.components.BedtimeIcons.Mic, contentDescription = "record a voice note", tint = c.accentText)
+                }
+            }
             if (prompts) TextButton(onClick = { prompting = !prompting }) { Text(if (prompting) "Hide prompts" else "Prompts", color = c.accentText) }
         },
-        panel = if (!prompting && moods.isEmpty()) null else { value, edit ->
+        panel = if (!prompting && moods.isEmpty() && (onPlay == null || app.bedtime.data.Voice.recordings(entry.text).isEmpty())) null else { value, edit ->
             val tap = { mood: String, all: List<String> ->
                 val (text, cursor, on) = Journal.withMood(value.text, value.selection.start, mood, all, now())
                 edit { androidx.compose.ui.text.input.TextFieldValue(text, androidx.compose.ui.text.TextRange(cursor)) }
                 onMood(mood, on)
             }
             Column(Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState()).padding(horizontal = PageGutter, vertical = 8.dp)) {
+                val recordings = if (onPlay == null) emptyList() else app.bedtime.data.Voice.recordings(value.text)
+                if (recordings.isNotEmpty() && onPlay != null) {
+                    RecordingChips(recordings, onPlay)
+                    Spacer(Modifier.height(10.dp))
+                }
                 if (moods.isNotEmpty()) {
+                    val here = Journal.moodsAt(value.text, value.selection.start, moods)
+                    Text(
+                        listOf("moods", here.joinToString(", ")).filter { it.isNotEmpty() }.joinToString(" · ") + if (moodsShown) "  ▴" else "  ▾",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = c.textMuted,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable(onClickLabel = if (moodsShown) "fold the moods" else "show the moods") { onMoodsShown(!moodsShown) }
+                            .padding(vertical = 4.dp),
+                    )
+                }
+                if (moods.isNotEmpty() && moodsShown) {
                     app.bedtime.ui.blocked.MoodChips(
                         moods,
                         Journal.moodsAt(value.text, value.selection.start, moods),
@@ -250,5 +284,26 @@ internal fun JournalPrompts(
             }
         }
         if (sections.isEmpty()) Text("No sections yet: add some under settings › notes › microjournal.", style = MaterialTheme.typography.bodySmall, color = faint)
+    }
+}
+
+/** The entry's recordings, each a tap from your audio player: "▶ 14:32 · 0:42". */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+internal fun RecordingChips(recordings: List<Pair<String, String>>, onPlay: (String) -> Unit) {
+    val c = Obsidian.colors
+    androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        recordings.forEach { (label, file) ->
+            Text(
+                "▶ $label",
+                style = MaterialTheme.typography.labelLarge,
+                color = c.accentText,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50))
+                    .border(1.dp, c.accent.copy(alpha = 0.6f), RoundedCornerShape(50))
+                    .clickable(onClickLabel = "play the recording from $label") { onPlay(file) }
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+            )
+        }
     }
 }

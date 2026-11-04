@@ -24,8 +24,24 @@ android {
         applicationId = "app.bedtime"
         minSdk = 26
         targetSdk = 35
-        versionCode = 80
-        versionName = "0.9.34"
+        versionCode = 81
+        versionName = "0.9.35"
+        // Whisper, for transcribing voice notes: built for 64-bit phones only (cpp/CMakeLists.txt), the
+        // rest of the app as before.
+        externalNativeBuild {
+            cmake {
+                // Always optimised: a debug build of whisper is too slow to try anything with.
+                arguments += listOf("-DCMAKE_BUILD_TYPE=Release", "-DANDROID_STL=c++_static")
+            }
+        }
+    }
+
+    ndkVersion = "27.2.12479018"
+    externalNativeBuild {
+        cmake {
+            path = file("cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
     }
 
     signingConfigs {

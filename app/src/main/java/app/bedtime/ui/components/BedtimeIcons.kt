@@ -85,6 +85,12 @@ object BedtimeIcons {
         }
     }
 
+    val Mic: ImageVector by lazy {
+        icon("Mic") {
+            path("M12,2 A3,3 0 0,1 15,5 V11 A3,3 0 0,1 9,11 V5 A3,3 0 0,1 12,2 Z M5,10 H7 A5,5 0 0,0 17,10 H19 A7,7 0 0,1 13,16.9 V20 H16 V22 H8 V20 H11 V16.9 A7,7 0 0,1 5,10 Z")
+        }
+    }
+
     val Phone: ImageVector by lazy {
         icon("Phone") {
             path("M8,2 H16 A2,2 0 0,1 18,4 V20 A2,2 0 0,1 16,22 H8 A2,2 0 0,1 6,20 V4 A2,2 0 0,1 8,2 Z M8,5 V18 H16 V5 Z", evenOdd = true)

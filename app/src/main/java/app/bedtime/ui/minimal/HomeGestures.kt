@@ -102,6 +102,8 @@ internal fun QuickNoteDialog(
     whole: Boolean = false,
     /** The microjournal as one more place for it, when the microjournal is on. */
     journal: JournalWith? = null,
+    /** A voice note instead, once they're set up. */
+    onRecord: (() -> Unit)? = null,
 ) {
     var words by remember { mutableStateOf(initial) }
     // A swipe puts it away only while there's no more than a word in it, so a note isn't lost to one.
@@ -118,6 +120,7 @@ internal fun QuickNoteDialog(
             initial = initial,
             onWords = { words = it },
             journal = journal?.let { j -> JournalWith(j.moods) { text, moods -> j.onSave(text, moods); onDismiss() } },
+            onRecord = onRecord?.let { record -> { onDismiss(); record() } },
         )
     }
 }
@@ -140,6 +143,8 @@ internal fun QuickNoteContent(
     onClose: (() -> Unit)? = null,
     /** The microjournal, when it's on: a line in today's entry, with how you feel if you like. */
     journal: JournalWith? = null,
+    /** A voice note instead of writing, once they're set up. */
+    onRecord: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val p = style.palette()
@@ -179,6 +184,11 @@ internal fun QuickNoteContent(
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("A quick note", style = MaterialTheme.typography.titleMedium, color = p.text, modifier = Modifier.weight(1f))
+            if (onRecord != null) {
+                Box(Modifier.size(36.dp).clip(RoundedCornerShape(50)).clickable(onClickLabel = "record a voice note", onClick = onRecord), contentAlignment = Alignment.Center) {
+                    Icon(BedtimeIcons.Mic, contentDescription = null, tint = p.accent, modifier = Modifier.size(20.dp))
+                }
+            }
             if (onClose != null) {
                 Box(Modifier.size(36.dp).clip(RoundedCornerShape(50)).clickable(onClickLabel = "close", onClick = onClose), contentAlignment = Alignment.Center) {
                     Icon(Icons.Default.Close, contentDescription = null, tint = p.faint, modifier = Modifier.size(20.dp))

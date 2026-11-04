@@ -58,6 +58,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -117,6 +118,9 @@ internal fun PhoneStats(
     onBudget: (Boolean, Int) -> Unit = { _, _ -> },
     /** Another page of the app: which apps are distracting. */
     onOpen: (String) -> Unit = {},
+    /** The month heatmap's colours, and choosing them. */
+    heatScale: app.bedtime.data.HeatScale = app.bedtime.data.HeatScale.GREEN,
+    onHeatScale: (app.bedtime.data.HeatScale) -> Unit = {},
 ) {
     val c = Obsidian.colors
     var period by rememberSaveable { mutableStateOf(initialPeriod) }
@@ -227,6 +231,8 @@ internal fun PhoneStats(
             onDay = { glance = it.toEpochDay() },
             onBudget = onBudget,
             today = today,
+            scale = heatScale,
+            onScale = onHeatScale,
         )
     }
 
@@ -364,16 +370,64 @@ private fun HoursLine(whose: String, hours: List<Int>) {
     }
 }
 
-/** Within the budget: calm, the tracker's calm colour where it's set. */
-private val Within = Color(0xFF86BC9F)
+/**
+ * The heatmap's scale, from no time to twice the budget: calm (green, or cream), through amber at the
+ * budget itself, to red. Mixed in Oklab, so the steps between look even.
+ */
+internal object HeatColours {
+    private val GREEN = listOf(0f to Color(0xFF5FA87E), 0.5f to Color(0xFFA9C46C), 1f to Color(0xFFE0B243), 1.5f to Color(0xFFDB7A3A), 2f to Color(0xFFD7263D))
+    private val CREAM = listOf(0f to Color(0xFFF2E6C9), 0.5f to Color(0xFFEDD49A), 1f to Color(0xFFE0B243), 1.5f to Color(0xFFDB7A3A), 2f to Color(0xFFD7263D))
 
-/** Over it, from the tracker's distracted colour (rose unless set) towards red, at twice the budget. */
-private val Rose = Color(0xFFE47B8A)
-private val Reddest = Color(0xFFD7263D)
+    fun stops(scale: app.bedtime.data.HeatScale) = if (scale == app.bedtime.data.HeatScale.CREAM) CREAM else GREEN
+
+    /** The colour at [level], the time as a share of the budget (1 at the budget, 2 and over as red as it gets). */
+    fun at(level: Float, scale: app.bedtime.data.HeatScale): Color {
+        val stops = stops(scale)
+        val l = level.coerceIn(0f, stops.last().first)
+        val i = stops.indexOfLast { it.first <= l }.coerceAtMost(stops.size - 2)
+        val (a, from) = stops[i]
+        val (b, to) = stops[i + 1]
+        return mix(from, to, (l - a) / (b - a))
+    }
+
+    private fun mix(from: Color, to: Color, t: Float): Color {
+        val x = oklab(from)
+        val y = oklab(to)
+        val m = FloatArray(3) { x[it] + (y[it] - x[it]) * t }
+        return fromOklab(m)
+    }
+
+    private fun lin(c: Float) = if (c <= 0.04045f) c / 12.92f else Math.pow(((c + 0.055f) / 1.055f).toDouble(), 2.4).toFloat()
+    private fun gamma(c: Float) = (if (c <= 0.0031308f) 12.92f * c else 1.055f * Math.pow(c.toDouble(), 1 / 2.4).toFloat() - 0.055f).coerceIn(0f, 1f)
+
+    private fun oklab(c: Color): FloatArray {
+        val r = lin(c.red); val g = lin(c.green); val b = lin(c.blue)
+        val l = Math.cbrt((0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b))
+        val m = Math.cbrt((0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b))
+        val s = Math.cbrt((0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b))
+        return floatArrayOf(
+            (0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s).toFloat(),
+            (1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s).toFloat(),
+            (0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s).toFloat(),
+        )
+    }
+
+    private fun fromOklab(lab: FloatArray): Color {
+        val l = lab[0] + 0.3963377774f * lab[1] + 0.2158037573f * lab[2]
+        val m = lab[0] - 0.1055613458f * lab[1] - 0.0638541728f * lab[2]
+        val s = lab[0] - 0.0894841775f * lab[1] - 1.2914855480f * lab[2]
+        val l3 = l * l * l; val m3 = m * m * m; val s3 = s * s * s
+        return Color(
+            gamma(4.0767416621f * l3 - 3.3077115913f * m3 + 0.2309699292f * s3),
+            gamma(-1.2684380046f * l3 + 2.6097574011f * m3 - 0.3413193965f * s3),
+            gamma(-0.0041960863f * l3 - 0.7034186147f * m3 + 1.7076147010f * s3),
+        )
+    }
+}
 
 /**
  * The month a day at a time, each coloured by its time against the tracker's daily budget, on the
- * budget's scale so months compare: calm within it, then the distracted colour deepening to red at
+ * budget's scale so months compare: calm within it, amber at it, deepening to red at
  * twice it. A tap opens that day. Under it, the month's most, and the budget it's set against.
  */
 @Composable
@@ -385,6 +439,8 @@ private fun MonthHeat(
     onDay: (LocalDate) -> Unit,
     onBudget: (Boolean, Int) -> Unit,
     today: LocalDate,
+    scale: app.bedtime.data.HeatScale = app.bedtime.data.HeatScale.GREEN,
+    onScale: (app.bedtime.data.HeatScale) -> Unit = {},
 ) {
     val c = Obsidian.colors
     // Your budget where you have one, on the home screen's tracker or the lock screen's.
@@ -398,12 +454,7 @@ private fun MonthHeat(
             onBudget(wholePhone, minutes)
         }
     }
-    val calm = style.hourCalmColor?.let { Color(it) } ?: Within
-    val over = style.hourDistractedColor?.let { Color(it) } ?: Rose
-    fun colour(seconds: Long): Color {
-        val level = UseHeat.level(seconds, budget)
-        return if (level <= 1f) calm.copy(alpha = 0.3f + 0.4f * level) else androidx.compose.ui.graphics.lerp(over, Reddest, (level - 1f) / (UseHeat.REDDEST - 1f))
-    }
+    fun colour(seconds: Long): Color = HeatColours.at(UseHeat.level(seconds, budget), scale)
     SectionCard(title = "Each day", subtitle = "Against a day's budget, the same in every month. Tap a day for its time and top apps") {
         SegmentedChoice(options = listOf("On the phone", "Distracting"), selected = if (wholePhone) 0 else 1, onSelect = { onWholePhone(it == 0) })
         Spacer(Modifier.height(8.dp))
@@ -443,16 +494,42 @@ private fun MonthHeat(
                                     .then(if (seconds != null || isToday) Modifier.clickable(onClickLabel = "this day at a glance") { onDay(day.date) } else Modifier),
                                 contentAlignment = Alignment.Center,
                             ) {
+                                // Dark numbers on the light end of the scale, light ones on the rest.
+                                val filled = seconds != null && seconds > 0
                                 Text(
                                     "${day.date.dayOfMonth}",
                                     style = MaterialTheme.typography.labelMedium,
                                     fontWeight = if (isToday) androidx.compose.ui.text.font.FontWeight.Bold else null,
-                                    color = if (seconds == null && !isToday) c.textFaint else c.textNormal,
+                                    color = when {
+                                        filled && colour(seconds ?: 0).luminance() > 0.45f -> Color(0xFF2A2A2A)
+                                        filled -> Color.White
+                                        seconds == null && !isToday -> c.textFaint
+                                        else -> c.textNormal
+                                    },
                                 )
                             }
                         }
                     }
                 }
+            }
+        }
+        Spacer(Modifier.height(10.dp))
+        // The scale itself, from nothing through the budget to twice it; and its colours to choose.
+        Box(Modifier.fillMaxWidth().height(10.dp).clip(RoundedCornerShape(50)).background(androidx.compose.ui.graphics.Brush.horizontalGradient((0..20).map { HeatColours.at(it / 10f, scale) })))
+        Row(Modifier.fillMaxWidth().padding(top = 4.dp)) {
+            Text("none", style = MaterialTheme.typography.labelSmall, color = c.textFaint)
+            Text("budget", style = MaterialTheme.typography.labelSmall, color = c.textFaint, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
+            Text("twice it", style = MaterialTheme.typography.labelSmall, color = c.textFaint)
+        }
+        Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            app.bedtime.data.HeatScale.entries.forEach { s ->
+                val on = s == scale
+                Text(
+                    if (s == app.bedtime.data.HeatScale.GREEN) "green to red" else "cream to red",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (on) c.accentText else c.textMuted,
+                    modifier = Modifier.clip(RoundedCornerShape(50)).border(1.dp, if (on) c.accent else c.border, RoundedCornerShape(50)).clickable { onScale(s) }.padding(horizontal = 10.dp, vertical = 5.dp),
+                )
             }
         }
         Spacer(Modifier.height(10.dp))
