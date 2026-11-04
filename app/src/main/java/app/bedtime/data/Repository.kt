@@ -144,6 +144,12 @@ class Repository private constructor(context: Context) {
     suspend fun voiceTranscribed(day: Long, file: String, words: String?) =
         update(JOURNAL, journalSerializer, emptyList()) { entries -> entries.map { if (it.day == day) it.copy(text = Voice.transcribed(it.text, file, words)) else it } }
 
+    /** A voice note's line at the foot of note [id], or the note begun with it if it isn't saved yet. */
+    suspend fun addToNote(id: String, line: String) = update(NOTES, notesSerializer, emptyList()) { notes ->
+        if (notes.any { it.id == id }) notes.map { if (it.id == id) it.copy(text = Journal.withLine(it.text, line), editedAt = System.currentTimeMillis()) else it }
+        else listOf(Note(id, line, System.currentTimeMillis())) + notes
+    }
+
     /** The words of the voice note [file] in the note made for it, once heard. */
     suspend fun voiceNoteTranscribed(file: String, words: String?) =
         update(NOTES, notesSerializer, emptyList()) { notes -> notes.map { if (file in it.text) it.copy(text = Voice.transcribed(it.text, file, words)) else it } }

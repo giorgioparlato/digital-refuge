@@ -36,6 +36,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
@@ -71,7 +72,14 @@ class VoiceRecorder : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             START -> if (_state.value == State.Idle) begin() else ensureForeground("recording")
-            STOP -> finish()
+            STOP -> {
+                // Asked at the end, from the notification: where it goes comes with the stop.
+                when (intent.getStringExtra(EXTRA_TO)) {
+                    TO_JOURNAL -> target.value = VoiceTo.Journal
+                    TO_NOTE -> target.value = VoiceTo.NewNote
+                }
+                finish()
+            }
         }
         return START_NOT_STICKY
     }
@@ -151,8 +159,10 @@ class VoiceRecorder : Service() {
         val settings = repo.settings.first()
         val at = Instant.ofEpochMilli(started).atZone(ZoneId.systemDefault()).toLocalDateTime()
         val tree = settings.voiceFolder?.let(Uri::parse) ?: return say("choose a folder for voice notes first")
+        // Never chosen (stopped some other way): a note of its own, where nothing is lost.
+        val to = target.value ?: VoiceTo.NewNote
         // The microjournal's in a folder of their own; a note's in yours.
-        val journal = to.value == VoiceTo.JOURNAL
+        val journal = to == VoiceTo.Journal
         val folder = (if (journal) subfolder(tree, Voice.JOURNAL_FOLDER) else top(tree))
             ?: return say("couldn't write to the voice notes folder; choose it again")
         val name = Voice.fileName(at, names(tree, folder))
@@ -162,7 +172,13 @@ class VoiceRecorder : Service() {
         encoded.delete()
         val day = at.toLocalDate().toEpochDay()
         val line = Voice.line(at.format(DateTimeFormatter.ofPattern("HH:mm")), seconds, name)
-        if (journal) repo.addVoiceLine(day, line) else repo.addNote(Voice.noteText(at, line))
+        when (to) {
+            VoiceTo.Journal -> repo.addVoiceLine(day, line)
+            VoiceTo.NewNote -> repo.addNote(Voice.noteText(at, line))
+            is VoiceTo.Into -> repo.addToNote(to.noteId, line)
+        }
+        // A page open on it takes the line in too, so its own saving doesn't write over it.
+        edits.tryEmit(Edit.Added(to, day, line))
         say(if (journal) "voice note kept in the microjournal" else "voice note kept in your notes")
         // The words, when there's a model to hear them with; without, the line keeps just the recording.
         val model = modelFile(this)
@@ -172,6 +188,7 @@ class VoiceRecorder : Service() {
             null
         }
         if (journal) repo.voiceTranscribed(day, name, words) else repo.voiceNoteTranscribed(name, words)
+        edits.tryEmit(Edit.Heard(name, words))
     }
 
     /** The folder you chose, as a document to write in. */
@@ -267,14 +284,25 @@ class VoiceRecorder : Service() {
             system.createNotificationChannel(NotificationChannel(CHANNEL, "voice notes", NotificationManager.IMPORTANCE_LOW))
         }
         val open = PendingIntent.getActivity(this, 0, RecordActivity.intent(this, start = false), PendingIntent.FLAG_IMMUTABLE)
-        val stop = PendingIntent.getService(this, 1, Intent(this, VoiceRecorder::class.java).setAction(STOP), PendingIntent.FLAG_IMMUTABLE)
+        val stop = { requestCode: Int, to: String? ->
+            PendingIntent.getService(this, requestCode, Intent(this, VoiceRecorder::class.java).setAction(STOP).putExtra(EXTRA_TO, to), PendingIntent.FLAG_IMMUTABLE)
+        }
+        val recordingNow = _state.value is State.Recording || text == "recording"
         return NotificationCompat.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.ic_tile)
             .setContentTitle("voice note")
             .setContentText(text)
             .setOngoing(true)
             .setContentIntent(open)
-            .apply { if (_state.value is State.Recording || text == "recording") addAction(0, "stop", stop) }
+            .apply {
+                // Where it goes, asked at the end here too when it wasn't decided at the start.
+                if (recordingNow && target.value == null) {
+                    addAction(0, "to the microjournal", stop(1, TO_JOURNAL))
+                    addAction(0, "to a note", stop(2, TO_NOTE))
+                } else if (recordingNow) {
+                    addAction(0, "stop", stop(3, null))
+                }
+            }
             .build()
     }
 
@@ -296,14 +324,46 @@ class VoiceRecorder : Service() {
         private val _state = MutableStateFlow<State>(State.Idle)
         val state: StateFlow<State> = _state
 
-        /** Where the recording goes once stopped; the recording screen sets it, and can change it while it runs. */
-        val to = MutableStateFlow(VoiceTo.JOURNAL)
+        /** Where the recording goes, set when it starts; null asks when you stop it. */
+        val target = MutableStateFlow<VoiceTo?>(null)
 
-        fun start(context: Context) {
+        /** What a recording did to an entry or a note, for a page open on it to take in as well. */
+        sealed interface Edit {
+            data class Added(val to: VoiceTo, val day: Long, val line: String) : Edit
+            data class Heard(val file: String, val words: String?) : Edit
+        }
+
+        val edits = kotlinx.coroutines.flow.MutableSharedFlow<Edit>(extraBufferCapacity = 8)
+
+        /** For the microjournal open on [day]: a recording's line there, then the words of any. */
+        fun journalEdits(day: Long): kotlinx.coroutines.flow.Flow<(String) -> String> = edits.mapNotNull { e ->
+            when (e) {
+                is Edit.Added -> if (e.to == VoiceTo.Journal && e.day == day) { text: String -> Voice.added(text, e.line) } else null
+                is Edit.Heard -> { text: String -> Voice.transcribed(text, e.file, e.words) }
+            }
+        }
+
+        /** For note [id] open: a recording's line in it, then the words of any. */
+        fun notesEdits(id: String): kotlinx.coroutines.flow.Flow<(String) -> String> = edits.mapNotNull { e ->
+            when (e) {
+                is Edit.Added -> if (e.to == VoiceTo.Into(id)) { text: String -> app.bedtime.data.Journal.withLine(text, e.line) } else null
+                is Edit.Heard -> { text: String -> Voice.transcribed(text, e.file, e.words) }
+            }
+        }
+
+        private const val EXTRA_TO = "to"
+        private const val TO_JOURNAL = "journal"
+        private const val TO_NOTE = "note"
+
+        /** A new recording, going to [to]; with null, you're asked where when it stops. */
+        fun start(context: Context, to: VoiceTo?) {
+            target.value = to
             ContextCompat.startForegroundService(context, Intent(context, VoiceRecorder::class.java).setAction(START))
         }
 
-        fun stop(context: Context) {
+        /** Stops it; [to] is where it goes, when that was asked at the end. */
+        fun stop(context: Context, to: VoiceTo? = null) {
+            if (to != null) target.value = to
             context.startService(Intent(context, VoiceRecorder::class.java).setAction(STOP))
         }
 

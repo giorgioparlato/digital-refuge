@@ -810,6 +810,8 @@ internal fun LockScreenContent(
                 )
                 val nowMillis = now.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
                 timers.forEach { end -> key(end) { TimerLine(end, nowMillis, style) { onHideTimer(end) } } }
+                // A voice note going on with the screen off and on again: a tap for its stop.
+                RecordingLine(style)
             }
             // The free space below the widgets: the quote keeps its place at the foot, and the notifications,
             // from the top, take as much as they need, going over the quote when there are many.
@@ -889,6 +891,39 @@ private fun runOffer(context: Context, repo: Repository, scope: kotlinx.coroutin
             say("copied ${offer.answer}")
         }
         else -> Unit
+    }
+}
+
+/** A voice note being recorded, under the widgets: how long so far, and a tap to stop it (or choose where it goes). */
+@Composable
+private fun RecordingLine(style: HomeStyle) {
+    val context = LocalContext.current
+    val state by app.bedtime.voice.VoiceRecorder.state.collectAsStateWithLifecycle()
+    val recording = state as? app.bedtime.voice.VoiceRecorder.State.Recording ?: return
+    val p = style.palette()
+    var now by remember { mutableStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(recording) {
+        while (true) {
+            now = System.currentTimeMillis()
+            delay(1_000)
+        }
+    }
+    Row(
+        Modifier
+            .padding(top = 20.dp)
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(p.text.copy(alpha = 0.06f))
+            .clickable(onClickLabel = "stop the recording") { context.startActivity(app.bedtime.voice.RecordActivity.intent(context, start = false)) }
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(10.dp).clip(CircleShape).background(androidx.compose.ui.graphics.Color(0xFFD7263D)))
+        Spacer(Modifier.width(10.dp))
+        Text("recording", style = MaterialTheme.typography.labelLarge, color = p.faint, modifier = Modifier.weight(1f))
+        Text(app.bedtime.data.Voice.length(((now - recording.since) / 1000L).toInt().coerceAtLeast(0)), style = MaterialTheme.typography.titleMedium.copy(fontFeatureSettings = "tnum"), color = p.text)
+        Spacer(Modifier.width(10.dp))
+        Text("stop ›", style = MaterialTheme.typography.labelLarge, color = p.accent)
     }
 }
 

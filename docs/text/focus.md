@@ -674,6 +674,7 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 - couldn't add it to a calendar
 - … until …
 - copied …
+- stop ›
 
 <sub>[LockNotificationViews.kt](../../app/src/main/java/app/bedtime/ui/lock/LockNotificationViews.kt)</sub>
 

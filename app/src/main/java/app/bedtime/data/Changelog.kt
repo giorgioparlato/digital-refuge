@@ -17,7 +17,7 @@ object Changelog {
             "0.9.35",
             listOf(
                 "Voice notes, if you switch them on: recorded and heard on the phone by Whisper, kept in a folder of yours, the words in the microjournal or a new note. A tap plays it.",
-                "Record from the microjournal, the quick note, the notes tab, a gesture (the lock screen too, without unlocking) or the app's icon.",
+                "Record from the microjournal or a note (it goes there), or from the quick note, the notes tab, a gesture or the app's icon (you choose where when you stop). It keeps recording with the screen off.",
                 "A notes tab at refuge's foot if you want one; held, it starts a note, today's microjournal, a to-do or a voice note.",
                 "Insights shows habits and moods only if you want them (the ⋮ at the top); switched off, nothing is lost.",
                 "The month's heatmap is one smooth scale, green or cream to red, with amber at your budget.",

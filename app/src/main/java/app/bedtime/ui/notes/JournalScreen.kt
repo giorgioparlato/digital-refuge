@@ -225,6 +225,7 @@ private fun JournalEditor(
             }
         },
         saveWith = aims,
+        outside = remember(entry.day) { app.bedtime.voice.VoiceRecorder.journalEdits(entry.day) },
         onType = if (!isToday) null else { old, new ->
             Journal.typed(old.text, new.text, new.selection.start, now())?.let { (text, cursor) ->
                 androidx.compose.ui.text.input.TextFieldValue(text, androidx.compose.ui.text.TextRange(cursor))

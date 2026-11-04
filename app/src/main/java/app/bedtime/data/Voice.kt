@@ -3,9 +3,12 @@ package app.bedtime.data
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
-/** Where a voice note goes: a line in today's microjournal, or a note of its own. */
-@kotlinx.serialization.Serializable
-enum class VoiceTo { JOURNAL, NOTE }
+/** Where a voice note goes: a line in today's microjournal, a note of its own, or the note it was recorded in. */
+sealed interface VoiceTo {
+    data object Journal : VoiceTo
+    data object NewNote : VoiceTo
+    data class Into(val noteId: String) : VoiceTo
+}
 
 /**
  * Voice notes: a recording kept as a file in your folder (the microjournal's in a folder of their own
@@ -55,6 +58,16 @@ object Voice {
 
     /** Whether voice notes can be recorded, so their buttons show: switched on, with a folder and a model chosen. */
     fun ready(settings: AppSettings): Boolean = settings.voiceOn && settings.voiceFolder != null && settings.voiceModel != null
+
+    /**
+     * [text], open to write in, with a recording's [line] come in: at the foot, or just above the
+     * fresh line waiting there, so you carry on where you were.
+     */
+    fun added(text: String, line: String): String {
+        val lines = text.trimEnd().lines()
+        val fresh = lines.lastOrNull()?.let { Regex("""^- \d{1,2}:\d{2} · ?$""").matches(it) } == true
+        return if (fresh) (lines.dropLast(1) + line + lines.last()).joinToString("\n") + " " else Journal.withLine(text, line)
+    }
 
     /** Recordings stop on their own after this long. */
     const val LONGEST_SECONDS = 30 * 60

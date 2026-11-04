@@ -51,4 +51,12 @@ class VoiceTest {
         assertEquals("# voice note, 4 november\n\n$line", Voice.noteText(at, line))
         assertEquals(listOf("14:32 · 0:42" to "2026-11-04 1432.m4a"), Voice.recordings(Voice.noteText(at, line)))
     }
+
+    @Test
+    fun aRecordingComesIntoAnOpenPageAboveTheFreshLine() {
+        val line = "- 14:32 · 🎙 0:42 · transcribing… · 2026-11-04 1432.m4a"
+        assertEquals("- 09:00 · coffee\n$line\n- 14:40 · ", Voice.added("- 09:00 · coffee\n- 14:40 · ", line))
+        assertEquals("- 09:00 · coffee\n$line", Voice.added("- 09:00 · coffee", line))
+        assertEquals(line, Voice.added("", line))
+    }
 }

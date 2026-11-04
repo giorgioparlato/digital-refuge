@@ -298,6 +298,7 @@ One file serves the look, widgets, gestures and notifications pages, for both sc
 - Camera, without unlocking
 - Write a note or look up a word, without unlocking
 - Microjournal: a line for today, once unlocked
+- Record a voice note, without unlocking
 - Open an app, once unlocked
 - + your own font
 - + another

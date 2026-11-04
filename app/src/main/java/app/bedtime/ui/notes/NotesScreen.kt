@@ -121,6 +121,7 @@ fun NotesScreen(onBack: (() -> Unit)?, initialOpen: String? = null, onSettings: 
         trash = trash,
         // A voice note's recordings, a tap from your audio player.
         onPlay = settings?.voiceFolder?.let { folder -> { file -> scope.launch { app.bedtime.voice.VoicePlayer.open(context, folder, file) } } },
+        onRecord = settings?.takeIf { app.bedtime.data.Voice.ready(it) }?.let { { id -> context.startActivity(app.bedtime.voice.RecordActivity.intent(context, note = id)) } },
         shelf = ShelfHandlers(
             move = { from, into -> scope.launch { repo.moveNote(from, into) } },
             merge = { ids -> scope.launch { repo.mergeNotes(ids) } },
@@ -163,6 +164,8 @@ internal fun NotesContent(
     onBack: (() -> Unit)?,
     /** One of a note's recordings, by file, opened in your audio player. */
     onPlay: ((String) -> Unit)? = null,
+    /** A voice note recorded into the note open, by its id, once they're set up. */
+    onRecord: ((String) -> Unit)? = null,
     initialOpen: String? = null,
     /** The microjournal, when it's switched on: a row of its own at the top. */
     onJournal: (() -> Unit)? = null,
@@ -219,7 +222,13 @@ internal fun NotesContent(
                 open = null
             },
             onDelete = note?.let { { open = null; deleteWithUndo(it) } },
+            outside = remember(editing) { app.bedtime.voice.VoiceRecorder.notesEdits(editing) },
             actions = {
+                if (onRecord != null && !todo) {
+                    IconButton(onClick = { onRecord(editing) }) {
+                        Icon(app.bedtime.ui.components.BedtimeIcons.Mic, contentDescription = "record a voice note into it", tint = Obsidian.colors.accentText)
+                    }
+                }
                 if (note != null) {
                     IconButton(onClick = { reminding = note }) {
                         Icon(Icons.Default.Notifications, contentDescription = "remind me", tint = if (note.remindAt != null) Obsidian.colors.accent else Obsidian.colors.textMuted)
@@ -789,6 +798,8 @@ internal fun NoteEditor(
     onType: ((old: TextFieldValue, new: TextFieldValue) -> TextFieldValue?)? = null,
     /** The keyboard up as it opens, ready to write. */
     focus: Boolean = false,
+    /** Changes made to the note from elsewhere while it's open (a voice note's line, then its words), taken in here. */
+    outside: kotlinx.coroutines.flow.Flow<(String) -> String>? = null,
     /** A box ticked or unticked at a line: the text it leaves, when the note does more than tick it (the to-do's). */
     onTick: ((text: String, line: Int) -> String)? = null,
     /** Under the text, scrolling with it: the to-do's done ones; it can set the text, and read it. */
@@ -810,6 +821,16 @@ internal fun NoteEditor(
         value = new
     }
     BackHandler { onDone(value.text) }
+    if (outside != null) LaunchedEffect(outside) {
+        outside.collect { change ->
+            val text = change(value.text)
+            if (text != value.text) {
+                // Writing at the end, the cursor stays at the end; elsewhere, where it was.
+                val atEnd = value.selection.start >= value.text.trimEnd().length
+                value = TextFieldValue(text, TextRange(if (atEnd) text.length else value.selection.start.coerceAtMost(text.length)))
+            }
+        }
+    }
     val focusText = remember { androidx.compose.ui.focus.FocusRequester() }
     if (focus) LaunchedEffect(Unit) { runCatching { focusText.requestFocus() } }
     // Saved a moment after you pause typing.

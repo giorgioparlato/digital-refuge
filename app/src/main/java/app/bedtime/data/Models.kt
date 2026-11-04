@@ -661,8 +661,6 @@ data class AppSettings(
     val voiceFolder: String? = null,
     /** The Whisper model's file name, as chosen; the file itself is copied into refuge's own storage. */
     val voiceModel: String? = null,
-    /** Where a voice note from the quick note, the notes tab, a gesture or the app's icon goes, as last chosen. */
-    val voiceTo: VoiceTo = VoiceTo.JOURNAL,
     /** What Whisper listens for: "auto", or a language's code. */
     val voiceLanguage: String = "auto",
     /** Your notes as a tab of their own at refuge's foot, beside insights. */

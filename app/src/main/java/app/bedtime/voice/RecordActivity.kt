@@ -44,14 +44,18 @@ import app.bedtime.ui.components.Text
 import app.bedtime.ui.theme.BedtimeTheme
 import app.bedtime.ui.theme.Obsidian
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 
 /**
  * Making a voice note: the time so far and a way to stop, over the lock screen too, without unlocking:
  * it only ever adds. Leaving it keeps recording; its notification brings it back, or stops it.
  */
 class RecordActivity : ComponentActivity() {
+    /** Where it goes, as asked for by what opened this: null asks when it stops. */
+    private var to: app.bedtime.data.VoiceTo? = null
+
     private val askMic = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) VoiceRecorder.start(this) else finish()
+        if (granted) VoiceRecorder.start(this, to) else finish()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -64,13 +68,21 @@ class RecordActivity : ComponentActivity() {
             window.addFlags(android.view.WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED)
         }
         val repo = app.bedtime.data.Repository.get(this)
-        val fromJournal = intent.getBooleanExtra(EXTRA_JOURNAL, false)
+        val note = intent.getStringExtra(EXTRA_NOTE)
         val starting = savedInstanceState == null && intent.getBooleanExtra(EXTRA_START, true) && VoiceRecorder.state.value == VoiceRecorder.State.Idle
-        // From the microjournal, it goes there; from anywhere else, where you last chose (a note, without the microjournal).
-        if (starting && fromJournal) VoiceRecorder.to.value = app.bedtime.data.VoiceTo.JOURNAL
-        if (starting) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
-                VoiceRecorder.start(this)
+        lifecycleScope.launch {
+            val settings = repo.settings.first()
+            // From the microjournal or a note, it goes there; from anywhere else, it asks when you stop,
+            // unless there's no microjournal to choose.
+            to = when {
+                intent.getBooleanExtra(EXTRA_JOURNAL, false) -> app.bedtime.data.VoiceTo.Journal
+                note != null -> app.bedtime.data.VoiceTo.Into(note)
+                !settings.journalOn -> app.bedtime.data.VoiceTo.NewNote
+                else -> null
+            }
+            if (!starting) return@launch
+            if (ContextCompat.checkSelfPermission(this@RecordActivity, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                VoiceRecorder.start(this@RecordActivity, to)
             } else {
                 askMic.launch(Manifest.permission.RECORD_AUDIO)
             }
@@ -79,13 +91,7 @@ class RecordActivity : ComponentActivity() {
             BedtimeTheme {
                 val c = Obsidian.colors
                 val state by VoiceRecorder.state.collectAsStateWithLifecycle()
-                val settings by repo.settings.collectAsStateWithLifecycle(initialValue = null)
-                val to by VoiceRecorder.to.collectAsStateWithLifecycle()
-                val choosing = !fromJournal && settings?.journalOn == true
-                LaunchedEffect(settings == null) {
-                    val s = settings ?: return@LaunchedEffect
-                    if (starting && !fromJournal) VoiceRecorder.to.value = if (s.journalOn) s.voiceTo else app.bedtime.data.VoiceTo.NOTE
-                }
+                val target by VoiceRecorder.target.collectAsStateWithLifecycle()
                 var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
                 var begun by remember { mutableLongStateOf(0L) }
                 LaunchedEffect(state) {
@@ -125,37 +131,28 @@ class RecordActivity : ComponentActivity() {
                                     Text("recording", style = MaterialTheme.typography.titleMedium, color = c.textNormal)
                                 }
                                 Text(Voice.length(((now - s.since) / 1000L).toInt().coerceAtLeast(0)), fontSize = 40.sp, color = c.textNormal)
-                                if (choosing) {
-                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        listOf(app.bedtime.data.VoiceTo.JOURNAL to "microjournal", app.bedtime.data.VoiceTo.NOTE to "new note").forEach { (where, name) ->
-                                            val on = where == to
-                                            Text(
-                                                name,
-                                                style = MaterialTheme.typography.labelLarge,
-                                                color = if (on) c.bgPrimary else c.textMuted,
-                                                modifier = Modifier
-                                                    .clip(RoundedCornerShape(50))
-                                                    .background(if (on) c.accent else Color.Transparent)
-                                                    .border(1.dp, if (on) c.accent else c.border, RoundedCornerShape(50))
-                                                    .clickable {
-                                                        VoiceRecorder.to.value = where
-                                                        lifecycleScope.launch { repo.updateSettings { it.copy(voiceTo = where) } }
-                                                    }
-                                                    .padding(horizontal = 14.dp, vertical = 7.dp),
-                                            )
-                                        }
-                                    }
-                                }
                                 Text(
-                                    (if (to == app.bedtime.data.VoiceTo.JOURNAL) "It goes in today's microjournal" else "It goes in a new note") +
-                                        "; the words follow once Whisper has heard them. Leave this and it keeps recording.",
+                                    when (target) {
+                                        null -> "Where it goes, you choose when you stop"
+                                        app.bedtime.data.VoiceTo.Journal -> "It goes in today's microjournal"
+                                        app.bedtime.data.VoiceTo.NewNote -> "It goes in a new note"
+                                        is app.bedtime.data.VoiceTo.Into -> "It goes in this note"
+                                    } + "; the words follow once Whisper has heard them. Leave this and it keeps recording.",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = c.textMuted,
                                 )
-                                SoftPillButton("Stop", onClick = { VoiceRecorder.stop(this@RecordActivity) })
+                                if (target == null) {
+                                    // Asked every time, never remembered: where this one goes.
+                                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                        SoftPillButton("Keep in the microjournal", onClick = { VoiceRecorder.stop(this@RecordActivity, app.bedtime.data.VoiceTo.Journal) })
+                                        SoftPillButton("Keep as a note", onClick = { VoiceRecorder.stop(this@RecordActivity, app.bedtime.data.VoiceTo.NewNote) })
+                                    }
+                                } else {
+                                    SoftPillButton("Stop", onClick = { VoiceRecorder.stop(this@RecordActivity) })
+                                }
                             }
                             VoiceRecorder.State.Saving -> Text(
-                                if (to == app.bedtime.data.VoiceTo.JOURNAL) "Kept. The words follow in the microjournal." else "Kept. The words follow in your notes.",
+                                if (target == app.bedtime.data.VoiceTo.Journal) "Kept. The words follow in the microjournal." else "Kept. The words follow in your notes.",
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = c.textNormal,
                             )
@@ -170,6 +167,7 @@ class RecordActivity : ComponentActivity() {
     companion object {
         private const val EXTRA_START = "start"
         private const val EXTRA_JOURNAL = "journal"
+        private const val EXTRA_NOTE = "note"
         const val ACTION = "app.bedtime.RECORD"
 
         /** A new recording from a gesture, once voice notes are set up; until then, where to set them up. */
@@ -180,10 +178,11 @@ class RecordActivity : ComponentActivity() {
 
         /**
          * The recording screen; with [start], a new recording begins if none is going. From the
-         * microjournal ([journal]) it goes there; from anywhere else, you choose: it or a new note.
+         * microjournal ([journal]) it goes there, from a note ([note]) into it; from anywhere else, you
+         * choose where when you stop.
          */
-        fun intent(context: Context, start: Boolean = true, journal: Boolean = false): Intent =
-            Intent(context, RecordActivity::class.java).setAction(ACTION).putExtra(EXTRA_START, start).putExtra(EXTRA_JOURNAL, journal)
+        fun intent(context: Context, start: Boolean = true, journal: Boolean = false, note: String? = null): Intent =
+            Intent(context, RecordActivity::class.java).setAction(ACTION).putExtra(EXTRA_START, start).putExtra(EXTRA_JOURNAL, journal).putExtra(EXTRA_NOTE, note)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
     }
 }
