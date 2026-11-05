@@ -123,11 +123,9 @@ insights
 - in distracting apps
 - Budget: … a day {what}
 - No budget chosen yet, so … a day {what} is suggested. Choose yours
-- green to red
-- cream to red
+- … budget
 - Today so far: … of …
 - Nothing kept for these days yet.
-- twice or more
 - {text} ›
 -  on the phone
 -  in distracting apps
@@ -200,6 +198,7 @@ insights
 
 <sub>[HabitViews.kt](../../app/src/main/java/app/bedtime/ui/habits/HabitViews.kt)</sub>
 
+- habits · {done} of …
 - days in a row
 - best run
 - Today

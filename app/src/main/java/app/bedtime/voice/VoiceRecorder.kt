@@ -74,6 +74,11 @@ class VoiceRecorder : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             START -> if (_state.value == State.Idle) begin() else ensureForeground("recording")
+            // Where it goes, chosen while it records (here or on the notification): it carries on, the notification follows.
+            CHOSEN -> {
+                Voice.target(intent.getStringExtra(EXTRA_TO))?.let { target.value = it }
+                if (_state.value is State.Recording) ensureForeground("recording")
+            }
             STOP -> {
                 // Asked at the end, from the notification: where it goes comes with the stop.
                 when (intent.getStringExtra(EXTRA_TO)) {
@@ -187,20 +192,32 @@ class VoiceRecorder : Service() {
         val stop = { requestCode: Int, to: String? ->
             PendingIntent.getService(this, requestCode, Intent(this, VoiceRecorder::class.java).setAction(STOP).putExtra(EXTRA_TO, to), PendingIntent.FLAG_IMMUTABLE)
         }
+        val choose = { requestCode: Int, to: String ->
+            PendingIntent.getService(this, requestCode, Intent(this, VoiceRecorder::class.java).setAction(CHOSEN).putExtra(EXTRA_TO, to), PendingIntent.FLAG_IMMUTABLE)
+        }
         val recordingNow = _state.value is State.Recording || text == "recording"
         val waiting = _state.value is State.Waiting
         return NotificationCompat.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.ic_tile)
             .setContentTitle("voice note")
-            .setContentText(text)
+            .setContentText(
+                if (recordingNow && choosable.value) when (target.value) {
+                    VoiceTo.Journal -> "recording · to the microjournal"
+                    VoiceTo.NewNote -> "recording · to a new note"
+                    else -> "recording · where should it go?"
+                } else text,
+            )
             .setOngoing(true)
             .setContentIntent(open)
             .apply {
-                // Stop while it records; then, if it wasn't settled at the start, where it goes.
+                // Stopped and not chosen: each way sends it there. Recording: only "stop" stops it; where it
+                // goes can be chosen beside it, and choosing leaves it recording.
                 if (waiting) {
                     addAction(0, "to the microjournal", stop(1, TO_JOURNAL))
                     addAction(0, "to a note", stop(2, TO_NOTE))
                 } else if (recordingNow) {
+                    if (choosable.value && target.value != VoiceTo.Journal) addAction(0, "microjournal", choose(4, TO_JOURNAL))
+                    if (choosable.value && target.value != VoiceTo.NewNote) addAction(0, "new note", choose(5, TO_NOTE))
                     addAction(0, "stop", stop(3, null))
                 }
             }
@@ -219,14 +236,18 @@ class VoiceRecorder : Service() {
         const val RATE = 16_000
         private const val START = "start"
         private const val STOP = "stop"
+        private const val CHOSEN = "chosen"
         private const val CHANNEL = "voice_notes"
         private const val NOTIFICATION = 7_301
 
         private val _state = MutableStateFlow<State>(State.Idle)
         val state: StateFlow<State> = _state
 
-        /** Where the recording goes, set when it starts; null asks when you stop it. */
+        /** Where the recording goes, set when it starts or chosen while it records; null asks when you stop it. */
         val target = MutableStateFlow<VoiceTo?>(null)
+
+        /** Whether where it goes is yours to choose: started from the quick note, the notes tab, a gesture or the icon. */
+        val choosable = MutableStateFlow(false)
 
         /** What a recording did to an entry or a note, for a page open on it to take in as well. */
         sealed interface Edit {
@@ -259,7 +280,14 @@ class VoiceRecorder : Service() {
         /** A new recording, going to [to]; with null, you're asked where when it stops. */
         fun start(context: Context, to: VoiceTo?) {
             target.value = to
+            choosable.value = to == null
             ContextCompat.startForegroundService(context, Intent(context, VoiceRecorder::class.java).setAction(START))
+        }
+
+        /** Where it goes, chosen while it records; the notification then offers just "stop". */
+        fun choose(context: Context, to: VoiceTo) {
+            target.value = to
+            context.startService(Intent(context, VoiceRecorder::class.java).setAction(CHOSEN))
         }
 
         /** Stops it; [to] is where it goes, when that was asked at the end. */

@@ -633,6 +633,7 @@ private fun MinimalHomeScreen(
                 onMark = { h, day, value -> scope.launch { repo.markHabit(h.id, day, value) } },
                 onOpen = { openHabit = it.id },
                 onHold = { holding = Module.HABITS },
+                onOpenAll = { runCatching { context.startActivity(app.bedtime.MainActivity.intent(context, app.bedtime.Routes.HABITS)) } },
             ),
             onGesture = onGesture,
             hours = todayHours.takeIf { Modules.isOn(style, Screen.HOME, Module.HOURS) && HourlyUse.counting(settings) }

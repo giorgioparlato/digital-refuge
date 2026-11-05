@@ -19,6 +19,7 @@ import app.bedtime.data.Note
 import app.bedtime.data.NoteWidget
 import app.bedtime.data.Screen
 import app.bedtime.ui.habits.HabitsWidget
+import app.bedtime.ui.habits.HabitsDots
 import app.bedtime.ui.homestyle.palette
 import app.bedtime.ui.notes.NoteWidgetView
 
@@ -82,12 +83,18 @@ internal fun habitsSlot(
     onMark: (Habit, Long, Int) -> Unit,
     onOpen: (Habit) -> Unit,
     onHold: () -> Unit,
+    /** All your habits, from a tap on the dots. */
+    onOpenAll: () -> Unit = {},
 ): (@Composable () -> Unit)? {
     val shown = habits.filter { it.shownOn(screen) }
     if (shown.isEmpty() || !Modules.isOn(style, screen, Module.HABITS)) return null
-    return {
+    return ret@{
         val p = style.palette()
         val today = HourlyUse.today()
+        if (style.habitsDots) {
+            HabitsDots(shown, marks, today, p.text, p.faint, p.accent, Modifier.padding(top = 22.dp), onOpenAll, onHold)
+            return@ret
+        }
         HabitsWidget(
             shown, marks, today, p.text, p.faint, p.accent,
             Modifier.padding(top = 22.dp),

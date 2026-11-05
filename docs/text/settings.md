@@ -396,6 +396,7 @@ One file serves the look, widgets, gestures and notifications pages, for both sc
 - Distracted hours
 - Accent
 - Tap it for today's detail.
+- A line each
 - No habits yet.
 
 <sub>[CircleScreen.kt](../../app/src/main/java/app/bedtime/ui/settings/CircleScreen.kt)</sub>

@@ -303,16 +303,18 @@ private fun BedtimeNavigation(pendingRoute: String?, onRouteConsumed: () -> Unit
                 }
             }
         }
+        // Held, the notes tab or focus's notes button: straight to writing.
+        val notesMenu = NotesMenu(
+            newNote = { push(Routes.note(java.util.UUID.randomUUID().toString())) },
+            journal = { push(Routes.JOURNAL_TODAY) },
+            todo = { addingTodo = true },
+            record = loaded?.takeIf { app.bedtime.data.Voice.ready(it) }?.let { { context.startActivity(app.bedtime.voice.RecordActivity.intent(context)) } },
+        )
         TabShell(
             tab,
             notesTab = loaded?.notesTab == true,
             onTab = { tab = it },
-            notesMenu = NotesMenu(
-                newNote = { push(Routes.note(java.util.UUID.randomUUID().toString())) },
-                journal = { push(Routes.JOURNAL_TODAY) },
-                todo = { addingTodo = true },
-                record = loaded?.takeIf { app.bedtime.data.Voice.ready(it) }?.let { { context.startActivity(app.bedtime.voice.RecordActivity.intent(context)) } },
-            ),
+            notesMenu = notesMenu,
         ) {
             key(tab) {
                 when (tab) {
@@ -330,6 +332,7 @@ private fun BedtimeNavigation(pendingRoute: String?, onRouteConsumed: () -> Unit
                         onSetup = { push(Routes.SETUP) },
                         onUnlock = { id -> push(Routes.unlock(id)) },
                         onNotes = { if (loaded?.notesTab == true) tab = Routes.NOTES else push(Routes.NOTES) },
+                        notesShortcuts = notesMenu.items(),
                         onWhy = { push(Routes.WHY) },
                     )
                 }
@@ -423,8 +426,7 @@ private fun TabShell(tab: String, notesTab: Boolean, onTab: (String) -> Unit, no
                         // Held: straight to writing, without going through the list.
                         if (notesMenu != null) {
                             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }, containerColor = c.bgSecondary) {
-                                (listOf("New note" to notesMenu.newNote, "Today's microjournal" to notesMenu.journal, "Add a to-do" to notesMenu.todo) +
-                                    listOfNotNull(notesMenu.record?.let { "Record a voice note" to it })).forEach { (label, go) ->
+                                notesMenu.items().forEach { (label, go) ->
                                     DropdownMenuItem(text = { Text(label, color = c.textNormal) }, onClick = {
                                         menu = false
                                         go()
@@ -444,7 +446,11 @@ private fun TabShell(tab: String, notesTab: Boolean, onTab: (String) -> Unit, no
 }
 
 /** What a long press on the notes tab offers: a new note, today's microjournal, a to-do, and a voice note once they're set up. */
-private class NotesMenu(val newNote: () -> Unit, val journal: () -> Unit, val todo: () -> Unit, val record: (() -> Unit)? = null)
+private class NotesMenu(val newNote: () -> Unit, val journal: () -> Unit, val todo: () -> Unit, val record: (() -> Unit)? = null) {
+    /** As the menu shows them, in order. */
+    fun items(): List<Pair<String, () -> Unit>> =
+        listOf("New note" to newNote, "Today's microjournal" to journal, "Add a to-do" to todo) + listOfNotNull(record?.let { "Record a voice note" to it })
+}
 
 /** One line for the to-do list, without opening it. */
 @Composable

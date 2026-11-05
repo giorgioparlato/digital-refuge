@@ -119,8 +119,6 @@ internal fun PhoneStats(
     /** Another page of the app: which apps are distracting. */
     onOpen: (String) -> Unit = {},
     /** The month heatmap's colours, and choosing them. */
-    heatScale: app.bedtime.data.HeatScale = app.bedtime.data.HeatScale.GREEN,
-    onHeatScale: (app.bedtime.data.HeatScale) -> Unit = {},
 ) {
     val c = Obsidian.colors
     var period by rememberSaveable { mutableStateOf(initialPeriod) }
@@ -231,8 +229,6 @@ internal fun PhoneStats(
             onDay = { glance = it.toEpochDay() },
             onBudget = onBudget,
             today = today,
-            scale = heatScale,
-            onScale = onHeatScale,
         )
     }
 
@@ -371,23 +367,22 @@ private fun HoursLine(whose: String, hours: List<Int>) {
 }
 
 /**
- * The heatmap's scale, from no time to twice the budget: calm (green, or cream), through amber at the
- * budget itself, to red. Mixed in Oklab, so the steps between look even.
+ * The heatmap's one scale: green for no time, cream at your budget, and red at the month's worst day,
+ * so the reddest is always the worst there was. Mixed in Oklab, so the steps between look even.
  */
 internal object HeatColours {
-    private val GREEN = listOf(0f to Color(0xFF5FA87E), 0.5f to Color(0xFFA9C46C), 1f to Color(0xFFE0B243), 1.5f to Color(0xFFDB7A3A), 2f to Color(0xFFD7263D))
-    private val CREAM = listOf(0f to Color(0xFFF2E6C9), 0.5f to Color(0xFFEDD49A), 1f to Color(0xFFE0B243), 1.5f to Color(0xFFDB7A3A), 2f to Color(0xFFD7263D))
+    private val GREEN = Color(0xFF5FA87E)
+    private val CREAM = Color(0xFFF2E6C9)
+    private val RED = Color(0xFFD7263D)
 
-    fun stops(scale: app.bedtime.data.HeatScale) = if (scale == app.bedtime.data.HeatScale.CREAM) CREAM else GREEN
-
-    /** The colour at [level], the time as a share of the budget (1 at the budget, 2 and over as red as it gets). */
-    fun at(level: Float, scale: app.bedtime.data.HeatScale): Color {
-        val stops = stops(scale)
-        val l = level.coerceIn(0f, stops.last().first)
-        val i = stops.indexOfLast { it.first <= l }.coerceAtMost(stops.size - 2)
-        val (a, from) = stops[i]
-        val (b, to) = stops[i + 1]
-        return mix(from, to, (l - a) / (b - a))
+    /** [seconds] on the month's scale: [budget] at cream, [most] (the month's worst) at red; red only past the budget. */
+    fun at(seconds: Long, budget: Long, most: Long): Color {
+        val within = budget.coerceAtLeast(1)
+        return if (seconds <= within || most <= within) {
+            mix(GREEN, CREAM, (seconds.toFloat() / within).coerceIn(0f, 1f))
+        } else {
+            mix(CREAM, RED, ((seconds - within).toFloat() / (most - within)).coerceIn(0f, 1f))
+        }
     }
 
     private fun mix(from: Color, to: Color, t: Float): Color {
@@ -426,9 +421,9 @@ internal object HeatColours {
 }
 
 /**
- * The month a day at a time, each coloured by its time against the tracker's daily budget, on the
- * budget's scale so months compare: calm within it, amber at it, deepening to red at
- * twice it. A tap opens that day. Under it, the month's most, and the budget it's set against.
+ * The month a day at a time, each coloured by its time against the tracker's daily budget: green
+ * within it, cream at it, deepening to red at the month's worst day. A tap shows that day at a
+ * glance. Under it, the scale in times, the month's most, and the budget it's set against.
  */
 @Composable
 private fun MonthHeat(
@@ -439,8 +434,6 @@ private fun MonthHeat(
     onDay: (LocalDate) -> Unit,
     onBudget: (Boolean, Int) -> Unit,
     today: LocalDate,
-    scale: app.bedtime.data.HeatScale = app.bedtime.data.HeatScale.GREEN,
-    onScale: (app.bedtime.data.HeatScale) -> Unit = {},
 ) {
     val c = Obsidian.colors
     // Your budget where you have one, on the home screen's tracker or the lock screen's.
@@ -454,7 +447,9 @@ private fun MonthHeat(
             onBudget(wholePhone, minutes)
         }
     }
-    fun colour(seconds: Long): Color = HeatColours.at(UseHeat.level(seconds, budget), scale)
+    // The worst day of the month is the reddest; within your budget, nothing is red.
+    val top = UseHeat.most(heat)?.seconds ?: 0L
+    fun colour(seconds: Long): Color = HeatColours.at(seconds, budget, top)
     SectionCard(title = "Each day", subtitle = "Against a day's budget, the same in every month. Tap a day for its time and top apps") {
         SegmentedChoice(options = listOf("On the phone", "Distracting"), selected = if (wholePhone) 0 else 1, onSelect = { onWholePhone(it == 0) })
         Spacer(Modifier.height(8.dp))
@@ -514,24 +509,16 @@ private fun MonthHeat(
             }
         }
         Spacer(Modifier.height(10.dp))
-        // The scale itself, from nothing through the budget to twice it; and its colours to choose.
-        Box(Modifier.fillMaxWidth().height(10.dp).clip(RoundedCornerShape(50)).background(androidx.compose.ui.graphics.Brush.horizontalGradient((0..20).map { HeatColours.at(it / 10f, scale) })))
+        // The scale itself, in times: nothing, your budget where it falls, and the month's most.
+        val end = maxOf(top, budget)
+        Box(Modifier.fillMaxWidth().height(10.dp).clip(RoundedCornerShape(50)).background(androidx.compose.ui.graphics.Brush.horizontalGradient((0..24).map { colour(end * it / 24) })))
         Row(Modifier.fillMaxWidth().padding(top = 4.dp)) {
-            // Times on the scale: none, your budget, twice it.
+            val at = (budget.toFloat() / end).coerceIn(0.05f, 0.95f)
             Text("0", style = MaterialTheme.typography.labelSmall, color = c.textFaint)
-            Text(UseWords.compact((budget / 60).toInt()), style = MaterialTheme.typography.labelSmall, color = c.textFaint, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
-            Text(UseWords.compact((2 * budget / 60).toInt()), style = MaterialTheme.typography.labelSmall, color = c.textFaint)
-        }
-        Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            app.bedtime.data.HeatScale.entries.forEach { s ->
-                val on = s == scale
-                Text(
-                    if (s == app.bedtime.data.HeatScale.GREEN) "green to red" else "cream to red",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = if (on) c.accentText else c.textMuted,
-                    modifier = Modifier.clip(RoundedCornerShape(50)).border(1.dp, if (on) c.accent else c.border, RoundedCornerShape(50)).clickable { onScale(s) }.padding(horizontal = 10.dp, vertical = 5.dp),
-                )
-            }
+            Spacer(Modifier.weight(at))
+            Text("${UseWords.compact((budget / 60).toInt())} budget", style = MaterialTheme.typography.labelSmall, color = c.textFaint)
+            Spacer(Modifier.weight(1f - at))
+            if (top > budget) Text(UseWords.compact((top / 60).toInt()), style = MaterialTheme.typography.labelSmall, color = c.textFaint)
         }
         Spacer(Modifier.height(10.dp))
         // Today, so far: a way into its page.
@@ -545,18 +532,6 @@ private fun MonthHeat(
             style = MaterialTheme.typography.bodyMedium,
             color = c.textMuted,
         )
-        Spacer(Modifier.height(8.dp))
-        // The scale: calm, then over, then twice over.
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            Box(Modifier.size(12.dp).clip(RoundedCornerShape(3.dp)).background(colour(budget / 2)))
-            Text("within", style = MaterialTheme.typography.labelSmall, color = c.textFaint)
-            Spacer(Modifier.width(6.dp))
-            Box(Modifier.size(12.dp).clip(RoundedCornerShape(3.dp)).background(colour(budget + budget / 10)))
-            Text("over", style = MaterialTheme.typography.labelSmall, color = c.textFaint)
-            Spacer(Modifier.width(6.dp))
-            Box(Modifier.size(12.dp).clip(RoundedCornerShape(3.dp)).background(colour(budget * 2)))
-            Text("twice or more", style = MaterialTheme.typography.labelSmall, color = c.textFaint)
-        }
     }
 }
 

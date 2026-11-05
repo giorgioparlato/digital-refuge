@@ -32,6 +32,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
@@ -121,6 +122,8 @@ fun HomeScreen(
     onSetup: () -> Unit,
     onUnlock: (String) -> Unit,
     onNotes: () -> Unit = {},
+    /** What a long press on the notes button offers: a new note, today's microjournal, a to-do, a voice note. */
+    notesShortcuts: List<Pair<String, () -> Unit>> = emptyList(),
     /** "Ask why" settings: after unlocking, and before distracting apps. */
     onWhy: () -> Unit = {},
 ) {
@@ -180,6 +183,7 @@ fun HomeScreen(
         onUndo = { id -> scope.launch { repo.undoStart(id) } },
         onDismissWhatsNew = { scope.launch { repo.updateSettings { it.copy(lastSeenVersion = installed) } } },
         onNotes = onNotes,
+        notesShortcuts = notesShortcuts,
         onWhy = onWhy,
         isInstalled = { AppCatalog.isLaunchable(context, it) },
         onToggle = { schedule, on -> scope.launch { repo.upsert(schedule.copy(enabled = on)) } },
@@ -200,6 +204,7 @@ internal fun HomeContent(
     onUndo: (String) -> Unit = {},
     onDismissWhatsNew: () -> Unit = {},
     onNotes: () -> Unit = {},
+    notesShortcuts: List<Pair<String, () -> Unit>> = emptyList(),
     /** "Ask why" settings: after unlocking, and before distracting apps. */
     onWhy: () -> Unit = {},
     isInstalled: (String) -> Boolean = { false },
@@ -227,7 +232,7 @@ internal fun HomeContent(
     val minuteOfDay = Instant.ofEpochMilli(ui.now).atZone(ZoneId.systemDefault()).toLocalTime().let { it.hour * 60 + it.minute }
     Box(Modifier.fillMaxSize().background(c.bgPrimary)) {
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 110.dp)) {
-            item(key = "header") { HomeHeader(ui, onUnlock, onUndo, onNotes) }
+            item(key = "header") { HomeHeader(ui, onUnlock, onUndo, onNotes, notesShortcuts) }
             if (needsSetup) {
                 item(key = "setup") {
                     Box(Modifier.padding(horizontal = PageGutter, vertical = 8.dp)) {
@@ -307,9 +312,9 @@ internal fun HomeContent(
 }
 
 /** The calm top of the screen: what is happening, in as few words as possible. */
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-private fun HomeHeader(ui: HomeUiState, onUnlock: (String) -> Unit, onUndo: (String) -> Unit, onNotes: () -> Unit) {
+private fun HomeHeader(ui: HomeUiState, onUnlock: (String) -> Unit, onUndo: (String) -> Unit, onNotes: () -> Unit, notesShortcuts: List<Pair<String, () -> Unit>> = emptyList()) {
     val context = LocalContext.current
     val c = Obsidian.colors
     val state = ui.active
@@ -325,9 +330,27 @@ private fun HomeHeader(ui: HomeUiState, onUnlock: (String) -> Unit, onUndo: (Str
                 Icon(BedtimeIcons.Refuge, contentDescription = null, tint = c.accent, modifier = Modifier.size(28.dp))
                 Spacer(Modifier.width(10.dp))
                 Text("digital refuge", style = MaterialTheme.typography.labelLarge, color = c.textFaint, modifier = Modifier.weight(1f))
-                // Your notes, always a tap away.
-                Box(Modifier.size(40.dp).clip(CircleShape).clickable(onClickLabel = "open your notes", onClick = onNotes), contentAlignment = Alignment.Center) {
-                    Icon(Icons.Default.Edit, contentDescription = "your notes", tint = c.textMuted, modifier = Modifier.size(20.dp))
+                // Your notes, always a tap away; held, straight to writing.
+                Box {
+                    var menu by remember { mutableStateOf(false) }
+                    Box(
+                        Modifier.size(40.dp).clip(CircleShape).combinedClickable(
+                            onClickLabel = "open your notes",
+                            onLongClick = if (notesShortcuts.isEmpty()) null else ({ menu = true }),
+                            onClick = onNotes,
+                        ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(Icons.Default.Edit, contentDescription = "your notes", tint = c.textMuted, modifier = Modifier.size(20.dp))
+                    }
+                    androidx.compose.material3.DropdownMenu(expanded = menu, onDismissRequest = { menu = false }, containerColor = c.bgSecondary) {
+                        notesShortcuts.forEach { (label, go) ->
+                            androidx.compose.material3.DropdownMenuItem(text = { Text(label, color = c.textNormal) }, onClick = {
+                                menu = false
+                                go()
+                            })
+                        }
+                    }
                 }
             }
             Spacer(Modifier.height(24.dp))

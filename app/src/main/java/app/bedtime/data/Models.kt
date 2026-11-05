@@ -219,11 +219,8 @@ data class LockLook(
     val noteBackground: Long? = null,
     val noteDarkText: Boolean? = null,
     val calendarTomorrow: Boolean? = null,
+    val habitsDots: Boolean? = null,
 )
-
-/** The month heatmap's scale: calm green, or cream, through amber at the budget to red at twice it. */
-@Serializable
-enum class HeatScale { GREEN, CREAM }
 
 /** A lock-screen notification swiped aside: cleared, kept for later, marked read, quieted for a while, or answered. */
 @Serializable
@@ -333,6 +330,8 @@ data class HomeStyle(
     val lockCalendarIconWhenEmpty: Boolean = true,
     /** Once today's events are done, tomorrow's first one in their place, to get ready for the morning. */
     val calendarTomorrow: Boolean = false,
+    /** The habits widget as a row of dots, today's for each, rather than a line a habit. */
+    val habitsDots: Boolean = false,
     /** Room above the lock screen's clock; null takes the home screen's [topSpace]. */
     val lockTopSpace: TopSpace? = null,
     /** How the distraction tracker looks on the home screen, and on the lock screen (null: as on home). */
@@ -356,6 +355,7 @@ data class HomeStyle(
         noteBackground = lock.noteBackground ?: noteBackground,
         noteDarkText = lock.noteDarkText ?: noteDarkText,
         calendarTomorrow = lock.calendarTomorrow ?: calendarTomorrow,
+        habitsDots = lock.habitsDots ?: habitsDots,
     )
 
     /**
@@ -383,6 +383,7 @@ data class HomeStyle(
                     noteBackground = kept({ it.noteBackground }, lock.noteBackground),
                     noteDarkText = kept({ it.noteDarkText }, lock.noteDarkText),
                     calendarTomorrow = kept({ it.calendarTomorrow }, lock.calendarTomorrow),
+                    habitsDots = kept({ it.habitsDots }, lock.habitsDots),
                 ),
                 lockWeatherStyle = lockWeatherStyle ?: weatherStyle.takeIf { after.weatherStyle != weatherStyle },
                 lockTopSpace = lockTopSpace ?: topSpace.takeIf { after.topSpace != topSpace },
@@ -406,11 +407,12 @@ data class HomeStyle(
             noteBackground = own({ it.noteBackground }, lock.noteBackground),
             noteDarkText = own({ it.noteDarkText }, lock.noteDarkText),
             calendarTomorrow = own({ it.calendarTomorrow }, lock.calendarTomorrow),
+            habitsDots = own({ it.habitsDots }, lock.habitsDots),
         )
         return after.copy(
             background = background, accent = accent, textColor = textColor, textSize = textSize, font = font, quoteFont = quoteFont,
             clockSize = clockSize, quoteRefresh = quoteRefresh, noteLines = noteLines, noteTextSize = noteTextSize,
-            noteBackground = noteBackground, noteDarkText = noteDarkText, calendarTomorrow = calendarTomorrow,
+            noteBackground = noteBackground, noteDarkText = noteDarkText, calendarTomorrow = calendarTomorrow, habitsDots = habitsDots,
             lock = own,
         )
     }
@@ -421,7 +423,7 @@ data class HomeStyle(
         noteWidgetId = from.noteWidgetId, noteLines = from.noteLines, noteTextSize = from.noteTextSize, noteBackground = from.noteBackground,
         noteDarkText = from.noteDarkText, noteBesideClock = from.noteBesideClock, lockNoteBesideClock = from.lockNoteBesideClock,
         calendarIconWhenEmpty = from.calendarIconWhenEmpty, lockCalendarIconWhenEmpty = from.lockCalendarIconWhenEmpty,
-        calendarTomorrow = from.calendarTomorrow, useWidget = from.useWidget, lockUseWidget = from.lockUseWidget,
+        calendarTomorrow = from.calendarTomorrow, habitsDots = from.habitsDots, useWidget = from.useWidget, lockUseWidget = from.lockUseWidget,
         weatherUnit = from.weatherUnit, calendarNamesOnLock = from.calendarNamesOnLock,
         hourCalmColor = from.hourCalmColor, hourDistractedColor = from.hourDistractedColor,
     )
@@ -670,8 +672,6 @@ data class AppSettings(
     /** Insights' habits and moods sections, for those who use them. */
     val insightsHabits: Boolean = true,
     val insightsMoods: Boolean = true,
-    /** The month heatmap's colours, from little use to twice the budget. */
-    val heatScale: HeatScale = HeatScale.GREEN,
     /** The mood chips open over the microjournal as you write, or folded to one line. */
     val journalMoodsShown: Boolean = true,
     /** The prompts a button away while writing (hidden until asked for); off, no button at all. */

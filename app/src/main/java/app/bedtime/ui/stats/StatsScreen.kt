@@ -176,8 +176,6 @@ fun StatsScreen(onBack: (() -> Unit)?, initialSection: Int = 0, onOpen: (String)
         // Habits and moods for those who use them: switched off here, they leave insights.
         sectionsShown = settings?.let { s -> listOf(s.insightsHabits, s.insightsMoods && s.moodsOn) },
         onSectionsShown = { habitsOn, moodsOn -> scope.launch { repo.updateSettings { it.copy(insightsHabits = habitsOn, insightsMoods = moodsOn, moodsOn = it.moodsOn || moodsOn) } } },
-        heatScale = settings?.heatScale ?: app.bedtime.data.HeatScale.GREEN,
-        onHeatScale = { scale -> scope.launch { repo.updateSettings { it.copy(heatScale = scale) } } },
         initialSection = initialSection,
     )
 }
@@ -204,9 +202,6 @@ internal fun StatsContent(
     /** Whether habits and moods have sections here, and the menu that switches them. */
     sectionsShown: List<Boolean>? = null,
     onSectionsShown: (habits: Boolean, moods: Boolean) -> Unit = { _, _ -> },
-    /** The month heatmap's colours. */
-    heatScale: app.bedtime.data.HeatScale = app.bedtime.data.HeatScale.GREEN,
-    onHeatScale: (app.bedtime.data.HeatScale) -> Unit = {},
     onBudget: (Boolean, Int) -> Unit = { _, _ -> },
     onOpen: (String) -> Unit = {},
     /** Your moods, as a section of their own when they're on. */
@@ -273,8 +268,6 @@ internal fun StatsContent(
                     onVersus = onVersus,
                     homeStyle = homeStyle,
                     onBudget = onBudget,
-                    heatScale = heatScale,
-                    onHeatScale = onHeatScale,
                     onOpen = onOpen,
                 )
                 Spacer(Modifier.height(16.dp))

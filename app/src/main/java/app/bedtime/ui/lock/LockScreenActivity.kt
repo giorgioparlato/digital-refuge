@@ -633,6 +633,8 @@ private fun LockScreen(
             onMark = { h, day, value -> onConfirmed { scope.launch { repo.markHabit(h.id, day, value) } } },
             onOpen = {},
             onHold = { holding = Module.HABITS },
+            // All of them, after the usual unlock.
+            onOpenAll = { onOpenRoute(app.bedtime.Routes.HABITS) },
         ),
         until = occurrence?.let { formatTime(context, it.end) },
         style = style,

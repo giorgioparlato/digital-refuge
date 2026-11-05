@@ -81,6 +81,42 @@ fun HabitsWidget(
     }
 }
 
+/**
+ * The habits widget small: a dot for each habit, today's (filled when done, part-filled for a count
+ * on its way), and how many of them are done. A tap opens all your habits; held, the widget's sheet.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun HabitsDots(
+    habits: List<Habit>,
+    marks: Map<String, Map<Long, Int>>,
+    today: Long,
+    text: Color,
+    faint: Color,
+    accent: Color,
+    modifier: Modifier = Modifier,
+    onOpenAll: () -> Unit,
+    onHold: (() -> Unit)? = null,
+) {
+    val states = habits.map { Habits.day(it, marks[it.id].orEmpty(), today) }
+    val done = states.count { it == HabitDay.DONE || it == HabitDay.MET }
+    Row(
+        modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .combinedClickable(onClickLabel = "open all your habits", onLongClick = onHold, onClick = onOpenAll)
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        habits.zip(states).forEach { (habit, state) ->
+            HabitDot(state, ringed = false, text = text, accent = habit.tint(accent), size = 14)
+            Spacer(Modifier.width(8.dp))
+        }
+        Spacer(Modifier.weight(1f))
+        Text("habits · $done of ${habits.size}", style = MaterialTheme.typography.bodyMedium, color = faint)
+    }
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun HabitLine(habit: Habit, marks: Map<Long, Int>, today: Long, text: Color, faint: Color, accent: Color, onTap: () -> Unit, onOpen: () -> Unit, onHold: (() -> Unit)?, roomForCount: Boolean) {

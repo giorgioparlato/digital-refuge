@@ -132,9 +132,32 @@ class RecordActivity : ComponentActivity() {
                                     Text("recording", style = MaterialTheme.typography.titleMedium, color = c.textNormal)
                                 }
                                 Text(Voice.length(((now - s.since) / 1000L).toInt().coerceAtLeast(0)), fontSize = 40.sp, color = c.textNormal)
+                                // Where it goes, asked straight away; left unanswered, it's asked again when it stops.
+                                val choosable by VoiceRecorder.choosable.collectAsStateWithLifecycle()
+                                if (choosable) {
+                                    Text("where should it go?", style = MaterialTheme.typography.labelLarge, color = c.textMuted)
+                                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                        listOf(app.bedtime.data.VoiceTo.Journal to "microjournal", app.bedtime.data.VoiceTo.NewNote to "new note").forEach { (where, name) ->
+                                            val on = target == where
+                                            Text(
+                                                name,
+                                                style = MaterialTheme.typography.labelLarge,
+                                                color = if (on) c.bgPrimary else c.textNormal,
+                                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .clip(RoundedCornerShape(50))
+                                                    .background(if (on) c.accent else Color.Transparent)
+                                                    .border(1.dp, if (on) c.accent else c.border, RoundedCornerShape(50))
+                                                    .clickable { VoiceRecorder.choose(this@RecordActivity, where) }
+                                                    .padding(vertical = 10.dp),
+                                            )
+                                        }
+                                    }
+                                }
                                 Text(
                                     when (target) {
-                                        null -> "Where it goes, you choose once you stop"
+                                        null -> "If you don't choose now, you will when it stops"
                                         app.bedtime.data.VoiceTo.Journal -> "It goes in today's microjournal"
                                         app.bedtime.data.VoiceTo.NewNote -> "It goes in a new note"
                                         is app.bedtime.data.VoiceTo.Into -> "It goes in this note"

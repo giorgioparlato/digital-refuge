@@ -225,6 +225,7 @@ object WidgetOptions {
             )
         }
         Module.HABITS -> listOf(
+            WidgetOption.Choice("Look", listOf("A line each" to false, "Dots" to true), style.habitsDots) { change(style.copy(habitsDots = it)) },
             WidgetOption.Ticks("Show", habits.map { Triple(it.id, it.name, it.shownOn(screen)) }, habitShown),
             WidgetOption.Link("Your habits: add, change or remove", Routes.HABITS),
         )

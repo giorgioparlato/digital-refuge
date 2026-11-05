@@ -13,6 +13,16 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            83,
+            "0.9.37",
+            listOf(
+                "Voice notes: where it goes is offered as soon as you start, and choosing never stops it; only \"stop\" does. Not chosen by then, it asks.",
+                "The month's colours: green, cream at your budget, and the month's worst day the reddest.",
+                "The habits widget can be a row of dots, today's for each; a tap opens them all.",
+                "Hold the notes button on focus: a new note, today's microjournal, a to-do or a voice note.",
+            ),
+        ),
+        ChangelogEntry(
             82,
             "0.9.36",
             listOf(
