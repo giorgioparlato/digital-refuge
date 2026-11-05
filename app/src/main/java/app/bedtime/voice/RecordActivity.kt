@@ -106,6 +106,7 @@ class RecordActivity : ComponentActivity() {
                             finish()
                         }
                         VoiceRecorder.State.Idle -> if (begun > 0) finish()
+                        is VoiceRecorder.State.Waiting -> Unit
                     }
                 }
                 Box(
@@ -133,7 +134,7 @@ class RecordActivity : ComponentActivity() {
                                 Text(Voice.length(((now - s.since) / 1000L).toInt().coerceAtLeast(0)), fontSize = 40.sp, color = c.textNormal)
                                 Text(
                                     when (target) {
-                                        null -> "Where it goes, you choose when you stop"
+                                        null -> "Where it goes, you choose once you stop"
                                         app.bedtime.data.VoiceTo.Journal -> "It goes in today's microjournal"
                                         app.bedtime.data.VoiceTo.NewNote -> "It goes in a new note"
                                         is app.bedtime.data.VoiceTo.Into -> "It goes in this note"
@@ -141,15 +142,14 @@ class RecordActivity : ComponentActivity() {
                                     style = MaterialTheme.typography.bodySmall,
                                     color = c.textMuted,
                                 )
-                                if (target == null) {
-                                    // Asked every time, never remembered: where this one goes.
-                                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                        SoftPillButton("Keep in the microjournal", onClick = { VoiceRecorder.stop(this@RecordActivity, app.bedtime.data.VoiceTo.Journal) })
-                                        SoftPillButton("Keep as a note", onClick = { VoiceRecorder.stop(this@RecordActivity, app.bedtime.data.VoiceTo.NewNote) })
-                                    }
-                                } else {
-                                    SoftPillButton("Stop", onClick = { VoiceRecorder.stop(this@RecordActivity) })
-                                }
+                                SoftPillButton("Stop", onClick = { VoiceRecorder.stop(this@RecordActivity) }, modifier = Modifier.fillMaxWidth())
+                            }
+                            // Stopped: where this one goes, asked every time, never remembered.
+                            is VoiceRecorder.State.Waiting -> {
+                                Text("where should it go?", style = MaterialTheme.typography.titleMedium, color = c.textNormal)
+                                Text("${Voice.length(s.seconds)} recorded", style = MaterialTheme.typography.bodyMedium, color = c.textMuted)
+                                SoftPillButton("In today's microjournal", onClick = { VoiceRecorder.stop(this@RecordActivity, app.bedtime.data.VoiceTo.Journal) }, modifier = Modifier.fillMaxWidth())
+                                SoftPillButton("As a new note", onClick = { VoiceRecorder.stop(this@RecordActivity, app.bedtime.data.VoiceTo.NewNote) }, modifier = Modifier.fillMaxWidth())
                             }
                             VoiceRecorder.State.Saving -> Text(
                                 if (target == app.bedtime.data.VoiceTo.Journal) "Kept. The words follow in the microjournal." else "Kept. The words follow in your notes.",

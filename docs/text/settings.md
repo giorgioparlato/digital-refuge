@@ -641,6 +641,10 @@ One file serves the look, widgets, gestures and notifications pages, for both sc
 
 - that file can't be written to from here
 - that folder can't be written to from here
+- exported … …
+-  and … days of the microjournal
+- couldn't write to that folder; choose it again
+- the folder chosen
 - Then run
 - Nothing
 - Android shares apps' shortcuts only with the home screen: make refuge yours (in setup) to choose one.
@@ -653,6 +657,11 @@ One file serves the look, widgets, gestures and notifications pages, for both sc
 - Kept on this phone, written in Markdown
 - A notes tab
 - Your notes and microjournal at refuge's foot, beside insights
+- Export again
+- Your notes and microjournal as Markdown files in {exportedTo}, written over with what's here now
+- Export to a folder
+- Export to another folder
+- A Markdown file a note, by its title, and the microjournal a file a day: into your Obsidian vault, say. Nothing comes back from the folder
 - Microjournal
 - An entry a day in your notes, a line at a time, each with its time; from the quick note and the share menu too
 - Prompts while writing

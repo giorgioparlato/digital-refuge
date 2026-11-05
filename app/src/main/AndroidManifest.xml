@@ -140,6 +140,11 @@
             android:taskAffinity="app.bedtime.voice"
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
 
+        <!-- The answer to "a voice note is waiting", from its notification. -->
+        <receiver
+            android:name=".voice.VoiceFiling$VoiceChoice"
+            android:exported="false" />
+
         <service
             android:name=".voice.VoiceRecorder"
             android:exported="false"

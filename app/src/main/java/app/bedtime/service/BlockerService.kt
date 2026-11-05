@@ -244,6 +244,8 @@ class BlockerService : AccessibilityService() {
 
         val repo = Repository.get(this)
         limitTracker.start()
+        // A voice note left on the way when refuge was last closed: taken on from where it was.
+        app.bedtime.voice.VoiceFiling.resume(this)
         // A while in an app with a limit, and gone from it: how do you feel now?
         limitTracker.onLeft = { pkg, minutes -> askMoodAfter("after $minutes min on ${AppCatalog.label(this, pkg).lowercase()}") }
         // Your blocks on the app icon's long press, kept as they change.

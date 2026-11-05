@@ -183,6 +183,8 @@ class MainActivity : ComponentActivity() {
             kotlinx.coroutines.flow.combine(repo.schedules, repo.settings.map { app.bedtime.data.Voice.ready(it) }.distinctUntilChanged()) { s, v -> s to v }
                 .collect { (schedules, voice) -> app.bedtime.service.BlockShortcuts.update(this@MainActivity, schedules, voice) }
         }
+        // A voice note left on the way when refuge was last closed: taken on from where it was.
+        app.bedtime.voice.VoiceFiling.resume(this)
         // "Add to microjournal" in the share menu, as the microjournal is switched on or off.
         lifecycleScope.launch {
             app.bedtime.data.Repository.get(this@MainActivity).settings.map { it.journalOn }.distinctUntilChanged()

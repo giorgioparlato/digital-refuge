@@ -58,6 +58,8 @@ class VoiceRecorder : Service() {
     sealed interface State {
         data object Idle : State
         data class Recording(val since: Long) : State
+        /** Stopped, and asking where it goes: [seconds] long. */
+        data class Waiting(val seconds: Int) : State
         data object Saving : State
     }
 
@@ -125,157 +127,55 @@ class VoiceRecorder : Service() {
         }.also { it.start() }
     }
 
-    /** Stops listening, keeps the recording and its line, then hears the words in it. */
+    /**
+     * Stops listening and keeps the sound here straight away (see [VoiceFiling]), so nothing is lost
+     * from then on; then files it, or first asks where it goes when that wasn't settled at the start
+     * (the screen, the notification and the lock screen ask until you say).
+     */
     private fun finish() {
-        if (_state.value !is State.Recording) {
-            if (_state.value == State.Idle) stopSelf()
-            return
+        when (_state.value) {
+            is State.Recording -> {
+                recording = false
+                thread?.join(2_000)
+                val bytes = synchronized(heard) { heard.toByteArray() }
+                if (bytes.size / 2 < RATE) return done()
+                val kept = VoiceFiling.keep(this, since, bytes, target.value)
+                if (target.value == null) {
+                    _state.value = State.Waiting(kept.seconds)
+                    ensureForeground("where should it go?")
+                } else {
+                    file()
+                }
+            }
+            is State.Waiting -> target.value?.let { to ->
+                VoiceFiling.choose(this, since, to)
+                file()
+            }
+            State.Idle -> stopSelf()
+            State.Saving -> Unit
         }
-        recording = false
-        thread?.join(2_000)
+    }
+
+    private fun file() {
         _state.value = State.Saving
         ensureForeground("saving, then transcribing")
-        val bytes = synchronized(heard) { heard.toByteArray() }
-        val started = since
+        val start = since
         scope.launch {
             try {
-                keep(bytes, started)
+                VoiceFiling.process(this@VoiceRecorder, start)
             } catch (e: Exception) {
+                // What was kept stays kept: it's taken on again when refuge next starts.
                 Problems.note("keeping a voice note", e)
-                say("couldn't keep the voice note")
             } finally {
-                _state.value = State.Idle
-                ServiceCompat.stopForeground(this@VoiceRecorder, ServiceCompat.STOP_FOREGROUND_REMOVE)
-                stopSelf()
+                done()
             }
         }
     }
 
-    private suspend fun keep(bytes: ByteArray, started: Long) {
-        val samples = ShortArray(bytes.size / 2).also { ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer().get(it) }
-        val seconds = samples.size / RATE
-        if (seconds < 1) return
-        val repo = Repository.get(this)
-        val settings = repo.settings.first()
-        val at = Instant.ofEpochMilli(started).atZone(ZoneId.systemDefault()).toLocalDateTime()
-        val tree = settings.voiceFolder?.let(Uri::parse) ?: return say("choose a folder for voice notes first")
-        // Never chosen (stopped some other way): a note of its own, where nothing is lost.
-        val to = target.value ?: VoiceTo.NewNote
-        // The microjournal's in a folder of their own; a note's in yours.
-        val journal = to == VoiceTo.Journal
-        val folder = (if (journal) subfolder(tree, Voice.JOURNAL_FOLDER) else top(tree))
-            ?: return say("couldn't write to the voice notes folder; choose it again")
-        val name = Voice.fileName(at, names(tree, folder))
-        val encoded = File(cacheDir, "voice.m4a")
-        encode(samples, encoded)
-        if (!copyInto(folder, name, encoded)) return say("couldn't write to the voice notes folder; choose it again")
-        encoded.delete()
-        val day = at.toLocalDate().toEpochDay()
-        val line = Voice.line(at.format(DateTimeFormatter.ofPattern("HH:mm")), seconds, name)
-        when (to) {
-            VoiceTo.Journal -> repo.addVoiceLine(day, line)
-            VoiceTo.NewNote -> repo.addNote(Voice.noteText(at, line))
-            is VoiceTo.Into -> repo.addToNote(to.noteId, line)
-        }
-        // A page open on it takes the line in too, so its own saving doesn't write over it.
-        edits.tryEmit(Edit.Added(to, day, line))
-        say(if (journal) "voice note kept in the microjournal" else "voice note kept in your notes")
-        // The words, when there's a model to hear them with; without, the line keeps just the recording.
-        val model = modelFile(this)
-        val words = if (model.exists() && Whisper.available) {
-            Whisper.words(model.path, FloatArray(samples.size) { samples[it] / 32768f }, settings.voiceLanguage)
-        } else {
-            null
-        }
-        if (journal) repo.voiceTranscribed(day, name, words) else repo.voiceNoteTranscribed(name, words)
-        edits.tryEmit(Edit.Heard(name, words))
-    }
-
-    /** The folder you chose, as a document to write in. */
-    private fun top(tree: Uri): Uri = DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
-
-    /** The folder called [name] inside yours, made if it isn't there. */
-    private fun subfolder(tree: Uri, name: String): Uri? = runCatching {
-        children(tree, top(tree)).firstOrNull { it.second == name && it.third }?.first
-            ?: DocumentsContract.createDocument(contentResolver, top(tree), DocumentsContract.Document.MIME_TYPE_DIR, name)
-    }.getOrNull()
-
-    /** What's in [folder]: each as its document, name, and whether it's a folder. */
-    private fun children(tree: Uri, folder: Uri): List<Triple<Uri, String, Boolean>> = runCatching {
-        val list = DocumentsContract.buildChildDocumentsUriUsingTree(tree, DocumentsContract.getDocumentId(folder))
-        val columns = arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_DISPLAY_NAME, DocumentsContract.Document.COLUMN_MIME_TYPE)
-        contentResolver.query(list, columns, null, null, null)?.use { c ->
-            buildList {
-                while (c.moveToNext()) add(Triple(DocumentsContract.buildDocumentUriUsingTree(tree, c.getString(0)), c.getString(1), c.getString(2) == DocumentsContract.Document.MIME_TYPE_DIR))
-            }
-        }.orEmpty()
-    }.getOrDefault(emptyList())
-
-    /** The folder's files, so a recording never writes over another. */
-    private fun names(tree: Uri, folder: Uri): Set<String> = children(tree, folder).map { it.second }.toSet()
-
-    private fun copyInto(parent: Uri, name: String, file: File): Boolean = runCatching {
-        val target = DocumentsContract.createDocument(contentResolver, parent, "audio/mp4", name) ?: return false
-        contentResolver.openOutputStream(target, "w")?.use { out -> file.inputStream().use { it.copyTo(out) } } ?: return false
-        true
-    }.getOrDefault(false)
-
-    /** [samples] as AAC in an m4a file: small, and every player and Obsidian take it. */
-    private fun encode(samples: ShortArray, out: File) {
-        val format = MediaFormat.createAudioFormat(MediaFormat.MIMETYPE_AUDIO_AAC, RATE, 1).apply {
-            setInteger(MediaFormat.KEY_AAC_PROFILE, MediaCodecInfo.CodecProfileLevel.AACObjectLC)
-            setInteger(MediaFormat.KEY_BIT_RATE, 48_000)
-            setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, 16_384)
-        }
-        val codec = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_AUDIO_AAC)
-        codec.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
-        codec.start()
-        val muxer = MediaMuxer(out.path, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
-        val info = MediaCodec.BufferInfo()
-        var track = -1
-        var at = 0
-        var fed = false
-        var done = false
-        try {
-            while (!done) {
-                if (!fed) {
-                    val i = codec.dequeueInputBuffer(10_000)
-                    if (i >= 0) {
-                        val buffer = checkNotNull(codec.getInputBuffer(i)).apply { clear(); order(ByteOrder.LITTLE_ENDIAN) }
-                        val count = minOf(buffer.remaining() / 2, samples.size - at)
-                        val time = at * 1_000_000L / RATE
-                        if (count <= 0) {
-                            codec.queueInputBuffer(i, 0, 0, time, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
-                            fed = true
-                        } else {
-                            buffer.asShortBuffer().put(samples, at, count)
-                            codec.queueInputBuffer(i, 0, count * 2, time, 0)
-                            at += count
-                        }
-                    }
-                }
-                val o = codec.dequeueOutputBuffer(info, 10_000)
-                if (o == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
-                    track = muxer.addTrack(codec.outputFormat)
-                    muxer.start()
-                } else if (o >= 0) {
-                    val buffer = checkNotNull(codec.getOutputBuffer(o))
-                    if (info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG != 0) info.size = 0
-                    if (info.size > 0 && track >= 0) {
-                        buffer.position(info.offset)
-                        buffer.limit(info.offset + info.size)
-                        muxer.writeSampleData(track, buffer, info)
-                    }
-                    codec.releaseOutputBuffer(o, false)
-                    if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) done = true
-                }
-            }
-        } finally {
-            codec.stop()
-            codec.release()
-            if (track >= 0) muxer.stop()
-            muxer.release()
-        }
+    private fun done() {
+        _state.value = State.Idle
+        ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
+        stopSelf()
     }
 
     private fun notification(text: String): Notification {
@@ -288,6 +188,7 @@ class VoiceRecorder : Service() {
             PendingIntent.getService(this, requestCode, Intent(this, VoiceRecorder::class.java).setAction(STOP).putExtra(EXTRA_TO, to), PendingIntent.FLAG_IMMUTABLE)
         }
         val recordingNow = _state.value is State.Recording || text == "recording"
+        val waiting = _state.value is State.Waiting
         return NotificationCompat.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.ic_tile)
             .setContentTitle("voice note")
@@ -295,8 +196,8 @@ class VoiceRecorder : Service() {
             .setOngoing(true)
             .setContentIntent(open)
             .apply {
-                // Where it goes, asked at the end here too when it wasn't decided at the start.
-                if (recordingNow && target.value == null) {
+                // Stop while it records; then, if it wasn't settled at the start, where it goes.
+                if (waiting) {
                     addAction(0, "to the microjournal", stop(1, TO_JOURNAL))
                     addAction(0, "to a note", stop(2, TO_NOTE))
                 } else if (recordingNow) {

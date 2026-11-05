@@ -1,5 +1,9 @@
 package app.bedtime.ui.notes
 
+import kotlinx.coroutines.flow.first
+import app.bedtime.data.NotesExport
+import androidx.compose.material.icons.filled.Share
+
 import androidx.compose.foundation.layout.fillMaxWidth
 
 import kotlinx.coroutines.withContext
@@ -111,11 +115,40 @@ fun NoteTargetsScreen(onBack: () -> Unit, onOpenNotes: () -> Unit, onOpenJournal
         original = null
         draft = NoteTarget("today", uri.toString(), daily = true)
     }
+    // Your notes as Markdown files: to the folder picked, and again to the same one later.
+    val exportTo = { folder: String ->
+        scope.launch {
+            val done = withContext(Dispatchers.IO) {
+                NotesExport.write(context, Uri.parse(folder), repo.notes.first(), repo.journal.first(), java.time.LocalDate.now())
+            }
+            Toast.makeText(
+                context,
+                done?.let { "exported ${it.notes} ${if (it.notes == 1) "note" else "notes"}" + if (it.days > 0) " and ${it.days} days of the microjournal" else "" }
+                    ?: "couldn't write to that folder; choose it again",
+                Toast.LENGTH_LONG,
+            ).show()
+        }
+    }
+    val pickExport = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        val kept = runCatching {
+            context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+        }.isSuccess
+        if (!kept) {
+            Toast.makeText(context, "that folder can't be written to from here", Toast.LENGTH_LONG).show()
+            return@rememberLauncherForActivityResult
+        }
+        scope.launch { repo.updateSettings { it.copy(notesExportFolder = uri.toString()) } }
+        exportTo(uri.toString())
+    }
     var choosingShortcut by remember { mutableStateOf(false) }
     val shortcuts by produceState<List<AppShortcut>?>(null, choosingShortcut) {
         if (choosingShortcut) value = withContext(Dispatchers.IO) { Shortcuts.all(context) }
     }
     val current = settings ?: return
+    val exportName by produceState<String?>(null, current.notesExportFolder) {
+        value = current.notesExportFolder?.let { withContext(Dispatchers.IO) { runCatching { app.bedtime.data.FolderIndex.folderName(context, Uri.parse(it)) }.getOrNull() } }
+    }
     draft?.let { target ->
         TargetDialog(
             target = target,
@@ -162,6 +195,9 @@ fun NoteTargetsScreen(onBack: () -> Unit, onOpenNotes: () -> Unit, onOpenJournal
         notesTab = current.notesTab,
         onNotesTab = { on -> scope.launch { repo.updateSettings { it.copy(notesTab = on) } } },
         voice = { app.bedtime.voice.VoiceSettingsCard() },
+        exportedTo = current.notesExportFolder?.let { exportName ?: "the folder chosen" },
+        onExportAgain = { current.notesExportFolder?.let { exportTo(it) } },
+        onExportTo = { pickExport.launch(null) },
         onMoods = onOpenMoods,
     )
     if (choosingShortcut) {
@@ -245,6 +281,10 @@ internal fun NoteTargetsContent(
     onNotesTab: (Boolean) -> Unit = {},
     /** Voice notes' own settings, drawn by the screen. */
     voice: (@Composable () -> Unit)? = null,
+    /** Where your notes went out as Markdown files last, if they have; again there, or to a folder you pick. */
+    exportedTo: String? = null,
+    onExportAgain: () -> Unit = {},
+    onExportTo: () -> Unit = {},
 ) {
     val c = Obsidian.colors
     Scaffold(containerColor = c.bgPrimary, topBar = { ObsidianTopBar("Quick notes", onBack = onBack, subtitle = "From the minimal home's search") }) { padding ->
@@ -262,6 +302,15 @@ internal fun NoteTargetsContent(
                 OptionRow(BedtimeIcons.Book, "A notes tab", description = "Your notes and microjournal at refuge's foot, beside insights") {
                     ObsidianToggle(notesTab, onNotesTab)
                 }
+                if (exportedTo != null) {
+                    OptionRow(Icons.Default.Refresh, "Export again", description = "Your notes and microjournal as Markdown files in $exportedTo, written over with what's here now", onClick = onExportAgain) { Chevron() }
+                }
+                OptionRow(
+                    Icons.Default.Share,
+                    if (exportedTo == null) "Export to a folder" else "Export to another folder",
+                    description = "A Markdown file a note, by its title, and the microjournal a file a day: into your Obsidian vault, say. Nothing comes back from the folder",
+                    onClick = onExportTo,
+                ) { Chevron() }
                 OptionRow(Icons.Default.DateRange, "Microjournal", description = "An entry a day in your notes, a line at a time, each with its time; from the quick note and the share menu too") {
                     ObsidianToggle(journalOn, onJournalOn)
                 }

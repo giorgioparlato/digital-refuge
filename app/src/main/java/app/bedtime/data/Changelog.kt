@@ -13,6 +13,15 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            82,
+            "0.9.36",
+            listOf(
+                "Export your notes as Markdown files to a folder (your Obsidian vault, say): a file a note, the microjournal a file a day, recordings as embeds. Nothing comes back from the folder.",
+                "Voice notes: stop first, then choose where it goes. A recording is kept safe from the moment you stop; if refuge is closed on the way, it carries on next time and asks again.",
+                "The month's colour scale shows times: none, your budget, twice it.",
+            ),
+        ),
+        ChangelogEntry(
             81,
             "0.9.35",
             listOf(

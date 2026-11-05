@@ -899,11 +899,13 @@ private fun runOffer(context: Context, repo: Repository, scope: kotlinx.coroutin
 private fun RecordingLine(style: HomeStyle) {
     val context = LocalContext.current
     val state by app.bedtime.voice.VoiceRecorder.state.collectAsStateWithLifecycle()
-    val recording = state as? app.bedtime.voice.VoiceRecorder.State.Recording ?: return
+    val waiting = state is app.bedtime.voice.VoiceRecorder.State.Waiting
+    val recording = state as? app.bedtime.voice.VoiceRecorder.State.Recording
+    if (recording == null && !waiting) return
     val p = style.palette()
     var now by remember { mutableStateOf(System.currentTimeMillis()) }
     LaunchedEffect(recording) {
-        while (true) {
+        while (recording != null) {
             now = System.currentTimeMillis()
             delay(1_000)
         }
@@ -920,10 +922,12 @@ private fun RecordingLine(style: HomeStyle) {
     ) {
         Box(Modifier.size(10.dp).clip(CircleShape).background(androidx.compose.ui.graphics.Color(0xFFD7263D)))
         Spacer(Modifier.width(10.dp))
-        Text("recording", style = MaterialTheme.typography.labelLarge, color = p.faint, modifier = Modifier.weight(1f))
-        Text(app.bedtime.data.Voice.length(((now - recording.since) / 1000L).toInt().coerceAtLeast(0)), style = MaterialTheme.typography.titleMedium.copy(fontFeatureSettings = "tnum"), color = p.text)
-        Spacer(Modifier.width(10.dp))
-        Text("stop ›", style = MaterialTheme.typography.labelLarge, color = p.accent)
+        Text(if (waiting) "voice note" else "recording", style = MaterialTheme.typography.labelLarge, color = p.faint, modifier = Modifier.weight(1f))
+        if (recording != null) {
+            Text(app.bedtime.data.Voice.length(((now - recording.since) / 1000L).toInt().coerceAtLeast(0)), style = MaterialTheme.typography.titleMedium.copy(fontFeatureSettings = "tnum"), color = p.text)
+            Spacer(Modifier.width(10.dp))
+        }
+        Text(if (waiting) "where should it go? ›" else "stop ›", style = MaterialTheme.typography.labelLarge, color = p.accent)
     }
 }
 

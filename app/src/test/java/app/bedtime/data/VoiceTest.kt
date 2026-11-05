@@ -59,4 +59,14 @@ class VoiceTest {
         assertEquals("- 09:00 · coffee\n$line", Voice.added("- 09:00 · coffee", line))
         assertEquals(line, Voice.added("", line))
     }
+
+    @Test
+    fun whereItGoesIsKeptOnDiskAndReadBack() {
+        listOf(VoiceTo.Journal, VoiceTo.NewNote, VoiceTo.Into("abc-123")).forEach { assertEquals(it, Voice.target(Voice.code(it))) }
+        // Not chosen yet, or something it doesn't know: asked.
+        assertEquals(null, Voice.target(null))
+        assertEquals(null, Voice.target("elsewhere"))
+        val waiting = PendingVoice(1_000L, 42)
+        assertEquals(waiting, AppJson.decodeFromString(PendingVoice.serializer(), AppJson.encodeToString(PendingVoice.serializer(), waiting)))
+    }
 }

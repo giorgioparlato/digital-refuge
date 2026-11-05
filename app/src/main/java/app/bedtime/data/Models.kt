@@ -663,6 +663,8 @@ data class AppSettings(
     val voiceModel: String? = null,
     /** What Whisper listens for: "auto", or a language's code. */
     val voiceLanguage: String = "auto",
+    /** Where your notes were last exported as Markdown files (a document tree), to export to again. */
+    val notesExportFolder: String? = null,
     /** Your notes as a tab of their own at refuge's foot, beside insights. */
     val notesTab: Boolean = false,
     /** Insights' habits and moods sections, for those who use them. */

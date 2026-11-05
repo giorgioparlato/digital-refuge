@@ -517,9 +517,10 @@ private fun MonthHeat(
         // The scale itself, from nothing through the budget to twice it; and its colours to choose.
         Box(Modifier.fillMaxWidth().height(10.dp).clip(RoundedCornerShape(50)).background(androidx.compose.ui.graphics.Brush.horizontalGradient((0..20).map { HeatColours.at(it / 10f, scale) })))
         Row(Modifier.fillMaxWidth().padding(top = 4.dp)) {
-            Text("none", style = MaterialTheme.typography.labelSmall, color = c.textFaint)
-            Text("budget", style = MaterialTheme.typography.labelSmall, color = c.textFaint, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
-            Text("twice it", style = MaterialTheme.typography.labelSmall, color = c.textFaint)
+            // Times on the scale: none, your budget, twice it.
+            Text("0", style = MaterialTheme.typography.labelSmall, color = c.textFaint)
+            Text(UseWords.compact((budget / 60).toInt()), style = MaterialTheme.typography.labelSmall, color = c.textFaint, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
+            Text(UseWords.compact((2 * budget / 60).toInt()), style = MaterialTheme.typography.labelSmall, color = c.textFaint)
         }
         Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             app.bedtime.data.HeatScale.entries.forEach { s ->
