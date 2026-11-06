@@ -13,6 +13,17 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            86,
+            "0.9.40",
+            listOf(
+                "Limits live on focus now, after your blocks, with what's left today; schedules come last. The limits tab is gone.",
+                "Check-ins have a page of their own in settings: ask why, moods, and the nudge after time in a row; a link at the foot of focus too.",
+                "Habits can have a tab of their own, like notes: switch it on at the foot of the habits page.",
+                "Hold the notes button on the home screen for a new note, the microjournal, a to-do or a voice note.",
+                "The everyday launcher is a choice in settings › home screen, not a step of setup. The greeting is gone.",
+            ),
+        ),
+        ChangelogEntry(
             85,
             "0.9.39",
             listOf(

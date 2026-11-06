@@ -242,6 +242,16 @@ private fun MinimalHomeScreen(
     var quickNote by rememberSaveable { mutableStateOf(false) }
     /** The word being looked up, or null with the dictionary closed. */
     var lookingUp by rememberSaveable { mutableStateOf<String?>(null) }
+    var addingTodo by remember { mutableStateOf(false) }
+    if (addingTodo) {
+        app.bedtime.ui.notes.AddTodoDialog(onDismiss = { addingTodo = false }) { words ->
+            addingTodo = false
+            scope.launch {
+                repo.addTodo(words)
+                Toast.makeText(context, "added to your to-do", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
     var rainOpen by remember { mutableStateOf(false) }
     var hoursDetail by remember { mutableStateOf(false) }
     var appsDetail by remember { mutableStateOf(false) }
@@ -617,6 +627,14 @@ private fun MinimalHomeScreen(
             onOpenRefuge = { AppCatalog.launch(context, context.packageName) },
             onRefugeHold = { blocksOpen = true },
             onOpenNotes = { notesOpen = true },
+            // Held: straight to writing, as the notes tab and focus's notes button offer.
+            notesShortcuts = listOf<Pair<String, () -> Unit>>(
+                "New note" to { runCatching { context.startActivity(app.bedtime.MainActivity.intent(context, app.bedtime.Routes.note(java.util.UUID.randomUUID().toString()))) } },
+                "Today's microjournal" to { runCatching { context.startActivity(app.bedtime.MainActivity.intent(context, app.bedtime.Routes.JOURNAL_TODAY)) } },
+                "Add a to-do" to { addingTodo = true },
+            ) + listOfNotNull(
+                ("Record a voice note" to { context.startActivity(app.bedtime.voice.RecordActivity.intent(context)) }).takeIf { app.bedtime.data.Voice.ready(settings) },
+            ),
             onWidgetHold = { holding = it },
             onScreenHold = { screenSheet = true },
             note = homeNote.inList,
@@ -855,6 +873,8 @@ internal fun MinimalHomeContent(
     onRefugeHold: (() -> Unit)? = null,
     /** The notes button at the bottom right, where you've switched it on. */
     onOpenNotes: () -> Unit = {},
+    /** What a long press on the notes button offers. */
+    notesShortcuts: List<Pair<String, () -> Unit>> = emptyList(),
     /** A long press on a widget: its own sheet, to hide or change it. */
     onWidgetHold: ((Module) -> Unit)? = null,
     /** A long press on an empty spot: this screen's widgets, and the way to their settings. */
@@ -984,8 +1004,26 @@ internal fun MinimalHomeContent(
                 }
             }
             val notesButton = @Composable {
-                IconButton(onClick = onOpenNotes) {
-                    Icon(Icons.Default.Edit, contentDescription = "refuge notes", tint = p.faint, modifier = Modifier.size(22.dp))
+                Box {
+                    var menu by remember { mutableStateOf(false) }
+                    Box(
+                        Modifier.size(48.dp).clip(CircleShape).combinedClickable(
+                            onClickLabel = "refuge notes",
+                            onLongClick = if (notesShortcuts.isEmpty()) null else ({ menu = true }),
+                            onClick = onOpenNotes,
+                        ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(Icons.Default.Edit, contentDescription = "refuge notes", tint = p.faint, modifier = Modifier.size(22.dp))
+                    }
+                    androidx.compose.material3.DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                        notesShortcuts.forEach { (label, go) ->
+                            androidx.compose.material3.DropdownMenuItem(text = { Text(label) }, onClick = {
+                                menu = false
+                                go()
+                            })
+                        }
+                    }
                 }
             }
             val emergencyButton = @Composable { onClick: () -> Unit ->

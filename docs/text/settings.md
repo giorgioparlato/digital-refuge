@@ -58,6 +58,10 @@ Home screen, lock screen, apps, shortcuts and about & backup are lists of rows f
 - Find a setting
 - set up once, then left alone
 - Nothing by that name.
+- A nudge after time in a row
+- After so long on the phone without the screen going off, in any app, a full screen asks if it's still what you meant to do. Never during a call.
+- {it} min
+- Off
 - digital refuge {version} · everything stays on this phone
 - Permissions & setup
 - All set
@@ -72,19 +76,21 @@ Home screen, lock screen, apps, shortcuts and about & backup are lists of rows f
 - Lock screen
 - All the time
 - In sessions
-- Off
 -  · look, widgets, notifications, gestures
 - lock screen
 - Search
 - What it offers, keywords, contacts, folders, the calendar
 - search keyword keywords web maps contacts messaging whatsapp signal telegram alarm timer calculator settings pages files folder obsidian spotify blocks calendar events dictionary dictionaries look up definition meaning
+- Check-ins
+- Ask why · moods · a nudge after time in a row
+- check-ins checkins pause ask why mood moods how do you feel nudge
 - Cover messages
 - What a blocked app's cover says · … messages
 - cover message messages words blocked
 - Everyday launcher
-- Off · only in minimal sessions. Switched on in setup
-- On · refuge's home screen all the time. Changed in setup
-- On, but not your home app yet · choose it in setup
+- Off · only in minimal sessions
+- On · refuge's home screen all the time
+- On, but not your home app yet
 - launcher home screen default home app everyday
 - The app list
 - Favourites, hidden apps, your own names, keywords, sizes
@@ -98,6 +104,11 @@ Home screen, lock screen, apps, shortcuts and about & backup are lists of rows f
 - Notifications
 - From the apps and people you choose
 - notifications messages reply replies people contacts circles groups lock screen rain alert weather your week sunday note
+- Moods
+-  · how do you feel now? after … min
+- mood moods feeling feelings tag tags hungry angry lonely tired bored happy anxious how do you feel now
+- After {it} min on the phone without a break
+- nudge time in a row long stretch reminder minutes break
 - App groups
 - Tick many apps at once when choosing
 - 1 group
@@ -136,7 +147,6 @@ Home screen, lock screen, apps, shortcuts and about & backup are lists of rows f
 - Add
 - quick settings tile
 - Edit your quick settings and add the “refuge” tile. Tapping it starts:
-- Find a setting: keyword, weather, colour…
 - Never
 - During sessions
 - Always
@@ -183,14 +193,7 @@ Home screen, lock screen, apps, shortcuts and about & backup are lists of rows f
 - Keep digital refuge running
 - Some phones (Samsung, Xiaomi, OnePlus…) put background apps to sleep. If blocking ever stops working, set digital refuge's battery usage to Unrestricted.
 - Open battery settings
-- Use as your default launcher
-- The minimal screen all the time, with your favourite apps; otherwise it's only there during the refuge sessions you choose. Switch it off any time and your previous launcher is back.
-- Use as default launcher
-- Not your home app yet.
-- Choose it as your home app
-- Stop using it
-- Pressing Home brings you to the minimal screen.
-- Stop using it as launcher
+- Want refuge's home screen all the time, not just in sessions? That's in settings › home screen › everyday launcher.
 - Done
 
 ## look, widgets, gestures and lock-screen notifications

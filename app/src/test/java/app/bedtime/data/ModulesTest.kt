@@ -16,7 +16,10 @@ class ModulesTest {
         assertEquals(listOf(Module.CLOCK, Module.DATE, Module.WEATHER, Module.QUOTE), Modules.shown(style, Screen.LOCK))
         // Saved before there were widgets, a style loads the same.
         val old = AppJson.decodeFromString(HomeStyle.serializer(), """{"showDate":false,"showCalendar":true}""")
-        assertEquals(listOf(Module.GREETING, Module.CLOCK, Module.EVENT, Module.QUOTE), Modules.shown(old, Screen.HOME))
+        // The greeting, on in those days, is gone: saved, it's simply not shown.
+        assertEquals(listOf(Module.CLOCK, Module.EVENT, Module.QUOTE), Modules.shown(old, Screen.HOME))
+        val withIt = Modules.with(style, Screen.HOME, listOf(ModuleChoice(Module.GREETING), ModuleChoice(Module.CLOCK)))
+        assert(Module.GREETING !in Modules.of(withIt, Screen.HOME).map { it.module })
     }
 
     @Test
@@ -25,7 +28,8 @@ class ModulesTest {
         val lock = Modules.switched(Modules.with(style, Screen.LOCK, listOf(ModuleChoice(Module.QUOTE), ModuleChoice(Module.CLOCK))), Screen.LOCK, Module.CLOCK, false)
         // The rest join at the end, off; the home screen is untouched.
         assertEquals(listOf(Module.QUOTE), Modules.shown(lock, Screen.LOCK))
-        assertEquals(Module.entries.size, Modules.of(lock, Screen.LOCK).size)
+        // Every widget but the greeting, which is gone.
+        assertEquals(Module.entries.size - 1, Modules.of(lock, Screen.LOCK).size)
         assertEquals(Modules.shown(style, Screen.HOME), Modules.shown(lock, Screen.HOME))
         assertTrue(Modules.onAnywhere(lock, Module.CLOCK))
         val noClock = Modules.switched(lock, Screen.HOME, Module.CLOCK, false)

@@ -109,6 +109,7 @@ import java.time.LocalDate
 enum class SettingsPlace(val route: String, val title: String, val intro: String) {
     HOME(Routes.SETTINGS_HOME, "Home screen", "Refuge's home screen takes over in sessions with minimal mode. It can be your everyday launcher too."),
     LOCK(Routes.SETTINGS_LOCK, "Lock screen", "Over Android's own lock screen: the clock and your widgets. A tap, or a swipe from the bottom, unlocks."),
+    CHECKINS(Routes.SETTINGS_CHECKINS, "Check-ins", "Moments that ask you to pause: why you picked up the phone, how you feel, and a nudge after a long stretch on it."),
     APPS(Routes.SETTINGS_APPS, "Apps", "Groups to tick many at once, the apps no session blocks, and the ones that count as distracting."),
     SHORTCUTS(Routes.SETTINGS_SHORTCUTS, "Shortcuts", "Two ways to start a block without opening the app."),
     ABOUT(Routes.SETTINGS_ABOUT, "About & backup", "How sessions work, and your settings in a file of their own."),
@@ -220,6 +221,7 @@ fun SettingsScreen(place: SettingsPlace? = null, onBack: (() -> Unit)? = null, o
         canPinWidget = canPinWidget,
         onBack = onBack,
         onOpen = onOpen,
+        onNudge = { m -> scope.launch { repo.updateSettings { it.copy(runNudgeMinutes = m) } } },
         onLockScreen = { on -> style { it.copy(lockScreen = on) } },
         onLockAlways = { on -> style { it.copy(lockAlways = on) } },
         onTileBlock = { id -> scope.launch { repo.updateSettings { it.copy(tileBlockId = id) } } },
@@ -268,11 +270,20 @@ internal fun SettingsContent(
     onWeeklyBackup: (Boolean) -> Unit = {},
     onChooseBackupFolder: () -> Unit = {},
     onBackUpNow: () -> Unit = {},
+    /** Minutes in a row on the phone before a nudge, or null for none. */
+    onNudge: (Int?) -> Unit = {},
 ) {
     val c = Obsidian.colors
     var query by rememberSaveable { mutableStateOf("") }
+    var choosingNudge by remember { mutableStateOf(false) }
+    if (choosingNudge) {
+        NudgeDialog(settings.runNudgeMinutes, onDismiss = { choosingNudge = false }) {
+            choosingNudge = false
+            onNudge(it)
+        }
+    }
     val backup = BackupRows(backupFolderName, backupWritable, onWeeklyBackup, onChooseBackupFolder, onBackUpNow)
-    val entries = settingsEntries(settings, setupStepsLeft, isDefaultHome, onOpen, onLockScreen, onLockAlways, onExport, onImport, backup)
+    val entries = settingsEntries(settings, setupStepsLeft, isDefaultHome, onOpen, onLockScreen, onLockAlways, onExport, onImport, backup, onChooseNudge = { choosingNudge = true })
     Scaffold(
         containerColor = c.bgPrimary,
         topBar = {
@@ -319,6 +330,36 @@ internal fun SettingsContent(
     }
 }
 
+/** How long in a row on the phone, in any app, before a full screen asks if it's still what you meant to do. */
+@Composable
+private fun NudgeDialog(current: Int?, onDismiss: () -> Unit, onPick: (Int?) -> Unit) {
+    val c = Obsidian.colors
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = c.bgSecondary,
+        title = { Text("A nudge after time in a row", color = c.textNormal) },
+        text = {
+            Column {
+                Text(
+                    "After so long on the phone without the screen going off, in any app, a full screen asks if it's still what you meant to do. Never during a call.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = c.textMuted,
+                    modifier = Modifier.padding(bottom = 8.dp),
+                )
+                listOf<Int?>(null, 5, 10, 15, 20, 30, 45).forEach { m ->
+                    Text(
+                        m?.let { "$it min" } ?: "Off",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = if (m == current) c.accentText else c.textNormal,
+                        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { onPick(m) }.padding(vertical = 10.dp, horizontal = 4.dp),
+                    )
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = c.textMuted) } },
+    )
+}
+
 @Composable
 private fun Rows(rows: List<Entry>) {
     rows.forEachIndexed { i, e -> SettingsRow(e.icon, e.title, e.description, onClick = e.onClick, trailing = e.trailing ?: { Chevron() }, last = i == rows.lastIndex) }
@@ -350,6 +391,7 @@ private fun settingsEntries(
     onExport: () -> Unit,
     onImport: () -> Unit,
     backup: BackupRows,
+    onChooseNudge: () -> Unit = {},
 ): List<Entry> {
     val style = s.homeStyle
     fun go(route: String): () -> Unit = { onOpen(route) }
@@ -403,6 +445,16 @@ private fun settingsEntries(
                 go(Routes.SEARCH),
             ),
         )
+        add(
+            Entry(
+                null,
+                Icons.Default.Info,
+                "Check-ins",
+                "Ask why · moods · a nudge after time in a row",
+                "check-ins checkins pause ask why mood moods how do you feel nudge",
+                go(SettingsPlace.CHECKINS.route),
+            ),
+        )
         add(Entry(null, BedtimeIcons.Grid, "Apps", "Groups · always available · distracting", "apps", go(SettingsPlace.APPS.route)))
         add(Entry(null, Icons.Default.Edit, "Notes", "Where quick notes go, and the to-do", "notes note quick to-do todo obsidian daily file", go(Routes.QUICK_NOTES)))
         add(Entry(null, Icons.Default.Edit, "Microjournal", "An entry a day, with prompts by section", "journal journalling microjournal prompts struthless vent gratitude mindset diary", go(Routes.QUICK_NOTES), searchOnly = true))
@@ -431,12 +483,12 @@ private fun settingsEntries(
                 Icons.Default.Home,
                 "Everyday launcher",
                 when {
-                    !s.homeScreen -> "Off · only in minimal sessions. Switched on in setup"
-                    isDefaultHome -> "On · refuge's home screen all the time. Changed in setup"
-                    else -> "On, but not your home app yet · choose it in setup"
+                    !s.homeScreen -> "Off · only in minimal sessions"
+                    isDefaultHome -> "On · refuge's home screen all the time"
+                    else -> "On, but not your home app yet"
                 },
                 "launcher home screen default home app everyday",
-                go(Routes.SETUP),
+                go(Routes.LAUNCHER),
             ),
         )
         add(Entry(home, Icons.Default.Edit, "Look", "Colours, sizes and fonts", "colour color theme background accent text font size top space look status bar logo mark arrow notes button", go(Routes.HOME_STYLE)))
@@ -479,8 +531,30 @@ private fun settingsEntries(
             ),
         )
         add(Entry(lock, Icons.Default.KeyboardArrowUp, "Gestures", "An app, the camera, screen off…", "gesture gestures swipe double tap lock camera screen off", go(Routes.STYLE_SWIPES)))
-        add(Entry(lock, Icons.Default.Info, "Ask why after unlocking", whyWords(s.askOnUnlock), "why unlock unlocking question journal struthless", go(Routes.WHY)))
-        add(Entry(lock, Icons.Default.Info, "Moods", moodsWords(s), "mood moods feeling feelings tag tags hungry angry lonely tired bored happy anxious", go(Routes.MOODS)))
+
+        // ---------------------------------------------------------------- check-ins
+        val checkins = SettingsPlace.CHECKINS
+        add(Entry(checkins, Icons.Default.Info, "Ask why after unlocking", whyWords(s.askOnUnlock), "why unlock unlocking question journal struthless", go(Routes.WHY)))
+        add(
+            Entry(
+                checkins,
+                Icons.Default.Info,
+                "Moods",
+                moodsWords(s) + if (s.moodAfterMinutes > 0) " · how do you feel now? after ${s.moodAfterMinutes} min" else "",
+                "mood moods feeling feelings tag tags hungry angry lonely tired bored happy anxious how do you feel now",
+                go(Routes.MOODS),
+            ),
+        )
+        add(
+            Entry(
+                checkins,
+                Icons.Default.Notifications,
+                "A nudge after time in a row",
+                s.runNudgeMinutes?.let { "After $it min on the phone without a break" } ?: "Off",
+                "nudge time in a row long stretch reminder minutes break",
+                onChooseNudge,
+            ),
+        )
 
         // ---------------------------------------------------------------- apps
         val apps = SettingsPlace.APPS
@@ -706,7 +780,8 @@ private fun SettingsSearch(query: String, onQuery: (String) -> Unit, focus: Bool
             modifier = Modifier.weight(1f).focusRequester(focusRequester),
             decorationBox = { field ->
                 Box {
-                    if (query.isEmpty()) Text("Find a setting: keyword, weather, colour…", style = MaterialTheme.typography.bodyLarge, color = c.textFaint)
+                    // One line, whatever the screen's width.
+                    if (query.isEmpty()) Text("Find a setting", style = MaterialTheme.typography.bodyLarge, color = c.textFaint, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                     field()
                 }
             },

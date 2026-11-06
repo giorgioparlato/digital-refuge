@@ -113,7 +113,7 @@ internal data class HomeUiState(
     val whatsNew: ChangelogEntry? = null,
 )
 
-/** The home tab: what's running now, how the week has gone, and the blocks you can start. */
+/** The focus tab: what's running now, the blocks you can start, your limits today, and your schedules. */
 @Composable
 fun HomeScreen(
     onEdit: (String) -> Unit,
@@ -124,8 +124,13 @@ fun HomeScreen(
     onNotes: () -> Unit = {},
     /** What a long press on the notes button offers: a new note, today's microjournal, a to-do, a voice note. */
     notesShortcuts: List<Pair<String, () -> Unit>> = emptyList(),
-    /** "Ask why" settings: after unlocking, and before distracting apps. */
+    /** The notes button at the top; not there once notes have a tab of their own. */
+    notesButton: Boolean = true,
+    /** Check-ins in settings: ask why, moods, the nudge. */
     onWhy: () -> Unit = {},
+    /** A limit to change, or a new one. */
+    onEditLimit: (String) -> Unit = {},
+    onCreateLimit: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val repo = remember { Repository.get(context) }
@@ -134,6 +139,7 @@ fun HomeScreen(
     val runtime by repo.runtime.collectAsStateWithLifecycle(initialValue = RuntimeState())
     val history by repo.history.collectAsStateWithLifecycle(initialValue = emptyList())
     val settings by repo.settings.collectAsStateWithLifecycle(initialValue = AppSettings())
+    val usage by repo.usage.collectAsStateWithLifecycle(initialValue = emptyList())
     val active by Engine.state(context).collectAsStateWithLifecycle()
     var serviceOn by remember { mutableStateOf(true) }
     var greyscaleOk by remember { mutableStateOf(true) }
@@ -184,7 +190,12 @@ fun HomeScreen(
         onDismissWhatsNew = { scope.launch { repo.updateSettings { it.copy(lastSeenVersion = installed) } } },
         onNotes = onNotes,
         notesShortcuts = notesShortcuts,
+        notesButton = notesButton,
         onWhy = onWhy,
+        limits = settings.limits,
+        todayUsage = java.time.LocalDate.now().toEpochDay().let { day -> usage.lastOrNull { it.day == day } ?: app.bedtime.data.UsageDay(day) },
+        onEditLimit = onEditLimit,
+        onCreateLimit = onCreateLimit,
         isInstalled = { AppCatalog.isLaunchable(context, it) },
         onToggle = { schedule, on -> scope.launch { repo.upsert(schedule.copy(enabled = on)) } },
         onDelete = { schedule -> scope.launch { repo.delete(schedule.id) } },
@@ -205,8 +216,14 @@ internal fun HomeContent(
     onDismissWhatsNew: () -> Unit = {},
     onNotes: () -> Unit = {},
     notesShortcuts: List<Pair<String, () -> Unit>> = emptyList(),
-    /** "Ask why" settings: after unlocking, and before distracting apps. */
+    notesButton: Boolean = true,
+    /** Check-ins in settings: ask why, moods, the nudge. */
     onWhy: () -> Unit = {},
+    /** Your limits, with what's left of today; a tap changes one. */
+    limits: List<app.bedtime.data.AppLimit> = emptyList(),
+    todayUsage: app.bedtime.data.UsageDay? = null,
+    onEditLimit: (String) -> Unit = {},
+    onCreateLimit: () -> Unit = {},
     isInstalled: (String) -> Boolean = { false },
     onToggle: (Schedule, Boolean) -> Unit = { _, _ -> },
     onDelete: (Schedule) -> Unit = {},
@@ -230,9 +247,39 @@ internal fun HomeContent(
 
     val schedulesOnly = ui.schedules.filterNot { it.isBlock }
     val minuteOfDay = Instant.ofEpochMilli(ui.now).atZone(ZoneId.systemDefault()).toLocalTime().let { it.hour * 60 + it.minute }
+    // Limits after blocks: what's left of today is what you look at; schedules, set up once, come last.
+    val limitsSection: androidx.compose.foundation.lazy.LazyListScope.() -> Unit = {
+        item(key = "limits-heading") { SectionLabel("limits · today", Modifier.padding(start = PageGutter, top = 12.dp)) }
+        if (limits.isEmpty()) {
+            item(key = "no-limits") {
+                Text(
+                    "No limits yet · give an app a daily budget, or a pause before it opens",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = c.textMuted,
+                    modifier = Modifier.padding(horizontal = PageGutter).fillMaxWidth().clip(RoundedCornerShape(CardRadius))
+                        .background(c.bgSecondary).clickable(onClick = onCreateLimit).padding(16.dp),
+                )
+            }
+        } else {
+            val today = todayUsage ?: app.bedtime.data.UsageDay(java.time.LocalDate.now().toEpochDay())
+            items(limits.size, key = { "limit-" + limits[it].id }) { index ->
+                Box(Modifier.padding(horizontal = PageGutter).padding(bottom = 12.dp)) {
+                    app.bedtime.ui.limits.LimitCard(limits[index], today, today.day, onClick = { onEditLimit(limits[index].id) })
+                }
+            }
+            item(key = "add-limit") {
+                Text(
+                    "+ add a limit",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = c.accentText,
+                    modifier = Modifier.padding(horizontal = PageGutter).clip(RoundedCornerShape(8.dp)).clickable(onClick = onCreateLimit).padding(vertical = 6.dp),
+                )
+            }
+        }
+    }
     Box(Modifier.fillMaxSize().background(c.bgPrimary)) {
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 110.dp)) {
-            item(key = "header") { HomeHeader(ui, onUnlock, onUndo, onNotes, notesShortcuts) }
+            item(key = "header") { HomeHeader(ui, onUnlock, onUndo, onNotes, notesShortcuts, notesButton) }
             if (needsSetup) {
                 item(key = "setup") {
                     Box(Modifier.padding(horizontal = PageGutter, vertical = 8.dp)) {
@@ -251,6 +298,7 @@ internal fun HomeContent(
                         EmptyState(onCreate = onCreate, onTemplate = onTemplate, isInstalled = isInstalled)
                     }
                 }
+                limitsSection()
             } else {
                 // Blocks first, all of them: starting one is what you come here for most.
                 item(key = "blocks-heading") { SectionLabel("blocks", Modifier.padding(start = PageGutter)) }
@@ -277,6 +325,7 @@ internal fun HomeContent(
                         }
                     }
                 }
+                limitsSection()
                 item(key = "schedules-heading") { SectionLabel("schedules", Modifier.padding(start = PageGutter, top = 12.dp)) }
                 if (schedulesOnly.isEmpty()) {
                     item(key = "no-schedules") {
@@ -295,10 +344,10 @@ internal fun HomeContent(
                     }
                 }
             }
-            // A pause before picking up the phone, a tap from here too.
+            // The check-ins live in settings; a way there from here too.
             item(key = "why") {
                 Text(
-                    "Ask why you're picking up the phone ›",
+                    "Check-ins: ask why, moods, a nudge ›",
                     style = MaterialTheme.typography.labelLarge,
                     color = c.textMuted,
                     modifier = Modifier.padding(horizontal = PageGutter).clip(RoundedCornerShape(8.dp)).clickable(onClick = onWhy).padding(vertical = 12.dp),
@@ -314,7 +363,14 @@ internal fun HomeContent(
 /** The calm top of the screen: what is happening, in as few words as possible. */
 @OptIn(ExperimentalLayoutApi::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-private fun HomeHeader(ui: HomeUiState, onUnlock: (String) -> Unit, onUndo: (String) -> Unit, onNotes: () -> Unit, notesShortcuts: List<Pair<String, () -> Unit>> = emptyList()) {
+private fun HomeHeader(
+    ui: HomeUiState,
+    onUnlock: (String) -> Unit,
+    onUndo: (String) -> Unit,
+    onNotes: () -> Unit,
+    notesShortcuts: List<Pair<String, () -> Unit>> = emptyList(),
+    notesButton: Boolean = true,
+) {
     val context = LocalContext.current
     val c = Obsidian.colors
     val state = ui.active
@@ -330,8 +386,8 @@ private fun HomeHeader(ui: HomeUiState, onUnlock: (String) -> Unit, onUndo: (Str
                 Icon(BedtimeIcons.Refuge, contentDescription = null, tint = c.accent, modifier = Modifier.size(28.dp))
                 Spacer(Modifier.width(10.dp))
                 Text("digital refuge", style = MaterialTheme.typography.labelLarge, color = c.textFaint, modifier = Modifier.weight(1f))
-                // Your notes, always a tap away; held, straight to writing.
-                Box {
+                // Your notes, a tap away when they have no tab of their own; held, straight to writing.
+                if (notesButton) Box {
                     var menu by remember { mutableStateOf(false) }
                     Box(
                         Modifier.size(40.dp).clip(CircleShape).combinedClickable(

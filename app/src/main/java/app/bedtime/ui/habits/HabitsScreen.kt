@@ -42,6 +42,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -73,12 +75,15 @@ import kotlinx.coroutines.launch
 
 /** Your habits: tick today, open one for its month and strength, add and change them. */
 @Composable
-fun HabitsScreen(onBack: () -> Unit) {
+fun HabitsScreen(onBack: (() -> Unit)?) {
     val context = LocalContext.current
     val repo = remember { Repository.get(context) }
     val scope = rememberCoroutineScope()
     val (habits, marks) = rememberHabits()
+    val settings by repo.settings.collectAsStateWithLifecycle(initialValue = null)
     HabitsContent(
+        habitsTab = settings?.habitsTab == true,
+        onHabitsTab = { on -> scope.launch { repo.updateSettings { it.copy(habitsTab = on) } } },
         habits = habits,
         marks = marks,
         today = HourlyUse.today(),
@@ -101,11 +106,14 @@ internal fun HabitsContent(
     habits: List<Habit>,
     marks: Map<String, Map<Long, Int>>,
     today: Long,
-    onBack: () -> Unit,
+    onBack: (() -> Unit)?,
     onMark: (Habit, Long, Int) -> Unit = { _, _, _ -> },
     onSave: (Habit) -> Unit = {},
     onMove: (List<Habit>) -> Unit = {},
     onDelete: (Habit) -> Unit = {},
+    /** Habits as a tab of their own at refuge's foot, or not. */
+    habitsTab: Boolean = false,
+    onHabitsTab: ((Boolean) -> Unit)? = null,
 ) {
     val c = Obsidian.colors
     var editing by remember { mutableStateOf<Habit?>(null) }
@@ -119,6 +127,14 @@ internal fun HabitsContent(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             HabitsBody(habits, marks, today, editing, { editing = it }, onMark, onSave, onMove, onDelete)
+            // At the foot, once they're set up: a tab of their own, as notes can have.
+            onHabitsTab?.let { set ->
+                app.bedtime.ui.components.SectionCard {
+                    app.bedtime.ui.components.OptionRow(Icons.Default.CheckCircle, "A habits tab", description = "Your habits at refuge's foot, beside focus and insights") {
+                        app.bedtime.ui.components.ObsidianToggle(habitsTab, set)
+                    }
+                }
+            }
             Spacer(Modifier.height(96.dp))
         }
     }

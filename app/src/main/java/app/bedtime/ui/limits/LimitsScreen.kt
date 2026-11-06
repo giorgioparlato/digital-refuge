@@ -152,7 +152,7 @@ internal fun limitSummary(limit: AppLimit): String {
  * underneath the limit itself in a line. No border; the fill and the card's own tone carry it.
  */
 @Composable
-private fun LimitCard(limit: AppLimit, today: UsageDay, todayDay: Long, onClick: () -> Unit) {
+internal fun LimitCard(limit: AppLimit, today: UsageDay, todayDay: Long, onClick: () -> Unit) {
     val c = Obsidian.colors
     val shape = RoundedCornerShape(CardRadius)
     val rules = limit.rules

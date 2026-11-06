@@ -42,9 +42,12 @@ focus
 
 <sub>[HomeScreen.kt](../../app/src/main/java/app/bedtime/ui/home/HomeScreen.kt)</sub>
 
+- limits · today
+- No limits yet · give an app a daily budget, or a pause before it opens
+- + add a limit
 - No blocks yet · add one
 - No schedules yet · add one
-- Ask why you're picking up the phone ›
+- Check-ins: ask why, moods, a nudge ›
 - new block or schedule
 - digital refuge
 - … is on
@@ -508,6 +511,7 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 
 <sub>[MinimalHomeActivity.kt](../../app/src/main/java/app/bedtime/ui/minimal/MinimalHomeActivity.kt)</sub>
 
+- added to your to-do
 - … until …
 - added to your calendar
 - couldn't add it to a calendar
@@ -522,6 +526,8 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 - no clock app took it
 - couldn't run that
 - Hold an app in the full list to add it here.
+- Add a to-do
+- Record a voice note
 - no calendar app opened it
 - more for …
 - nothing to open right now. enjoy the quiet.

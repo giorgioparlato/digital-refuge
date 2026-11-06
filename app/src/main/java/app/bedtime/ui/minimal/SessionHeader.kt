@@ -43,7 +43,6 @@ import androidx.compose.ui.text.font.FontStyle
 import app.bedtime.ui.components.ScheduleIcons
 import app.bedtime.ui.components.Text
 import app.bedtime.ui.components.styledTime
-import app.bedtime.ui.greeting
 import app.bedtime.ui.homestyle.palette
 import app.bedtime.ui.timeFormatter
 import java.time.LocalDateTime
@@ -115,13 +114,14 @@ internal fun SessionHeader(
     // The note beside the clock takes a column of its own on the right, beside the greeting, clock and
     // date at the top, with room between.
     val besideHead = if (noteBeside != null && Module.NOTE in modules) {
-        modules.takeWhile { it == Module.GREETING || it == Module.CLOCK || it == Module.DATE }.size
+        modules.takeWhile { it == Module.CLOCK || it == Module.DATE }.size
     } else {
         0
     }
     val one: @Composable (Int, Module) -> Unit = { at, module ->
             when (module) {
-                Module.GREETING -> Text(greeting(now.hour), style = MaterialTheme.typography.titleMedium, color = p.accent, modifier = held(Module.GREETING))
+                // Gone: never among the modules shown.
+                Module.GREETING -> Unit
                 Module.CLOCK -> Row(
                     if (onClockTap == null && onClockDoubleTap == null) {
                         held(Module.CLOCK)

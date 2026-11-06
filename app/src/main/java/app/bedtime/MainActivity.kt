@@ -36,6 +36,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.material3.TextButton
@@ -102,9 +103,8 @@ import app.bedtime.unlock.UnlockFlow
 
 /** String routes for the app's small back stack; also used by the Quick Settings tile. */
 object Routes {
-    /** The four tabs; everything else is pushed on top of them. */
-    /** focus (still "home" to links and widgets), limits, insights, settings. */
-    val TABS = listOf(HOME, LIMITS, INSIGHTS, SETTINGS)
+    /** The tabs; everything else is pushed on top of them: focus (still "home" to links and widgets, with limits on it), insights, settings, and notes when asked for. */
+    val TABS = listOf(HOME, INSIGHTS, SETTINGS)
 
     const val HOME = "home"
     const val SCHEDULES = "schedules"
@@ -141,6 +141,7 @@ object Routes {
     const val JOURNAL_PROMPTS = "quicknotes/journal"
     const val WHY = "settings/why"
     const val MOODS = "settings/moods"
+    const val LAUNCHER = "settings/launcher"
     const val JOURNAL_TODAY = "notes/journal"
 
     /** A day's microjournal entry, from the moods in insights. */
@@ -151,6 +152,7 @@ object Routes {
     const val SETTINGS_APPS = "settings/apps"
     const val SETTINGS_SHORTCUTS = "settings/shortcuts"
     const val SETTINGS_ABOUT = "settings/about"
+    const val SETTINGS_CHECKINS = "settings/checkins"
     const val APP_LIST = "settings/applist"
     const val COVER_MESSAGES = "settings/messages"
     const val PROBLEMS = "settings/problems"
@@ -160,9 +162,9 @@ object Routes {
     /** Settings' own pages: each has the search icon at the top right. */
     val SETTINGS_PAGES by lazy {
         setOf(
-            SETTINGS_HOME, SETTINGS_LOCK, SETTINGS_APPS, SETTINGS_SHORTCUTS, SETTINGS_ABOUT, APP_LIST, COVER_MESSAGES, PROBLEMS,
+            SETTINGS_HOME, SETTINGS_LOCK, SETTINGS_APPS, SETTINGS_SHORTCUTS, SETTINGS_ABOUT, SETTINGS_CHECKINS, APP_LIST, COVER_MESSAGES, PROBLEMS,
             HOME_STYLE, HOME_STYLE_LOCK, STYLE_SHOWN, STYLE_SHOWN_LOCK, STYLE_SWIPES, STYLE_NOTIFICATIONS, STYLE_GESTURES,
-            SEARCH, DISTRACTION, GROUPS, ALWAYS_AVAILABLE, QUICK_NOTES, JOURNAL_PROMPTS, WHY, MOODS, QUOTES, SETUP,
+            SEARCH, DISTRACTION, GROUPS, ALWAYS_AVAILABLE, QUICK_NOTES, JOURNAL_PROMPTS, WHY, MOODS, LAUNCHER, QUOTES, SETUP,
         )
     }
 
@@ -259,10 +261,13 @@ private fun BedtimeNavigation(pendingRoute: String?, onRouteConsumed: () -> Unit
     LaunchedEffect(pendingRoute) {
         if (pendingRoute != null) {
             // Schedules now live on focus, the home tab.
-            val route = if (pendingRoute == Routes.SCHEDULES) Routes.HOME else pendingRoute
+            // Schedules and limits now live on focus, the home tab.
+            val route = if (pendingRoute == Routes.SCHEDULES || pendingRoute == Routes.LIMITS) Routes.HOME else pendingRoute
             // Notes are a tab too, when you've asked for one.
-            val notesTab = route == Routes.NOTES && Repository.get(context).settings.first().notesTab
-            if (route in Routes.TABS || notesTab) {
+            val current = Repository.get(context).settings.first()
+            val notesTab = route == Routes.NOTES && current.notesTab
+            val habitsTab = route == Routes.HABITS && current.habitsTab
+            if (route in Routes.TABS || notesTab || habitsTab) {
                 tab = route
                 stack.clear()
             } else if (stack.lastOrNull() != route) {
@@ -295,7 +300,7 @@ private fun BedtimeNavigation(pendingRoute: String?, onRouteConsumed: () -> Unit
     if (top == null) {
         var addingTodo by remember { mutableStateOf(false) }
         if (addingTodo) {
-            AddTodoDialog(onDismiss = { addingTodo = false }) { words ->
+            app.bedtime.ui.notes.AddTodoDialog(onDismiss = { addingTodo = false }) { words ->
                 addingTodo = false
                 scope.launch {
                     repo.addTodo(words)
@@ -313,18 +318,16 @@ private fun BedtimeNavigation(pendingRoute: String?, onRouteConsumed: () -> Unit
         TabShell(
             tab,
             notesTab = loaded?.notesTab == true,
+            habitsTab = loaded?.habitsTab == true,
             onTab = { tab = it },
             notesMenu = notesMenu,
         ) {
             key(tab) {
                 when (tab) {
                     Routes.INSIGHTS -> StatsScreen(onBack = null, onOpen = ::push)
-                    Routes.LIMITS -> LimitsScreen(
-                        onEdit = { id -> push(Routes.LIMIT + id) },
-                        onCreate = { push(Routes.LIMIT) },
-                    )
                     Routes.SETTINGS -> SettingsScreen(onOpen = ::push)
                     Routes.NOTES -> NotesScreen(onBack = null, onSettings = { push(Routes.QUICK_NOTES) })
+                    Routes.HABITS -> app.bedtime.ui.habits.HabitsScreen(onBack = null)
                     else -> HomeScreen(
                         onEdit = { id -> push(Routes.EDIT + id) },
                         onCreate = { push(Routes.CREATE) },
@@ -333,7 +336,11 @@ private fun BedtimeNavigation(pendingRoute: String?, onRouteConsumed: () -> Unit
                         onUnlock = { id -> push(Routes.unlock(id)) },
                         onNotes = { if (loaded?.notesTab == true) tab = Routes.NOTES else push(Routes.NOTES) },
                         notesShortcuts = notesMenu.items(),
-                        onWhy = { push(Routes.WHY) },
+                        // With a notes tab of their own, the button at the top would only say it twice.
+                        notesButton = loaded?.notesTab != true,
+                        onWhy = { push(Routes.SETTINGS_CHECKINS) },
+                        onEditLimit = { id -> push(Routes.LIMIT + id) },
+                        onCreateLimit = { push(Routes.LIMIT) },
                     )
                 }
             }
@@ -374,6 +381,7 @@ private fun BedtimeNavigation(pendingRoute: String?, onRouteConsumed: () -> Unit
             top == Routes.JOURNAL_PROMPTS -> app.bedtime.ui.notes.JournalPromptsScreen(onBack = ::pop)
             top == Routes.WHY -> app.bedtime.ui.settings.WhySettingsScreen(onBack = ::pop, onOpenAnswers = { push(Routes.JOURNAL_TODAY) }, onOpenMoods = { push(Routes.MOODS) })
             top == Routes.MOODS -> app.bedtime.ui.settings.MoodsScreen(onBack = ::pop)
+            top == Routes.LAUNCHER -> app.bedtime.ui.settings.LauncherScreen(onBack = ::pop)
             top.startsWith(Routes.EDIT) -> ScheduleEditScreen(
                 scheduleId = top.removePrefix(Routes.EDIT).ifEmpty { null },
                 template = null,
@@ -403,9 +411,9 @@ private fun BedtimeNavigation(pendingRoute: String?, onRouteConsumed: () -> Unit
     }
 }
 
-/** The tab frame every root screen sits in: four, and notes when you've asked for them. */
+/** The tab frame every root screen sits in: focus, insights and settings, and notes and habits when you've asked for them. */
 @Composable
-private fun TabShell(tab: String, notesTab: Boolean, onTab: (String) -> Unit, notesMenu: NotesMenu? = null, content: @Composable () -> Unit) {
+private fun TabShell(tab: String, notesTab: Boolean, habitsTab: Boolean = false, onTab: (String) -> Unit, notesMenu: NotesMenu? = null, content: @Composable () -> Unit) {
     val c = Obsidian.colors
     Scaffold(
         containerColor = c.bgPrimary,
@@ -419,7 +427,6 @@ private fun TabShell(tab: String, notesTab: Boolean, onTab: (String) -> Unit, no
                     horizontalArrangement = Arrangement.SpaceEvenly,
                 ) {
                     TabItem(BedtimeIcons.Refuge, "focus", tab == Routes.HOME || tab == Routes.SCHEDULES) { onTab(Routes.HOME) }
-                    TabItem(BedtimeIcons.Hourglass, "limits", tab == Routes.LIMITS) { onTab(Routes.LIMITS) }
                     if (notesTab) Box {
                         var menu by remember { mutableStateOf(false) }
                         TabItem(BedtimeIcons.Book, "notes", tab == Routes.NOTES, onLongClick = notesMenu?.let { { menu = true } }) { onTab(Routes.NOTES) }
@@ -435,6 +442,7 @@ private fun TabShell(tab: String, notesTab: Boolean, onTab: (String) -> Unit, no
                             }
                         }
                     }
+                    if (habitsTab) TabItem(Icons.Default.CheckCircle, "habits", tab == Routes.HABITS) { onTab(Routes.HABITS) }
                     TabItem(BedtimeIcons.Leaf, "insights", tab == Routes.INSIGHTS) { onTab(Routes.INSIGHTS) }
                     TabItem(Icons.Default.Settings, "settings", tab == Routes.SETTINGS) { onTab(Routes.SETTINGS) }
                 }
@@ -450,37 +458,6 @@ private class NotesMenu(val newNote: () -> Unit, val journal: () -> Unit, val to
     /** As the menu shows them, in order. */
     fun items(): List<Pair<String, () -> Unit>> =
         listOf("New note" to newNote, "Today's microjournal" to journal, "Add a to-do" to todo) + listOfNotNull(record?.let { "Record a voice note" to it })
-}
-
-/** One line for the to-do list, without opening it. */
-@Composable
-private fun AddTodoDialog(onDismiss: () -> Unit, onAdd: (String) -> Unit) {
-    val c = Obsidian.colors
-    var words by remember { mutableStateOf("") }
-    val focus = remember { androidx.compose.ui.focus.FocusRequester() }
-    LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
-    val add = { words.trim().takeIf { it.isNotEmpty() }?.let(onAdd) ?: Unit }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = c.bgSecondary,
-        title = { Text("Add a to-do", color = c.textNormal) },
-        text = {
-            app.bedtime.ui.components.ObsidianTextField(
-                value = words,
-                onValueChange = { words = it },
-                placeholder = "what to do",
-                singleLine = true,
-                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                    capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.None,
-                    imeAction = androidx.compose.ui.text.input.ImeAction.Done,
-                ),
-                keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = { add() }),
-                modifier = Modifier.fillMaxWidth().focusRequester(focus),
-            )
-        },
-        confirmButton = { TextButton(onClick = { add() }, enabled = words.isNotBlank()) { Text("Add", color = c.accentText) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = c.textMuted) } },
-    )
 }
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)

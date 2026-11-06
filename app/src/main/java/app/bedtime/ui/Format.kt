@@ -74,13 +74,6 @@ fun formatCountdown(millis: Long): String {
 
 fun pluralApps(count: Int): String = if (count == 1) "1 app" else "$count apps"
 
-fun greeting(hour: Int): String = when (hour) {
-    in 5..11 -> "Good morning"
-    in 12..17 -> "Good afternoon"
-    in 18..22 -> "Good evening"
-    else -> "Good night"
-}
-
 /** A wait length as "30 s", "5 min", or "1 min 30 s". */
 fun formatWaitSeconds(seconds: Int): String = when {
     seconds < 60 -> "$seconds s"

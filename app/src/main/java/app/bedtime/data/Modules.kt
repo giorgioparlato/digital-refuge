@@ -5,6 +5,7 @@ import kotlinx.serialization.Serializable
 /** The pieces around the clock on the home and lock screens, each switched on or off, in your order. */
 @Serializable
 enum class Module(val label: String) {
+    /** No longer offered or shown; kept only so settings saved with it still read. */
     GREETING("Greeting"),
     CLOCK("Clock"),
     DATE("Date"),
@@ -38,7 +39,7 @@ object Modules {
     fun isOn(style: HomeStyle, screen: Screen, module: Module): Boolean = module in shown(style, screen)
 
     /** The clock and what sits with it; the session pill comes after the last of these. */
-    val CLOCK_GROUP = setOf(Module.GREETING, Module.CLOCK, Module.DATE, Module.WEATHER, Module.EVENT)
+    val CLOCK_GROUP = setOf(Module.CLOCK, Module.DATE, Module.WEATHER, Module.EVENT)
 
     fun onAnywhere(style: HomeStyle, module: Module): Boolean = Screen.entries.any { isOn(style, it, module) }
 
@@ -67,10 +68,10 @@ object Modules {
     fun switched(style: HomeStyle, screen: Screen, module: Module, on: Boolean): HomeStyle =
         with(style, screen, of(style, screen).map { if (it.module == module) it.copy(on = on) else it })
 
-    /** Each module once, in the order given, and any not in it (new ones) at the end, off. */
+    /** Each module once, in the order given, and any not in it (new ones) at the end, off; never the greeting, which is gone. */
     fun arrange(list: List<ModuleChoice>): List<ModuleChoice> {
-        val known = list.distinctBy { it.module }
-        return known + Module.entries.filter { m -> known.none { it.module == m } }.map { ModuleChoice(it, on = false) }
+        val known = list.distinctBy { it.module }.filter { it.module != Module.GREETING }
+        return known + Module.entries.filter { m -> m != Module.GREETING && known.none { it.module == m } }.map { ModuleChoice(it, on = false) }
     }
 
     private fun fromSwitches(style: HomeStyle, screen: Screen): List<ModuleChoice> = Module.entries.map { m ->

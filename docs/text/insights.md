@@ -145,6 +145,8 @@ insights
 - Habits
 - Kept on this phone
 - add a habit
+- A habits tab
+- Your habits at refuge's foot, beside focus and insights
 - Habits you want to keep, ticked off each day: daily, a few times a week, or a count like pages or reps. Add one with the + below; your home and lock screen can show them too.
 - Today
 - Hold one and drag it to change the order

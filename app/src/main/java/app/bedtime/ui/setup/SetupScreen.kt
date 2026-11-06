@@ -283,24 +283,13 @@ internal fun SetupContent(
                 PlainButton("Open battery settings", onClick = onOpenBattery, modifier = Modifier.fillMaxWidth())
             }
 
-            StepCard(8, "Use as your default launcher", done = launcherOn && isDefaultHome, badge = "Optional") {
-                Body(
-                    "The minimal screen all the time, with your favourite apps; otherwise it's only there during the refuge " +
-                        "sessions you choose. Switch it off any time and your previous launcher is back.",
-                )
-                when {
-                    !launcherOn -> PlainButton("Use as default launcher", onClick = { onLauncher(true) }, modifier = Modifier.fillMaxWidth())
-                    !isDefaultHome -> {
-                        Body("Not your home app yet.")
-                        PlainButton("Choose it as your home app", onClick = onChooseHome, modifier = Modifier.fillMaxWidth())
-                        PlainButton("Stop using it", onClick = { onLauncher(false) }, modifier = Modifier.fillMaxWidth())
-                    }
-                    else -> {
-                        Body("Pressing Home brings you to the minimal screen.")
-                        PlainButton("Stop using it as launcher", onClick = { onLauncher(false) }, modifier = Modifier.fillMaxWidth())
-                    }
-                }
-            }
+            // The everyday launcher is a choice, not a step: it's in settings › home screen.
+            Text(
+                "Want refuge's home screen all the time, not just in sessions? That's in settings › home screen › everyday launcher.",
+                style = MaterialTheme.typography.bodySmall,
+                color = c.textMuted,
+                modifier = Modifier.padding(horizontal = 4.dp),
+            )
             Spacer(Modifier.height(8.dp))
         }
     }
