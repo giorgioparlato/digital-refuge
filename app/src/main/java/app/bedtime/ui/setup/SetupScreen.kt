@@ -200,6 +200,17 @@ internal fun SetupContent(
 
             StepCard(1, "Let digital refuge see which app is open", done = serviceOn, badge = "Required") {
                 Body("This is what notices when a blocked app opens. It only sees which app is in front: it can't read what's on your screen or what you type.")
+                // Before Android's own warning, which reads the same for every app that uses this switch.
+                Callout(
+                    title = "About Android's warning",
+                    kind = CalloutKind.INFO,
+                    body = "When you switch this on, Android warns that the app can \u201cview and control the screen\u201d. It shows that warning for every app that uses this switch.\n\n" +
+                        "What digital refuge actually has: it's told when a different app comes to the front, and the name of that app or Settings page. " +
+                        "It can't read what's on the screen or what you type, and it can't tap or swipe for you.\n\n" +
+                        "Digital refuge has no internet access at all: Android doesn't let it go online, so no data from it can ever leave your phone.\n\n" +
+                        "What it uses that for: blocking an app the moment it opens; keeping blocking from being switched off in Settings during a session; " +
+                        "turning the screen off from refuge's lock screen; and noticing when you unlock.",
+                )
                 if (!serviceOn) {
                     Body("Android hides this switch for apps installed outside the Play Store, so there are two parts. Do them in this order:")
                     NumberedLine(1, "Tap “Allow restricted settings” below. In App info, tap ⋮ in the top-right corner, then “Allow restricted settings”. If that menu item isn't there, skip to step 2 — your phone doesn't need it.")

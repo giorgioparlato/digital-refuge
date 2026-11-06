@@ -13,6 +13,15 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            85,
+            "0.9.39",
+            listOf(
+                "The note beside the clock shows the lines you choose again, and its own background colour.",
+                "Setup explains Android's warning for the accessibility switch: what refuge is actually told, what it's for, and that it has no internet access at all.",
+                "Small fixes from a check for bugs.",
+            ),
+        ),
+        ChangelogEntry(
             84,
             "0.9.38",
             listOf(

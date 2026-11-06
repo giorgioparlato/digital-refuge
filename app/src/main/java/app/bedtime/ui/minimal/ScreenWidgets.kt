@@ -57,7 +57,11 @@ internal fun noteSlots(style: HomeStyle, screen: Screen, note: Note?, onWrite: (
                 val p = style.palette()
                 NoteWidgetView(
                     note, p.text, p.faint, p.accent,
-                    maxLines = style.noteLines.coerceAtMost(3),
+                    // As many lines as chosen, a row each, in the room beside the clock.
+                    maxLines = style.noteLines.coerceAtMost(6),
+                    // Its own colours beside the clock too, as in the list.
+                    card = style.noteBackground?.let { Color(it) },
+                    darkText = style.noteDarkText,
                     textScale = style.noteTextSize.scale,
                     compact = true,
                     onToggle = toggle,

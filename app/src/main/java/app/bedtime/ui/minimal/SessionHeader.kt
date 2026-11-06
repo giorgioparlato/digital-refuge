@@ -205,11 +205,11 @@ internal fun SessionHeader(
     Column {
         if (pillAfter < 0) SessionPill(scheduleName, until, scheduleIcon, style)
         if (besideHead > 0 && noteBeside != null) {
-            // The clock as wide as it is, and the note in all the room beside it, no taller than the clock.
+            // The clock as wide as it is (or as the note's chosen share leaves), and the note in all the room beside it.
             androidx.compose.ui.layout.Layout(
                 content = {
                     Column { modules.take(besideHead).forEachIndexed { at, m -> one(at, m) } }
-                    Box(Modifier.padding(start = 24.dp, top = 6.dp).clipToBounds()) { noteBeside() }
+                    Box(Modifier.padding(start = 24.dp, top = 6.dp)) { noteBeside() }
                 },
                 modifier = Modifier.fillMaxWidth(),
             ) { parts, constraints ->
@@ -223,8 +223,8 @@ internal fun SessionHeader(
                 }
                 val clock = parts[0].measure(androidx.compose.ui.unit.Constraints.fixedWidth(clockWidth))
                 val room = (constraints.maxWidth - clock.width).coerceAtLeast(0)
-                val note = parts[1].measure(androidx.compose.ui.unit.Constraints(minWidth = room, maxWidth = room, maxHeight = clock.height))
-                layout(constraints.maxWidth, clock.height) {
+                val note = parts[1].measure(androidx.compose.ui.unit.Constraints(minWidth = room, maxWidth = room))
+                layout(constraints.maxWidth, maxOf(clock.height, note.height)) {
                     clock.place(0, 0)
                     note.place(clock.width, 0)
                 }

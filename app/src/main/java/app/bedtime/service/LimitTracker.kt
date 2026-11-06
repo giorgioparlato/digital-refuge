@@ -129,10 +129,6 @@ internal class LimitTracker(
 
     private fun limited(pkg: String): Boolean = limits.any { pkg in it.rules.apps }
 
-    /**
-     * [pkg] is now in front, or nothing is (the screen went off). Returns true if it's a different
-     * app from the one before, which is when the pause before opening is due.
-     */
     private var closing: Runnable? = null
 
     /**
@@ -179,6 +175,10 @@ internal class LimitTracker(
         }.also { handler.postDelayed(it, grace * 60_000L) }
     }
 
+    /**
+     * [pkg] is now in front, or nothing is (the screen went off). Returns true if it's a different
+     * app from the one before, which is when the pause before opening is due.
+     */
     fun moveTo(pkg: String?): Boolean {
         val previous = current
         if (pkg == previous) return false
@@ -189,7 +189,7 @@ internal class LimitTracker(
             currentPass = null
             currentPassApps = emptySet()
         }
-        // Back in a limit's apps before its "back within" ran out: the same stretch, so not asked yet.
+        // Back in a limit's apps within the minute that's the same visit: not asked yet.
         if (pkg != null && pkg in moodApps) moodLater?.let {
             handler.removeCallbacks(it)
             moodLater = null

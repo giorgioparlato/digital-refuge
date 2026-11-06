@@ -150,6 +150,8 @@ Home screen, lock screen, apps, shortcuts and about & backup are lists of rows f
 - Let digital refuge see which app is open
 - Required
 - This is what notices when a blocked app opens. It only sees which app is in front: it can't read what's on your screen or what you type.
+- About Android's warning
+- When you switch this on, Android warns that the app can “view and control the screen”. It shows that warning for every app that uses this switch.  What digital refuge actually has: it's told when a different app comes to the front, and the name of that app or Settings page. It can't read what's on the screen or what you type, and it can't tap or swipe for you.  Digital refuge has no internet access at all: Android doesn't let it go online, so no data from it can ever leave your phone.  What it uses that for: blocking an app the moment it opens; keeping blocking from being switched off in Settings during a session; turning the screen off from refuge's lock screen; and noticing when you unlock.
 - Android hides this switch for apps installed outside the Play Store, so there are two parts. Do them in this order:
 - Tap “Allow restricted settings” below. In App info, tap ⋮ in the top-right corner, then “Allow restricted settings”. If that menu item isn't there, skip to step 2 — your phone doesn't need it.
 - Tap “Open accessibility settings” below, find digital refuge blocker (under “Downloaded apps” on most phones), open it and switch it on. Confirm the permission Android asks about.

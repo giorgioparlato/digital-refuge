@@ -207,64 +207,67 @@ internal fun NotesContent(
         var done by remember(editing) { mutableStateOf(if (todo) Todo.split(note?.text.orEmpty()).second else emptyList()) }
         val whole = { text: String -> if (todo) Todo.join(text, done) else text }
         val today = java.time.LocalDate.now()
-        NoteEditor(
-            initial = initial,
-            isNew = note == null && initial.isEmpty(),
-            // A new note opens ready to write.
-            focus = note == null && initial.isEmpty(),
-            onSave = { text -> whole(text).let { if (it.isNotBlank() && it != note?.text) onSave(editing, it) } },
-            onDone = { text ->
-                val all = whole(text)
-                if (all.isBlank()) {
-                    if (note != null) onDelete(editing)
-                } else if (all != note?.text) {
-                    onSave(editing, all)
-                }
-                open = null
-            },
-            onDelete = note?.let { { open = null; deleteWithUndo(it) } },
-            outside = remember(editing) { app.bedtime.voice.VoiceRecorder.notesEdits(editing) },
-            actions = {
-                if (onRecord != null && !todo) {
-                    IconButton(onClick = { onRecord(editing) }) {
-                        Icon(app.bedtime.ui.components.BedtimeIcons.Mic, contentDescription = "record a voice note into it", tint = Obsidian.colors.accentText)
+        // A fresh editor for each note, so one never carries another's words.
+        androidx.compose.runtime.key(editing) {
+            NoteEditor(
+                initial = initial,
+                isNew = note == null && initial.isEmpty(),
+                // A new note opens ready to write.
+                focus = note == null && initial.isEmpty(),
+                onSave = { text -> whole(text).let { if (it.isNotBlank() && it != note?.text) onSave(editing, it) } },
+                onDone = { text ->
+                    val all = whole(text)
+                    if (all.isBlank()) {
+                        if (note != null) onDelete(editing)
+                    } else if (all != note?.text) {
+                        onSave(editing, all)
                     }
-                }
-                if (note != null) {
-                    IconButton(onClick = { reminding = note }) {
-                        Icon(Icons.Default.Notifications, contentDescription = "remind me", tint = if (note.remindAt != null) Obsidian.colors.accent else Obsidian.colors.textMuted)
-                    }
-                }
-            },
-            saveWith = done,
-            panel = if (onPlay == null || app.bedtime.data.Voice.recordings(initial).isEmpty()) null else { value, _ ->
-                Column(Modifier.padding(horizontal = PageGutter, vertical = 8.dp)) {
-                    RecordingChips(app.bedtime.data.Voice.recordings(value.text), onPlay)
-                }
-            },
-            onTick = if (!todo) null else { text, line ->
-                val (rest, nowDone) = Todo.split(Todo.toggled(Todo.join(text, done), line, today))
-                done = nowDone
-                rest
-            },
-            below = if (!todo) null else { set, current ->
-                DoneTodos(
-                    done, today,
-                    onUntick = { item ->
-                        val all = Todo.join(current(), done)
-                        val lines = all.lines()
-                        val from = current().lines().size
-                        val at = (from until lines.size).firstOrNull { lines[it] == item.lines.first() }
-                        if (at != null) {
-                            val (rest, nowDone) = Todo.split(Todo.toggled(all, at, today))
-                            done = nowDone
-                            set(rest)
+                    open = null
+                },
+                onDelete = note?.let { { open = null; deleteWithUndo(it) } },
+                outside = remember(editing) { app.bedtime.voice.VoiceRecorder.notesEdits(editing) },
+                actions = {
+                    if (onRecord != null && !todo) {
+                        IconButton(onClick = { onRecord(editing) }) {
+                            Icon(app.bedtime.ui.components.BedtimeIcons.Mic, contentDescription = "record a voice note into it", tint = Obsidian.colors.accentText)
                         }
-                    },
-                    onClear = { done = emptyList() },
-                )
-            },
-        )
+                    }
+                    if (note != null) {
+                        IconButton(onClick = { reminding = note }) {
+                            Icon(Icons.Default.Notifications, contentDescription = "remind me", tint = if (note.remindAt != null) Obsidian.colors.accent else Obsidian.colors.textMuted)
+                        }
+                    }
+                },
+                saveWith = done,
+                panel = if (onPlay == null || app.bedtime.data.Voice.recordings(initial).isEmpty()) null else { value, _ ->
+                    Column(Modifier.padding(horizontal = PageGutter, vertical = 8.dp)) {
+                        RecordingChips(app.bedtime.data.Voice.recordings(value.text), onPlay)
+                    }
+                },
+                onTick = if (!todo) null else { text, line ->
+                    val (rest, nowDone) = Todo.split(Todo.toggled(Todo.join(text, done), line, today))
+                    done = nowDone
+                    rest
+                },
+                below = if (!todo) null else { set, current ->
+                    DoneTodos(
+                        done, today,
+                        onUntick = { item ->
+                            val all = Todo.join(current(), done)
+                            val lines = all.lines()
+                            val from = current().lines().size
+                            val at = (from until lines.size).firstOrNull { lines[it] == item.lines.first() }
+                            if (at != null) {
+                                val (rest, nowDone) = Todo.split(Todo.toggled(all, at, today))
+                                done = nowDone
+                                set(rest)
+                            }
+                        },
+                        onClear = { done = emptyList() },
+                    )
+                },
+            )
+        }
         return
     }
     val c = Obsidian.colors
