@@ -352,7 +352,15 @@ private fun BedtimeNavigation(pendingRoute: String?, onRouteConsumed: () -> Unit
         CompositionLocalProvider(LocalSettingsSearch provides if (top in Routes.SETTINGS_PAGES) ({ push(Routes.SETTINGS_SEARCH) }) else null) {
         when {
             top == Routes.SETTINGS_SEARCH -> SettingsScreen(onBack = ::pop, onOpen = ::push, searching = true)
-            top == Routes.CREATE -> CreateScreen(onBack = ::pop, onPick = { key -> push(Routes.TEMPLATE + key) })
+            top == Routes.CREATE -> CreateScreen(
+                onBack = ::pop,
+                onPick = { key -> push(Routes.TEMPLATE + key) },
+                // In place of "new": back from the limit is back on focus.
+                onLimit = {
+                    pop()
+                    push(Routes.LIMIT)
+                },
+            )
             top == Routes.SETUP -> SetupScreen(onBack = ::pop, onAlwaysAvailable = { push(Routes.ALWAYS_AVAILABLE) })
             top == Routes.HOME_STYLE -> HomeStyleScreen(onBack = ::pop)
             top == Routes.STYLE_SHOWN -> HomeStyleScreen(onBack = ::pop, page = StylePage.SHOWN, onOpen = ::push)

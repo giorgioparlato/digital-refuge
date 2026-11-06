@@ -48,15 +48,15 @@ import app.bedtime.ui.formatMinuteOfDay
 import app.bedtime.ui.formatMinutes
 import app.bedtime.ui.theme.Obsidian
 
-/** "New": start from scratch or from a template. Always reachable, even with schedules already set up. */
+/** "New": a schedule, block or limit from scratch, or a schedule or block from a template. Always reachable. */
 @Composable
-fun CreateScreen(onBack: () -> Unit, onPick: (String) -> Unit) {
+fun CreateScreen(onBack: () -> Unit, onPick: (String) -> Unit, onLimit: () -> Unit = {}) {
     val context = LocalContext.current
-    CreateContent(onBack = onBack, onPick = onPick, isInstalled = { AppCatalog.isLaunchable(context, it) })
+    CreateContent(onBack = onBack, onPick = onPick, isInstalled = { AppCatalog.isLaunchable(context, it) }, onLimit = onLimit)
 }
 
 @Composable
-internal fun CreateContent(onBack: () -> Unit, onPick: (String) -> Unit, isInstalled: (String) -> Boolean = { false }) {
+internal fun CreateContent(onBack: () -> Unit, onPick: (String) -> Unit, isInstalled: (String) -> Boolean = { false }, onLimit: () -> Unit = {}) {
     val c = Obsidian.colors
     Scaffold(containerColor = c.bgPrimary, topBar = { ObsidianTopBar("New", onBack = onBack) }) { padding ->
         Column(
@@ -69,12 +69,13 @@ internal fun CreateContent(onBack: () -> Unit, onPick: (String) -> Unit, isInsta
         ) {
             GroupTitle("Start from scratch")
             Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                ScratchCard(Icons.Default.DateRange, "Schedule", "Repeats on days and times", Modifier.weight(1f)) {
+                ScratchCard(Icons.Default.DateRange, "Schedule", "On set days and times", Modifier.weight(1f)) {
                     onPick(Templates.SCRATCH_SCHEDULE)
                 }
-                ScratchCard(BedtimeIcons.Hourglass, "Block", "Start any time, for a set length", Modifier.weight(1f)) {
+                ScratchCard(BedtimeIcons.Hourglass, "Block", "Any time, for a set length", Modifier.weight(1f)) {
                     onPick(Templates.SCRATCH_BLOCK)
                 }
+                ScratchCard(BedtimeIcons.Block, "Limit", "Every day, for the apps that pull", Modifier.weight(1f), onClick = onLimit)
             }
             TemplateGallery(onPick = onPick, isInstalled = isInstalled)
             Spacer(Modifier.height(8.dp))

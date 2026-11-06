@@ -24,6 +24,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
@@ -229,6 +230,9 @@ internal fun HomeContent(
     onDelete: (Schedule) -> Unit = {},
 ) {
     val c = Obsidian.colors
+    // Sections folded to their heading, for now only: each opens again the next time focus does.
+    var folded by remember { mutableStateOf(emptySet<String>()) }
+    val onFold = { section: String, fold: Boolean -> folded = if (fold) folded + section else folded - section }
     var editingLength by remember { mutableStateOf<Schedule?>(null) }
     editingLength?.let { block ->
         BlockLengthDialog(
@@ -249,8 +253,8 @@ internal fun HomeContent(
     val minuteOfDay = Instant.ofEpochMilli(ui.now).atZone(ZoneId.systemDefault()).toLocalTime().let { it.hour * 60 + it.minute }
     // Limits after blocks: what's left of today is what you look at; schedules, set up once, come last.
     val limitsSection: androidx.compose.foundation.lazy.LazyListScope.() -> Unit = {
-        item(key = "limits-heading") { SectionLabel("limits · today", Modifier.padding(start = PageGutter, top = 12.dp)) }
-        if (limits.isEmpty()) {
+        item(key = "limits-heading") { FoldHeading("limits · today", limits.size, "limits" in folded, Modifier.padding(top = 12.dp)) { onFold("limits", it) } }
+        if ("limits" in folded) Unit else if (limits.isEmpty()) {
             item(key = "no-limits") {
                 Text(
                     "No limits yet · give an app a daily budget, or a pause before it opens",
@@ -301,8 +305,8 @@ internal fun HomeContent(
                 limitsSection()
             } else {
                 // Blocks first, all of them: starting one is what you come here for most.
-                item(key = "blocks-heading") { SectionLabel("blocks", Modifier.padding(start = PageGutter)) }
-                item(key = "blocks") {
+                item(key = "blocks-heading") { FoldHeading("blocks", blocks.size, "blocks" in folded) { onFold("blocks", it) } }
+                if ("blocks" !in folded) item(key = "blocks") {
                     val shape = RoundedCornerShape(CardRadius)
                     Column(Modifier.padding(horizontal = PageGutter).fillMaxWidth().clip(shape).background(c.bgSecondary).border(1.dp, c.border, shape)) {
                         blocks.forEachIndexed { i, block ->
@@ -326,8 +330,8 @@ internal fun HomeContent(
                     }
                 }
                 limitsSection()
-                item(key = "schedules-heading") { SectionLabel("schedules", Modifier.padding(start = PageGutter, top = 12.dp)) }
-                if (schedulesOnly.isEmpty()) {
+                item(key = "schedules-heading") { FoldHeading("schedules", schedulesOnly.size, "schedules" in folded, Modifier.padding(top = 12.dp)) { onFold("schedules", it) } }
+                if ("schedules" in folded) Unit else if (schedulesOnly.isEmpty()) {
                     item(key = "no-schedules") {
                         Text(
                             "No schedules yet · add one",
@@ -338,7 +342,7 @@ internal fun HomeContent(
                         )
                     }
                 }
-                items(schedulesOnly.size, key = { schedulesOnly[it].id }) { index ->
+                if ("schedules" !in folded) items(schedulesOnly.size, key = { schedulesOnly[it].id }) { index ->
                     Box(Modifier.padding(horizontal = PageGutter).padding(bottom = 12.dp)) {
                         ScheduleItem(schedulesOnly[index], ui.active, ui.history, ui.now, minuteOfDay, onEdit, onToggle, onDelete)
                     }
@@ -355,8 +359,30 @@ internal fun HomeContent(
             }
         }
         if (ui.schedules.isNotEmpty()) {
-            AddCircleButton("new block or schedule", onClick = onCreate, modifier = Modifier.align(Alignment.BottomEnd).padding(20.dp))
+            AddCircleButton("new block, schedule or limit", onClick = onCreate, modifier = Modifier.align(Alignment.BottomEnd).padding(20.dp))
         }
+    }
+}
+
+/** A section's name, a tap folding it to that and its count, or opening it again. */
+@Composable
+private fun FoldHeading(title: String, count: Int, folded: Boolean, modifier: Modifier = Modifier, onFold: (Boolean) -> Unit) {
+    val c = Obsidian.colors
+    Row(
+        modifier
+            .padding(horizontal = PageGutter - 4.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(onClickLabel = if (folded) "open $title" else "fold $title") { onFold(!folded) }
+            .padding(horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        SectionLabel(if (folded) "$title · $count" else title)
+        Icon(
+            if (folded) Icons.AutoMirrored.Filled.KeyboardArrowRight else Icons.Default.KeyboardArrowDown,
+            contentDescription = null,
+            tint = c.accentText,
+            modifier = Modifier.padding(start = 4.dp, top = 12.dp).size(18.dp),
+        )
     }
 }
 

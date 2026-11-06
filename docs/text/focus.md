@@ -48,7 +48,8 @@ focus
 - No blocks yet · add one
 - No schedules yet · add one
 - Check-ins: ask why, moods, a nudge ›
-- new block or schedule
+- new block, schedule or limit
+- {title} · {count}
 - digital refuge
 - … is on
 - … sessions are on
@@ -177,9 +178,11 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 - New
 - Start from scratch
 - Schedule
-- Repeats on days and times
+- On set days and times
 - Block
-- Start any time, for a set length
+- Any time, for a set length
+- Limit
+- Every day, for the apps that pull
 - Schedules
 - Switch on by themselves at set times
 - Focus blocks

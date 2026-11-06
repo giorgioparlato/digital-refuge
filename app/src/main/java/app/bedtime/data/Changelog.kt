@@ -13,6 +13,14 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            87,
+            "0.9.41",
+            listOf(
+                "The + on focus makes limits too: \"limit\" sits beside schedule and block on the new page.",
+                "Tap blocks, limits or schedules on focus to fold them to their count, for a quicker way about the page.",
+            ),
+        ),
+        ChangelogEntry(
             86,
             "0.9.40",
             listOf(
