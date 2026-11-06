@@ -368,6 +368,11 @@ One file serves the look, widgets, gestures and notifications pages, for both sc
 - Beside the clock
 - Small, at the top right: its title and first lines
 - Only with a small or very small clock, and the weather not beside it (off, or set to 5 days)
+- Width beside the clock
+- To fit
+- A third
+- Half
+- Two thirds
 - Text size
 - Its background
 - The screen's own

@@ -49,10 +49,10 @@ class WidgetOptionsTest {
 
     @Test
     fun everyWidgetReadsInTheSameOrder() {
-        // What it shows, then its size, then its colours, then what a tap does.
+        // The note in full first, as what's most often wanted from holding it; then what it shows, its size, its colours.
         val labels = WidgetOptions.of(Module.NOTE, HomeStyle(noteBackground = 0xFF223344, noteWidgetId = "a"), Screen.HOME, {}, notes).map { it.label }
         assertEquals(
-            listOf("Show", "Lines shown", "Beside the clock", "Text size", "Its background", "Its text", "Open this note in full", "Tap its lines to write right there."),
+            listOf("Open this note in full", "Show", "Lines shown", "Beside the clock", "Text size", "Its background", "Its text", "Tap its lines to write right there."),
             labels,
         )
         val tracker = WidgetOptions.of(Module.HOURS, HomeStyle(), Screen.HOME, {}).map { it.label }

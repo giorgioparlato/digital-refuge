@@ -156,6 +156,8 @@ object WidgetOptions {
             val chosen = style.noteWidgetId ?: Notes.TODO_ID
             val fits = style.noteFitsBesideClock(screen)
             listOfNotNull(
+                // First, as the thing most often wanted from holding it.
+                if (notes.any { it.id == chosen }) WidgetOption.Link("Open this note in full", Routes.note(chosen)) else null,
                 WidgetOption.Pick(
                     "Show",
                     notes.sortedBy { it.id != Notes.TODO_ID }.map { it.id to NoteWidget.title(it.text).ifBlank { "A note" } },
@@ -169,6 +171,15 @@ object WidgetOptions {
                     style.noteBeside(screen) && fits,
                     enabled = fits || style.noteBeside(screen),
                 ) { change(style.withNoteBeside(screen, it)) },
+                if (style.noteBeside(screen) && fits) {
+                    WidgetOption.Choice(
+                        "Width beside the clock",
+                        listOf("To fit" to 0, "A third" to 33, "Half" to 50, "Two thirds" to 66),
+                        style.noteBesideShare,
+                    ) { change(style.copy(noteBesideShare = it)) }
+                } else {
+                    null
+                },
                 WidgetOption.Choice("Text size", listOf("Small" to TextSize.SMALL, "Medium" to TextSize.MEDIUM, "Large" to TextSize.LARGE), style.noteTextSize) {
                     change(style.copy(noteTextSize = it))
                 },
@@ -180,7 +191,6 @@ object WidgetOptions {
                 } else {
                     null
                 },
-                if (notes.any { it.id == chosen }) WidgetOption.Link("Open this note in full", Routes.note(chosen)) else null,
                 WidgetOption.Hint("Tap its lines to write right there."),
             )
         }

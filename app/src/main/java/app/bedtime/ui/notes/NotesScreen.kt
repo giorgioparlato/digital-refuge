@@ -111,7 +111,8 @@ fun NotesScreen(onBack: (() -> Unit)?, initialOpen: String? = null, onSettings: 
     }
     NotesContent(
         notes = notes ?: return,
-        onSave = { id, text -> scope.launch { repo.saveNote(id, text) } },
+        // Saved through to the end, even when the page closes as it saves.
+        onSave = { id, text -> repo.keep { saveNote(id, text) } },
         onDelete = { id -> scope.launch { repo.deleteNote(id) } },
         onBack = onBack,
         initialOpen = initialOpen,
@@ -811,7 +812,9 @@ internal fun NoteEditor(
     var undo by remember { mutableStateOf(emptyList<TextFieldValue>()) }
     var redo by remember { mutableStateOf(emptyList<TextFieldValue>()) }
     var lastStep by remember { mutableStateOf(0L) }
-    val edit: (TextFieldValue, Boolean) -> Unit = { new, step ->
+    val edit: (TextFieldValue, Boolean) -> Unit = { changed, step ->
+        // Numbered lists count on by themselves, whatever was added or taken out in between.
+        val new = Markdown.renumbered(changed)
         if (new.text != value.text) {
             val now = System.currentTimeMillis()
             if (step || undo.isEmpty() || now - lastStep > UNDO_PAUSE_MS) undo = (undo + value).takeLast(UNDO_STEPS)
@@ -820,7 +823,17 @@ internal fun NoteEditor(
         }
         value = new
     }
-    BackHandler { onDone(value.text) }
+    // Once closed by its own back or delete, it's dealt with; otherwise (another tab, home, the screen
+    // off, anything that takes the page away) what's written is saved there and then, not 0.6 s later.
+    var finished by remember { mutableStateOf(false) }
+    val latest by androidx.compose.runtime.rememberUpdatedState(value.text)
+    val saveNow by androidx.compose.runtime.rememberUpdatedState(onSave)
+    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { if (!finished) saveNow(latest) } }
+    androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_STOP) { if (!finished) saveNow(latest) }
+    BackHandler {
+        finished = true
+        onDone(value.text)
+    }
     if (outside != null) LaunchedEffect(outside) {
         outside.collect { change ->
             val text = change(value.text)
@@ -841,10 +854,16 @@ internal fun NoteEditor(
     Scaffold(
         containerColor = c.bgPrimary,
         topBar = {
-            ObsidianTopBar(title ?: if (isNew) "New note" else "Note", onBack = { onDone(value.text) }) {
+            ObsidianTopBar(title ?: if (isNew) "New note" else "Note", onBack = {
+                finished = true
+                onDone(value.text)
+            }) {
                 actions()
                 if (onDelete != null) {
-                    IconButton(onClick = onDelete) { Icon(Icons.Default.Delete, contentDescription = "delete", tint = c.textMuted) }
+                    IconButton(onClick = {
+                        finished = true
+                        onDelete()
+                    }) { Icon(Icons.Default.Delete, contentDescription = "delete", tint = c.textMuted) }
                 }
             }
         },

@@ -53,35 +53,14 @@ insights
 <sub>[StatsScreen.kt](../../app/src/main/java/app/bedtime/ui/stats/StatsScreen.kt)</sub>
 
 - Phone
-- Sessions
 - Habits
 - Moods
+- Sessions
 - add a habit
-- in refuge in the last seven days
-- kept in a row
-- best run
-- … of …
-- kept this week
-- no ways out taken this week
-- early unlock
-- early unlocks
-- emergency break
-- emergency breaks
-- time blocking was switched off
-- times blocking was switched off
-- Two weeks
-- Time in refuge each day, by the day a session began. Tap a day for its figures.
-- Each schedule and block
-- The last four weeks
-- … of … kept
 - Time in limited apps
 - The last seven days
 - unnamed limit
 -  · more time {extras}×
-- a way out taken
-- {hours} h
--  · nothing on
-- nothing on
 
 <sub>[PhoneUseSections.kt](../../app/src/main/java/app/bedtime/ui/stats/PhoneUseSections.kt)</sub>
 
@@ -201,8 +180,8 @@ insights
 - habits · {done} of …
 - days in a row
 - best run
-- Today
 - {value} of ……
 - Tap a day to tick or untick it.
+- Tap a day to change its count above.
 - All your habits
 - Change it

@@ -13,6 +13,18 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            84,
+            "0.9.38",
+            listOf(
+                "Sessions in insights, by what they did: phone-free nights, phone time spared, kept week by week, when and why you break, the hour after, the apps used in them, and blocks' focus. Hours in refuge are one quiet line now.",
+                "Notes are saved the moment you leave them, whatever takes you away, so nothing written is lost.",
+                "Numbered lists renumber themselves as you add or take out a line.",
+                "The note beside the clock is no taller than the clock, as wide as there's room, or the width you choose.",
+                "Count habits can be changed for past days: tap the day, then − or +.",
+                "Sessions can be switched off in insights; holding the note widget offers the note in full first.",
+            ),
+        ),
+        ChangelogEntry(
             83,
             "0.9.37",
             listOf(

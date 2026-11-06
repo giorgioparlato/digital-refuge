@@ -27,6 +27,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -204,9 +205,29 @@ internal fun SessionHeader(
     Column {
         if (pillAfter < 0) SessionPill(scheduleName, until, scheduleIcon, style)
         if (besideHead > 0 && noteBeside != null) {
-            Row(Modifier.fillMaxWidth()) {
-                Column(Modifier.weight(1.3f)) { modules.take(besideHead).forEachIndexed { at, m -> one(at, m) } }
-                Box(Modifier.weight(1f).padding(start = 24.dp, top = 6.dp)) { noteBeside() }
+            // The clock as wide as it is, and the note in all the room beside it, no taller than the clock.
+            androidx.compose.ui.layout.Layout(
+                content = {
+                    Column { modules.take(besideHead).forEachIndexed { at, m -> one(at, m) } }
+                    Box(Modifier.padding(start = 24.dp, top = 6.dp).clipToBounds()) { noteBeside() }
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) { parts, constraints ->
+                // Its share as chosen, the clock's lines wrapping in the rest; or the clock what it needs.
+                val share = style.noteBesideShare
+                val clockWidth = if (share > 0) {
+                    (constraints.maxWidth * (100 - share) / 100f).toInt()
+                } else {
+                    val needs = runCatching { parts[0].maxIntrinsicWidth(constraints.maxHeight) }.getOrDefault((constraints.maxWidth * 0.56f).toInt())
+                    needs.coerceIn(0, (constraints.maxWidth * 0.62f).toInt())
+                }
+                val clock = parts[0].measure(androidx.compose.ui.unit.Constraints.fixedWidth(clockWidth))
+                val room = (constraints.maxWidth - clock.width).coerceAtLeast(0)
+                val note = parts[1].measure(androidx.compose.ui.unit.Constraints(minWidth = room, maxWidth = room, maxHeight = clock.height))
+                layout(constraints.maxWidth, clock.height) {
+                    clock.place(0, 0)
+                    note.place(clock.width, 0)
+                }
             }
             if (pillAfter in 0 until besideHead) SessionPill(scheduleName, until, scheduleIcon, style)
         }

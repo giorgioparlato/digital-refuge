@@ -46,4 +46,20 @@ class MarkdownEditingTest {
         val seen = (1..4).map { title = Markdown.cycleHeading(title); title.text }
         assertEquals(listOf("# Plan", "## Plan", "### Plan", "Plan"), seen)
     }
+
+    @Test
+    fun numberedListsCountOnByThemselves() {
+        // One taken out of the middle, and one put in: the rest follow.
+        assertEquals("1. a\n2. c\n3. d", Markdown.renumbered("1. a\n3. c\n4. d"))
+        assertEquals("1. a\n2. new\n3. b", Markdown.renumbered("1. a\n2. new\n2. b"))
+        // A list begun at 5 counts from 5; each indent counts on its own; a blank line ends one.
+        assertEquals("5. a\n6. b", Markdown.renumbered("5. a\n9. b"))
+        assertEquals("1. a\n  1. x\n  2. y\n2. b", Markdown.renumbered("1. a\n  1. x\n  5. y\n7. b"))
+        assertEquals("1. a\n\n3. b", Markdown.renumbered("1. a\n\n3. b"))
+        // Going from 9 to 10, the cursor keeps its place in the words.
+        val v = androidx.compose.ui.text.input.TextFieldValue((1..9).joinToString("\n") { "$it. x" } + "\n11. end", androidx.compose.ui.text.TextRange(57))
+        val fixed = Markdown.renumbered(v)
+        assertEquals("10. end", fixed.text.lines().last())
+        assertEquals(fixed.text.length, fixed.selection.start)
+    }
 }

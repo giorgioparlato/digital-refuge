@@ -1,6 +1,7 @@
 package app.bedtime.data
 
 import java.time.LocalDateTime
+import kotlinx.coroutines.launch
 import android.content.Context
 import androidx.datastore.core.DataMigration
 import androidx.datastore.core.DataStore
@@ -50,6 +51,17 @@ internal class MoveToDays(private val old: DataStore<Preferences>) : DataMigrati
 
 /** Schedules, runtime state, settings and history, each stored as JSON under its own DataStore key; the rest in [days]. */
 class Repository private constructor(context: Context) {
+    /**
+     * Writes that must finish whatever screen asked for them: a note or an entry saved as a page closes
+     * would otherwise go with the page's own scope, half done.
+     */
+    private val writes = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO)
+
+    /** [block], run to the end even if the screen that asked has gone. */
+    fun keep(block: suspend Repository.() -> Unit) {
+        writes.launch { block() }
+    }
+
     private val store = context.store
     private val days = context.days
 

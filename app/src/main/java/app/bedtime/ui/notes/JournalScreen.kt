@@ -77,7 +77,8 @@ internal fun JournalContent(onBack: () -> Unit, openToday: Boolean = false, open
             entry ?: JournalEntry(day, ""),
             sections,
             today,
-            onSave = { text, aims -> scope.launch { repo.saveJournal(day, text, aims) } },
+            // Saved through to the end, even when the page closes as it saves.
+            onSave = { text, aims -> repo.keep { saveJournal(day, text, aims) } },
             onDone = { open = null },
             prompts = settings?.journalPrompts != false,
             moods = app.bedtime.data.Why.moods(settings ?: app.bedtime.data.AppSettings()),

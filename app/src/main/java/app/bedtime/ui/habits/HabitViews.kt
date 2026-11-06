@@ -186,6 +186,8 @@ fun HabitDetailContent(
     val accent = habit.tint(accent)
     var shown by remember { mutableIntStateOf(0) }
     val month = YearMonth.from(LocalDate.ofEpochDay(today)).minusMonths(shown.toLong())
+    // A count's day to change: today, or one picked on the month below.
+    var picked by remember(habit.id) { androidx.compose.runtime.mutableLongStateOf(today) }
     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(background).padding(22.dp)) {
         Text(habit.name, style = MaterialTheme.typography.titleMedium, color = text)
         Text(Habits.describe(habit), style = MaterialTheme.typography.bodySmall, color = faint)
@@ -196,12 +198,17 @@ fun HabitDetailContent(
             Figure("${Habits.bestStreak(habit, marks, today)}", "best run", text, faint, Modifier.weight(1f))
         }
         if (habit.kind == HabitKind.COUNT) {
-            val value = marks[today] ?: 0
+            val value = marks[picked] ?: 0
             Row(Modifier.padding(top = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("Today", style = MaterialTheme.typography.bodyMedium, color = faint, modifier = Modifier.weight(1f))
-                Step("−", text) { onSet(today, (value - 1).coerceAtLeast(0)) }
+                Text(
+                    if (picked == today) "Today" else DateTimeFormatter.ofPattern("EEE d MMM", Locale.getDefault()).format(LocalDate.ofEpochDay(picked)),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (picked == today) faint else accent,
+                    modifier = Modifier.weight(1f),
+                )
+                Step("−", text) { onSet(picked, (value - 1).coerceAtLeast(0)) }
                 Text("$value of ${habit.target}${if (habit.unit.isBlank()) "" else " ${habit.unit}"}", style = MaterialTheme.typography.bodyLarge, color = text, modifier = Modifier.padding(horizontal = 12.dp))
-                Step("+", text) { onSet(today, value + 1) }
+                Step("+", text) { onSet(picked, value + 1) }
             }
         }
         Row(Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -216,10 +223,13 @@ fun HabitDetailContent(
                 Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "the month after", tint = faint, modifier = Modifier.clip(CircleShape).clickable { shown-- }.padding(4.dp))
             }
         }
-        MonthGrid(habit, marks, month, today, text, faint, accent, onSet)
-        if (habit.kind == HabitKind.YES_NO) {
-            Text("Tap a day to tick or untick it.", style = MaterialTheme.typography.labelSmall, color = faint, modifier = Modifier.padding(top = 6.dp))
-        }
+        MonthGrid(habit, marks, month, today, text, faint, accent, onSet, picked = picked.takeIf { habit.kind == HabitKind.COUNT }, onPick = { picked = it })
+        Text(
+            if (habit.kind == HabitKind.YES_NO) "Tap a day to tick or untick it." else "Tap a day to change its count above.",
+            style = MaterialTheme.typography.labelSmall,
+            color = faint,
+            modifier = Modifier.padding(top = 6.dp),
+        )
         if (onOpenAll != null) {
             Text(
                 "All your habits",
@@ -242,7 +252,19 @@ fun HabitDetailContent(
 
 /** The month's days in weeks, Monday first; days to come are faint and can't be marked. */
 @Composable
-private fun MonthGrid(habit: Habit, marks: Map<Long, Int>, month: YearMonth, today: Long, text: Color, faint: Color, accent: Color, onSet: (Long, Int) -> Unit) {
+private fun MonthGrid(
+    habit: Habit,
+    marks: Map<Long, Int>,
+    month: YearMonth,
+    today: Long,
+    text: Color,
+    faint: Color,
+    accent: Color,
+    onSet: (Long, Int) -> Unit,
+    /** A count's day being changed, ringed in its colour; a tap on a day picks it. */
+    picked: Long? = null,
+    onPick: (Long) -> Unit = {},
+) {
     val first = month.atDay(1)
     val lead = first.dayOfWeek.value - 1
     val cells = List(lead) { null } + (1..month.lengthOfMonth()).map { first.withDayOfMonth(it).toEpochDay() }
@@ -272,8 +294,17 @@ private fun MonthGrid(habit: Habit, marks: Map<Long, Int>, month: YearMonth, tod
                                         },
                                     )
                                     .then(if (state == HabitDay.MET && !ahead) Modifier.border(1.5.dp, accent, CircleShape) else Modifier)
-                                    .then(if (day == today) Modifier.border(1.5.dp, text, CircleShape) else Modifier)
-                                    .clickable(enabled = !ahead && habit.kind == HabitKind.YES_NO) { onSet(day, Habits.tapped(habit, marks[day] ?: 0)) },
+                                    .then(
+                                        when (day) {
+                                            picked -> Modifier.border(2.dp, accent, CircleShape)
+                                            today -> Modifier.border(1.5.dp, text, CircleShape)
+                                            else -> Modifier
+                                        },
+                                    )
+                                    // A tick habit's day ticks; a count's is picked, to change it above.
+                                    .clickable(enabled = !ahead) {
+                                        if (habit.kind == HabitKind.COUNT) onPick(day) else onSet(day, Habits.tapped(habit, marks[day] ?: 0))
+                                    },
                                 contentAlignment = Alignment.Center,
                             ) {
                                 Text(

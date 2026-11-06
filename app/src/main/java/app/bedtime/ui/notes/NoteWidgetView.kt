@@ -40,6 +40,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -113,9 +114,28 @@ fun NoteWidgetView(
         }
         if (!typing) keyboardSeen = false
     }
+    // Beside the clock, the height it's given decides how many lines fit under the title.
+    var fitting by remember { mutableStateOf(maxLines) }
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val titleStyle = MaterialTheme.typography.labelLarge.sized()
+    val lineStyle = MaterialTheme.typography.bodyMedium.sized()
     Column(
         modifier
             .fillMaxWidth()
+            .then(
+                if (!compact) Modifier else Modifier.layout { measurable, constraints ->
+                    if (constraints.hasBoundedHeight) {
+                        with(density) {
+                            fun TextStyle.rowHeight() = (if (lineHeight.isSp) lineHeight.toPx() else fontSize.toPx() * 1.4f)
+                            val title = titleStyle.rowHeight() + 4.dp.toPx()
+                            val each = lineStyle.rowHeight() + 4.dp.toPx()
+                            fitting = ((constraints.maxHeight - title) / each).toInt().coerceAtLeast(0)
+                        }
+                    }
+                    val placeable = measurable.measure(constraints)
+                    layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+                },
+            )
             .then(if (card != null) Modifier.clip(RoundedCornerShape(18.dp)).background(card).padding(horizontal = 16.dp, vertical = 12.dp) else Modifier),
     ) {
         if (note == null) {
@@ -150,7 +170,9 @@ fun NoteWidgetView(
             modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).then(startTyping).padding(vertical = 2.dp),
         )
         val body = (if (compact) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodyLarge).sized()
-        NoteWidget.lines(note.text, maxLines).forEach { line ->
+        // Beside the clock: as many lines as its height holds, a line each.
+        val shown = if (compact) minOf(maxLines, fitting) else maxLines
+        NoteWidget.lines(note.text, shown).forEach { line ->
             Row(Modifier.fillMaxWidth().padding(start = (16 * line.indent).dp, top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 when (line.box) {
                     null -> if (line.bullet) Text("•", style = body, color = faint, modifier = Modifier.width((18 * textScale).dp))
@@ -171,14 +193,16 @@ fun NoteWidgetView(
                 }
                 if (line.box != null) Spacer(Modifier.width(4.dp))
                 VerbatimText(
-                    line.text,
+                    androidx.compose.ui.text.AnnotatedString(line.text),
                     style = body.copy(textDecoration = if (line.box == true) TextDecoration.LineThrough else null),
                     color = if (line.box == true) faint else text,
+                    maxLines = if (compact) 1 else Int.MAX_VALUE,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f).clip(RoundedCornerShape(6.dp)).then(startTyping),
                 )
             }
         }
-        if (NoteWidget.lines(note.text, maxLines).isEmpty()) {
+        if (NoteWidget.lines(note.text, shown).isEmpty()) {
             Text("tap to write", style = MaterialTheme.typography.bodyMedium, color = faint, modifier = Modifier.padding(top = 4.dp).clip(RoundedCornerShape(6.dp)).then(startTyping))
         }
     }

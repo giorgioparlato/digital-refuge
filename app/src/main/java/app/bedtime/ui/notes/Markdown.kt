@@ -227,6 +227,56 @@ object Markdown {
         }
     }
 
+    private val numbered = Regex("""^(\s*)(\d+)([.)])( .*)?$""")
+
+    /**
+     * [text] with each numbered list counting on from its first item, so adding, taking out or moving
+     * one renumbers the rest: each indent counts on its own, and a blank line or a line further out
+     * ends a list.
+     */
+    fun renumbered(text: String): String {
+        val lines = text.split("\n").toMutableList()
+        val next = mutableMapOf<String, Int>()
+        lines.forEachIndexed { i, line ->
+            val m = numbered.matchEntire(line)
+            if (m == null) {
+                if (line.isBlank()) next.clear() else {
+                    val indent = line.takeWhile { it == ' ' || it == '\t' }
+                    next.keys.removeAll { it.length >= indent.length }
+                }
+                return@forEachIndexed
+            }
+            val indent = m.groupValues[1]
+            next.keys.removeAll { it.length > indent.length }
+            val n = next[indent] ?: m.groupValues[2].toInt()
+            if (m.groupValues[2].toInt() != n) lines[i] = indent + n + m.groupValues[3] + m.groupValues[4]
+            next[indent] = n + 1
+        }
+        return lines.joinToString("\n")
+    }
+
+    /** [value] renumbered, the cursor kept at the same place in its words. */
+    fun renumbered(value: TextFieldValue): TextFieldValue {
+        val text = renumbered(value.text)
+        if (text == value.text) return value
+        val before = value.text.split("\n")
+        val after = text.split("\n")
+        fun at(cursor: Int): Int {
+            var line = 0
+            var start = 0
+            while (line < before.lastIndex && start + before[line].length < cursor) {
+                start += before[line].length + 1
+                line++
+            }
+            val column = cursor - start
+            val newStart = after.take(line).sumOf { it.length + 1 }
+            val marker = numbered.matchEntire(before[line])?.let { it.groupValues[1].length + it.groupValues[2].length } ?: 0
+            val shift = if (column >= marker) after[line].length - before[line].length else 0
+            return (newStart + column + shift).coerceIn(newStart, newStart + after[line].length)
+        }
+        return TextFieldValue(text, androidx.compose.ui.text.TextRange(at(value.selection.start), at(value.selection.end)))
+    }
+
     private val listItem = Regex("""^(\s*)(- \[[ xX]] |[-*+] |(\d+)([.)]) )(.*)$""")
 
     /**

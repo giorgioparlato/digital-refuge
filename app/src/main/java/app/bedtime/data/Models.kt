@@ -220,6 +220,7 @@ data class LockLook(
     val noteDarkText: Boolean? = null,
     val calendarTomorrow: Boolean? = null,
     val habitsDots: Boolean? = null,
+    val noteBesideShare: Int? = null,
 )
 
 /** A lock-screen notification swiped aside: cleared, kept for later, marked read, quieted for a while, or answered. */
@@ -332,6 +333,8 @@ data class HomeStyle(
     val calendarTomorrow: Boolean = false,
     /** The habits widget as a row of dots, today's for each, rather than a line a habit. */
     val habitsDots: Boolean = false,
+    /** The note beside the clock: its share of the width, in percent; 0 leaves the clock what it needs and the note the rest. */
+    val noteBesideShare: Int = 0,
     /** Room above the lock screen's clock; null takes the home screen's [topSpace]. */
     val lockTopSpace: TopSpace? = null,
     /** How the distraction tracker looks on the home screen, and on the lock screen (null: as on home). */
@@ -356,6 +359,7 @@ data class HomeStyle(
         noteDarkText = lock.noteDarkText ?: noteDarkText,
         calendarTomorrow = lock.calendarTomorrow ?: calendarTomorrow,
         habitsDots = lock.habitsDots ?: habitsDots,
+        noteBesideShare = lock.noteBesideShare ?: noteBesideShare,
     )
 
     /**
@@ -384,6 +388,7 @@ data class HomeStyle(
                     noteDarkText = kept({ it.noteDarkText }, lock.noteDarkText),
                     calendarTomorrow = kept({ it.calendarTomorrow }, lock.calendarTomorrow),
                     habitsDots = kept({ it.habitsDots }, lock.habitsDots),
+                    noteBesideShare = kept({ it.noteBesideShare }, lock.noteBesideShare),
                 ),
                 lockWeatherStyle = lockWeatherStyle ?: weatherStyle.takeIf { after.weatherStyle != weatherStyle },
                 lockTopSpace = lockTopSpace ?: topSpace.takeIf { after.topSpace != topSpace },
@@ -408,12 +413,13 @@ data class HomeStyle(
             noteDarkText = own({ it.noteDarkText }, lock.noteDarkText),
             calendarTomorrow = own({ it.calendarTomorrow }, lock.calendarTomorrow),
             habitsDots = own({ it.habitsDots }, lock.habitsDots),
+            noteBesideShare = own({ it.noteBesideShare }, lock.noteBesideShare),
         )
         return after.copy(
             background = background, accent = accent, textColor = textColor, textSize = textSize, font = font, quoteFont = quoteFont,
             clockSize = clockSize, quoteRefresh = quoteRefresh, noteLines = noteLines, noteTextSize = noteTextSize,
             noteBackground = noteBackground, noteDarkText = noteDarkText, calendarTomorrow = calendarTomorrow, habitsDots = habitsDots,
-            lock = own,
+            noteBesideShare = noteBesideShare, lock = own,
         )
     }
 
@@ -423,7 +429,7 @@ data class HomeStyle(
         noteWidgetId = from.noteWidgetId, noteLines = from.noteLines, noteTextSize = from.noteTextSize, noteBackground = from.noteBackground,
         noteDarkText = from.noteDarkText, noteBesideClock = from.noteBesideClock, lockNoteBesideClock = from.lockNoteBesideClock,
         calendarIconWhenEmpty = from.calendarIconWhenEmpty, lockCalendarIconWhenEmpty = from.lockCalendarIconWhenEmpty,
-        calendarTomorrow = from.calendarTomorrow, habitsDots = from.habitsDots, useWidget = from.useWidget, lockUseWidget = from.lockUseWidget,
+        calendarTomorrow = from.calendarTomorrow, habitsDots = from.habitsDots, noteBesideShare = from.noteBesideShare, useWidget = from.useWidget, lockUseWidget = from.lockUseWidget,
         weatherUnit = from.weatherUnit, calendarNamesOnLock = from.calendarNamesOnLock,
         hourCalmColor = from.hourCalmColor, hourDistractedColor = from.hourDistractedColor,
     )
@@ -670,6 +676,7 @@ data class AppSettings(
     /** Your notes as a tab of their own at refuge's foot, beside insights. */
     val notesTab: Boolean = false,
     /** Insights' habits and moods sections, for those who use them. */
+    val insightsSessions: Boolean = true,
     val insightsHabits: Boolean = true,
     val insightsMoods: Boolean = true,
     /** The mood chips open over the microjournal as you write, or folded to one line. */
