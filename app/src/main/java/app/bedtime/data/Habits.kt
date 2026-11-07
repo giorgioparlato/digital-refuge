@@ -29,11 +29,23 @@ data class Habit(
     /** Whether the habits widget shows it on the home screen, and on the lock screen (null: as on home). */
     val inWidget: Boolean = true,
     val inLockWidget: Boolean? = null,
+    /** A set: the steps it's made of (a workout's exercises, say), each ticked apart; done when all are. Yes/no habits only. */
+    val steps: List<HabitStep> = emptyList(),
 ) {
+    /** A yes/no habit made of steps, whose day's mark holds which of them are ticked, a bit each. */
+    val isSet: Boolean get() = kind == HabitKind.YES_NO && steps.isNotEmpty()
+
+    /** Every step's bit, together: the mark of a day with all of them ticked. */
+    val allSteps: Int get() = steps.fold(0) { all, step -> all or (1 shl step.bit) }
+
     fun shownOn(screen: Screen): Boolean = if (screen == Screen.HOME) inWidget else inLockWidget ?: inWidget
 
     fun withShownOn(screen: Screen, shown: Boolean): Habit = if (screen == Screen.HOME) copy(inWidget = shown) else copy(inLockWidget = shown)
 }
+
+/** One step of a set, and its own bit in the day's mark; a bit stays with its step when others go. */
+@Serializable
+data class HabitStep(val bit: Int, val name: String)
 
 /** What was marked for a habit on a day (epoch day): 1 for done, or the count. */
 @Serializable
@@ -68,7 +80,45 @@ object Habits {
     fun byDay(marks: List<HabitMark>): Map<String, Map<Long, Int>> =
         marks.groupBy { it.habit }.mapValues { (_, list) -> list.associate { it.day to it.value } }
 
-    fun done(habit: Habit, value: Int): Boolean = if (habit.kind == HabitKind.YES_NO) value > 0 else value >= habit.target
+    fun done(habit: Habit, value: Int): Boolean = when {
+        habit.isSet -> value and habit.allSteps == habit.allSteps
+        habit.kind == HabitKind.YES_NO -> value > 0
+        else -> value >= habit.target
+    }
+
+    /** How a set's day reads in its steps: how many of them are ticked. */
+    fun stepsTicked(habit: Habit, value: Int): Int = habit.steps.count { value and (1 shl it.bit) != 0 }
+
+    /** [value] with [step] ticked or unticked. */
+    fun stepTapped(value: Int, step: HabitStep): Int = value xor (1 shl step.bit)
+
+    /** [habit] with a step called [name] at the end, on the next bit free (31 at most). */
+    fun withStep(habit: Habit, name: String): Habit {
+        if (habit.steps.size >= 31) return habit
+        val used = habit.steps.map { it.bit }.toSet()
+        val bit = (habit.steps.maxOfOrNull { it.bit } ?: -1).plus(1).takeIf { it <= 30 } ?: (0..30).first { it !in used }
+        return habit.copy(steps = habit.steps + HabitStep(bit, name))
+    }
+
+    /**
+     * Whether today asks for [habit]: whatever happens today, unless the days before have already
+     * covered how often it's meant to happen (three times this week done, say). What keeps the run going.
+     */
+    fun due(habit: Habit, marks: Map<Long, Int>, today: Long): Boolean = day(habit, marks - today, today) != HabitDay.MET
+
+    /**
+     * The habits the widget shows: those chosen for [screen]; or, asked for what's due, every habit
+     * today asks for, those done included only when [keepDone].
+     */
+    fun forWidget(habits: List<Habit>, marks: Map<String, Map<Long, Int>>, today: Long, screen: Screen, dueOnly: Boolean, keepDone: Boolean): List<Habit> =
+        if (!dueOnly) {
+            habits.filter { it.shownOn(screen) }
+        } else {
+            habits.filter { h ->
+                val m = marks[h.id].orEmpty()
+                due(h, m, today) && (keepDone || day(h, m, today) != HabitDay.DONE)
+            }
+        }
 
     fun day(habit: Habit, marks: Map<Long, Int>, day: Long): HabitDay {
         val value = marks[day] ?: 0
@@ -127,17 +177,23 @@ object Habits {
     }
 
     /** What a tap on today does: a yes/no is ticked or unticked; a count goes up by one. */
-    fun tapped(habit: Habit, value: Int): Int = if (habit.kind == HabitKind.YES_NO) (if (value > 0) 0 else 1) else value + 1
+    fun tapped(habit: Habit, value: Int): Int = when {
+        // A set at once: all its steps ticked, or none once they all are.
+        habit.isSet -> if (done(habit, value)) 0 else habit.allSteps
+        habit.kind == HabitKind.YES_NO -> if (value > 0) 0 else 1
+        else -> value + 1
+    }
 
     /** "Every day", "Every 3 days", "3 times a week", "10 times a month", or "10 reps a day". */
     fun describe(habit: Habit): String {
         if (habit.kind == HabitKind.COUNT) return "${habit.target}${if (habit.unit.isBlank()) "" else " ${habit.unit}"} a day"
-        return when (HabitFrequency.of(habit)) {
+        val how = when (HabitFrequency.of(habit)) {
             HabitFrequency.DAILY -> "Every day"
             HabitFrequency.EVERY -> "Every ${habit.days} days"
             HabitFrequency.WEEK -> if (habit.times == 1) "Once a week" else "${habit.times} times a week"
             HabitFrequency.MONTH -> if (habit.times == 1) "Once a month" else "${habit.times} times a month"
         }
+        return if (habit.isSet) "$how · ${habit.steps.size} ${if (habit.steps.size == 1) "step" else "steps"}" else how
     }
 
     /** [habit] said to happen [n] at a time in [frequency]: n days apart for "every few days", n times otherwise. */

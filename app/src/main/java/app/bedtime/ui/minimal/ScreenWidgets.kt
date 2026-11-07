@@ -20,6 +20,9 @@ import app.bedtime.data.NoteWidget
 import app.bedtime.data.Screen
 import app.bedtime.ui.habits.HabitsWidget
 import app.bedtime.ui.habits.HabitsDots
+import app.bedtime.ui.habits.HabitStepsCard
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import app.bedtime.ui.homestyle.palette
 import app.bedtime.ui.notes.NoteWidgetView
 
@@ -90,24 +93,53 @@ internal fun habitsSlot(
     /** All your habits, from a tap on the dots. */
     onOpenAll: () -> Unit = {},
 ): (@Composable () -> Unit)? {
-    val shown = habits.filter { it.shownOn(screen) }
-    if (shown.isEmpty() || !Modules.isOn(style, screen, Module.HABITS)) return null
+    if (habits.isEmpty() || !Modules.isOn(style, screen, Module.HABITS)) return null
+    val today = HourlyUse.today()
+    val shown = Habits.forWidget(habits, marks, today, screen, style.habitsDue, style.habitsKeepDone)
+    // Chosen ones, none chosen: no widget. What's due, all of it done: a quiet word that it is.
+    if (shown.isEmpty() && (!style.habitsDue || (style.habitsDots && !style.habitsLabel))) return null
     return ret@{
         val p = style.palette()
-        val today = HourlyUse.today()
-        if (style.habitsDots) {
-            HabitsDots(shown, marks, today, p.text, p.faint, p.accent, Modifier.padding(top = 22.dp), onOpenAll, onHold)
+        if (shown.isEmpty()) {
+            app.bedtime.ui.components.Text(
+                "habits · all done for today",
+                style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
+                color = p.faint,
+                modifier = Modifier.combinedClickableHold(onOpenAll, onHold).padding(vertical = 4.dp),
+            )
             return@ret
         }
+        if (style.habitsDots) {
+            HabitsDots(shown, marks, today, p.text, p.faint, p.accent, Modifier, onOpenAll, onHold, label = style.habitsLabel)
+            return@ret
+        }
+        // A set, tapped anywhere on its line: its steps, to tick each, and the way on to it.
+        var steps by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf<String?>(null) }
         HabitsWidget(
             shown, marks, today, p.text, p.faint, p.accent,
-            Modifier.padding(top = 22.dp),
-            onTap = { h -> onMark(h, today, Habits.tapped(h, marks[h.id]?.get(today) ?: 0)) },
-            onOpen = onOpen,
+            Modifier,
+            onTap = { h -> if (h.isSet) steps = h.id else onMark(h, today, Habits.tapped(h, marks[h.id]?.get(today) ?: 0)) },
+            onOpen = { h -> if (h.isSet) steps = h.id else onOpen(h) },
             onHold = onHold,
         )
+        shown.firstOrNull { it.id == steps }?.let { habit ->
+            androidx.compose.ui.window.Dialog(onDismissRequest = { steps = null }) {
+                val value = marks[habit.id]?.get(today) ?: 0
+                HabitStepsCard(
+                    habit, value, p.background, p.text, p.faint, p.accent,
+                    onStep = { step -> onMark(habit, today, Habits.stepTapped(value, step)) },
+                    // The lock screen has no habit of its own to open: all of them, after the unlock.
+                    onOpen = { steps = null; if (screen == Screen.LOCK) onOpenAll() else onOpen(habit) },
+                )
+            }
+        }
     }
 }
+
+/** A tap that opens, and a long press for the widget's sheet. */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+private fun Modifier.combinedClickableHold(onTap: () -> Unit, onHold: () -> Unit): Modifier =
+    combinedClickable(onClickLabel = "open all your habits", onLongClick = onHold, onClick = onTap)
 
 /**
  * Today's microjournal as one quiet line: how many lines and the latest's time, never what they say,

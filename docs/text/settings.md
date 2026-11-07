@@ -407,6 +407,18 @@ One file serves the look, widgets, gestures and notifications pages, for both sc
 - Accent
 - Tap it for today's detail.
 - A line each
+- The ones I choose
+- What today needs
+- Keep the done ones
+- Off, each goes once it's done today
+- Which habits
+- Every habit today asks for to keep its run going: daily ones always, a few times a week until they're done.
+- Where
+- A row of their own
+- Under the date
+- Beside the clock only with a small or very small clock, and the weather not beside it; until then, a row of their own.
+- Their words
+- "habits · 2 of 5" after the dots
 - No habits yet.
 
 <sub>[CircleScreen.kt](../../app/src/main/java/app/bedtime/ui/settings/CircleScreen.kt)</sub>

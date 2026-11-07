@@ -150,6 +150,10 @@ insights
 - Habits you want to keep, ticked off each day: daily, a few times a week, or a count like pages or reps. Add one with the + below; your home and lock screen can show them too.
 - Today
 - Hold one and drag it to change the order
+- fold its steps
+- show its steps
+- one more
+- tick …
 - … of …… today
 - … in a row
 - {kept} of {possible}
@@ -164,6 +168,9 @@ insights
 - every {it} days
 - {it} a week
 - {it} a month
+- Steps
+- Optional: what it's made of, like a workout's exercises. Each is ticked on its own on the habits page, and it's done once they all are; the widgets show it as one habit.
+- Add a step: squats, lunges…
 - A day's aim
 - reps, pages, glasses…
 - In the home screen's habits widget
@@ -180,6 +187,8 @@ insights
 <sub>[HabitViews.kt](../../app/src/main/java/app/bedtime/ui/habits/HabitViews.kt)</sub>
 
 - habits · {done} of …
+- … of … today · …
+- Open the habit
 - days in a row
 - best run
 - {value} of ……

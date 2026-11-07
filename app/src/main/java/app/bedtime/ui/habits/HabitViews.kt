@@ -8,6 +8,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -38,6 +39,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.bedtime.data.Habit
 import app.bedtime.data.HabitDay
 import app.bedtime.data.HabitKind
+import app.bedtime.data.HabitStep
+import androidx.compose.material.icons.filled.Check
 import app.bedtime.data.Habits
 import app.bedtime.data.Repository
 import app.bedtime.ui.components.Text
@@ -85,7 +88,7 @@ fun HabitsWidget(
  * The habits widget small: a dot for each habit, today's (filled when done, part-filled for a count
  * on its way), and how many of them are done. A tap opens all your habits; held, the widget's sheet.
  */
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun HabitsDots(
     habits: List<Habit>,
@@ -97,6 +100,8 @@ fun HabitsDots(
     modifier: Modifier = Modifier,
     onOpenAll: () -> Unit,
     onHold: (() -> Unit)? = null,
+    /** "habits · 2 of 5" after the dots; off, the dots alone. */
+    label: Boolean = true,
 ) {
     val states = habits.map { Habits.day(it, marks[it.id].orEmpty(), today) }
     val done = states.count { it == HabitDay.DONE || it == HabitDay.MET }
@@ -108,12 +113,11 @@ fun HabitsDots(
             .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        habits.zip(states).forEach { (habit, state) ->
-            HabitDot(state, ringed = false, text = text, accent = habit.tint(accent), size = 14)
-            Spacer(Modifier.width(8.dp))
+        // Wrapping onto a second row where there are more than fit, as beside the clock.
+        FlowRow(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            habits.zip(states).forEach { (habit, state) -> HabitDot(state, ringed = false, text = text, accent = habit.tint(accent), size = 14) }
         }
-        Spacer(Modifier.weight(1f))
-        Text("habits · $done of ${habits.size}", style = MaterialTheme.typography.bodyMedium, color = faint)
+        if (label) Text("habits · $done of ${habits.size}", style = MaterialTheme.typography.bodyMedium, color = faint, maxLines = 1, modifier = Modifier.padding(start = 8.dp))
     }
 }
 
@@ -144,6 +148,49 @@ private fun HabitLine(habit: Habit, marks: Map<Long, Int>, today: Long, text: Co
         } else if (roomForCount) {
             Spacer(Modifier.padding(start = 4.dp).width(34.dp))
         }
+    }
+}
+
+/** A set's steps, each a row with its tick, for today's [value]; a tap ticks or unticks one. */
+@Composable
+fun HabitStepRows(habit: Habit, value: Int, text: Color, muted: Color, faint: Color, accent: Color, modifier: Modifier = Modifier, onStep: (HabitStep) -> Unit) {
+    Column(modifier) {
+        habit.steps.forEach { step ->
+            val ticked = value and (1 shl step.bit) != 0
+            Row(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable(onClickLabel = if (ticked) "untick ${step.name}" else "tick ${step.name}") { onStep(step) }
+                    .padding(vertical = 8.dp, horizontal = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    Modifier.size(22.dp).clip(CircleShape).background(if (ticked) accent else Color.Transparent).border(1.5.dp, if (ticked) accent else faint, CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) { if (ticked) Icon(Icons.Default.Check, contentDescription = null, tint = background(accent), modifier = Modifier.size(14.dp)) }
+                Spacer(Modifier.width(16.dp))
+                Text(step.name, style = MaterialTheme.typography.bodyMedium, color = if (ticked) muted else text)
+            }
+        }
+    }
+}
+
+/**
+ * A set from a widget: its steps to tick for today, and a way on to the habit itself. Ticking goes
+ * through [onStep], so the lock screen can ask for its unlock first, as for any tick there.
+ */
+@Composable
+fun HabitStepsCard(habit: Habit, value: Int, background: Color, text: Color, faint: Color, accent: Color, onStep: (HabitStep) -> Unit, onOpen: () -> Unit) {
+    val accent = habit.tint(accent)
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(background).padding(22.dp)) {
+        Text(habit.name, style = MaterialTheme.typography.titleMedium, color = text)
+        Text("${Habits.stepsTicked(habit, value)} of ${habit.steps.size} today · ${Habits.describe(habit)}", style = MaterialTheme.typography.bodySmall, color = faint)
+        HabitStepRows(habit, value, text, faint, faint, accent, Modifier.padding(top = 10.dp), onStep)
+        Text(
+            "Open the habit",
+            style = MaterialTheme.typography.labelLarge,
+            color = accent,
+            modifier = Modifier.padding(top = 14.dp).clip(RoundedCornerShape(50)).border(1.dp, accent.copy(alpha = 0.5f), RoundedCornerShape(50))
+                .clickable(onClick = onOpen).padding(horizontal = 16.dp, vertical = 10.dp),
+        )
     }
 }
 

@@ -142,6 +142,7 @@ object Routes {
     const val WHY = "settings/why"
     const val MOODS = "settings/moods"
     const val LAUNCHER = "settings/launcher"
+    const val CREDITS = "settings/credits"
     const val JOURNAL_TODAY = "notes/journal"
 
     /** A day's microjournal entry, from the moods in insights. */
@@ -390,6 +391,7 @@ private fun BedtimeNavigation(pendingRoute: String?, onRouteConsumed: () -> Unit
             top == Routes.WHY -> app.bedtime.ui.settings.WhySettingsScreen(onBack = ::pop, onOpenAnswers = { push(Routes.JOURNAL_TODAY) }, onOpenMoods = { push(Routes.MOODS) })
             top == Routes.MOODS -> app.bedtime.ui.settings.MoodsScreen(onBack = ::pop)
             top == Routes.LAUNCHER -> app.bedtime.ui.settings.LauncherScreen(onBack = ::pop)
+            top == Routes.CREDITS -> app.bedtime.ui.settings.CreditsScreen(onBack = ::pop)
             top.startsWith(Routes.EDIT) -> ScheduleEditScreen(
                 scheduleId = top.removePrefix(Routes.EDIT).ifEmpty { null },
                 template = null,

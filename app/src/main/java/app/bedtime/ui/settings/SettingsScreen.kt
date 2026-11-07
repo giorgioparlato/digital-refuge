@@ -608,6 +608,7 @@ private fun settingsEntries(
         add(Entry(about, BedtimeIcons.Leaf, "The intro again", "The walk-through from the first launch", "intro walkthrough", go(Routes.WALKTHROUGH)))
         add(Entry(about, Icons.Default.Share, "Export settings", "Everything you set, with your history, notes, habits and phone use, in one file", "export backup save file", onExport))
         add(Entry(about, BedtimeIcons.Refuge, "Import settings", "Replace everything with a saved file", "import restore backup file", onImport))
+        add(Entry(about, Icons.Default.Star, "Credits", "With thanks to struthless, minimal phone, clicks, alfred and loop; and the open source refuge uses", "credits thanks struthless minimal phone clicks communicator alfred loop habits open source licence license whisper", go(Routes.CREDITS)))
         add(Entry(about, Icons.Default.Warning, "Recent problems", "What failed lately, to copy into a message", "problems errors log crash bug", go(Routes.PROBLEMS)))
         val folder = s.backupFolder
         add(

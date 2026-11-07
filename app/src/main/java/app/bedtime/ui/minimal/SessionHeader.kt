@@ -32,6 +32,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.bedtime.data.HabitsPlace
 import app.bedtime.data.HomeStyle
 import app.bedtime.data.Module
 import app.bedtime.data.Modules
@@ -113,11 +114,18 @@ internal fun SessionHeader(
     val pillAfter = modules.indexOfLast { it in Modules.CLOCK_GROUP }
     // The note beside the clock takes a column of its own on the right, beside the greeting, clock and
     // date at the top, with room between.
-    val besideHead = if (noteBeside != null && Module.NOTE in modules) {
-        modules.takeWhile { it == Module.CLOCK || it == Module.DATE }.size
-    } else {
-        0
+    // The habits' dots under the date or beside the clock, where asked and where those are there to sit by.
+    val habitsAt = when {
+        habits == null || !style.habitsDots -> HabitsPlace.ROW
+        style.habitsPlace == HabitsPlace.UNDER_DATE && Module.DATE in modules -> HabitsPlace.UNDER_DATE
+        style.habitsPlace == HabitsPlace.BESIDE_CLOCK && clockShown && style.noteFitsBesideClock(screen) -> HabitsPlace.BESIDE_CLOCK
+        else -> HabitsPlace.ROW
     }
+    // What sits beside the clock, the note and the dots, one above the other in the widgets' order.
+    val beside = modules.filter { (it == Module.NOTE && noteBeside != null) || (it == Module.HABITS && habitsAt == HabitsPlace.BESIDE_CLOCK) }
+    val besideHead = if (beside.isNotEmpty()) modules.takeWhile { it == Module.CLOCK || it == Module.DATE }.size else 0
+    val noteInList = besideHead == 0 || noteBeside == null
+    val habitsInList = habitsAt == HabitsPlace.ROW || (habitsAt == HabitsPlace.BESIDE_CLOCK && besideHead == 0)
     val one: @Composable (Int, Module) -> Unit = { at, module ->
             when (module) {
                 // Gone: never among the modules shown.
@@ -162,7 +170,7 @@ internal fun SessionHeader(
                         modifier = Modifier.weight(1f),
                     )
                     if (weather != null && detailOnDate) WeatherDetail(weather, style, onWeather, onWeatherHold = hold(Module.WEATHER))
-                }
+                }.also { if (habitsAt == HabitsPlace.UNDER_DATE) habits?.let { Column(held(Module.HABITS).padding(top = 4.dp)) { it() } } }
                 Module.WEATHER -> if (weather != null) {
                     val nowHere = hasNow && !clockShown
                     if (nowHere || (detail && !detailOnDate)) {
@@ -195,21 +203,26 @@ internal fun SessionHeader(
                 }
                 Module.HOURS -> hours?.let { Column(held(Module.HOURS)) { it() } }
                 Module.QUOTE -> quote?.let { Column(held(Module.QUOTE)) { it() } }
-                Module.HABITS -> habits?.let { Column(held(Module.HABITS)) { it() } }
+                Module.HABITS -> if (habitsInList) habits?.let { Column(held(Module.HABITS).padding(top = 22.dp)) { it() } }
                 Module.NOW_PLAYING -> nowPlaying?.let { Column(held(Module.NOW_PLAYING)) { it() } }
-                Module.NOTE -> if (besideHead == 0) note?.let { Column(held(Module.NOTE)) { it() } }
+                Module.NOTE -> if (noteInList) note?.let { Column(held(Module.NOTE)) { it() } }
                 Module.JOURNAL -> journal?.invoke()
             }
             if (at == pillAfter && at >= besideHead) SessionPill(scheduleName, until, scheduleIcon, style)
     }
     Column {
         if (pillAfter < 0) SessionPill(scheduleName, until, scheduleIcon, style)
-        if (besideHead > 0 && noteBeside != null) {
+        if (besideHead > 0) {
             // The clock as wide as it is (or as the note's chosen share leaves), and the note in all the room beside it.
             androidx.compose.ui.layout.Layout(
                 content = {
                     Column { modules.take(besideHead).forEachIndexed { at, m -> one(at, m) } }
-                    Box(Modifier.padding(start = 24.dp, top = 6.dp)) { noteBeside() }
+                    Column(Modifier.padding(start = 24.dp)) {
+                        beside.forEach { m ->
+                            if (m == Module.NOTE) noteBeside?.let { Box(Modifier.padding(top = 6.dp)) { it() } }
+                            else habits?.let { Column(held(Module.HABITS).padding(top = 10.dp)) { it() } }
+                        }
+                    }
                 },
                 modifier = Modifier.fillMaxWidth(),
             ) { parts, constraints ->

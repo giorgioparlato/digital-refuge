@@ -13,6 +13,16 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            88,
+            "0.9.42",
+            listOf(
+                "The habits widget can show what today needs to keep each run going, rather than the habits you chose; on each screen apart, with the done ones kept or gone.",
+                "The habits dots can sit under the date or beside the clock, with or without their words.",
+                "Habits can be sets of steps, like a workout's exercises: ticked one by one on the habits page, or from a pop-up when you tap the set in the widget.",
+                "A credits page in settings › about, with thanks and the open source refuge is built with.",
+            ),
+        ),
+        ChangelogEntry(
             87,
             "0.9.41",
             listOf(

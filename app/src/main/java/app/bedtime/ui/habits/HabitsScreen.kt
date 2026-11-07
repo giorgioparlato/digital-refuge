@@ -57,6 +57,8 @@ import androidx.compose.ui.window.Dialog
 import app.bedtime.data.Habit
 import app.bedtime.data.HabitFrequency
 import app.bedtime.data.HabitKind
+import app.bedtime.data.HabitStep
+import androidx.compose.material.icons.filled.Close
 import app.bedtime.data.Habits
 import app.bedtime.data.HourlyUse
 import app.bedtime.data.Repository
@@ -193,6 +195,8 @@ internal fun HabitsBody(
             Box(Modifier.weight(1f)) {
                 HabitCard(habit, marks[habit.id].orEmpty(), today, onTick = {
                     onMark(habit, today, Habits.tapped(habit, marks[habit.id]?.get(today) ?: 0))
+                }, onStep = { step ->
+                    onMark(habit, today, Habits.stepTapped(marks[habit.id]?.get(today) ?: 0, step))
                 }, onOpen = { open = habit.id })
             }
         }
@@ -204,11 +208,13 @@ internal fun HabitsBody(
  * and run, and the week as dots, in its colour. A tap anywhere else opens it.
  */
 @Composable
-private fun HabitCard(habit: Habit, marks: Map<Long, Int>, today: Long, onTick: () -> Unit, onOpen: () -> Unit) {
+private fun HabitCard(habit: Habit, marks: Map<Long, Int>, today: Long, onTick: () -> Unit, onStep: (HabitStep) -> Unit, onOpen: () -> Unit) {
     val c = Obsidian.colors
     val tint = habit.tint(c.accent)
     val state = Habits.day(habit, marks, today)
     val kept = state == HabitDay.DONE || state == HabitDay.MET
+    // A set's circle unfolds its steps, to tick each; folded again each time the page opens.
+    var unfolded by remember(habit.id) { mutableStateOf(false) }
     Column(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(CardRadius)).background(c.bgSecondary).clickable(onClickLabel = "open ${habit.name}", onClick = onOpen).padding(14.dp),
     ) {
@@ -219,10 +225,18 @@ private fun HabitCard(habit: Habit, marks: Map<Long, Int>, today: Long, onTick: 
                     .clip(CircleShape)
                     .background(if (state == HabitDay.DONE) tint else if (state == HabitDay.PARTIAL) tint.copy(alpha = 0.35f) else Color.Transparent)
                     .border(2.dp, if (kept || state == HabitDay.PARTIAL) tint else c.textFaint, CircleShape)
-                    .clickable(onClickLabel = if (habit.kind == HabitKind.COUNT) "one more" else "tick ${habit.name}", onClick = onTick),
+                    .clickable(
+                        onClickLabel = when {
+                            habit.isSet -> if (unfolded) "fold its steps" else "show its steps"
+                            habit.kind == HabitKind.COUNT -> "one more"
+                            else -> "tick ${habit.name}"
+                        },
+                        onClick = { if (habit.isSet) unfolded = !unfolded else onTick() },
+                    ),
                 contentAlignment = Alignment.Center,
             ) {
                 if (state == HabitDay.DONE) Icon(Icons.Default.Check, contentDescription = null, tint = c.bgPrimary, modifier = Modifier.size(20.dp))
+                else if (habit.isSet) Text("${Habits.stepsTicked(habit, marks[today] ?: 0)}/${habit.steps.size}", style = MaterialTheme.typography.labelSmall, color = c.textMuted)
                 else if (habit.kind == HabitKind.COUNT) Text("+", style = MaterialTheme.typography.titleMedium, color = c.textMuted)
             }
             Spacer(Modifier.width(14.dp))
@@ -239,6 +253,7 @@ private fun HabitCard(habit: Habit, marks: Map<Long, Int>, today: Long, onTick: 
                 Text("${Habits.streak(habit, marks, today)} in a row", style = MaterialTheme.typography.labelSmall, color = c.textFaint)
             }
         }
+        if (habit.isSet && unfolded) HabitStepRows(habit, marks[today] ?: 0, c.textNormal, c.textMuted, c.textFaint, tint, Modifier.padding(top = 8.dp), onStep)
         Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
             ((today - 6)..today).forEach { day ->
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -302,6 +317,8 @@ private fun HabitEditDialog(habit: Habit, isNew: Boolean, onDismiss: () -> Unit,
     val c = Obsidian.colors
     var draft by remember { mutableStateOf(habit) }
     var frequency by remember { mutableStateOf(HabitFrequency.of(habit)) }
+    // A step being typed, added with its + (or kept by saving).
+    var step by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = c.bgSecondary,
@@ -330,6 +347,49 @@ private fun HabitEditDialog(habit: Habit, isNew: Boolean, onDismiss: () -> Unit,
                         HabitFrequency.WEEK -> NumberStepper(draft.times, { draft = Habits.withFrequency(draft, frequency, it) }, 1..6, title = "times", format = { "$it a week" })
                         HabitFrequency.MONTH -> NumberStepper(draft.times, { draft = Habits.withFrequency(draft, frequency, it) }, 1..29, title = "times", format = { "$it a month" })
                     }
+                    Text("Steps", style = MaterialTheme.typography.labelLarge, color = c.textMuted)
+                    Text(
+                        "Optional: what it's made of, like a workout's exercises. Each is ticked on its own on the habits page, and it's done once they all are; the widgets show it as one habit.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = c.textFaint,
+                    )
+                    draft.steps.forEach { step ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            ObsidianTextField(
+                                step.name,
+                                { name -> draft = draft.copy(steps = draft.steps.map { if (it.bit == step.bit) it.copy(name = name.take(40)) else it }) },
+                                modifier = Modifier.weight(1f),
+                            )
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = "remove ${step.name}",
+                                tint = c.textFaint,
+                                modifier = Modifier.padding(start = 4.dp).clip(CircleShape).clickable { draft = draft.copy(steps = draft.steps.filterNot { it.bit == step.bit }) }.padding(8.dp),
+                            )
+                        }
+                    }
+                    val addStep = {
+                        if (step.isNotBlank()) {
+                            draft = Habits.withStep(draft, step.trim())
+                            step = ""
+                        }
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        ObsidianTextField(
+                            step,
+                            { step = it.take(40) },
+                            modifier = Modifier.weight(1f),
+                            placeholder = "Add a step: squats, lunges…",
+                            keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = { addStep() }),
+                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Done),
+                        )
+                        Icon(
+                            Icons.Default.Add,
+                            contentDescription = "add the step",
+                            tint = if (step.isNotBlank()) c.accent else c.textFaint,
+                            modifier = Modifier.padding(start = 4.dp).clip(CircleShape).clickable(enabled = step.isNotBlank()) { addStep() }.padding(8.dp),
+                        )
+                    }
                 } else {
                     Text("A day's aim", style = MaterialTheme.typography.labelLarge, color = c.textMuted)
                     NumberStepper(draft.target, { draft = draft.copy(target = it, times = 1, days = 1) }, 1..1000, title = "aim", presets = listOf(5, 8, 10, 20, 30, 50, 100))
@@ -354,7 +414,7 @@ private fun HabitEditDialog(habit: Habit, isNew: Boolean, onDismiss: () -> Unit,
             }
         },
         confirmButton = {
-            TextButton(onClick = { onSave(draft.copy(name = draft.name.trim())) }, enabled = draft.name.isNotBlank()) {
+            TextButton(onClick = { onSave((if (step.isNotBlank() && draft.kind == HabitKind.YES_NO) Habits.withStep(draft, step.trim()) else draft).let { d -> d.copy(name = d.name.trim(), steps = d.steps.filter { it.name.isNotBlank() }.map { it.copy(name = it.name.trim()) }) }) }, enabled = draft.name.isNotBlank()) {
                 Text("Save", color = if (draft.name.isNotBlank()) c.accentText else c.textFaint)
             }
         },

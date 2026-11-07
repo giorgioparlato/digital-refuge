@@ -221,7 +221,15 @@ data class LockLook(
     val calendarTomorrow: Boolean? = null,
     val habitsDots: Boolean? = null,
     val noteBesideShare: Int? = null,
+    val habitsDue: Boolean? = null,
+    val habitsKeepDone: Boolean? = null,
+    val habitsLabel: Boolean? = null,
+    val habitsPlace: HabitsPlace? = null,
 )
+
+/** Where the habits widget's dots sit: a row of their own, under the date, or beside the clock. */
+@Serializable
+enum class HabitsPlace { ROW, UNDER_DATE, BESIDE_CLOCK }
 
 /** A lock-screen notification swiped aside: cleared, kept for later, marked read, quieted for a while, or answered. */
 @Serializable
@@ -335,6 +343,14 @@ data class HomeStyle(
     val habitsDots: Boolean = false,
     /** The note beside the clock: its share of the width, in percent; 0 leaves the clock what it needs and the note the rest. */
     val noteBesideShare: Int = 0,
+    /** The habits widget shows what today asks for to keep each run going, rather than the habits chosen for it. */
+    val habitsDue: Boolean = false,
+    /** Showing what's due: those done today stay, filled in, rather than going. */
+    val habitsKeepDone: Boolean = true,
+    /** The dots' words, "habits · 2 of 5"; off, only the dots. */
+    val habitsLabel: Boolean = true,
+    /** Where the dots sit; under the date and beside the clock only where those are shown (beside, as the note can). */
+    val habitsPlace: HabitsPlace = HabitsPlace.ROW,
     /** Room above the lock screen's clock; null takes the home screen's [topSpace]. */
     val lockTopSpace: TopSpace? = null,
     /** How the distraction tracker looks on the home screen, and on the lock screen (null: as on home). */
@@ -360,6 +376,10 @@ data class HomeStyle(
         calendarTomorrow = lock.calendarTomorrow ?: calendarTomorrow,
         habitsDots = lock.habitsDots ?: habitsDots,
         noteBesideShare = lock.noteBesideShare ?: noteBesideShare,
+        habitsDue = lock.habitsDue ?: habitsDue,
+        habitsKeepDone = lock.habitsKeepDone ?: habitsKeepDone,
+        habitsLabel = lock.habitsLabel ?: habitsLabel,
+        habitsPlace = lock.habitsPlace ?: habitsPlace,
     )
 
     /**
@@ -389,6 +409,10 @@ data class HomeStyle(
                     calendarTomorrow = kept({ it.calendarTomorrow }, lock.calendarTomorrow),
                     habitsDots = kept({ it.habitsDots }, lock.habitsDots),
                     noteBesideShare = kept({ it.noteBesideShare }, lock.noteBesideShare),
+                    habitsDue = kept({ it.habitsDue }, lock.habitsDue),
+                    habitsKeepDone = kept({ it.habitsKeepDone }, lock.habitsKeepDone),
+                    habitsLabel = kept({ it.habitsLabel }, lock.habitsLabel),
+                    habitsPlace = kept({ it.habitsPlace }, lock.habitsPlace),
                 ),
                 lockWeatherStyle = lockWeatherStyle ?: weatherStyle.takeIf { after.weatherStyle != weatherStyle },
                 lockTopSpace = lockTopSpace ?: topSpace.takeIf { after.topSpace != topSpace },
@@ -414,12 +438,17 @@ data class HomeStyle(
             calendarTomorrow = own({ it.calendarTomorrow }, lock.calendarTomorrow),
             habitsDots = own({ it.habitsDots }, lock.habitsDots),
             noteBesideShare = own({ it.noteBesideShare }, lock.noteBesideShare),
+            habitsDue = own({ it.habitsDue }, lock.habitsDue),
+            habitsKeepDone = own({ it.habitsKeepDone }, lock.habitsKeepDone),
+            habitsLabel = own({ it.habitsLabel }, lock.habitsLabel),
+            habitsPlace = own({ it.habitsPlace }, lock.habitsPlace),
         )
         return after.copy(
             background = background, accent = accent, textColor = textColor, textSize = textSize, font = font, quoteFont = quoteFont,
             clockSize = clockSize, quoteRefresh = quoteRefresh, noteLines = noteLines, noteTextSize = noteTextSize,
             noteBackground = noteBackground, noteDarkText = noteDarkText, calendarTomorrow = calendarTomorrow, habitsDots = habitsDots,
-            noteBesideShare = noteBesideShare, lock = own,
+            noteBesideShare = noteBesideShare, habitsDue = habitsDue, habitsKeepDone = habitsKeepDone, habitsLabel = habitsLabel,
+            habitsPlace = habitsPlace, lock = own,
         )
     }
 
@@ -429,7 +458,8 @@ data class HomeStyle(
         noteWidgetId = from.noteWidgetId, noteLines = from.noteLines, noteTextSize = from.noteTextSize, noteBackground = from.noteBackground,
         noteDarkText = from.noteDarkText, noteBesideClock = from.noteBesideClock, lockNoteBesideClock = from.lockNoteBesideClock,
         calendarIconWhenEmpty = from.calendarIconWhenEmpty, lockCalendarIconWhenEmpty = from.lockCalendarIconWhenEmpty,
-        calendarTomorrow = from.calendarTomorrow, habitsDots = from.habitsDots, noteBesideShare = from.noteBesideShare, useWidget = from.useWidget, lockUseWidget = from.lockUseWidget,
+        calendarTomorrow = from.calendarTomorrow, habitsDots = from.habitsDots, noteBesideShare = from.noteBesideShare,
+        habitsDue = from.habitsDue, habitsKeepDone = from.habitsKeepDone, habitsLabel = from.habitsLabel, habitsPlace = from.habitsPlace, useWidget = from.useWidget, lockUseWidget = from.lockUseWidget,
         weatherUnit = from.weatherUnit, calendarNamesOnLock = from.calendarNamesOnLock,
         hourCalmColor = from.hourCalmColor, hourDistractedColor = from.hourDistractedColor,
     )

@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import app.bedtime.Routes
 import app.bedtime.data.ClockSize
 import app.bedtime.data.Habit
+import app.bedtime.data.HabitsPlace
 import app.bedtime.data.HomeStyle
 import app.bedtime.data.Module
 import app.bedtime.data.Note
@@ -234,9 +235,30 @@ object WidgetOptions {
                 WidgetOption.Hint("Tap it for today's detail."),
             )
         }
-        Module.HABITS -> listOf(
+        Module.HABITS -> listOfNotNull(
             WidgetOption.Choice("Look", listOf("A line each" to false, "Dots" to true), style.habitsDots) { change(style.copy(habitsDots = it)) },
-            WidgetOption.Ticks("Show", habits.map { Triple(it.id, it.name, it.shownOn(screen)) }, habitShown),
+            WidgetOption.Choice("Show", listOf("The ones I choose" to false, "What today needs" to true), style.habitsDue) { change(style.copy(habitsDue = it)) },
+            if (style.habitsDue) {
+                WidgetOption.Switch("Keep the done ones", "Off, each goes once it's done today", style.habitsKeepDone) { change(style.copy(habitsKeepDone = it)) }
+            } else {
+                WidgetOption.Ticks("Which habits", habits.map { Triple(it.id, it.name, it.shownOn(screen)) }, habitShown)
+            },
+            if (style.habitsDue) WidgetOption.Hint("Every habit today asks for to keep its run going: daily ones always, a few times a week until they're done.") else null,
+            if (style.habitsDots) {
+                WidgetOption.Choice(
+                    "Where",
+                    listOf("A row of their own" to HabitsPlace.ROW, "Under the date" to HabitsPlace.UNDER_DATE, "Beside the clock" to HabitsPlace.BESIDE_CLOCK),
+                    style.habitsPlace,
+                ) { change(style.copy(habitsPlace = it)) }
+            } else {
+                null
+            },
+            if (style.habitsDots && style.habitsPlace == HabitsPlace.BESIDE_CLOCK && !style.noteFitsBesideClock(screen)) {
+                WidgetOption.Hint("Beside the clock only with a small or very small clock, and the weather not beside it; until then, a row of their own.")
+            } else {
+                null
+            },
+            if (style.habitsDots) WidgetOption.Switch("Their words", "\"habits · 2 of 5\" after the dots", style.habitsLabel) { change(style.copy(habitsLabel = it)) } else null,
             WidgetOption.Link("Your habits: add, change or remove", Routes.HABITS),
         )
         Module.GREETING, Module.DATE, Module.NOW_PLAYING -> emptyList()
