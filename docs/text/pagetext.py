@@ -182,9 +182,9 @@ settings
 ├── cover messages: yours · the app's own
 ├── shortcuts: home-screen widget · quick-settings tile
 └── about & backup: how it works · the intro again · export · import · recent problems · weekly backup ·
-                    back up now
+                    back up now · backup passphrase · microjournal in backups
 """, [
-    ("settings, and the pages it opens", ["ui/settings/SettingsScreen.kt"], "Home screen, lock screen, apps, shortcuts and about & backup are lists of rows from this one file."),
+    ("settings, and the pages it opens", ["ui/settings/SettingsScreen.kt", "ui/settings/BackupDialogs.kt"], "Home screen, lock screen, apps, shortcuts and about & backup are lists of rows from this one file."),
     ("permissions & setup", ["ui/setup/SetupScreen.kt"]),
     ("look, widgets, gestures and lock-screen notifications", ["ui/homestyle/HomeStyleScreen.kt", "ui/homestyle/WidgetOptions.kt", "ui/settings/CircleScreen.kt", "ui/settings/PeoplePickerScreen.kt"], "One file serves the look, widgets, gestures and notifications pages, for both screens."),
     ("quotes (from the quote widget)", ["ui/quotes/QuotesScreen.kt"]),

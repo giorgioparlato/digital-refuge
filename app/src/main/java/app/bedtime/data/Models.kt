@@ -679,6 +679,8 @@ data class AppSettings(
     val backupFolder: String? = null,
     /** When the last of those was written. */
     val lastBackupAt: Long = 0L,
+    /** The microjournal (its lines, moods and "why?" answers) in backups and exports: only once asked for. */
+    val backupJournal: Boolean = false,
     /** A notification looking back on the week, on Sunday evening. */
     val weeklyNote: Boolean = false,
     /** The week (its Monday, as an epoch day) last looked back on in that notification. */
@@ -711,7 +713,7 @@ data class AppSettings(
     val insightsSessions: Boolean = true,
     val insightsHabits: Boolean = true,
     val insightsMoods: Boolean = true,
-    /** The mood chips open over the microjournal as you write, or folded to one line. */
+    /** No longer used: the mood chips start folded each time the microjournal opens. Kept so saved settings still read. */
     val journalMoodsShown: Boolean = true,
     /** The prompts a button away while writing (hidden until asked for); off, no button at all. */
     val journalPrompts: Boolean = true,

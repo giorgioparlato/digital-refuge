@@ -457,27 +457,41 @@ class Repository private constructor(context: Context) {
 
     suspend fun deleteGroup(id: String) = updateSettings { it.copy(groups = it.groups.filterNot { group -> group.id == id }) }
 
-    /** Everything worth keeping across a reinstall. Running sessions are left out on purpose. */
+    /**
+     * Everything worth keeping across a reinstall. Running sessions are left out on purpose, and the
+     * microjournal unless you've asked for it in backups.
+     */
     suspend fun snapshot(): Backup = Backup(
         exportedAt = System.currentTimeMillis(),
         schedules = schedules.first(),
         settings = settings.first(),
         history = history.first(),
         notes = notes.first(),
-        journal = journal.first(),
+        journal = if (settings.first().backupJournal) journal.first() else emptyList(),
         habitMarks = habitMarks.first(),
         usage = usage.first(),
         usageMonths = usageMonths.first(),
     )
+
+    /** The key backups are sealed with, made from your passphrase; null writes them as plain text. Never in a backup. */
+    val backupKey: Flow<BackupKey?> = observe(BACKUP_KEY, BackupKey.serializer().nullable, null)
+
+    suspend fun setBackupKey(key: BackupKey?) = update(BACKUP_KEY, BackupKey.serializer().nullable, null) { key }
+
+    /** A backup file's text: [snapshot], sealed when there's a passphrase. Slow then: call it off the main thread. */
+    suspend fun backupText(): String {
+        val json = Backup.encode(snapshot())
+        return backupKey.first()?.let { BackupSeal.seal(json, it) } ?: json
+    }
 
     /**
      * Replaces schedules, settings and history with [backup], and the notes, habit marks and phone use
      * too when it has them (an older backup hasn't, and shouldn't wipe yours). Runtime state is left alone.
      */
     suspend fun restore(backup: Backup) {
-        // Where this phone writes its weekly backups is this phone's, not the file's.
+        // Where this phone writes its weekly backups, and whether they hold the microjournal, are this phone's, not the file's.
         val here = settings.first()
-        val restored = backup.settings.copy(backupFolder = here.backupFolder, lastBackupAt = here.lastBackupAt)
+        val restored = backup.settings.copy(backupFolder = here.backupFolder, lastBackupAt = here.lastBackupAt, backupJournal = here.backupJournal)
         store.edit { prefs ->
             prefs[SCHEDULES] = AppJson.encodeToString(schedulesSerializer, backup.schedules)
             prefs[SETTINGS] = AppJson.encodeToString(AppSettings.serializer(), restored)
@@ -532,6 +546,7 @@ class Repository private constructor(context: Context) {
         private val trashSerializer = ListSerializer(TrashedNote.serializer())
         private val journalSerializer = ListSerializer(JournalEntry.serializer())
         private val WEATHER = stringPreferencesKey("weather")
+        private val BACKUP_KEY = stringPreferencesKey("backupKey")
         private val notesSerializer = ListSerializer(Note.serializer())
         private val HABIT_MARKS = stringPreferencesKey("habit_marks")
         private val habitMarksSerializer = ListSerializer(HabitMark.serializer())

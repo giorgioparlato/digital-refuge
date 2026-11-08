@@ -35,7 +35,7 @@ settings
 ├── cover messages: yours · the app's own
 ├── shortcuts: home-screen widget · quick-settings tile
 └── about & backup: how it works · the intro again · export · import · recent problems · weekly backup ·
-                    back up now
+                    back up now · backup passphrase · microjournal in backups
 ```
 
 ## settings, and the pages it opens
@@ -49,10 +49,12 @@ Home screen, lock screen, apps, shortcuts and about & backup are lists of rows f
 - backed up
 - couldn't write to that folder; choose it again
 - that folder can't be written to from here
-- Import settings?
-- This replaces your schedules, blocks and settings with the ones in the file. Running sessions aren't affected.
 - that file isn't a digital refuge backup
 - settings restored
+- backups sealed
+- backups are plain text again
+- Import settings?
+- This replaces your schedules, blocks and settings with the ones in the file. Running sessions aren't affected.
 - Replace
 - Cancel
 - Find a setting
@@ -124,8 +126,12 @@ Home screen, lock screen, apps, shortcuts and about & backup are lists of rows f
 - … apps
 -  · what counts as a distracted hour
 - distraction distracting tracker hours dots
+- Everything you set, with your history, notes, habits
+- , phone use and microjournal
+-  and phone use
+- , in one file sealed with your passphrase
+- , in one file
 - Export settings
-- Everything you set, with your history, notes, habits and phone use, in one file
 - export backup save file
 - Import settings
 - Replace everything with a saved file
@@ -139,6 +145,14 @@ Home screen, lock screen, apps, shortcuts and about & backup are lists of rows f
 - Back up now
 - Write this week's file straight away
 - backup now
+- Backup passphrase
+- On · backups and exports open only with it
+- Off · anyone with the file can read it
+- backup passphrase password encrypt seal export
+- Microjournal in backups
+- Its lines, moods and why answers go in backups and exports
+- Off · its lines, moods and why answers stay on this phone
+- backup export journal microjournal moods why include
 - widget widgets weather calendar event date greeting clock clock size hours distraction tracker budget unlocks habits quote quotes now playing music note colours
 - home-screen widget
 - A one-tap button on your home screen that starts a block. Add one for:
@@ -150,6 +164,27 @@ Home screen, lock screen, apps, shortcuts and about & backup are lists of rows f
 - Never
 - During sessions
 - Always
+
+<sub>[BackupDialogs.kt](../../app/src/main/java/app/bedtime/ui/settings/BackupDialogs.kt)</sub>
+
+- the backup holds your schedules, history, notes, habits and phone use
+- , and your microjournal with its moods and why answers.
+- it's sealed with your passphrase, so only someone who knows it can read it.
+- it's plain text: anyone who can open the folder can read it. a backup passphrase, in these settings, seals it.
+- before you choose a folder
+- {holds} {who}  a folder that syncs (google drive, dropbox, syncthing, a computer you share) puts a copy there too. choose one only you can reach.
+- choose folder
+- backup passphrase
+- seal backups with a passphrase
+- backups and exports are sealed. a new passphrase seals the next ones; files already written still open with the old one.
+- backups and exports then can't be read without it, wherever they end up. forget it and there's no way back: not even refuge can open them. files already written stay as they were.
+- new passphrase
+- at least … characters
+- the same again
+- they don't match
+- this backup is sealed
+- its passphrase opens it, and then it replaces your schedules, blocks and settings.
+- that passphrase doesn't open it
 
 ## permissions & setup
 

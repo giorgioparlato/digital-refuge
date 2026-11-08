@@ -52,8 +52,8 @@ object AutoBackup {
             // Today's again replaces today's, rather than sitting beside it as "(1)".
             existing[name]?.let { DocumentsContract.deleteDocument(resolver, it) }
             val file = DocumentsContract.createDocument(resolver, parent, "application/json", name) ?: return@withContext false
-            val json = Backup.encode(repo.snapshot())
-            checkNotNull(resolver.openOutputStream(file, "wt")).use { it.write(json.toByteArray()) }
+            val text = repo.backupText()
+            checkNotNull(resolver.openOutputStream(file, "wt")).use { it.write(text.toByteArray()) }
             toDelete(existing.keys.toList() + name).forEach { old -> existing[old]?.let { runCatching { DocumentsContract.deleteDocument(resolver, it) } } }
             repo.updateSettings { it.copy(lastBackupAt = now) }
             true

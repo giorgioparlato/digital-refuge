@@ -81,6 +81,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.bedtime.Routes
 import app.bedtime.data.AppSettings
 import app.bedtime.data.Backup
+import app.bedtime.data.BackupSeal
 import app.bedtime.data.HomeStyle
 import app.bedtime.data.Repository
 import app.bedtime.data.Schedule
@@ -125,6 +126,11 @@ fun SettingsScreen(place: SettingsPlace? = null, onBack: (() -> Unit)? = null, o
     val version = remember { runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull().orEmpty() }
     val canPinWidget = remember { BlockWidget.canPin(context) }
     var pendingImport by remember { mutableStateOf<Uri?>(null) }
+    /** A sealed backup being imported, waiting for its passphrase. */
+    var sealedImport by remember { mutableStateOf<String?>(null) }
+    var askingFolder by remember { mutableStateOf(false) }
+    var choosingPassphrase by remember { mutableStateOf(false) }
+    val backupKey by repo.backupKey.collectAsStateWithLifecycle(initialValue = null)
 
     fun say(message: String) = Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
     fun style(change: (HomeStyle) -> HomeStyle) {
@@ -136,8 +142,8 @@ fun SettingsScreen(place: SettingsPlace? = null, onBack: (() -> Unit)? = null, o
             scope.launch {
                 val saved = withContext(Dispatchers.IO) {
                     runCatching {
-                        val json = Backup.encode(repo.snapshot())
-                        checkNotNull(context.contentResolver.openOutputStream(uri)).use { it.write(json.toByteArray()) }
+                        val text = repo.backupText()
+                        checkNotNull(context.contentResolver.openOutputStream(uri)).use { it.write(text.toByteArray()) }
                     }.isSuccess
                 }
                 say(if (saved) "settings saved to the file" else "couldn't write that file")
@@ -165,6 +171,62 @@ fun SettingsScreen(place: SettingsPlace? = null, onBack: (() -> Unit)? = null, o
             backUpNow()
         }
     }
+    suspend fun restoreFrom(raw: String?) {
+        val backup = raw?.let(Backup::decode)
+        if (backup == null) {
+            say("that file isn't a digital refuge backup")
+        } else {
+            repo.restore(backup)
+            say("settings restored")
+        }
+    }
+    if (askingFolder) {
+        BackupFolderWarning(
+            sealed = backupKey != null,
+            journal = settings.backupJournal,
+            onChoose = {
+                askingFolder = false
+                pickBackupFolder.launch(null)
+            },
+            onDismiss = { askingFolder = false },
+        )
+    }
+    if (choosingPassphrase) {
+        BackupPassphraseDialog(
+            sealed = backupKey != null,
+            onSet = { passphrase ->
+                val key = withContext(Dispatchers.Default) { BackupSeal.key(passphrase) }
+                choosingPassphrase = false
+                scope.launch {
+                    repo.setBackupKey(key)
+                    say("backups sealed")
+                    // This week's file again, sealed, if there's a folder to write it to.
+                    if (settings.backupFolder?.let { AutoBackup.canWrite(context, it) } == true) backUpNow()
+                }
+            },
+            onRemove = {
+                choosingPassphrase = false
+                scope.launch {
+                    repo.setBackupKey(null)
+                    say("backups are plain text again")
+                }
+            },
+            onDismiss = { choosingPassphrase = false },
+        )
+    }
+    sealedImport?.let { raw ->
+        OpenSealedBackupDialog(
+            onOpen = { passphrase ->
+                val json = withContext(Dispatchers.Default) { BackupSeal.open(raw, passphrase) }
+                if (json != null) {
+                    sealedImport = null
+                    scope.launch { restoreFrom(json) }
+                }
+                json != null
+            },
+            onDismiss = { sealedImport = null },
+        )
+    }
     val backupFolderName by produceState<String?>(null, settings.backupFolder) {
         value = settings.backupFolder?.let { withContext(Dispatchers.IO) { FolderIndex.folderName(context, Uri.parse(it)) } }
     }
@@ -184,15 +246,10 @@ fun SettingsScreen(place: SettingsPlace? = null, onBack: (() -> Unit)? = null, o
                 TextButton(onClick = {
                     pendingImport = null
                     scope.launch {
-                        val backup = withContext(Dispatchers.IO) {
-                            runCatching {
-                                checkNotNull(context.contentResolver.openInputStream(uri)).use { Backup.decode(it.readBytes().decodeToString()) }
-                            }.getOrNull()
+                        val raw = withContext(Dispatchers.IO) {
+                            runCatching { checkNotNull(context.contentResolver.openInputStream(uri)).use { it.readBytes().decodeToString() } }.getOrNull()
                         }
-                        if (backup == null) say("that file isn't a digital refuge backup") else {
-                            repo.restore(backup)
-                            say("settings restored")
-                        }
+                        if (raw != null && BackupSeal.isSealed(raw)) sealedImport = raw else restoreFrom(raw)
                     }
                 }) { Text("Replace", color = c.accentText, fontWeight = FontWeight.SemiBold) }
             },
@@ -232,7 +289,7 @@ fun SettingsScreen(place: SettingsPlace? = null, onBack: (() -> Unit)? = null, o
         backupWritable = backupWritable,
         onWeeklyBackup = { on ->
             if (on) {
-                pickBackupFolder.launch(null)
+                askingFolder = true
             } else {
                 settings.backupFolder?.let { old ->
                     runCatching { context.contentResolver.releasePersistableUriPermission(Uri.parse(old), Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION) }
@@ -240,8 +297,11 @@ fun SettingsScreen(place: SettingsPlace? = null, onBack: (() -> Unit)? = null, o
                 scope.launch { repo.updateSettings { it.copy(backupFolder = null) } }
             }
         },
-        onChooseBackupFolder = { pickBackupFolder.launch(null) },
+        onChooseBackupFolder = { askingFolder = true },
         onBackUpNow = ::backUpNow,
+        backupSealed = backupKey != null,
+        onBackupPassphrase = { choosingPassphrase = true },
+        onBackupJournal = { on -> scope.launch { repo.updateSettings { it.copy(backupJournal = on) } } },
     )
 }
 
@@ -270,6 +330,10 @@ internal fun SettingsContent(
     onWeeklyBackup: (Boolean) -> Unit = {},
     onChooseBackupFolder: () -> Unit = {},
     onBackUpNow: () -> Unit = {},
+    /** Whether backups and exports are sealed with a passphrase. */
+    backupSealed: Boolean = false,
+    onBackupPassphrase: () -> Unit = {},
+    onBackupJournal: (Boolean) -> Unit = {},
     /** Minutes in a row on the phone before a nudge, or null for none. */
     onNudge: (Int?) -> Unit = {},
 ) {
@@ -282,7 +346,7 @@ internal fun SettingsContent(
             onNudge(it)
         }
     }
-    val backup = BackupRows(backupFolderName, backupWritable, onWeeklyBackup, onChooseBackupFolder, onBackUpNow)
+    val backup = BackupRows(backupFolderName, backupWritable, onWeeklyBackup, onChooseBackupFolder, onBackUpNow, backupSealed, onBackupPassphrase, onBackupJournal)
     val entries = settingsEntries(settings, setupStepsLeft, isDefaultHome, onOpen, onLockScreen, onLockAlways, onExport, onImport, backup, onChooseNudge = { choosingNudge = true })
     Scaffold(
         containerColor = c.bgPrimary,
@@ -606,7 +670,9 @@ private fun settingsEntries(
         val about = SettingsPlace.ABOUT
         add(Entry(about, Icons.Default.Info, "How it works", "What a session locks, and your ways out", "how it works help", go(Routes.ONBOARDING)))
         add(Entry(about, BedtimeIcons.Leaf, "The intro again", "The walk-through from the first launch", "intro walkthrough", go(Routes.WALKTHROUGH)))
-        add(Entry(about, Icons.Default.Share, "Export settings", "Everything you set, with your history, notes, habits and phone use, in one file", "export backup save file", onExport))
+        val holds = "Everything you set, with your history, notes, habits" + (if (s.backupJournal) ", phone use and microjournal" else " and phone use") +
+            (if (backup.sealed) ", in one file sealed with your passphrase" else ", in one file")
+        add(Entry(about, Icons.Default.Share, "Export settings", holds, "export backup save file", onExport))
         add(Entry(about, BedtimeIcons.Refuge, "Import settings", "Replace everything with a saved file", "import restore backup file", onImport))
         add(Entry(about, Icons.Default.Star, "Credits", "With thanks to struthless, minimal phone, clicks, alfred and loop; and the open source refuge uses", "credits thanks struthless minimal phone clicks communicator alfred loop habits open source licence license whisper", go(Routes.CREDITS)))
         add(Entry(about, Icons.Default.Warning, "Recent problems", "What failed lately, to copy into a message", "problems errors log crash bug", go(Routes.PROBLEMS)))
@@ -630,6 +696,26 @@ private fun settingsEntries(
         if (folder != null && backup.writable) {
             add(Entry(about, Icons.Default.Share, "Back up now", "Write this week's file straight away", "backup now", backup.onNow))
         }
+        add(
+            Entry(
+                about,
+                Icons.Default.Lock,
+                "Backup passphrase",
+                if (backup.sealed) "On · backups and exports open only with it" else "Off · anyone with the file can read it",
+                "backup passphrase password encrypt seal export",
+                backup.onPassphrase,
+            ),
+        )
+        add(
+            Entry(
+                about,
+                BedtimeIcons.Leaf,
+                "Microjournal in backups",
+                if (s.backupJournal) "Its lines, moods and why answers go in backups and exports" else "Off · its lines, moods and why answers stay on this phone",
+                "backup export journal microjournal moods why include",
+                trailing = { ObsidianToggle(s.backupJournal, backup.onJournal) },
+            ),
+        )
     }
 }
 
@@ -640,6 +726,9 @@ private class BackupRows(
     val onWeekly: (Boolean) -> Unit,
     val onChooseFolder: () -> Unit,
     val onNow: () -> Unit,
+    val sealed: Boolean,
+    val onPassphrase: () -> Unit,
+    val onJournal: (Boolean) -> Unit,
 )
 
 /** "28 october", the day a backup was written. */

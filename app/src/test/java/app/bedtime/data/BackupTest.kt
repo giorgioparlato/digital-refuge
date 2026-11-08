@@ -1,6 +1,9 @@
 package app.bedtime.data
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertTrue
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -47,6 +50,46 @@ class BackupTest {
     @Test
     fun brokenFileIsRefused() {
         assertNull(Backup.decode("this is not a backup"))
+    }
+
+    @Test
+    fun aSealedBackupOpensWithItsPassphrase() {
+        val key = BackupSeal.key("correct horse", rounds = 1_000)
+        val sealed = BackupSeal.seal(Backup.encode(backup), key)
+        assertTrue(BackupSeal.isSealed(sealed))
+        assertFalse("meetings" in sealed)
+        assertEquals(backup, Backup.decode(BackupSeal.open(sealed, "correct horse")!!))
+    }
+
+    @Test
+    fun aSealedBackupStaysShutToAnyOtherPassphrase() {
+        val sealed = BackupSeal.seal(Backup.encode(backup), BackupSeal.key("correct horse", rounds = 1_000))
+        assertNull(BackupSeal.open(sealed, "Correct horse"))
+        assertNull(BackupSeal.open(sealed, ""))
+    }
+
+    @Test
+    fun aSealedFileIsNeverReadAsAnEmptyBackup() {
+        val sealed = BackupSeal.seal(Backup.encode(backup), BackupSeal.key("correct horse", rounds = 1_000))
+        assertNull(Backup.decode(sealed))
+    }
+
+    @Test
+    fun aPlainBackupIsNotSealed() {
+        assertFalse(BackupSeal.isSealed(Backup.encode(backup)))
+        assertNull(BackupSeal.open(Backup.encode(backup), "correct horse"))
+    }
+
+    @Test
+    fun eachFileIsSealedAfresh() {
+        val key = BackupSeal.key("correct horse", rounds = 1_000)
+        val json = Backup.encode(backup)
+        assertNotEquals(BackupSeal.seal(json, key), BackupSeal.seal(json, key))
+    }
+
+    @Test
+    fun theJournalStaysOutOfBackupsUnlessAskedFor() {
+        assertFalse(AppSettings().backupJournal)
     }
 
     @Test

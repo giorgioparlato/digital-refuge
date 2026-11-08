@@ -70,6 +70,8 @@ internal fun JournalContent(onBack: () -> Unit, openToday: Boolean = false, open
     val sections = Journal.sections(settings?.journalSections)
     val today = LocalDate.now()
     var open by rememberSaveable { mutableStateOf(openDay ?: if (openToday) today.toEpochDay() else null) }
+    // The mood chips, folded each time an entry opens.
+    var moodsShown by remember(open) { mutableStateOf(false) }
     val all = entries ?: return
     open?.let { day ->
         val entry = all.firstOrNull { it.day == day }
@@ -86,8 +88,9 @@ internal fun JournalContent(onBack: () -> Unit, openToday: Boolean = false, open
             onAddMood = { mood -> scope.launch { repo.addMoodTag(mood) } },
             onRecord = settings?.takeIf { app.bedtime.data.Voice.ready(it) }?.let { { context.startActivity(app.bedtime.voice.RecordActivity.intent(context, journal = true)) } },
             // Its recordings, a tap from your player: wherever they were kept, even with voice notes off since.
-            moodsShown = settings?.journalMoodsShown != false,
-            onMoodsShown = { shown -> scope.launch { repo.updateSettings { it.copy(journalMoodsShown = shown) } } },
+            // Folded each time the page opens, a tap away; not remembered.
+            moodsShown = moodsShown,
+            onMoodsShown = { moodsShown = it },
             onPlay = settings?.voiceFolder?.let { folder -> { file -> scope.launch { app.bedtime.voice.VoicePlayer.open(context, folder, file) } } },
         )
         return

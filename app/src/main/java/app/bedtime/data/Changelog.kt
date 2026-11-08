@@ -13,6 +13,16 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            89,
+            "0.9.43",
+            listOf(
+                "Backups can be sealed with a passphrase: settings › about & backup › backup passphrase. Exports and the weekly backup then can't be read without it, wherever they end up.",
+                "The microjournal, its moods and why answers stay out of backups unless you switch on \"microjournal in backups\".",
+                "Choosing the weekly backup's folder first says what the file holds, and that a folder which syncs puts a copy there too.",
+                "The microjournal's mood chips start folded each time it opens.",
+            ),
+        ),
+        ChangelogEntry(
             88,
             "0.9.42",
             listOf(

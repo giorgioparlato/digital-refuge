@@ -9,7 +9,7 @@ Contributions from the open-source community of developers are extremely welcome
 
 The app **has no internet permission at all.** You can check that yourself: [the manifest](app/src/main/AndroidManifest.xml) lists every permission it asks for, and there is no `INTERNET` line. Without it Android will not let the app open a connection, whatever its code says.
 
-So there is no account to make, nothing to sign into, no sync, no analytics, no ads, and no way for your schedules, the apps you choose, or your history to reach anyone. It all lives in the app's own storage on the device, and it's gone when you uninstall it. The one thing that ever goes anywhere is a backup file, and only if you ask for one and choose where to put it.
+So there is no account to make, nothing to sign into, no sync, no analytics, no ads, and no way for your schedules, the apps you choose, or your history to reach anyone. It all lives in the app's own storage on the device, and it's gone when you uninstall it. The one thing that ever goes anywhere is a backup file, and only if you ask for one and choose where to put it. It can be sealed with a passphrase (AES-256-GCM), and it leaves the microjournal out unless you ask for it.
 
 ### You decide how firmly it holds
 
