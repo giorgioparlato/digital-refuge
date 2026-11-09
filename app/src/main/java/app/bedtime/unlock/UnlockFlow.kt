@@ -47,6 +47,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
@@ -256,7 +257,7 @@ private fun ordinal(n: Int): String {
 
 /** The small print at the foot: what unlocking does, plus whatever this step needs you to know. */
 private fun footnoteFor(step: Challenge?, outcome: String): String = when (step) {
-    Challenge.WAIT -> "$outcome The timer only runs while this screen is open, and starts over if you back out."
+    Challenge.WAIT -> "$outcome The timer keeps going with the screen off or the phone locked, pauses while you're in another app, and starts over if you back out."
     Challenge.TEXT -> "$outcome Spaces and punctuation fill themselves in; pasting and typos are rejected."
     else -> outcome
 }
@@ -416,11 +417,38 @@ internal fun UnlockSuccess(message: String) {
  */
 @Composable
 private fun waitCountdown(key: Any, total: Long): Long {
+    val context = LocalContext.current
     var elapsed by rememberSaveable(key) { mutableLongStateOf(0L) }
     var inFront by remember { mutableStateOf(false) }
+    // Left with the screen going off: when, and when you were back in the phone (unlocked) since.
+    var awayAt by remember { mutableStateOf<Long?>(null) }
+    var backAt by remember { mutableStateOf<Long?>(null) }
+    DisposableEffect(Unit) {
+        val receiver = object : android.content.BroadcastReceiver() {
+            override fun onReceive(c: android.content.Context, intent: android.content.Intent) {
+                if (awayAt != null && backAt == null) backAt = SystemClock.elapsedRealtime()
+            }
+        }
+        androidx.core.content.ContextCompat.registerReceiver(
+            context,
+            receiver,
+            android.content.IntentFilter(android.content.Intent.ACTION_USER_PRESENT),
+            androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
+        onDispose { runCatching { context.unregisterReceiver(receiver) } }
+    }
     LifecycleResumeEffect(Unit) {
+        val left = awayAt
+        if (left != null) elapsed = (elapsed + WaitAway.counted(left, backAt, SystemClock.elapsedRealtime())).coerceAtMost(total)
+        awayAt = null
+        backAt = null
         inFront = true
-        onPauseOrDispose { inFront = false }
+        onPauseOrDispose {
+            inFront = false
+            // The screen going off (or the phone locking) keeps the wait going; leaving for another app doesn't.
+            val interactive = context.getSystemService(android.os.PowerManager::class.java)?.isInteractive != false
+            if (!interactive) awayAt = SystemClock.elapsedRealtime()
+        }
     }
     LaunchedEffect(inFront) {
         if (!inFront) return@LaunchedEffect
@@ -686,5 +714,19 @@ internal fun PasswordChallengeContent(
             enabled = input.isNotEmpty() && !checking,
             modifier = Modifier.align(Alignment.CenterHorizontally),
         )
+    }
+}
+
+/**
+ * How much of a time away from the wait counts. Away with the screen off (and the phone locked, as it
+ * then is), it counts until you were back in the phone ([backAt], unlocked), or until the wait was back
+ * in front if that came within a few seconds; whatever you did in between in other apps doesn't.
+ */
+internal object WaitAway {
+    private const val BACK_WITHIN_MS = 10_000L
+
+    fun counted(awayAt: Long, backAt: Long?, resumedAt: Long): Long {
+        val until = if (backAt == null || resumedAt - backAt <= BACK_WITHIN_MS) resumedAt else backAt
+        return (until - awayAt).coerceAtLeast(0L)
     }
 }

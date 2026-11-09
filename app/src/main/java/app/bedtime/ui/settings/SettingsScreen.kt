@@ -122,6 +122,7 @@ fun SettingsScreen(place: SettingsPlace? = null, onBack: (() -> Unit)? = null, o
     val repo = remember { Repository.get(context) }
     val scope = rememberCoroutineScope()
     val schedules by repo.schedules.collectAsStateWithLifecycle(initialValue = emptyList())
+    val engineState by app.bedtime.engine.Engine.state(context).collectAsStateWithLifecycle()
     val settings by repo.settings.collectAsStateWithLifecycle(initialValue = AppSettings())
     val version = remember { runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull().orEmpty() }
     val canPinWidget = remember { BlockWidget.canPin(context) }
@@ -272,6 +273,9 @@ fun SettingsScreen(place: SettingsPlace? = null, onBack: (() -> Unit)? = null, o
         place = place,
         settings = settings,
         blocks = schedules.filter { it.isBlock },
+        schedules = schedules,
+        onChange = { change -> scope.launch { repo.updateSettings(change) } },
+        inSession = engineState?.isActive == true,
         setupStepsLeft = stepsLeft,
         isDefaultHome = isDefaultHome,
         version = version,
@@ -312,6 +316,11 @@ internal fun SettingsContent(
     searching: Boolean = false,
     settings: AppSettings,
     blocks: List<Schedule>,
+    /** Every schedule and block, for what each used to set alone. */
+    schedules: List<Schedule> = emptyList(),
+    onChange: ((AppSettings) -> AppSettings) -> Unit = {},
+    /** A session running now: what guards every session can't be changed until it's over. */
+    inSession: Boolean = false,
     setupStepsLeft: Int,
     isDefaultHome: Boolean = false,
     version: String = "0.9.20",
@@ -347,7 +356,7 @@ internal fun SettingsContent(
         }
     }
     val backup = BackupRows(backupFolderName, backupWritable, onWeeklyBackup, onChooseBackupFolder, onBackUpNow, backupSealed, onBackupPassphrase, onBackupJournal)
-    val entries = settingsEntries(settings, setupStepsLeft, isDefaultHome, onOpen, onLockScreen, onLockAlways, onExport, onImport, backup, onChooseNudge = { choosingNudge = true })
+    val entries = settingsEntries(settings, setupStepsLeft, isDefaultHome, onOpen, onLockScreen, onLockAlways, onExport, onImport, backup, onChooseNudge = { choosingNudge = true }, schedules = schedules, onChange = onChange, inSession = inSession)
     Scaffold(
         containerColor = c.bgPrimary,
         topBar = {
@@ -456,6 +465,9 @@ private fun settingsEntries(
     onImport: () -> Unit,
     backup: BackupRows,
     onChooseNudge: () -> Unit = {},
+    schedules: List<Schedule> = emptyList(),
+    onChange: ((AppSettings) -> AppSettings) -> Unit = {},
+    inSession: Boolean = false,
 ): List<Entry> {
     val style = s.homeStyle
     fun go(route: String): () -> Unit = { onOpen(route) }
@@ -520,6 +532,28 @@ private fun settingsEntries(
             ),
         )
         add(Entry(null, BedtimeIcons.Grid, "Apps", "Groups · always available · distracting", "apps", go(SettingsPlace.APPS.route)))
+        // Both guard every session, so neither can be switched off while one runs.
+        val locked = " · can't be changed while a session runs".takeIf { inSession }.orEmpty()
+        add(
+            Entry(
+                null,
+                Icons.Default.Lock,
+                "Cover Android's off switches",
+                "While a session runs, covers the Settings screens that switch blocking off or uninstall refuge$locked",
+                "cover off switches settings uninstall accessibility guard sessions",
+                trailing = { ObsidianToggle(s.coversOffSwitches(schedules), { on -> onChange { it.copy(coverOffSwitches = on) } }, enabled = !inSession) },
+            ),
+        )
+        add(
+            Entry(
+                null,
+                BedtimeIcons.Contrast,
+                "Full-screen reminder",
+                "If blocking is switched off while a session runs, the screen is taken over until it's back on$locked",
+                "full screen reminder takeover overlay switched off sessions",
+                trailing = { ObsidianToggle(s.remindsFullScreen, { on -> onChange { it.copy(fullScreenReminder = on) } }, enabled = !inSession) },
+            ),
+        )
         add(Entry(null, Icons.Default.Edit, "Notes", "Where quick notes go, and the to-do", "notes note quick to-do todo obsidian daily file", go(Routes.QUICK_NOTES)))
         add(Entry(null, Icons.Default.Edit, "Microjournal", "An entry a day, with prompts by section", "journal journalling microjournal prompts struthless vent gratitude mindset diary", go(Routes.QUICK_NOTES), searchOnly = true))
         add(Entry(null, Icons.Default.Edit, "Journal sections and prompts", "Change, delete or add your own", "journal prompts sections struthless vent obligations mindset gratitude ideation trajectory", go(Routes.JOURNAL_PROMPTS), searchOnly = true))
@@ -669,7 +703,8 @@ private fun settingsEntries(
         // ---------------------------------------------------------------- about & backup
         val about = SettingsPlace.ABOUT
         add(Entry(about, Icons.Default.Info, "How it works", "What a session locks, and your ways out", "how it works help", go(Routes.ONBOARDING)))
-        add(Entry(about, BedtimeIcons.Leaf, "The intro again", "The walk-through from the first launch", "intro walkthrough", go(Routes.WALKTHROUGH)))
+        add(Entry(about, BedtimeIcons.Leaf, "Set up again", "Distracting apps, a budget, bedtime, limits: the first-run setup, from what you have now", "setup set up again intro walkthrough onboarding first run", go(Routes.WALKTHROUGH)))
+        add(Entry(about, Icons.Default.Star, "A tour", "What else refuge does: habits, notes, voice notes, check-ins, Obsidian, widgets, search, gestures", "tour features what else habits notes voice check-ins obsidian widgets search gestures", go(Routes.TOUR)))
         val holds = "Everything you set, with your history, notes, habits" + (if (s.backupJournal) ", phone use and microjournal" else " and phone use") +
             (if (backup.sealed) ", in one file sealed with your passphrase" else ", in one file")
         add(Entry(about, Icons.Default.Share, "Export settings", holds, "export backup save file", onExport))

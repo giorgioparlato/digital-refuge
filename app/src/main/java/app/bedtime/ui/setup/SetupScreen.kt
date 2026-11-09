@@ -209,17 +209,7 @@ internal fun SetupContent(
 
             Group("Needed")
             Step("See which app is open", serviceOn, "How refuge notices a blocked app the moment it opens. It only learns which app is in front.") {
-                if (!serviceOn) {
-                    // Android hides the switch for apps from outside the Play Store: two parts, in order.
-                    Part(1, "Allow restricted settings", "In app info, tap ⋮ at the top right, then \u201callow restricted settings\u201d. Not there? Skip to 2.")
-                    PlainButton("Open app info", onClick = onOpenAppInfo, modifier = Modifier.fillMaxWidth())
-                    Part(2, "Switch on digital refuge blocker", "In accessibility settings, usually under \u201cdownloaded apps\u201d. Confirm what Android asks.")
-                    CtaButton("Open accessibility settings", onClick = onOpenAccessibility, modifier = Modifier.fillMaxWidth())
-                    Faint("Switch still greyed out? Check the ⋮ menu in app info again: the option shows only once, and again after a reinstall.")
-                } else {
-                    Link("Accessibility settings", onOpenAccessibility)
-                }
-                AndroidWarning()
+                AccessibilityHow(serviceOn, onOpenAppInfo, onOpenAccessibility)
             }
 
             Group("Recommended")
@@ -262,6 +252,26 @@ internal fun SetupContent(
             Faint("Refuge's home screen all the time, not only in sessions: settings › home screen › everyday launcher.", Modifier.padding(top = 8.dp))
             Spacer(Modifier.height(8.dp))
         }
+    }
+}
+
+/**
+ * Switching on the accessibility service: Android hides it for apps from outside the Play Store, so two
+ * parts, in order, each with its button; once on, a way back to it. Android's warning explained a tap away.
+ */
+@Composable
+internal fun AccessibilityHow(serviceOn: Boolean, onOpenAppInfo: () -> Unit, onOpenAccessibility: () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        if (!serviceOn) {
+            Part(1, "Allow restricted settings", "In app info, tap ⋮ at the top right, then \u201callow restricted settings\u201d. Not there? Skip to 2.")
+            PlainButton("Open app info", onClick = onOpenAppInfo, modifier = Modifier.fillMaxWidth())
+            Part(2, "Switch on digital refuge blocker", "In accessibility settings, usually under \u201cdownloaded apps\u201d. Confirm what Android asks.")
+            CtaButton("Open accessibility settings", onClick = onOpenAccessibility, modifier = Modifier.fillMaxWidth())
+            Faint("Switch still greyed out? Check the ⋮ menu in app info again: the option shows only once, and again after a reinstall.")
+        } else {
+            Link("Accessibility settings", onOpenAccessibility)
+        }
+        AndroidWarning()
     }
 }
 
@@ -378,7 +388,7 @@ private fun AndroidWarning() {
     }
 }
 
-private fun Context.tryStart(intent: Intent) {
+internal fun Context.tryStart(intent: Intent) {
     runCatching { startActivity(intent) }
 }
 

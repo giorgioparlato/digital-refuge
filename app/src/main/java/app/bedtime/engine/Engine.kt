@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.stateIn
@@ -39,7 +40,13 @@ object Engine {
 
     @OptIn(ExperimentalCoroutinesApi::class)
     private fun build(repo: Repository): StateFlow<ActiveState?> =
-        combine(repo.schedules, repo.runtime, tick) { schedules, runtime, _ -> schedules to runtime }
+        combine(repo.schedules, repo.runtime, repo.settings, tick) { schedules, runtime, settings, _ ->
+            // Covering Android's off switches and the full-screen reminder are one switch each, for every session.
+            val cover = settings.coversOffSwitches(schedules)
+            val remind = settings.remindsFullScreen
+            schedules.map { it.copy(lockSettings = cover, fullScreenAlert = remind) } to runtime
+        }
+            .distinctUntilChanged()
             .flatMapLatest { (schedules, runtime) ->
                 flow {
                     while (true) {

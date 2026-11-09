@@ -24,8 +24,8 @@ android {
         applicationId = "app.bedtime"
         minSdk = 26
         targetSdk = 35
-        versionCode = 91
-        versionName = "0.9.45"
+        versionCode = 92
+        versionName = "0.9.46"
         // Whisper, for transcribing voice notes: built for 64-bit phones only (cpp/CMakeLists.txt), the
         // rest of the app as before.
         externalNativeBuild {

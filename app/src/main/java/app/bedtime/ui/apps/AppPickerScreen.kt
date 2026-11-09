@@ -79,6 +79,9 @@ fun AppPickerScreen(
     onDone: (Set<String>) -> Unit,
     onBack: () -> Unit,
     lock: PickerLock? = null,
+    /** Only these to choose from, if given; and never those in [except]. */
+    within: Set<String>? = null,
+    except: Set<String> = emptySet(),
 ) {
     val context = LocalContext.current
     val repo = remember { Repository.get(context) }
@@ -95,7 +98,9 @@ fun AppPickerScreen(
     LaunchedEffect(Unit) {
         // Previously selected apps first; order is fixed at load so rows don't jump while toggling.
         apps = withContext(Dispatchers.IO) {
-            AppCatalog.launchableApps(context).sortedByDescending { it.packageName in initial }
+            AppCatalog.launchableApps(context)
+                .filter { (within == null || it.packageName in within) && it.packageName !in except }
+                .sortedByDescending { it.packageName in initial }
         }
     }
 

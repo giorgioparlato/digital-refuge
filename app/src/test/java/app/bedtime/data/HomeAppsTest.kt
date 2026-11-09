@@ -7,8 +7,8 @@ class HomeAppsTest {
     private val installed = listOf("phone", "maps", "signal", "chrome", "insta", "bank", "camera")
     private val favourites = listOf("signal", "insta", "camera", "gone")
 
-    private fun lists(minimal: Set<String>? = null, blocked: Set<String> = emptySet(), hidden: Set<String> = setOf("bank")) =
-        HomeApps.lists(installed, favourites, hidden, minimal, blocked, alwaysAvailable = setOf("maps"), dialer = "phone")
+    private fun lists(minimal: Set<String>? = null, blocked: Set<String> = emptySet(), hidden: Set<String> = setOf("bank"), allowed: Set<String>? = null) =
+        HomeApps.lists(installed, favourites, hidden, minimal, blocked, alwaysAvailable = setOf("maps"), dialer = "phone", allowed = allowed)
 
     @Test
     fun outsideSessionsYourFavouritesAndEverythingNotHidden() {
@@ -27,10 +27,21 @@ class HomeAppsTest {
     }
 
     @Test
-    fun minimalModeIsWhatItAllowsAsBefore() {
-        val l = lists(minimal = setOf("signal", "camera"))
+    fun allButTheseShowsWhatItAllows() {
+        val l = lists(minimal = setOf("signal", "camera"), allowed = setOf("signal", "camera"))
         assertEquals(listOf("phone", "signal", "camera"), l.home)
         assertEquals(listOf("phone", "signal", "camera", "maps"), l.all)
+        // Its home screen trimmed to fewer: the other allowed apps are still in the full list.
+        val trimmed = lists(minimal = setOf("signal"), allowed = setOf("signal", "camera"))
+        assertEquals(listOf("phone", "signal"), trimmed.home)
+        assertEquals(listOf("phone", "signal", "maps", "camera"), trimmed.all)
+    }
+
+    @Test
+    fun aQuietHomeScreenOfItsOwnWhileShuttingSome() {
+        val l = lists(minimal = setOf("signal", "chrome"), blocked = setOf("insta"))
+        assertEquals(listOf("phone", "signal", "chrome"), l.home)
+        assertEquals(installed - "bank" - "insta", l.all)
     }
 
     @Test

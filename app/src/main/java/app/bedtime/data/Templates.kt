@@ -40,9 +40,10 @@ object Templates {
                 blockedApps = apps,
                 greyscale = true,
                 minimalMode = true,
+                allowOnly = true,
                 dnd = DndMode.PRIORITY,
                 hideNotifications = true,
-                unlock = UnlockConfig(waitEnabled = true, waitSeconds = 10 * 60, textEnabled = true, textLength = 150),
+                unlock = Strictness.FIRM.applied(UnlockConfig()),
             )
         },
         Template("work", ScheduleKind.RECURRING, "Work focus", "no social apps · notifications held back", TemplateIcon.TARGET) { apps ->
@@ -77,6 +78,7 @@ object Templates {
                 blockedApps = apps,
                 greyscale = true,
                 minimalMode = true,
+                allowOnly = true,
                 unlock = UnlockConfig(waitEnabled = true, waitSeconds = 15 * 60, textEnabled = true, textLength = 200),
             )
         },
@@ -99,6 +101,7 @@ object Templates {
                 durationMinutes = 90,
                 greyscale = true,
                 minimalMode = true,
+                allowOnly = true,
                 dnd = DndMode.SILENCE,
                 hideNotifications = true,
                 unlock = UnlockConfig(waitEnabled = true, waitSeconds = 10 * 60, textEnabled = true, textLength = 200),

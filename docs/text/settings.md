@@ -86,6 +86,13 @@ Home screen, lock screen, apps, shortcuts and about & backup are lists of rows f
 - Check-ins
 - Ask why · moods · a nudge after time in a row
 - check-ins checkins pause ask why mood moods how do you feel nudge
+-  · can't be changed while a session runs
+- Cover Android's off switches
+- While a session runs, covers the Settings screens that switch blocking off or uninstall refuge{locked}
+- cover off switches settings uninstall accessibility guard sessions
+- Full-screen reminder
+- If blocking is switched off while a session runs, the screen is taken over until it's back on{locked}
+- full screen reminder takeover overlay switched off sessions
 - Cover messages
 - What a blocked app's cover says · … messages
 - cover message messages words blocked
@@ -195,14 +202,6 @@ Home screen, lock screen, apps, shortcuts and about & backup are lists of rows f
 - Needed
 - See which app is open
 - How refuge notices a blocked app the moment it opens. It only learns which app is in front.
-- Allow restricted settings
-- In app info, tap ⋮ at the top right, then “allow restricted settings”. Not there? Skip to 2.
-- Open app info
-- Switch on digital refuge blocker
-- In accessibility settings, usually under “downloaded apps”. Confirm what Android asks.
-- Open accessibility settings
-- Switch still greyed out? Check the ⋮ menu in app info again: the option shows only once, and again after a reinstall.
-- Accessibility settings
 - Recommended
 - Always-available apps
 - Usable in every session, from the emergency button: maps, rides, your authenticator. Keep the list short.
@@ -226,6 +225,14 @@ Home screen, lock screen, apps, shortcuts and about & backup are lists of rows f
 - If blocking is switched off during a session, refuge covers the screen until it's back on.
 - Allow display over other apps
 - Refuge's home screen all the time, not only in sessions: settings › home screen › everyday launcher.
+- Allow restricted settings
+- In app info, tap ⋮ at the top right, then “allow restricted settings”. Not there? Skip to 2.
+- Open app info
+- Switch on digital refuge blocker
+- In accessibility settings, usually under “downloaded apps”. Confirm what Android asks.
+- Open accessibility settings
+- Switch still greyed out? Check the ⋮ menu in app info again: the option shows only once, and again after a reinstall.
+- Accessibility settings
 - All done
 - {done} of {of} done
 - {label} ›

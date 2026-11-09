@@ -9,8 +9,27 @@ class EnforcementTest {
     private val minimal = Schedule(id = "min", minimalMode = true, allowedApps = setOf("maps"))
     private fun state(vararg s: Schedule) = ActiveState(s.map { Occurrence(it, 0L, 1L) }, null)
 
-    private fun decide(pkg: String, state: ActiveState?, recents: Boolean = false, isApp: Boolean = true, available: Set<String> = emptySet()) =
-        Enforcement.decide(pkg, "app.bedtime", state, alwaysAllowed = setOf("phone"), alwaysAvailable = available, recentsInFront = recents, opensAsApp = { isApp })
+    private fun decide(pkg: String, state: ActiveState?, recents: Boolean = false, isApp: Boolean = true, available: Set<String> = emptySet(), now: Long = 0L) =
+        Enforcement.decide(
+            pkg, "app.bedtime", state, alwaysAllowed = setOf("phone"), alwaysAvailable = available, recentsInFront = recents,
+            opensAsApp = { isApp }, launchers = setOf("launcher"), now = now,
+        )
+
+    @Test
+    fun allButTheseWithoutTheQuietHomeScreenCoversButLetsYourLauncherBe() {
+        val allBut = Schedule(id = "ab", allowOnly = true, allowedApps = setOf("maps"))
+        assertEquals(Verdict.COVER, decide("mail", state(allBut)))
+        assertEquals(Verdict.CHECK_LIMITS, decide("maps", state(allBut)))
+        // Home still works.
+        assertEquals(Verdict.CHECK_LIMITS, decide("launcher", state(allBut)))
+    }
+
+    @Test
+    fun anAppRefugeOpensForYouPassesForAMoment() {
+        Passes.grant("sync", now = 1_000L)
+        assertEquals(Verdict.LET_THROUGH, decide("sync", state(Schedule(blockedApps = setOf("sync"))), now = 5_000L))
+        assertEquals(Verdict.COVER, decide("sync", state(Schedule(blockedApps = setOf("sync"))), now = 60_000L))
+    }
 
     @Test
     fun aBlockedAppIsCovered() {

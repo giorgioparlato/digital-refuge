@@ -41,9 +41,14 @@ object Shortcuts {
             .take(limit)
     }
 
-    /** Runs [shortcut]; false if it couldn't be (refuge isn't the home screen, or the app took it away). */
-    fun start(context: Context, shortcut: AppShortcut): Boolean =
-        Problems.attempt("running ${shortcut.app}'s “${shortcut.label}”") {
+    /**
+     * Runs [shortcut]; false if it couldn't be (refuge isn't the home screen, or the app took it away).
+     * [passing] lets its app through a session for a moment: refuge runs it for you, after a note.
+     */
+    fun start(context: Context, shortcut: AppShortcut, passing: Boolean = false): Boolean {
+        if (passing) app.bedtime.engine.Passes.grant(shortcut.packageName)
+        return Problems.attempt("running ${shortcut.app}'s “${shortcut.label}”") {
             context.getSystemService(LauncherApps::class.java)?.startShortcut(shortcut.packageName, shortcut.id, null, null, Process.myUserHandle())
         } != null
+    }
 }

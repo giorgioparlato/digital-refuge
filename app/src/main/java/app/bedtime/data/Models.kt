@@ -35,12 +35,20 @@ data class Schedule(
     val endMinute: Int = 7 * 60,
     /** Default length of a block, in minutes. */
     val durationMinutes: Int = 60,
+    /** What it shuts, by name ("these apps"); not used with [allowOnly]. */
     val blockedApps: Set<String> = emptySet(),
     val greyscale: Boolean = true,
-    /** While this session greys the screen, leave our own minimal home in colour. */
-    val keepHomeInColour: Boolean = true,
+    /** Refuge's quiet home screen while it runs, showing [homeApps]. */
     val minimalMode: Boolean = false,
+    /** What "all but these" lets open ([allowsOnly]). */
     val allowedApps: Set<String> = emptySet(),
+    /**
+     * "All but these": everything shut but [allowedApps]. Null on schedules saved before it was a choice
+     * of its own, when the quiet home screen ([minimalMode]) meant it.
+     */
+    val allowOnly: Boolean? = null,
+    /** The apps on its quiet home screen; null for the ones it lets open ([quietHomeDefault]). */
+    val homeApps: Set<String>? = null,
     val dnd: DndMode = DndMode.OFF,
     /** Hide filtered notifications until the session ends (uses Do Not Disturb's visual suppression). */
     val hideNotifications: Boolean = false,
@@ -76,6 +84,26 @@ data class Schedule(
     val message: CoverMessage = CoverMessage(),
 ) {
     val isBlock: Boolean get() = kind == ScheduleKind.BLOCK
+
+    /** Shuts everything but [allowed], rather than [blockedApps]. */
+    val allowsOnly: Boolean get() = allowOnly ?: minimalMode
+
+    /** The apps it shuts by name: none with "all but these", where whatever isn't [allowed] is shut. */
+    val shut: Set<String> get() = if (allowsOnly) emptySet() else blockedApps
+
+    /** What "all but these" lets open. Saved before it was a choice, an app on both lists was shut, so it's left out. */
+    val allowed: Set<String> get() = if (allowOnly == null) allowedApps - blockedApps else allowedApps
+
+    /**
+     * As the editor shows it, doing just what it did: "all but these" stated, the allowed apps without
+     * any that were shut too, and notifications kept out of sight while everyone could ring (which
+     * held them under priority) read as priority.
+     */
+    fun settled(): Schedule = copy(
+        allowOnly = allowsOnly,
+        allowedApps = allowed,
+        dnd = if (dnd == DndMode.OFF && hideNotifications) DndMode.PRIORITY else dnd,
+    )
 }
 
 /**
@@ -771,7 +799,19 @@ data class AppSettings(
     /** Moods to tap when answering and in the microjournal, for the mood tracker; null keeps the suggested ones. */
     val moodsOn: Boolean = true,
     val moodTags: List<String>? = null,
+    /**
+     * Every session covers Android's screens that switch blocking off, and takes over the screen if
+     * blocking is switched off anyway. Null until set here: before, each schedule had its own.
+     */
+    val coverOffSwitches: Boolean? = null,
+    val fullScreenReminder: Boolean? = null,
 ) {
+    /** Whether sessions cover Android's off switches: as set, or as any of [schedules] did before it was one switch. */
+    fun coversOffSwitches(schedules: List<Schedule>): Boolean = coverOffSwitches ?: (schedules.isEmpty() || schedules.any { it.lockSettings })
+
+    /** Whether sessions take over the screen when blocking is switched off: on unless switched off here. */
+    val remindsFullScreen: Boolean get() = fullScreenReminder ?: true
+
     /** Where quick notes and the search can add: the to-do note first, then your files. */
     val quickTargets: List<NoteTarget> get() = listOf(Notes.TODO) + noteTargets
 

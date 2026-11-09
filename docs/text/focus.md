@@ -57,7 +57,7 @@ focus
 - undo …
 - leave early
 - … blocked
-- minimal mode
+- quiet home screen
 - do not disturb
 - taking a break
 - … picks up again at …
@@ -90,8 +90,9 @@ focus
 <sub>[ScheduleItem.kt](../../app/src/main/java/app/bedtime/ui/schedules/ScheduleItem.kt)</sub>
 
 - on now
-- minimal mode
-- … blocked
+- all but … shut
+- … shut
+- quiet home screen
 - priority only
 - can be changed from …
 - locked until …
@@ -216,8 +217,9 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 - Widen the hours it can be changed, or move them clear of the hours it runs.
 - Leave a longer gap between when it ends and when it starts again.
 - Choose a password, or switch off the password step.
-- Apps to block
-- Apps to allow
+- Apps to shut
+- Apps left open
+- On its home screen
 - Notifications from
 - Starts at
 - Ends at
@@ -233,22 +235,28 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 - Your edits won't be saved.
 - Discard
 - Keep editing
-- nothing blocked yet
-- … blocked
-- minimal home
-- priority calls only
-- notifications held
+- all but …
+- nothing shut yet
+- quiet home screen
+- priority rings
+- nothing rings
+- out of sight
+- lock screen: only these
+- lock screen: none
+- as usual
+- emergency break … min · 
+- no emergency break · 
+- asks why
+- its own widgets
+- changeable after leaving early
+- changeable {changeable}
+- the cover's words, ask why, widgets, changing it
 - a single tap — no steps picked
 - ends the block
 - off until its next start
 - a …-minute break
 - as long as you say
 - … · {then}
-- emergency break … min
-- no emergency break
-- off switches covered
-- reminder on
-- changeable {changeable}
 - Name this block
 - Name this schedule
 - e.g. Deep work
@@ -268,29 +276,33 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 - Its settings stay shut until …, when it would have ended — otherwise unlocking would be a way to soften it and start again. You can change that under "the ways around it".
 - To keep you honest, it can't be changed or deleted until you unlock it or it ends.
 - Almost there
-- What it does
-- Block apps
+- What it shuts
+- These apps
+- All but these
 - None yet · tap to choose
-- What the cover says
+- The phone app and your always-available apps stay open either way.
+- How the phone feels
 - Greyscale
-- Fade apps to black and white
+- Everything in black and white, refuge too
 - Needs a one-time step (see Setup)
-- Keep home screen in colour
-- Only apps turn grey; digital refuge's own home screen keeps its colours
-- Minimal mode
-- Swap your home screen for a calm list of essential apps
-- Allowed apps
-- Just the phone app for now · tap to add
+- Quiet home screen
+- Refuge's own while it runs: the time and a few apps as words
 - …, plus the phone app
+- The apps it leaves open · tap to choose fewer
+- Your usual home apps, less the shut ones · tap to choose
 - Notifications
-- Off
+- Who can ring
+- Everyone
 - Priority
-- Silence
-- Calls and notifications work as usual.
-- Only your priority contacts can ring. Music, videos and alarms still play.
-- No calls or notification sounds. Music, videos and alarms still play.
-- Hide notifications
-- Held back while it's on, then they all come back
+- No one
+- Calls and notifications as usual.
+- Only your priority contacts and apps, as set in Android, make a sound. Music, videos and alarms still play.
+- Nothing rings or buzzes. Music, videos and alarms still play.
+- What's silenced
+- Still shows
+- Out of sight
+- No banners or icons; they all come back when it ends.
+- Silent, but still there to look at.
 - On refuge's lock screen
 - As usual
 - Only these
@@ -306,25 +318,16 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 - Needs Do Not Disturb access
 - Grant it once in Setup so digital refuge can quiet your phone.
 - Open setup
-- On the screens
-- Your usual widgets
-- Its own widgets on home and the lock screen
-- Its own widgets on home
-- Its own widgets on the lock screen
-- Home screen
-- Lock screen
-- Its own
-- While it runs, the … shows your usual widgets.
-- While it runs, these instead, in this order. If another session with its own starts later, its own win.
-- Ask why
-- Not while it runs
-- After each unlock · at least … words
-- After each unlock
-- Ask why after each unlock
-- While it runs: a question, a box to write in and how you feel; going on is a tap
-- Words, at least
-- How hard to leave
-- The steps, in this order
+- Leaving early
+- Keep the emergency break?
+- Some apps, banking ones especially, may ask you to switch digital refuge off before they'll open, for security reasons. The emergency break lets you do that for a minute without unlocking. Without it, the only way is the steps.
+- Keep it on
+- Turn it off
+- Emergency break
+- For what can't wait, with no steps
+- How long it lasts
+- emergency break
+- Unlocking it, step by step
 - What unlocking gets you
 - End it
 - End today
@@ -341,16 +344,18 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 - break length
 - How do you feel now?
 - Your moods to tap, once the break is over
-- The ways around it
-- Every way around a session has a switch of its own.
-- Emergency break
-- A short step out for whatever genuinely can't wait. It counts as an escape.
-- How long you can step out
-- step out
-- Cover Android's off switches
-- While it runs, covers the Settings screens that switch blocking off or uninstall the app
-- Full-screen reminder
-- If blocking is switched off while this runs, take over the screen until it's back on
+- More options
+- What the cover says
+- Ask why after each unlock
+- While it runs: a question, a box to write in and how you feel; going on is a tap
+- Words, at least
+- Its own widgets
+- Home screen
+- Lock screen
+- Its own
+- While it runs, the … shows your usual widgets.
+- While it runs, these instead, in this order. If another session with its own starts later, its own win.
+- Changing it
 - Keep this shut after leaving early
 - Its settings stay as they are until it would have ended, so leaving early can't soften it
 - Changeable only at certain hours
@@ -374,6 +379,7 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 - Weekends
 - Done
 - Cancel
+- Start from
 
 <sub>[UnlockStepsEditor.kt](../../app/src/main/java/app/bedtime/ui/edit/UnlockStepsEditor.kt)</sub>
 
@@ -382,24 +388,25 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 - type … characters
 - write … words
 - a password
-- Password
+- Wait it out
+- Start a timer, come back when it's done
+- Type random text
+- No pasting, typos don't count
+- Write a few lines
+- Why you want to unlock, or from prompts you choose
+- A password
 - Tip: let someone else choose it
+- No steps yet: unlocking takes a single tap.
+- Timer
 - New password (leave empty to keep)
 - Choose a password
-- Each early unlock in a day makes the wait, the typing and the writing longer
-- No steps picked
-- Unlocking will take a single tap.
-- Write a few lines
-- Why you want to unlock, or from prompts you choose; kept with your answers to “why?”
+- Each time in a day makes the wait, the typing and the writing longer
+- + add a step
+- + add another step
 - Words, at least
 - Prompts from
 - Just “why?”
-- The microjournal's sections, as you've written them in settings › notes.
-- Start a timer, come back when it's done
-- Wait it out
-- Timer
-- Type random text
-- No pasting, typos don't count
+- Kept with your answers to “why?”. The sections are the microjournal's, as written in settings › notes.
 - Characters
 - What to copy
 - Letters
@@ -456,7 +463,7 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 - Continue
 - Waiting\u2026
 - unlocking …
-- {outcome} The timer only runs while this screen is open, and starts over if you back out.
+- {outcome} The timer keeps going with the screen off or the phone locked, pauses while you're in another app, and starts over if you back out.
 - {outcome} Spaces and punctuation fill themselves in; pasting and typos are rejected.
 - This ends the block.
 - This ends the current session.
@@ -716,7 +723,7 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 - {name} is still running · tap to switch blocking back on
 - no session running
 - +{others} more
-- minimal home
+- quiet home screen
 - … apps blocked
 - do not disturb
 - session running

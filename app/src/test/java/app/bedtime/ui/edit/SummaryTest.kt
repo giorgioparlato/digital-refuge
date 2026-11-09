@@ -1,6 +1,7 @@
 package app.bedtime.ui.edit
 
 import app.bedtime.data.DndMode
+import app.bedtime.data.LockNotes
 import app.bedtime.data.Schedule
 import app.bedtime.data.ScheduleKind
 import app.bedtime.data.TextSource
@@ -27,25 +28,20 @@ class SummaryTest {
 
     @Test
     fun anEmptyScheduleSaysSoRatherThanShowingNothing() {
-        assertEquals("nothing blocked yet", whatItDoesSummary(bare))
+        assertEquals("nothing shut yet", shutsSummary(bare))
+        assertEquals("as usual", feelsSummary(bare))
     }
 
     @Test
-    fun whatItDoesReadsInOrder() {
-        val full = bare.copy(
-            blockedApps = setOf("a", "b", "c"),
-            minimalMode = true,
-            greyscale = true,
-            dnd = DndMode.SILENCE,
-            hideNotifications = true,
-        )
-        assertEquals("3 apps blocked · minimal home · greyscale · silenced · notifications held", whatItDoesSummary(full))
+    fun whatItShutsSaysWhichWay() {
+        assertEquals("3 apps", shutsSummary(bare.copy(blockedApps = setOf("a", "b", "c"), allowOnly = false)))
+        assertEquals("all but 2 apps", shutsSummary(bare.copy(allowOnly = true, allowedApps = setOf("a", "b"))))
     }
 
     @Test
-    fun doNotDisturbOffIsNotWorthMentioning() {
-        val quiet = bare.copy(blockedApps = setOf("a"), dnd = DndMode.OFF)
-        assertEquals("1 app blocked", whatItDoesSummary(quiet))
+    fun howThePhoneFeelsReadsInOrder() {
+        val full = bare.copy(minimalMode = true, greyscale = true, dnd = DndMode.SILENCE, hideNotifications = true, lockNotes = LockNotes.NONE)
+        assertEquals("greyscale · quiet home screen · nothing rings · out of sight · lock screen: none", feelsSummary(full))
     }
 
     @Test
@@ -77,15 +73,15 @@ class SummaryTest {
     }
 
     @Test
-    fun theWaysAroundNameTheDoorsThatAreShut() {
-        val firm = bare.copy(pauseEnabled = false, lockSettings = true, fullScreenAlert = true)
-        assertEquals("no emergency break · off switches covered · reminder on", waysAroundSummary(firm, null))
+    fun leavingEarlyStartsWithTheEmergencyBreak() {
+        val stepped = bare.copy(pauseEnabled = true, breakMinutes = 2, unlock = UnlockConfig(waitEnabled = true, waitSeconds = 60, textEnabled = false))
+        assertTrue(leavingEarlySummary(stepped, false).startsWith("emergency break 2 min · wait 1 min"))
+        assertTrue(leavingEarlySummary(stepped.copy(pauseEnabled = false), false).startsWith("no emergency break · wait 1 min"))
     }
 
     @Test
-    fun theHoursAppearOnlyWhenThereAreSome() {
-        val open = bare.copy(pauseEnabled = true, breakMinutes = 2, lockSettings = false, fullScreenAlert = false)
-        assertEquals("emergency break 2 min", waysAroundSummary(open, null))
-        assertEquals("emergency break 2 min · changeable 08:00–20:00", waysAroundSummary(open, "08:00–20:00"))
+    fun moreOptionsNameWhatsSetOrWhatsInThem() {
+        assertEquals("the cover's words, ask why, widgets, changing it", moreSummary(bare, null))
+        assertEquals("asks why · changeable 08:00–20:00", moreSummary(bare.copy(askWhy = true), "08:00–20:00"))
     }
 }

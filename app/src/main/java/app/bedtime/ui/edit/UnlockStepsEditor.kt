@@ -7,6 +7,18 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.material.icons.filled.Create
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -49,9 +61,33 @@ internal fun unlockSteps(unlock: UnlockConfig, hasNewPassword: Boolean): List<St
     if (unlock.passwordEnabled && (unlock.hasPassword || hasNewPassword)) add("a password")
 }
 
+/** A step an unlock can take, in the order they run. */
+private enum class StepKind(val title: String, val description: String) {
+    WAIT("Wait it out", "Start a timer, come back when it's done"),
+    TYPE("Type random text", "No pasting, typos don't count"),
+    WRITE("Write a few lines", "Why you want to unlock, or from prompts you choose"),
+    PASSWORD("A password", "Tip: let someone else choose it"),
+    ;
+
+    fun isOn(u: UnlockConfig): Boolean = when (this) {
+        WAIT -> u.waitEnabled
+        TYPE -> u.textEnabled
+        WRITE -> u.writeEnabled
+        PASSWORD -> u.passwordEnabled
+    }
+
+    fun set(u: UnlockConfig, on: Boolean): UnlockConfig = when (this) {
+        WAIT -> u.copy(waitEnabled = on)
+        TYPE -> u.copy(textEnabled = on)
+        WRITE -> u.copy(writeEnabled = on)
+        PASSWORD -> u.copy(passwordEnabled = on)
+    }
+}
+
 /**
- * Wait, type, write, password and "harder each time": the steps an unlock takes. Shared by schedules,
- * blocks and limits, so the same words mean the same thing everywhere.
+ * The steps an unlock takes: only the ones added, each with its own settings and a × to take it away,
+ * then "+ add a step" for more friction. Shared by schedules, blocks and limits, so the same words mean
+ * the same thing everywhere. "Harder each time" shows once there's a step it can make longer.
  */
 @Composable
 internal fun UnlockStepsEditor(
@@ -63,163 +99,144 @@ internal fun UnlockStepsEditor(
 ) {
     val c = Obsidian.colors
     fun setUnlock(transform: (UnlockConfig) -> UnlockConfig) = onChange(transform(unlock))
+    val added = StepKind.entries.filter { it.isOn(unlock) }
     Column {
-        WaitStep(unlock.waitEnabled, { on -> setUnlock { it.copy(waitEnabled = on) } }, unlock.waitDurationSeconds, { v -> setUnlock { it.copy(waitSeconds = v) } }, editable)
-        TypingStep(
-            unlock.textEnabled,
-            { on -> setUnlock { it.copy(textEnabled = on) } },
-            unlock.textLength,
-            { v -> setUnlock { it.copy(textLength = v) } },
-            unlock.textSource,
-            { v -> setUnlock { it.copy(textSource = v) } },
-            editable,
-        )
-        WritingStep(unlock, { change -> setUnlock(change) }, editable)
-        OptionRow(Icons.Default.Lock, "Password", description = "Tip: let someone else choose it", enabled = editable) {
-            ObsidianToggle(unlock.passwordEnabled, { on -> setUnlock { it.copy(passwordEnabled = on) } }, enabled = editable)
+        if (added.isEmpty()) {
+            Text("No steps yet: unlocking takes a single tap.", style = MaterialTheme.typography.bodySmall, color = c.textFaint, modifier = Modifier.padding(vertical = 6.dp))
         }
-        AnimatedVisibility(unlock.passwordEnabled && editable) {
-            ObsidianTextField(
-                value = newPassword,
-                onValueChange = onNewPasswordChange,
-                label = if (unlock.hasPassword) "New password (leave empty to keep)" else "Choose a password",
-                password = true,
-                modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
-            )
-        }
-        AnimatedVisibility(unlock.waitEnabled || unlock.textEnabled || unlock.writeEnabled) {
-            Column {
-                HarderStep(
-                    unlock.escalate,
-                    { on -> setUnlock { it.copy(escalate = on) } },
-                    (unlock.escalateFactor * 10).roundToInt(),
-                    { v -> setUnlock { it.copy(escalateFactor = v / 10f) } },
+        added.forEach { kind ->
+            StepHeader(kind, editable) { onChange(kind.set(unlock, false)) }
+            when (kind) {
+                StepKind.WAIT -> SubOptionRow("Timer") {
+                    NumberStepper(
+                        unlock.waitDurationSeconds, { v -> setUnlock { it.copy(waitSeconds = v) } }, 5..3600, step = 5, enabled = editable,
+                        presets = listOf(10, 30, 60, 120, 300, 600), title = "timer", format = { formatWaitSeconds(it) },
+                    )
+                }
+                StepKind.TYPE -> TypingSettings(
+                    unlock.textLength, { v -> setUnlock { it.copy(textLength = v) } },
+                    unlock.textSource, { v -> setUnlock { it.copy(textSource = v) } },
                     editable,
-                    description = "Each early unlock in a day makes the wait, the typing and the writing longer",
                 )
+                StepKind.WRITE -> WritingSettings(unlock, { change -> setUnlock(change) }, editable)
+                StepKind.PASSWORD -> if (editable) {
+                    ObsidianTextField(
+                        value = newPassword,
+                        onValueChange = onNewPasswordChange,
+                        label = if (unlock.hasPassword) "New password (leave empty to keep)" else "Choose a password",
+                        password = true,
+                        modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
+                    )
+                }
             }
         }
-        val anyStep = unlock.waitEnabled || unlock.textEnabled || unlock.writeEnabled ||
-            (unlock.passwordEnabled && (unlock.hasPassword || newPassword.isNotBlank()))
-        AnimatedVisibility(!anyStep) {
-            Callout(
-                title = "No steps picked",
-                kind = CalloutKind.WARNING,
-                body = "Unlocking will take a single tap.",
-                modifier = Modifier.padding(top = 8.dp),
+        if (unlock.waitEnabled || unlock.textEnabled || unlock.writeEnabled) {
+            HarderStep(
+                unlock.escalate,
+                { on -> setUnlock { it.copy(escalate = on) } },
+                (unlock.escalateFactor * 10).roundToInt(),
+                { v -> setUnlock { it.copy(escalateFactor = v / 10f) } },
+                editable,
+                description = "Each time in a day makes the wait, the typing and the writing longer",
             )
+        }
+        val left = StepKind.entries - added.toSet()
+        if (editable && left.isNotEmpty()) {
+            Box {
+                var choosing by remember { mutableStateOf(false) }
+                Text(
+                    if (added.isEmpty()) "+ add a step" else "+ add another step",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = c.accentText,
+                    modifier = Modifier.padding(top = 8.dp).clip(RoundedCornerShape(8.dp)).clickable { choosing = true }.padding(vertical = 8.dp, horizontal = 4.dp),
+                )
+                DropdownMenu(expanded = choosing, onDismissRequest = { choosing = false }, containerColor = c.bgSecondary) {
+                    left.forEach { kind ->
+                        DropdownMenuItem(
+                            text = {
+                                Column {
+                                    Text(kind.title, color = c.textNormal)
+                                    Text(kind.description, style = MaterialTheme.typography.bodySmall, color = c.textMuted)
+                                }
+                            },
+                            onClick = {
+                                choosing = false
+                                onChange(kind.set(unlock, true))
+                            },
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** An added step's name and what it asks, with a × to take it away again. */
+@Composable
+private fun StepHeader(kind: StepKind, editable: Boolean, onRemove: () -> Unit) {
+    val icon = when (kind) {
+        StepKind.WAIT -> BedtimeIcons.Hourglass
+        StepKind.TYPE -> Icons.Default.Edit
+        StepKind.WRITE -> Icons.Default.Create
+        StepKind.PASSWORD -> Icons.Default.Lock
+    }
+    OptionRow(icon, kind.title, description = kind.description, enabled = editable) {
+        if (editable) {
+            IconButton(onClick = onRemove) { Icon(Icons.Default.Close, contentDescription = "remove ${kind.title}", tint = Obsidian.colors.textFaint) }
         }
     }
 }
 
 /**
- * "Write a few lines": at least so many words, from a prompt of the microjournal's sections you pick,
+ * "Write a few lines", once added: at least so many words, from a prompt of the microjournal's sections you pick,
  * or "why do I want to unlock this?" with none picked. What's written goes with your answers to "why?".
  */
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
-internal fun WritingStep(unlock: UnlockConfig, onChange: ((UnlockConfig) -> UnlockConfig) -> Unit, editable: Boolean) {
+private fun WritingSettings(unlock: UnlockConfig, onChange: ((UnlockConfig) -> UnlockConfig) -> Unit, editable: Boolean) {
     val c = Obsidian.colors
     val context = androidx.compose.ui.platform.LocalContext.current
     val repo = androidx.compose.runtime.remember { app.bedtime.data.Repository.get(context) }
     val settings by repo.settings.collectAsStateWithLifecycle(initialValue = null)
     val sections = app.bedtime.data.Journal.sections(settings?.journalSections)
-    OptionRow(Icons.Default.Create, "Write a few lines", description = "Why you want to unlock, or from prompts you choose; kept with your answers to “why?”", enabled = editable) {
-        ObsidianToggle(unlock.writeEnabled, { on -> onChange { it.copy(writeEnabled = on) } }, enabled = editable)
+    SubOptionRow("Words, at least") {
+        NumberStepper(unlock.writeWords, { v -> onChange { it.copy(writeWords = v) } }, 5..500, step = 5, enabled = editable, presets = listOf(10, 20, 30, 50, 100, 200), title = "words")
     }
-    AnimatedVisibility(unlock.writeEnabled) {
-        Column {
-            SubOptionRow("Words, at least") {
-                NumberStepper(unlock.writeWords, { v -> onChange { it.copy(writeWords = v) } }, 5..500, step = 5, enabled = editable, presets = listOf(10, 20, 30, 50, 100, 200), title = "words")
+    Text("Prompts from", style = MaterialTheme.typography.bodyMedium, color = c.textMuted, modifier = Modifier.padding(top = 12.dp, bottom = 8.dp))
+    androidx.compose.foundation.layout.FlowRow(
+        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp),
+        verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp),
+    ) {
+        app.bedtime.ui.components.QuickChip("Just “why?”", unlock.writeSections.isEmpty()) { if (editable) onChange { it.copy(writeSections = emptyList()) } }
+        sections.forEach { section ->
+            val on = section.name in unlock.writeSections
+            app.bedtime.ui.components.QuickChip(section.name, on) {
+                if (editable) onChange { it.copy(writeSections = if (on) it.writeSections - section.name else it.writeSections + section.name) }
             }
-            Text("Prompts from", style = MaterialTheme.typography.bodyMedium, color = c.textMuted, modifier = Modifier.padding(top = 12.dp, bottom = 8.dp))
-            androidx.compose.foundation.layout.FlowRow(
-                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp),
-                verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp),
-            ) {
-                app.bedtime.ui.components.QuickChip("Just “why?”", unlock.writeSections.isEmpty()) { if (editable) onChange { it.copy(writeSections = emptyList()) } }
-                sections.forEach { section ->
-                    val on = section.name in unlock.writeSections
-                    app.bedtime.ui.components.QuickChip(section.name, on) {
-                        if (editable) onChange { it.copy(writeSections = if (on) it.writeSections - section.name else it.writeSections + section.name) }
-                    }
-                }
-            }
-            Text("The microjournal's sections, as you've written them in settings › notes.", style = MaterialTheme.typography.bodySmall, color = c.textFaint, modifier = Modifier.padding(top = 8.dp))
         }
     }
+    Text("Kept with your answers to “why?”. The sections are the microjournal's, as written in settings › notes.", style = MaterialTheme.typography.bodySmall, color = c.textFaint, modifier = Modifier.padding(top = 8.dp))
 }
 
-/** "Wait it out": a timer to sit through, and how long. The same row wherever a wait is asked for. */
+/** "Type random text", once added: how much, and from what. */
 @Composable
-internal fun WaitStep(
-    on: Boolean,
-    onToggle: (Boolean) -> Unit,
-    seconds: Int,
-    onSeconds: (Int) -> Unit,
-    editable: Boolean,
-    description: String = "Start a timer, come back when it's done",
-    range: IntRange = 5..3600,
-    step: Int = 5,
-    presets: List<Int> = listOf(10, 30, 60, 120, 300, 600),
-) {
-    OptionRow(BedtimeIcons.Hourglass, "Wait it out", description = description, enabled = editable) {
-        ObsidianToggle(on, onToggle, enabled = editable)
-    }
-    AnimatedVisibility(on) {
-        SubOptionRow("Timer") {
-            NumberStepper(seconds, onSeconds, range, step = step, enabled = editable, presets = presets, title = "timer", format = { formatWaitSeconds(it) })
-        }
-    }
-}
-
-/** "Type random text": how much, and from what. The same row wherever typing is asked for. */
-@Composable
-internal fun TypingStep(
-    on: Boolean,
-    onToggle: (Boolean) -> Unit,
-    length: Int,
-    onLength: (Int) -> Unit,
-    source: TextSource,
-    onSource: (TextSource) -> Unit,
-    editable: Boolean,
-    range: IntRange = 25..2000,
-    step: Int = 25,
-    presets: List<Int> = listOf(50, 100, 150, 200, 300, 500, 1000),
-) {
+internal fun TypingSettings(length: Int, onLength: (Int) -> Unit, source: TextSource, onSource: (TextSource) -> Unit, editable: Boolean) {
     val c = Obsidian.colors
-    OptionRow(Icons.Default.Edit, "Type random text", description = "No pasting, typos don't count", enabled = editable) {
-        ObsidianToggle(on, onToggle, enabled = editable)
+    SubOptionRow("Characters") {
+        NumberStepper(length, onLength, 25..2000, step = 25, enabled = editable, presets = listOf(50, 100, 150, 200, 300, 500, 1000), title = "characters")
     }
-    AnimatedVisibility(on) {
-        Column {
-            SubOptionRow("Characters") {
-                NumberStepper(length, onLength, range, step = step, enabled = editable, presets = presets, title = "characters")
-            }
-            Text(
-                "What to copy",
-                style = MaterialTheme.typography.bodyMedium,
-                color = c.textMuted,
-                modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
-            )
-            SegmentedChoice(
-                options = listOf("Letters", "Words", "Passages"),
-                selected = source.ordinal,
-                onSelect = { onSource(TextSource.entries[it]) },
-                enabled = editable,
-            )
-            Text(
-                when (source) {
-                    TextSource.LETTERS -> "Random letters and digits. Nothing to read, only to copy."
-                    TextSource.WORDS -> "Plain words, easier on the eyes at midnight."
-                    TextSource.PASSAGES -> "Quotes and longer passages, worth reading while you type them."
-                },
-                style = MaterialTheme.typography.bodySmall,
-                color = c.textFaint,
-                modifier = Modifier.padding(top = 8.dp),
-            )
-        }
-    }
+    Text("What to copy", style = MaterialTheme.typography.bodyMedium, color = c.textMuted, modifier = Modifier.padding(top = 12.dp, bottom = 8.dp))
+    SegmentedChoice(options = listOf("Letters", "Words", "Passages"), selected = source.ordinal, onSelect = { onSource(TextSource.entries[it]) }, enabled = editable)
+    Text(
+        when (source) {
+            TextSource.LETTERS -> "Random letters and digits. Nothing to read, only to copy."
+            TextSource.WORDS -> "Plain words, easier on the eyes at midnight."
+            TextSource.PASSAGES -> "Quotes and longer passages, worth reading while you type them."
+        },
+        style = MaterialTheme.typography.bodySmall,
+        color = c.textFaint,
+        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
+    )
 }
 
 /** "Harder each time", and by how much, in tenths: 15 is 1.5× the time before. */

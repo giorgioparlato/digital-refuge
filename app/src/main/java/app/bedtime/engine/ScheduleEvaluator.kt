@@ -20,7 +20,7 @@ data class ActiveState(
 ) {
     val isActive: Boolean get() = active.isNotEmpty()
 
-    val blocked: Set<String> = active.flatMapTo(mutableSetOf()) { it.schedule.blockedApps }
+    val blocked: Set<String> = active.flatMapTo(mutableSetOf()) { it.schedule.shut }
 
     val greyscale: Boolean = active.any { it.schedule.greyscale }
 
@@ -34,23 +34,32 @@ data class ActiveState(
 
     val fullScreenAlert: Boolean = active.any { it.schedule.fullScreenAlert }
 
-    /** Our own home screen stays in colour only if every session greying the screen allows it. */
-    val keepHomeInColour: Boolean = active.filter { it.schedule.greyscale }.all { it.schedule.keepHomeInColour }
-
-    /** Null when no active schedule uses minimal mode; otherwise only apps allowed by *every* such schedule. */
-    val minimalAllowlist: Set<String>? = active
-        .filter { it.schedule.minimalMode }
-        .map { it.schedule.allowedApps }
+    /** Null when no active schedule shuts all but some apps; otherwise only the apps *every* such schedule allows. */
+    val allowlist: Set<String>? = active
+        .filter { it.schedule.allowsOnly }
+        .map { it.schedule.allowed }
         .reduceOrNull { a, b -> a intersect b }
 
+    /** The session whose quiet home screen shows, if any does. */
     val minimalOccurrence: Occurrence? get() = active.firstOrNull { it.schedule.minimalMode }
+
+    /**
+     * The apps on the quiet home screen: its schedule's own list, or the ones it allows; never one that
+     * a running session shuts. Null shows your usual home apps, less the shut ones.
+     */
+    val quietHomeApps: Set<String>?
+        get() {
+            val schedule = minimalOccurrence?.schedule ?: return null
+            val own = schedule.homeApps ?: schedule.allowed.takeIf { schedule.allowsOnly } ?: allowlist ?: return null
+            return (allowlist?.let { own intersect it } ?: own) - blocked
+        }
 
     fun occurrenceOf(scheduleId: String): Occurrence? = active.firstOrNull { it.schedule.id == scheduleId }
 
     /** The active occurrence that forbids [pkg], preferring an explicit block over minimal mode. */
     fun blockerOf(pkg: String): Occurrence? =
-        active.firstOrNull { pkg in it.schedule.blockedApps }
-            ?: active.firstOrNull { it.schedule.minimalMode && pkg !in it.schedule.allowedApps }
+        active.firstOrNull { pkg in it.schedule.shut }
+            ?: active.firstOrNull { it.schedule.allowsOnly && pkg !in it.schedule.allowed }
 
     companion object {
         val Idle = ActiveState(emptyList(), null)

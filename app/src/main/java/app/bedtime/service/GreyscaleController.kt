@@ -13,11 +13,8 @@ object GreyscaleController {
     /** Whether greyscale can be switched on at all (Android 15+ with Do Not Disturb access). */
     fun isAvailable(context: Context): Boolean = ModeGreyscale.isSupported(context)
 
-    /**
-     * Turns greyscale on or off. [pausedForHome] shows the user's normal colours on the minimal home
-     * screen while a session still wants greyscale everywhere else.
-     */
-    fun apply(context: Context, wanted: Boolean, pausedForHome: Boolean = false) {
-        ModeGreyscale.apply(context, on = wanted && !pausedForHome)
+    /** Turns greyscale on or off: everywhere, refuge's own screens too. */
+    fun apply(context: Context, wanted: Boolean) {
+        ModeGreyscale.apply(context, on = wanted)
     }
 }

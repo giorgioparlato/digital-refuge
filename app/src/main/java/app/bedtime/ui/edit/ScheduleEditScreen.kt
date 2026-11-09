@@ -66,6 +66,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.bedtime.apps.AppCatalog
 import app.bedtime.data.AppJson
 import app.bedtime.data.DndMode
+import app.bedtime.data.Hush
+import app.bedtime.data.Strictness
 import app.bedtime.data.EditWindow
 import app.bedtime.engine.EditWindows
 import app.bedtime.data.Repository
@@ -137,6 +139,7 @@ private val ScheduleSaver = Saver<Schedule, String>(
 
 private const val PICK_BLOCKED = "blocked"
 private const val PICK_ALLOWED = "allowed"
+private const val PICK_HOME = "home"
 private const val PICK_NOTE_APPS = "note-apps"
 private const val PICK_NOTE_PEOPLE = "note-people"
 /**
@@ -189,8 +192,10 @@ fun ScheduleEditScreen(
 
     var original by rememberSaveable(stateSaver = ScheduleSaver) {
         mutableStateOf(
-            template?.let { key -> Templates.instantiate(key, { AppCatalog.isLaunchable(context, it) }, essentials) }
-                ?: Schedule(name = "", allowedApps = essentials),
+            (
+                template?.let { key -> Templates.instantiate(key, { AppCatalog.isLaunchable(context, it) }, essentials) }
+                    ?: Schedule(name = "", allowedApps = essentials)
+                ).settled(),
         )
     }
     var draft by rememberSaveable(stateSaver = ScheduleSaver) { mutableStateOf(original) }
@@ -220,7 +225,7 @@ fun ScheduleEditScreen(
 
     LaunchedEffect(scheduleId) {
         if (!loaded && scheduleId != null) {
-            repo.schedules.first().firstOrNull { it.id == scheduleId }?.let {
+            repo.schedules.first().firstOrNull { it.id == scheduleId }?.settled()?.let {
                 original = it
                 draft = it
             }
@@ -249,17 +254,34 @@ fun ScheduleEditScreen(
     }
     when (picking) {
         PICK_BLOCKED -> {
-            AppPickerScreen("Apps to block", draft.blockedApps, PickerMode.BLOCK, onDone = {
+            AppPickerScreen("Apps to shut", draft.blockedApps, PickerMode.BLOCK, onDone = {
                 draft = draft.copy(blockedApps = it)
                 picking = null
             }, onBack = { picking = null })
             return
         }
         PICK_ALLOWED -> {
-            AppPickerScreen("Apps to allow", draft.allowedApps, PickerMode.ALLOW, onDone = {
+            AppPickerScreen("Apps left open", draft.allowedApps, PickerMode.ALLOW, onDone = {
                 draft = draft.copy(allowedApps = it)
                 picking = null
             }, onBack = { picking = null })
+            return
+        }
+        // Its quiet home screen's apps: from those it leaves open, or any it doesn't shut.
+        PICK_HOME -> {
+            val usual = draft.homeApps ?: if (draft.allowsOnly) draft.allowedApps else appSettings?.homeFavourites.orEmpty().toSet() - draft.blockedApps
+            AppPickerScreen(
+                "On its home screen",
+                usual,
+                PickerMode.FAVOURITE,
+                onDone = {
+                    draft = draft.copy(homeApps = it)
+                    picking = null
+                },
+                onBack = { picking = null },
+                within = draft.allowedApps.takeIf { draft.allowsOnly },
+                except = if (draft.allowsOnly) emptySet() else draft.blockedApps,
+            )
             return
         }
         PICK_NOTE_APPS -> {
@@ -390,6 +412,7 @@ fun ScheduleEditScreen(
         onUnlock = { scheduleId?.let(onUnlock) },
         onPickBlocked = { picking = PICK_BLOCKED },
         onPickAllowed = { picking = PICK_ALLOWED },
+        onPickHome = { picking = PICK_HOME },
         onPickNoteApps = { picking = PICK_NOTE_APPS },
         onPickNotePeople = {
             if (app.bedtime.data.ContactSearch.canRead(context)) picking = PICK_NOTE_PEOPLE else askContacts.launch(android.Manifest.permission.READ_CONTACTS)
@@ -408,24 +431,46 @@ fun ScheduleEditScreen(
 }
 
 /** Which fold is open. Only one at a time, so the page never grows past a screenful of scrolling. */
-private const val SECTION_DOES = "does"
+private const val SECTION_SHUTS = "shuts"
+private const val SECTION_FEELS = "feels"
 private const val SECTION_LEAVING = "leaving"
-private const val SECTION_SCREENS = "screens"
-private const val SECTION_AROUND = "around"
-private const val SECTION_WHY = "why"
+private const val SECTION_MORE = "more"
 
-/** The line "what it does" shows while it is shut. */
-internal fun whatItDoesSummary(draft: Schedule): String = buildList {
-    add(if (draft.blockedApps.isEmpty()) "nothing blocked yet" else "${pluralApps(draft.blockedApps.size)} blocked")
-    if (draft.minimalMode) add("minimal home")
+/** The line "what it shuts" shows while it is shut. */
+internal fun shutsSummary(draft: Schedule): String = when {
+    draft.allowsOnly -> "all but ${pluralApps(draft.allowedApps.size)}"
+    draft.blockedApps.isEmpty() -> "nothing shut yet"
+    else -> pluralApps(draft.blockedApps.size)
+}
+
+/** The line "how the phone feels" shows while it is shut. */
+internal fun feelsSummary(draft: Schedule): String = buildList {
     if (draft.greyscale) add("greyscale")
+    if (draft.minimalMode) add("quiet home screen")
     when (draft.dnd) {
-        DndMode.PRIORITY -> add("priority calls only")
-        DndMode.SILENCE -> add("silenced")
+        DndMode.PRIORITY -> add("priority rings")
+        DndMode.SILENCE -> add("nothing rings")
         DndMode.OFF -> Unit
     }
-    if (draft.hideNotifications) add("notifications held")
-}.joinToString(" · ")
+    if (draft.hideNotifications && draft.dnd != DndMode.OFF) add("out of sight")
+    when (draft.lockNotes) {
+        LockNotes.OWN -> add("lock screen: only these")
+        LockNotes.NONE -> add("lock screen: none")
+        LockNotes.USUAL -> Unit
+    }
+}.ifEmpty { listOf("as usual") }.joinToString(" · ")
+
+/** The line "leaving early" shows while it is shut: the emergency break, then the steps and what they buy. */
+internal fun leavingEarlySummary(draft: Schedule, hasNewPassword: Boolean): String =
+    (if (draft.pauseEnabled) "emergency break ${draft.breakMinutes} min · " else "no emergency break · ") + leavingSummary(draft, hasNewPassword)
+
+/** The line "more options" shows while it is shut: what's set beyond the usual, or what's in it. */
+internal fun moreSummary(draft: Schedule, changeable: String?): String = buildList {
+    if (draft.askWhy) add("asks why")
+    if (draft.homeModules != null || draft.lockModules != null) add("its own widgets")
+    if (draft.editAfterUnlock) add("changeable after leaving early")
+    if (changeable != null) add("changeable $changeable")
+}.ifEmpty { listOf("the cover's words, ask why, widgets, changing it") }.joinToString(" · ")
 
 /** The line "how hard to leave" shows while it is shut: the steps in order, then what they buy. */
 internal fun leavingSummary(draft: Schedule, hasNewPassword: Boolean): String {
@@ -438,14 +483,6 @@ internal fun leavingSummary(draft: Schedule, hasNewPassword: Boolean): String {
     }
     return "${steps.joinToString(", then ")} · $then"
 }
-
-/** The line "the ways around it" shows while it is shut. [changeable] is null when there are no hours set. */
-internal fun waysAroundSummary(draft: Schedule, changeable: String?): String = buildList {
-    add(if (draft.pauseEnabled) "emergency break ${draft.breakMinutes} min" else "no emergency break")
-    if (draft.lockSettings) add("off switches covered")
-    if (draft.fullScreenAlert) add("reminder on")
-    if (changeable != null) add("changeable $changeable")
-}.joinToString(" · ")
 
 @Composable
 internal fun ScheduleEditContent(
@@ -469,6 +506,7 @@ internal fun ScheduleEditContent(
     onUnlock: () -> Unit,
     onPickBlocked: () -> Unit,
     onPickAllowed: () -> Unit,
+    onPickHome: () -> Unit = {},
     onPickNoteApps: () -> Unit = {},
     onPickNotePeople: () -> Unit = {},
     onEditStart: () -> Unit,
@@ -492,7 +530,7 @@ internal fun ScheduleEditContent(
     val unlock = draft.unlock
     val isBlock = draft.isBlock
     // A new schedule opens on its first question answered — what it does — rather than on three shut doors.
-    var open by rememberSaveable { mutableStateOf<String?>(if (isNew) SECTION_DOES else null) }
+    var open by rememberSaveable { mutableStateOf<String?>(if (isNew) SECTION_SHUTS else null) }
     var renaming by rememberSaveable { mutableStateOf(false) }
 
     fun toggle(section: String) {
@@ -600,109 +638,133 @@ internal fun ScheduleEditContent(
                 }
                 Spacer(Modifier.height(10.dp))
 
-                // ---------------------------------------------------------------- what it does
+                // ---------------------------------------------------------------- what it shuts
                 FoldSection(
-                    title = "What it does",
-                    summary = whatItDoesSummary(draft),
-                    open = open == SECTION_DOES,
-                    onToggle = { toggle(SECTION_DOES) },
+                    title = "What it shuts",
+                    summary = shutsSummary(draft),
+                    open = open == SECTION_SHUTS,
+                    onToggle = { toggle(SECTION_SHUTS) },
                 ) {
-                    OptionRow(
-                        BedtimeIcons.Block,
-                        "Block apps",
-                        description = if (draft.blockedApps.isEmpty()) "None yet · tap to choose" else pluralApps(draft.blockedApps.size),
-                        enabled = editable,
-                        onClick = onPickBlocked,
-                    ) {
-                        AppIconStack(draft.blockedApps.sorted(), appLabel)
-                        Chevron()
-                    }
-                    MessageChoiceRow(
-                        "What the cover says",
-                        draft.message,
-                        { onDraftChange(draft.copy(message = it)) },
+                    SegmentedChoice(
+                        options = listOf("These apps", "All but these"),
+                        selected = if (draft.allowsOnly) 1 else 0,
+                        onSelect = { i ->
+                            val allowOnly = i == 1
+                            val allowed = if (allowOnly && draft.allowedApps.isEmpty()) essentials else draft.allowedApps
+                            onDraftChange(draft.copy(allowOnly = allowOnly, allowedApps = allowed))
+                        },
                         enabled = editable,
                     )
-                    OptionRow(
-                        BedtimeIcons.Contrast,
-                        "Greyscale",
-                        description = if (greyscaleAvailable) "Fade apps to black and white" else "Needs a one-time step (see Setup)",
-                        enabled = editable,
-                    ) { ObsidianToggle(draft.greyscale, { onDraftChange(draft.copy(greyscale = it)) }, enabled = editable) }
-                    AnimatedVisibility(draft.greyscale) {
-                        OptionRow(
-                            BedtimeIcons.Contrast,
-                            "Keep home screen in colour",
-                            description = "Only apps turn grey; digital refuge's own home screen keeps its colours",
-                            enabled = editable,
-                        ) {
-                            ObsidianToggle(
-                                draft.keepHomeInColour,
-                                { on -> onDraftChange(draft.copy(keepHomeInColour = on)) },
-                                enabled = editable,
-                            )
-                        }
-                    }
-                    OptionRow(
-                        Icons.Default.Home,
-                        "Minimal mode",
-                        description = "Swap your home screen for a calm list of essential apps",
-                        enabled = editable,
-                    ) {
-                        ObsidianToggle(
-                            draft.minimalMode,
-                            { on ->
-                                val allowed = if (on && draft.allowedApps.isEmpty()) essentials else draft.allowedApps
-                                onDraftChange(draft.copy(minimalMode = on, allowedApps = allowed))
-                            },
-                            enabled = editable,
-                        )
-                    }
-                    AnimatedVisibility(draft.minimalMode) {
+                    Spacer(Modifier.height(6.dp))
+                    if (draft.allowsOnly) {
                         OptionRow(
                             BedtimeIcons.Grid,
-                            "Allowed apps",
-                            description = if (draft.allowedApps.isEmpty()) {
-                                "Just the phone app for now · tap to add"
-                            } else {
-                                "${pluralApps(draft.allowedApps.size)}, plus the phone app"
-                            },
+                            "Apps left open",
+                            description = if (draft.allowedApps.isEmpty()) "None yet · tap to choose" else pluralApps(draft.allowedApps.size),
                             enabled = editable,
                             onClick = onPickAllowed,
                         ) {
                             AppIconStack(draft.allowedApps.sorted(), appLabel)
                             Chevron()
                         }
+                    } else {
+                        OptionRow(
+                            BedtimeIcons.Block,
+                            "Apps to shut",
+                            description = if (draft.blockedApps.isEmpty()) "None yet · tap to choose" else pluralApps(draft.blockedApps.size),
+                            enabled = editable,
+                            onClick = onPickBlocked,
+                        ) {
+                            AppIconStack(draft.blockedApps.sorted(), appLabel)
+                            Chevron()
+                        }
                     }
+                    Text(
+                        "The phone app and your always-available apps stay open either way.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = c.textMuted,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
+
+                // ---------------------------------------------------------------- how the phone feels
+                FoldSection(
+                    title = "How the phone feels",
+                    summary = feelsSummary(draft),
+                    open = open == SECTION_FEELS,
+                    onToggle = { toggle(SECTION_FEELS) },
+                ) {
+                    OptionRow(
+                        BedtimeIcons.Contrast,
+                        "Greyscale",
+                        description = if (greyscaleAvailable) "Everything in black and white, refuge too" else "Needs a one-time step (see Setup)",
+                        enabled = editable,
+                    ) { ObsidianToggle(draft.greyscale, { onDraftChange(draft.copy(greyscale = it)) }, enabled = editable) }
+                    OptionRow(
+                        Icons.Default.Home,
+                        "Quiet home screen",
+                        description = "Refuge's own while it runs: the time and a few apps as words",
+                        enabled = editable,
+                    ) { ObsidianToggle(draft.minimalMode, { on -> onDraftChange(draft.copy(minimalMode = on)) }, enabled = editable) }
+                    AnimatedVisibility(draft.minimalMode) {
+                        val own = draft.homeApps?.let { apps -> if (draft.allowsOnly) apps intersect draft.allowedApps else apps - draft.blockedApps }
+                        OptionRow(
+                            BedtimeIcons.Grid,
+                            "On its home screen",
+                            description = when {
+                                own != null -> "${pluralApps(own.size)}, plus the phone app"
+                                draft.allowsOnly -> "The apps it leaves open · tap to choose fewer"
+                                else -> "Your usual home apps, less the shut ones · tap to choose"
+                            },
+                            enabled = editable,
+                            onClick = onPickHome,
+                        ) {
+                            own?.let { AppIconStack(it.sorted(), appLabel) }
+                            Chevron()
+                        }
+                    }
+
                     SectionLabel("Notifications")
+                    StartFrom(Hush.entries.map { it.label }, Hush.of(draft)?.ordinal, editable) { i -> onDraftChange(Hush.entries[i].applied(draft)) }
+                    Text("Who can ring", style = MaterialTheme.typography.bodyMedium, color = c.textMuted, modifier = Modifier.padding(top = 12.dp, bottom = 8.dp))
                     SegmentedChoice(
-                        options = listOf("Off", "Priority", "Silence"),
+                        options = listOf("Everyone", "Priority", "No one"),
                         selected = draft.dnd.ordinal,
-                        onSelect = { onDraftChange(draft.copy(dnd = DndMode.entries[it])) },
+                        onSelect = { i ->
+                            val dnd = DndMode.entries[i]
+                            // With everyone ringing, nothing is silenced to keep out of sight.
+                            onDraftChange(draft.copy(dnd = dnd, hideNotifications = draft.hideNotifications && dnd != DndMode.OFF))
+                        },
                         enabled = editable,
                     )
                     Text(
                         when (draft.dnd) {
-                            DndMode.OFF -> "Calls and notifications work as usual."
-                            DndMode.PRIORITY -> "Only your priority contacts can ring. Music, videos and alarms still play."
-                            DndMode.SILENCE -> "No calls or notification sounds. Music, videos and alarms still play."
+                            DndMode.OFF -> "Calls and notifications as usual."
+                            DndMode.PRIORITY -> "Only your priority contacts and apps, as set in Android, make a sound. Music, videos and alarms still play."
+                            DndMode.SILENCE -> "Nothing rings or buzzes. Music, videos and alarms still play."
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = c.textMuted,
-                        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
+                        modifier = Modifier.padding(top = 8.dp),
                     )
-                    OptionRow(
-                        Icons.Default.Notifications,
-                        "Hide notifications",
-                        description = "Held back while it's on, then they all come back",
-                        enabled = editable,
-                    ) { ObsidianToggle(draft.hideNotifications, { onDraftChange(draft.copy(hideNotifications = it)) }, enabled = editable) }
-                    Text(
-                        "On refuge's lock screen",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = c.textMuted,
-                        modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
-                    )
+                    AnimatedVisibility(draft.dnd != DndMode.OFF) {
+                        Column {
+                            Text("What's silenced", style = MaterialTheme.typography.bodyMedium, color = c.textMuted, modifier = Modifier.padding(top = 12.dp, bottom = 8.dp))
+                            SegmentedChoice(
+                                options = listOf("Still shows", "Out of sight"),
+                                selected = if (draft.hideNotifications) 1 else 0,
+                                onSelect = { onDraftChange(draft.copy(hideNotifications = it == 1)) },
+                                enabled = editable,
+                            )
+                            Text(
+                                if (draft.hideNotifications) "No banners or icons; they all come back when it ends." else "Silent, but still there to look at.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = c.textMuted,
+                                modifier = Modifier.padding(top = 8.dp),
+                            )
+                        }
+                    }
+                    Text("On refuge's lock screen", style = MaterialTheme.typography.bodyMedium, color = c.textMuted, modifier = Modifier.padding(top = 12.dp, bottom = 8.dp))
                     SegmentedChoice(
                         options = listOf("As usual", "Only these", "None"),
                         selected = draft.lockNotes.ordinal,
@@ -748,7 +810,7 @@ internal fun ScheduleEditContent(
                         color = c.textMuted,
                         modifier = Modifier.padding(top = 8.dp),
                     )
-                    AnimatedVisibility((draft.dnd != DndMode.OFF || draft.hideNotifications) && !dndAvailable) {
+                    AnimatedVisibility(draft.dnd != DndMode.OFF && !dndAvailable) {
                         Callout(
                             title = "Needs Do Not Disturb access",
                             kind = CalloutKind.INFO,
@@ -760,80 +822,66 @@ internal fun ScheduleEditContent(
                     }
                 }
 
-                // ---------------------------------------------------------------- on the screens
+                // ---------------------------------------------------------------- leaving early
                 FoldSection(
-                    title = "On the screens",
-                    summary = when {
-                        draft.homeModules == null && draft.lockModules == null -> "Your usual widgets"
-                        draft.homeModules != null && draft.lockModules != null -> "Its own widgets on home and the lock screen"
-                        draft.homeModules != null -> "Its own widgets on home"
-                        else -> "Its own widgets on the lock screen"
-                    },
-                    open = open == SECTION_SCREENS,
-                    onToggle = { toggle(SECTION_SCREENS) },
-                ) {
-                    var lock by rememberSaveable { mutableStateOf(false) }
-                    SegmentedChoice(options = listOf("Home screen", "Lock screen"), selected = if (lock) 1 else 0, onSelect = { lock = it == 1 })
-                    val own = if (lock) draft.lockModules else draft.homeModules
-                    fun setOwn(list: List<ModuleChoice>?) = onDraftChange(if (lock) draft.copy(lockModules = list) else draft.copy(homeModules = list))
-                    Spacer(Modifier.height(10.dp))
-                    SegmentedChoice(
-                        options = listOf("As usual", "Its own"),
-                        selected = if (own == null) 0 else 1,
-                        onSelect = { setOwn(if (it == 0) null else own ?: if (lock) usualLock else usualHome) },
-                        enabled = editable,
-                    )
-                    Text(
-                        if (own == null) {
-                            "While it runs, the ${if (lock) "lock screen" else "minimal screen"} shows your usual widgets."
-                        } else {
-                            "While it runs, these instead, in this order. If another session with its own starts later, its own win."
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = c.textMuted,
-                        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
-                    )
-                    if (own != null) ModuleListEditor(own, enabled = editable, onChange = { setOwn(it) })
-                }
-
-                // ---------------------------------------------------------------- ask why
-                FoldSection(
-                    title = "Ask why",
-                    summary = when {
-                        !draft.askWhy -> "Not while it runs"
-                        draft.askWhyWords > 0 -> "After each unlock · at least ${draft.askWhyWords} words"
-                        else -> "After each unlock"
-                    },
-                    open = open == SECTION_WHY,
-                    onToggle = { toggle(SECTION_WHY) },
-                ) {
-                    OptionRow(Icons.Default.Info, "Ask why after each unlock", description = "While it runs: a question, a box to write in and how you feel; going on is a tap", enabled = editable) {
-                        ObsidianToggle(draft.askWhy, { on -> onDraftChange(draft.copy(askWhy = on)) }, enabled = editable)
-                    }
-                    AnimatedVisibility(draft.askWhy) {
-                        SubOptionRow("Words, at least") {
-                            NumberStepper(
-                                draft.askWhyWords,
-                                { v -> onDraftChange(draft.copy(askWhyWords = v)) },
-                                0..300,
-                                step = 5,
-                                enabled = editable,
-                                presets = listOf(0, 10, 20, 30, 50),
-                                title = "words",
-                                format = { if (it == 0) "none" else "$it" },
-                            )
-                        }
-                    }
-                }
-
-                // ---------------------------------------------------------------- how hard to leave
-                FoldSection(
-                    title = "How hard to leave",
-                    summary = leavingSummary(draft, newPassword.isNotBlank()),
+                    title = "Leaving early",
+                    summary = leavingEarlySummary(draft, newPassword.isNotBlank()),
                     open = open == SECTION_LEAVING,
                     onToggle = { toggle(SECTION_LEAVING) },
                 ) {
-                    SectionLabel("The steps, in this order")
+                    // Switching it off asks first: some apps won't open while refuge watches, and this is the way to let them.
+                    var confirmNoBreak by remember { mutableStateOf(false) }
+                    if (confirmNoBreak) {
+                        AlertDialog(
+                            onDismissRequest = { confirmNoBreak = false },
+                            containerColor = c.bgSecondary,
+                            title = { Text("Keep the emergency break?") },
+                            text = {
+                                Text(
+                                    "Some apps, banking ones especially, may ask you to switch digital refuge off before they'll open, for security reasons. " +
+                                        "The emergency break lets you do that for a minute without unlocking. Without it, the only way is the steps.",
+                                    color = c.textMuted,
+                                )
+                            },
+                            confirmButton = { TextButton(onClick = { confirmNoBreak = false }) { Text("Keep it on", color = c.accentText, fontWeight = FontWeight.SemiBold) } },
+                            dismissButton = {
+                                TextButton(onClick = {
+                                    confirmNoBreak = false
+                                    onDraftChange(draft.copy(pauseEnabled = false))
+                                }) { Text("Turn it off", color = c.textMuted) }
+                            },
+                        )
+                    }
+                    OptionRow(
+                        BedtimeIcons.Hourglass,
+                        "Emergency break",
+                        description = "For what can't wait, with no steps",
+                        enabled = editable,
+                    ) {
+                        ObsidianToggle(
+                            draft.pauseEnabled,
+                            { on -> if (on) onDraftChange(draft.copy(pauseEnabled = true)) else confirmNoBreak = true },
+                            enabled = editable,
+                        )
+                    }
+                    AnimatedVisibility(draft.pauseEnabled) {
+                        SubOptionRow("How long it lasts") {
+                            NumberStepper(
+                                draft.breakMinutes,
+                                { v -> onDraftChange(draft.copy(breakMinutes = v)) },
+                                1..60,
+                                suffix = " min",
+                                enabled = editable,
+                                presets = listOf(1, 2, 3, 5, 10),
+                                title = "emergency break",
+                            )
+                        }
+                    }
+                    SectionLabel("Unlocking it, step by step")
+                    StartFrom(Strictness.entries.map { it.label }, Strictness.of(unlock)?.ordinal, editable) { i ->
+                        onDraftChange(draft.copy(unlock = Strictness.entries[i].applied(unlock)))
+                    }
+                    Spacer(Modifier.height(6.dp))
                     UnlockStepsEditor(unlock, { u -> onDraftChange(draft.copy(unlock = u)) }, editable, newPassword, onNewPasswordChange)
                     SectionLabel("What unlocking gets you")
                     SegmentedChoice(
@@ -880,50 +928,65 @@ internal fun ScheduleEditContent(
                     }
                 }
 
-                // ---------------------------------------------------------------- the ways around it
+                // ---------------------------------------------------------------- more options
                 FoldSection(
-                    title = "The ways around it",
-                    summary = waysAroundSummary(
+                    title = "More options",
+                    summary = moreSummary(
                         draft,
-                        draft.editWindow?.let {
-                            "${formatMinuteOfDay(context, it.startMinute)}–${formatMinuteOfDay(context, it.endMinute)}"
-                        },
+                        draft.editWindow?.let { "${formatMinuteOfDay(context, it.startMinute)}–${formatMinuteOfDay(context, it.endMinute)}" },
                     ),
-                    open = open == SECTION_AROUND,
-                    onToggle = { toggle(SECTION_AROUND) },
-                    note = "Every way around a session has a switch of its own.",
+                    open = open == SECTION_MORE,
+                    onToggle = { toggle(SECTION_MORE) },
                 ) {
-                    OptionRow(
-                        BedtimeIcons.Hourglass,
-                        "Emergency break",
-                        description = "A short step out for whatever genuinely can't wait. It counts as an escape.",
+                    MessageChoiceRow(
+                        "What the cover says",
+                        draft.message,
+                        { onDraftChange(draft.copy(message = it)) },
                         enabled = editable,
-                    ) { ObsidianToggle(draft.pauseEnabled, { on -> onDraftChange(draft.copy(pauseEnabled = on)) }, enabled = editable) }
-                    AnimatedVisibility(draft.pauseEnabled) {
-                        SubOptionRow("How long you can step out") {
+                    )
+                    OptionRow(Icons.Default.Info, "Ask why after each unlock", description = "While it runs: a question, a box to write in and how you feel; going on is a tap", enabled = editable) {
+                        ObsidianToggle(draft.askWhy, { on -> onDraftChange(draft.copy(askWhy = on)) }, enabled = editable)
+                    }
+                    AnimatedVisibility(draft.askWhy) {
+                        SubOptionRow("Words, at least") {
                             NumberStepper(
-                                draft.breakMinutes,
-                                { v -> onDraftChange(draft.copy(breakMinutes = v)) },
-                                1..60,
-                                suffix = " min",
+                                draft.askWhyWords,
+                                { v -> onDraftChange(draft.copy(askWhyWords = v)) },
+                                0..300,
+                                step = 5,
                                 enabled = editable,
-                                presets = listOf(1, 2, 3, 5, 10),
-                                title = "step out",
+                                presets = listOf(0, 10, 20, 30, 50),
+                                title = "words",
+                                format = { if (it == 0) "none" else "$it" },
                             )
                         }
                     }
-                    OptionRow(
-                        Icons.Default.Lock,
-                        "Cover Android's off switches",
-                        description = "While it runs, covers the Settings screens that switch blocking off or uninstall the app",
+
+                    SectionLabel("Its own widgets")
+                    var lock by rememberSaveable { mutableStateOf(false) }
+                    SegmentedChoice(options = listOf("Home screen", "Lock screen"), selected = if (lock) 1 else 0, onSelect = { lock = it == 1 })
+                    val ownWidgets = if (lock) draft.lockModules else draft.homeModules
+                    fun setOwn(list: List<ModuleChoice>?) = onDraftChange(if (lock) draft.copy(lockModules = list) else draft.copy(homeModules = list))
+                    Spacer(Modifier.height(10.dp))
+                    SegmentedChoice(
+                        options = listOf("As usual", "Its own"),
+                        selected = if (ownWidgets == null) 0 else 1,
+                        onSelect = { setOwn(if (it == 0) null else ownWidgets ?: if (lock) usualLock else usualHome) },
                         enabled = editable,
-                    ) { ObsidianToggle(draft.lockSettings, { on -> onDraftChange(draft.copy(lockSettings = on)) }, enabled = editable) }
-                    OptionRow(
-                        BedtimeIcons.Contrast,
-                        "Full-screen reminder",
-                        description = "If blocking is switched off while this runs, take over the screen until it's back on",
-                        enabled = editable,
-                    ) { ObsidianToggle(draft.fullScreenAlert, { on -> onDraftChange(draft.copy(fullScreenAlert = on)) }, enabled = editable) }
+                    )
+                    Text(
+                        if (ownWidgets == null) {
+                            "While it runs, the ${if (lock) "lock screen" else "quiet home screen"} shows your usual widgets."
+                        } else {
+                            "While it runs, these instead, in this order. If another session with its own starts later, its own win."
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = c.textMuted,
+                        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
+                    )
+                    if (ownWidgets != null) ModuleListEditor(ownWidgets, enabled = editable, onChange = { setOwn(it) })
+
+                    SectionLabel("Changing it")
                     // Whether this page itself can be changed: after leaving early, and at what hours.
                     OptionRow(
                         Icons.Default.Lock,
@@ -1304,5 +1367,18 @@ internal fun TimeDialContent(title: String, state: TimePickerState, onDismiss: (
                 }
             }
         }
+    }
+}
+
+/** "Start from": chips that fill in what's below them, which stays yours to change; [chosen] lit while it still matches. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+internal fun StartFrom(labels: List<String>, chosen: Int?, enabled: Boolean, onPick: (Int) -> Unit) {
+    androidx.compose.foundation.layout.FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text("Start from", style = MaterialTheme.typography.bodySmall, color = Obsidian.colors.textFaint, modifier = Modifier.align(Alignment.CenterVertically))
+        labels.forEachIndexed { i, label -> QuickChip(label, chosen == i, enabled) { onPick(i) } }
     }
 }

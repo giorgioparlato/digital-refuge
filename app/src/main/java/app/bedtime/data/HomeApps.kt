@@ -6,10 +6,10 @@ object HomeApps {
     data class Lists(val home: List<String>, val all: List<String>)
 
     /**
-     * In a minimal session ([minimal] not null) home lists what it allows, plus the phone app, and the
-     * full list adds the always-available apps, as before. Otherwise home is your favourites in your
-     * order, and the full list everything installed but hidden; a session's [blocked] apps are left
-     * out of both, since they wouldn't open anyway.
+     * On a session's quiet home screen ([minimal] not null) home lists its apps, plus the phone app.
+     * Otherwise home is your favourites in your order. The full list is everything that opens: with
+     * "all but these" ([allowed] not null) what's allowed and the always-available apps, otherwise
+     * everything installed but hidden. A session's [blocked] apps are left out, since they wouldn't open.
      */
     fun lists(
         installed: List<String>,
@@ -19,18 +19,14 @@ object HomeApps {
         blocked: Set<String>,
         alwaysAvailable: Set<String>,
         dialer: String?,
+        allowed: Set<String>? = null,
     ): Lists {
         val present = installed.toSet()
-        if (minimal != null) {
-            val home = installed.filter { it in minimal || it == dialer }
-            return Lists(home, (home + installed.filter { it in alwaysAvailable }).distinct())
-        }
-        // Always-available apps are never blocked, whatever the session says.
-        fun open(pkg: String) = pkg in present && (pkg !in blocked || pkg in alwaysAvailable)
-        return Lists(
-            home = favourites.filter(::open),
-            all = installed.filter { open(it) && it !in hidden },
-        )
+        // Always-available apps are never shut, whatever the session says.
+        fun open(pkg: String) = pkg in present && (pkg in alwaysAvailable || (pkg !in blocked && (allowed == null || pkg in allowed)))
+        val home = if (minimal != null) installed.filter { it in minimal || it == dialer } else favourites.filter(::open)
+        val all = if (allowed != null) (home + installed.filter(::open)).distinct() else installed.filter { open(it) && it !in hidden }
+        return Lists(home, all)
     }
 
     /** [favourites] with [pkg] moved one place up (or down), staying put at either end. */

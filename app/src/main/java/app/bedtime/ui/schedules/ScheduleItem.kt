@@ -125,8 +125,8 @@ private fun ScheduleCard(
             ObsidianToggle(schedule.enabled, onToggle, enabled = !running && lockedUntil == null && shutWindow == null)
         }
         val tags = buildList {
-            if (schedule.minimalMode) add("minimal mode")
-            if (schedule.blockedApps.isNotEmpty()) add("${pluralApps(schedule.blockedApps.size)} blocked")
+            if (schedule.allowsOnly) add("all but ${pluralApps(schedule.allowed.size)} shut") else if (schedule.shut.isNotEmpty()) add("${pluralApps(schedule.shut.size)} shut")
+            if (schedule.minimalMode) add("quiet home screen")
             if (schedule.greyscale) add("greyscale")
             when (schedule.dnd) {
                 DndMode.PRIORITY -> add("priority only")

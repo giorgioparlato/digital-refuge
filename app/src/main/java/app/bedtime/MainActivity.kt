@@ -89,7 +89,6 @@ import app.bedtime.ui.limits.LimitEditScreen
 import app.bedtime.ui.limits.LimitsScreen
 import app.bedtime.ui.stats.StatsScreen
 import app.bedtime.ui.onboarding.OnboardingScreen
-import app.bedtime.ui.onboarding.WalkthroughScreen
 import app.bedtime.ui.homestyle.HomeStyleScreen
 import app.bedtime.ui.notes.NoteTargetsScreen
 import app.bedtime.ui.notes.NotesScreen
@@ -143,6 +142,8 @@ object Routes {
     const val MOODS = "settings/moods"
     const val LAUNCHER = "settings/launcher"
     const val CREDITS = "settings/credits"
+    /** What else refuge does, a card each: from setup's end and settings › about. */
+    const val TOUR = "settings/tour"
     const val JOURNAL_TODAY = "notes/journal"
 
     /** A day's microjournal entry, from the moods in insights. */
@@ -283,13 +284,8 @@ private fun BedtimeNavigation(pendingRoute: String?, onRouteConsumed: () -> Unit
     val scope = rememberCoroutineScope()
     val loaded = settings
     if (loaded != null && !loaded.onboarded) {
-        // A fresh install has nothing to catch up on, so its version counts as seen.
-        WalkthroughScreen(onDone = {
-            scope.launch {
-                val installed = Changelog.installedVersion(context)
-                repo.updateSettings { it.copy(onboarded = true, lastSeenVersion = installed) }
-            }
-        })
+        // Setting it up for yourself; a fresh install has nothing to catch up on, so its version counts as seen.
+        app.bedtime.ui.onboarding.SetupFlow(onDone = { routes -> routes.forEach { push(it) } })
         return
     }
 
@@ -380,7 +376,11 @@ private fun BedtimeNavigation(pendingRoute: String?, onRouteConsumed: () -> Unit
             top == Routes.GROUPS -> GroupsScreen(onBack = ::pop)
             top == Routes.ALWAYS_AVAILABLE -> AlwaysAvailableScreen(onBack = ::pop)
             top == Routes.ONBOARDING -> OnboardingScreen(onDone = ::pop)
-            top == Routes.WALKTHROUGH -> WalkthroughScreen(onDone = ::pop)
+            // Setup again, from settings: back where it was opened, or on to the page it asked for.
+            top == Routes.WALKTHROUGH -> app.bedtime.ui.onboarding.SetupFlow(onDone = { routes ->
+                pop()
+                routes.forEach { push(it) }
+            })
             top == Routes.STATS -> StatsScreen(onBack = ::pop, onOpen = ::push)
             top == Routes.QUOTES -> QuotesScreen(onBack = ::pop)
             top == Routes.NOTES -> NotesScreen(onBack = ::pop, onSettings = { push(Routes.QUICK_NOTES) })
@@ -392,6 +392,7 @@ private fun BedtimeNavigation(pendingRoute: String?, onRouteConsumed: () -> Unit
             top == Routes.MOODS -> app.bedtime.ui.settings.MoodsScreen(onBack = ::pop)
             top == Routes.LAUNCHER -> app.bedtime.ui.settings.LauncherScreen(onBack = ::pop)
             top == Routes.CREDITS -> app.bedtime.ui.settings.CreditsScreen(onBack = ::pop)
+            top == Routes.TOUR -> app.bedtime.ui.onboarding.TourScreen(onBack = ::pop, onOpen = ::push)
             top.startsWith(Routes.EDIT) -> ScheduleEditScreen(
                 scheduleId = top.removePrefix(Routes.EDIT).ifEmpty { null },
                 template = null,

@@ -273,7 +273,7 @@ object Notes {
         val prefs = prefs(context)
         if (!prefs.getBoolean(WAITING, false)) return
         prefs.edit().remove(WAITING).apply()
-        repo.settings.first().afterNoteShortcut?.let { Shortcuts.start(context, it) }
+        repo.settings.first().afterNoteShortcut?.let { Shortcuts.start(context, it, passing = true) }
     }
 
     /**
@@ -299,7 +299,7 @@ object Notes {
         // Then, say, a sync app's "Sync now", so the file reaches your other devices. From the lock
         // screen it waits until you're in: there it would only sit behind the lock, or ask to unlock.
         val locked = context.getSystemService(android.app.KeyguardManager::class.java)?.isKeyguardLocked == true
-        if (added) repo.settings.first().afterNoteShortcut?.let { if (locked) syncWhenUnlocked(context) else Shortcuts.start(context, it) }
+        if (added) repo.settings.first().afterNoteShortcut?.let { if (locked) syncWhenUnlocked(context) else Shortcuts.start(context, it, passing = true) }
         val name = target.name.lowercase()
         return if (added) "added to $name" else "couldn't reach $name, so it's in refuge notes"
     }

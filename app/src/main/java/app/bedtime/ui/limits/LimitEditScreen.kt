@@ -75,9 +75,12 @@ import app.bedtime.ui.components.SectionLabel
 import app.bedtime.ui.edit.EditorHeader
 import app.bedtime.ui.edit.RenameDialog
 import app.bedtime.ui.edit.UnlockStepsEditor
-import app.bedtime.ui.edit.WaitStep
-import app.bedtime.ui.edit.TypingStep
 import app.bedtime.ui.edit.HarderStep
+import app.bedtime.ui.edit.TypingSettings
+import app.bedtime.ui.edit.FoldSection
+import app.bedtime.ui.edit.StartFrom
+import app.bedtime.data.LimitChoice
+import app.bedtime.data.Strictness
 import androidx.compose.ui.unit.sp
 import app.bedtime.ui.formatMinutes
 import app.bedtime.ui.formatWaitSeconds
@@ -262,6 +265,51 @@ fun LimitEditScreen(limitId: String?, onBack: () -> Unit) {
 private const val WINDOW_START = "start"
 private const val WINDOW_END = "end"
 
+private const val FOLD_PAUSE = "pause"
+private const val FOLD_DAILY = "daily"
+private const val FOLD_OUT = "out"
+private const val FOLD_MORE = "more"
+
+/** The line "before it opens" shows while it is shut. */
+internal fun pauseSummary(rules: LimitRules): String {
+    val seconds = rules.pauseSeconds ?: 0
+    if (seconds <= 0) return "no pause"
+    val what = when (rules.pauseKind) {
+        PauseKind.WAIT -> "a ${formatWaitSeconds(seconds)} wait"
+        PauseKind.TYPING -> "type ${rules.pauseTextLength} characters"
+        PauseKind.ASK -> "ask why"
+    }
+    return listOfNotNull(
+        what,
+        "harder each time".takeIf { rules.pauseGrowth > 0 && rules.pauseKind != PauseKind.ASK },
+        rules.openMinutes?.let { "then open $it min" } ?: "then open until you leave",
+    ).joinToString(" · ")
+}
+
+/** The line "each day" shows while it is shut. */
+internal fun dailySummary(rules: LimitRules): String = listOfNotNull(
+    rules.dailyMinutes?.let { "${formatMinutes(it.toLong())} a day" },
+    rules.dailyOpens?.let { opensADay(it) },
+).joinToString(" · ").ifEmpty { "no daily budget" } + if ((rules.dailyMinutes != null || rules.dailyOpens != null) && rules.apps.size > 1 && !rules.shared) " · each app" else ""
+
+/** The line "when it runs out" shows while it is shut: the answer, then the steps for more. */
+internal fun runsOutSummary(rules: LimitRules, hasNewPassword: Boolean): String {
+    val answer = when (rules.outOfTime) {
+        OutOfTime.TOMORROW -> return "wait for tomorrow"
+        OutOfTime.MORE_TIME -> "${rules.extraMinutes} min more"
+        OutOfTime.CHOOSE -> "you choose how much"
+        OutOfTime.REST_OF_DAY -> "the rest of the day"
+    }
+    val steps = app.bedtime.ui.edit.unlockSteps(rules.unlock, hasNewPassword)
+    return answer + " · " + if (steps.isEmpty()) "a single tap" else steps.joinToString(", then ")
+}
+
+/** The line "more options" shows while it is shut: what's set beyond the usual, or what's in it. */
+internal fun limitMoreSummary(limit: AppLimit, changeable: String?): String = buildList {
+    if (limit.rules.moodAfter) add("how do you feel now?")
+    if (changeable != null) add("changeable $changeable")
+}.ifEmpty { listOf("the cover's words, how you feel after, changing it") }.joinToString(" · ")
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun LimitEditContent(
@@ -288,6 +336,11 @@ internal fun LimitEditContent(
     val editable = shutWindow == null
     fun setRules(transform: (LimitRules) -> LimitRules) = onDraftChange(draft.copy(rules = transform(rules)))
 
+    // One fold open at a time, as on a schedule's page; a new limit opens on what it does before an app opens.
+    var open by rememberSaveable { mutableStateOf<String?>(if (isNew) FOLD_PAUSE else null) }
+    fun toggle(fold: String) {
+        open = if (open == fold) null else fold
+    }
     var renaming by rememberSaveable { mutableStateOf(false) }
     if (renaming) {
         RenameDialog(
@@ -401,78 +454,76 @@ internal fun LimitEditContent(
                     AppIconStack(rules.apps.sorted(), appLabel)
                     Chevron()
                 }
+                StartFrom(LimitChoice.starts.map { it.label }, LimitChoice.of(rules)?.let { LimitChoice.starts.indexOf(it) }, editable) { i ->
+                    setRules { LimitChoice.starts[i].applied(it) }
+                }
+                Spacer(Modifier.height(10.dp))
 
-                SectionLabel("Pause before opening")
-                // The same rows as a block's steps. A pause is one of them: switching one on switches the
-                // others off, and with all off these apps open straight away.
+                // ---------------------------------------------------------------- before it opens
                 val paused = (rules.pauseSeconds ?: 0) > 0
-                WaitStep(
-                    paused && rules.pauseKind == PauseKind.WAIT,
-                    { on -> setRules { it.copy(pauseSeconds = if (on) it.pauseSeconds ?: 10 else null, pauseKind = PauseKind.WAIT) } },
-                    rules.pauseSeconds ?: 10,
-                    { v -> setRules { it.copy(pauseSeconds = v) } },
-                    editable,
-                    description = "Before one of these apps opens, a moment to decide",
-                    range = 3..600,
-                    step = 1,
-                    presets = listOf(5, 10, 15, 30, 60),
-                )
-                TypingStep(
-                    paused && rules.pauseKind == PauseKind.TYPING,
-                    { on -> setRules { it.copy(pauseSeconds = if (on) it.pauseSeconds ?: 10 else null, pauseKind = PauseKind.TYPING) } },
-                    rules.pauseTextLength,
-                    { v -> setRules { it.copy(pauseTextLength = v) } },
-                    rules.pauseTextSource,
-                    { v -> setRules { it.copy(pauseTextSource = v) } },
-                    editable,
-                    range = 10..500,
-                    step = 10,
-                    presets = listOf(20, 40, 60, 100, 150),
-                )
-                // Or a question, a different one each time, and a box to write in.
-                OptionRow(Icons.Default.Info, "Ask why", description = "A question and a box to write in; going on is a tap. What you write goes to its note", enabled = editable) {
-                    ObsidianToggle(
-                        paused && rules.pauseKind == PauseKind.ASK,
-                        { on -> setRules { it.copy(pauseSeconds = if (on) it.pauseSeconds ?: 10 else null, pauseKind = PauseKind.ASK) } },
-                        enabled = editable,
-                    )
-                }
-                var questions by remember { mutableStateOf(false) }
-                if (questions) {
-                    // Over the limit, so nothing set here is lost on the way.
-                    androidx.compose.ui.window.Dialog(
-                        onDismissRequest = { questions = false },
-                        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
-                    ) { app.bedtime.ui.settings.WhyAppQuestionsScreen(onBack = { questions = false }) }
-                }
-                AnimatedVisibility(paused && rules.pauseKind == PauseKind.ASK) {
-                    Column {
-                        SubOptionRow("Words, at least") {
-                            NumberStepper(
-                                rules.askWords,
-                                { v -> setRules { it.copy(askWords = v) } },
-                                0..300,
-                                step = 5,
-                                enabled = editable,
-                                presets = listOf(0, 10, 20, 30, 50),
-                                title = "words",
-                                format = { if (it == 0) "none" else "$it" },
+                FoldSection(
+                    title = "Before it opens",
+                    summary = pauseSummary(rules),
+                    open = open == FOLD_PAUSE,
+                    onToggle = { toggle(FOLD_PAUSE) },
+                ) {
+                    // One kind of pause, or none: only the chosen one's settings show.
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        QuickChip("No pause", !paused, editable) { setRules { it.copy(pauseSeconds = null) } }
+                        listOf(PauseKind.WAIT to "A wait", PauseKind.TYPING to "Typing", PauseKind.ASK to "Ask why").forEach { (kind, label) ->
+                            QuickChip(label, paused && rules.pauseKind == kind, editable) {
+                                setRules { it.copy(pauseSeconds = it.pauseSeconds?.takeIf { s -> s > 0 } ?: 10, pauseKind = kind) }
+                            }
+                        }
+                    }
+                    if (paused) {
+                        when (rules.pauseKind) {
+                            PauseKind.WAIT -> SubOptionRow("Wait") {
+                                NumberStepper(
+                                    rules.pauseSeconds ?: 10, { v -> setRules { it.copy(pauseSeconds = v) } }, 3..600, step = 1, enabled = editable,
+                                    presets = listOf(5, 10, 15, 30, 60), title = "wait", format = { formatWaitSeconds(it) },
+                                )
+                            }
+                            PauseKind.TYPING -> TypingSettings(
+                                rules.pauseTextLength, { v -> setRules { it.copy(pauseTextLength = v) } },
+                                rules.pauseTextSource, { v -> setRules { it.copy(pauseTextSource = v) } },
+                                editable,
+                            )
+                            PauseKind.ASK -> {
+                                Text(
+                                    "A question and a box to write in; going on is a tap. What you write goes to its note.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = c.textMuted,
+                                    modifier = Modifier.padding(top = 10.dp),
+                                )
+                                SubOptionRow("Words, at least") {
+                                    NumberStepper(
+                                        rules.askWords, { v -> setRules { it.copy(askWords = v) } }, 0..300, step = 5, enabled = editable,
+                                        presets = listOf(0, 10, 20, 30, 50), title = "words", format = { if (it == 0) "none" else "$it" },
+                                    )
+                                }
+                                var questions by remember { mutableStateOf(false) }
+                                if (questions) {
+                                    // Over the limit, so nothing set here is lost on the way.
+                                    androidx.compose.ui.window.Dialog(
+                                        onDismissRequest = { questions = false },
+                                        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
+                                    ) { app.bedtime.ui.settings.WhyAppQuestionsScreen(onBack = { questions = false }) }
+                                }
+                                OptionRow(Icons.Default.Edit, "The questions", description = "Asked in turn, shared by every limit that asks", onClick = { questions = true }) { Chevron() }
+                            }
+                        }
+                        if (rules.pauseKind != PauseKind.ASK) {
+                            HarderStep(
+                                rules.pauseGrowth > 0,
+                                { on -> setRules { it.copy(pauseGrowth = if (on) 50 else 0) } },
+                                10 + rules.pauseGrowth / 10,
+                                { v -> setRules { it.copy(pauseGrowth = (v - 10) * 10) } },
+                                editable,
+                                description = "Each open in a day makes it longer, up to 8× the wait or 3× the text. A new day starts over",
                             )
                         }
-                        OptionRow(Icons.Default.Edit, "The questions", description = "Asked in turn, shared by every limit that asks", onClick = { questions = true }) { Chevron() }
-                    }
-                }
-                AnimatedVisibility(paused) {
-                    Column {
-                        HarderStep(
-                            rules.pauseGrowth > 0,
-                            { on -> setRules { it.copy(pauseGrowth = if (on) 50 else 0) } },
-                            10 + rules.pauseGrowth / 10,
-                            { v -> setRules { it.copy(pauseGrowth = (v - 10) * 10) } },
-                            editable,
-                            description = "Each open in a day makes the wait or the typing longer, up to 8× the wait or 3× the text. A new day starts over",
-                        )
-                        SubOptionRow("After the pause, open for") {
+                        SubOptionRow("After it, open for") {
                             NumberStepper(
                                 rules.openMinutes ?: 0,
                                 { v -> setRules { it.copy(openMinutes = v.takeIf { m -> m > 0 }) } },
@@ -485,12 +536,7 @@ internal fun LimitEditContent(
                             )
                         }
                         if (rules.apps.size > 1) {
-                            Text(
-                                "Getting through the pause opens",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = c.textMuted,
-                                modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
-                            )
+                            Text("Getting through it opens", style = MaterialTheme.typography.bodyMedium, color = c.textMuted, modifier = Modifier.padding(top = 12.dp, bottom = 8.dp))
                             SegmentedChoice(
                                 options = listOf("Just that app", "All of them"),
                                 selected = if (rules.pauseForGroup) 1 else 0,
@@ -500,112 +546,83 @@ internal fun LimitEditContent(
                         }
                         val all = rules.apps.size > 1 && rules.pauseForGroup
                         Text(
-                            when (val open = rules.openMinutes) {
+                            when (val openFor = rules.openMinutes) {
                                 null -> if (all) {
                                     "Getting through the pause once opens all of these apps until you leave them. Back within a minute is the same visit."
                                 } else {
                                     "The pause comes each time you open one. Back within a minute is the same visit."
                                 }
                                 else -> if (all) {
-                                    "Getting through the pause once opens all of these apps for $open min, coming and going as you like. Then the pause again."
+                                    "Getting through the pause once opens all of these apps for $openFor min, coming and going as you like. Then the pause again."
                                 } else {
-                                    "Each app opens for $open min after its pause, coming and going as you like. Then the pause again."
+                                    "Each app opens for $openFor min after its pause, coming and going as you like. Then the pause again."
                                 }
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = c.textMuted,
                             modifier = Modifier.padding(top = 6.dp),
                         )
+                    } else {
+                        Text("These apps open straight away.", style = MaterialTheme.typography.bodySmall, color = c.textFaint, modifier = Modifier.padding(top = 8.dp))
                     }
                 }
 
-                SectionLabel("Daily budget")
-                OptionRow(
-                    Icons.Default.Refresh,
-                    "Minutes a day",
-                    description = "Once they're used, the apps step aside until tomorrow",
-                    enabled = editable,
+                // ---------------------------------------------------------------- each day
+                val daily = rules.dailyMinutes != null || rules.dailyOpens != null
+                FoldSection(
+                    title = "Each day",
+                    summary = dailySummary(rules),
+                    open = open == FOLD_DAILY,
+                    onToggle = { toggle(FOLD_DAILY) },
                 ) {
-                    ObsidianToggle(
-                        rules.dailyMinutes != null,
-                        { on -> setRules { it.copy(dailyMinutes = if (on) 30 else null) } },
-                        enabled = editable,
-                    )
-                }
-                AnimatedVisibility(rules.dailyMinutes != null) {
-                    SubOptionRow("Each day") {
-                        NumberStepper(
-                            rules.dailyMinutes ?: 30,
-                            { v -> setRules { it.copy(dailyMinutes = v) } },
-                            5..480,
-                            step = 5,
-                            suffix = " min",
-                            presets = listOf(10, 15, 20, 30, 45, 60, 90, 120),
-                            title = "minutes a day",
-                            enabled = editable,
-                        )
+                    OptionRow(Icons.Default.Refresh, "Minutes a day", description = "Once they're used, the apps step aside until tomorrow", enabled = editable) {
+                        ObsidianToggle(rules.dailyMinutes != null, { on -> setRules { it.copy(dailyMinutes = if (on) 30 else null) } }, enabled = editable)
                     }
-                }
-                OptionRow(
-                    BedtimeIcons.Target,
-                    "Opens a day",
-                    description = "How many times they can be opened; coming back within a minute isn't another",
-                    enabled = editable,
-                ) {
-                    ObsidianToggle(
-                        rules.dailyOpens != null,
-                        { on -> setRules { it.copy(dailyOpens = if (on) 5 else null) } },
-                        enabled = editable,
-                    )
-                }
-                AnimatedVisibility(rules.dailyOpens != null) {
-                    SubOptionRow("Each day") {
-                        NumberStepper(
-                            rules.dailyOpens ?: 5,
-                            { v -> setRules { it.copy(dailyOpens = v) } },
-                            1..50,
-                            presets = listOf(1, 2, 3, 5, 10, 20),
-                            title = "opens a day",
-                            enabled = editable,
-                        )
-                    }
-                }
-                AnimatedVisibility(rules.dailyMinutes != null || rules.dailyOpens != null) {
-                    Column {
-                        if (rules.apps.size > 1) {
-                            Text(
-                                "Shared or each",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = c.textMuted,
-                                modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
-                            )
-                            SegmentedChoice(
-                                options = listOf("Shared", "Each app"),
-                                selected = if (rules.shared) 0 else 1,
-                                onSelect = { i -> setRules { it.copy(shared = i == 0) } },
-                                enabled = editable,
-                            )
-                            val allowance = listOfNotNull(
-                                rules.dailyMinutes?.let { formatMinutes(it.toLong()) },
-                                rules.dailyOpens?.let { opensADay(it).removeSuffix(" a day") },
-                            ).joinToString(" and ")
-                            Text(
-                                if (rules.shared) {
-                                    "$allowance across all of them, so it doesn't just move from one to another."
-                                } else {
-                                    "$allowance in each of them."
-                                },
-                                style = MaterialTheme.typography.bodySmall,
-                                color = c.textMuted,
-                                modifier = Modifier.padding(top = 8.dp),
+                    AnimatedVisibility(rules.dailyMinutes != null) {
+                        SubOptionRow("Each day") {
+                            NumberStepper(
+                                rules.dailyMinutes ?: 30, { v -> setRules { it.copy(dailyMinutes = v) } }, 5..480, step = 5, suffix = " min",
+                                presets = listOf(10, 15, 20, 30, 45, 60, 90, 120), title = "minutes a day", enabled = editable,
                             )
                         }
-                        Text(
-                            "When it runs out",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = c.textMuted,
-                            modifier = Modifier.padding(top = 14.dp, bottom = 8.dp),
+                    }
+                    OptionRow(BedtimeIcons.Target, "Opens a day", description = "How many times they can be opened; coming back within a minute isn't another", enabled = editable) {
+                        ObsidianToggle(rules.dailyOpens != null, { on -> setRules { it.copy(dailyOpens = if (on) 5 else null) } }, enabled = editable)
+                    }
+                    AnimatedVisibility(rules.dailyOpens != null) {
+                        SubOptionRow("Each day") {
+                            NumberStepper(rules.dailyOpens ?: 5, { v -> setRules { it.copy(dailyOpens = v) } }, 1..50, presets = listOf(1, 2, 3, 5, 10, 20), title = "opens a day", enabled = editable)
+                        }
+                    }
+                    if (daily && rules.apps.size > 1) {
+                        Text("Shared or each", style = MaterialTheme.typography.bodyMedium, color = c.textMuted, modifier = Modifier.padding(top = 12.dp, bottom = 8.dp))
+                        SegmentedChoice(
+                            options = listOf("Shared", "Each app"),
+                            selected = if (rules.shared) 0 else 1,
+                            onSelect = { i -> setRules { it.copy(shared = i == 0) } },
+                            enabled = editable,
                         )
+                        val allowance = listOfNotNull(
+                            rules.dailyMinutes?.let { formatMinutes(it.toLong()) },
+                            rules.dailyOpens?.let { opensADay(it).removeSuffix(" a day") },
+                        ).joinToString(" and ")
+                        Text(
+                            if (rules.shared) "$allowance across all of them, so it doesn't just move from one to another." else "$allowance in each of them.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = c.textMuted,
+                            modifier = Modifier.padding(top = 8.dp),
+                        )
+                    }
+                }
+
+                // ---------------------------------------------------------------- when it runs out
+                if (daily) {
+                    FoldSection(
+                        title = "When it runs out",
+                        summary = runsOutSummary(rules, newPassword.isNotBlank()),
+                        open = open == FOLD_OUT,
+                        onToggle = { toggle(FOLD_OUT) },
+                    ) {
                         // Four answers don't fit one row of segments, so they wrap as chips.
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             listOf(
@@ -632,83 +649,59 @@ internal fun LimitEditContent(
                             color = c.textMuted,
                             modifier = Modifier.padding(top = 8.dp),
                         )
-                        AnimatedVisibility(rules.outOfTime == OutOfTime.MORE_TIME) {
+                        if (rules.outOfTime == OutOfTime.MORE_TIME) {
                             SubOptionRow("Each time") {
-                                NumberStepper(
-                                    rules.extraMinutes,
-                                    { v -> setRules { it.copy(extraMinutes = v) } },
-                                    1..120,
-                                    suffix = " min",
-                                    presets = listOf(5, 10, 15, 20, 30),
-                                    title = "more time",
-                                    enabled = editable,
-                                )
+                                NumberStepper(rules.extraMinutes, { v -> setRules { it.copy(extraMinutes = v) } }, 1..120, suffix = " min", presets = listOf(5, 10, 15, 20, 30), title = "more time", enabled = editable)
                             }
                         }
-                        AnimatedVisibility(rules.outOfTime != OutOfTime.TOMORROW) {
-                            Column {
-                                SectionLabel("The steps for more, in this order")
-                                UnlockStepsEditor(
-                                    rules.unlock,
-                                    { u -> setRules { it.copy(unlock = u) } },
-                                    editable = editable,
-                                    newPassword = newPassword,
-                                    onNewPasswordChange = onNewPasswordChange,
-                                )
+                        if (rules.outOfTime != OutOfTime.TOMORROW) {
+                            SectionLabel("Getting more, step by step")
+                            StartFrom(Strictness.entries.map { it.label }, Strictness.of(rules.unlock)?.ordinal, editable) { i ->
+                                setRules { it.copy(unlock = Strictness.entries[i].applied(it.unlock)) }
                             }
+                            Spacer(Modifier.height(6.dp))
+                            UnlockStepsEditor(rules.unlock, { u -> setRules { it.copy(unlock = u) } }, editable = editable, newPassword = newPassword, onNewPasswordChange = onNewPasswordChange)
                         }
                     }
                 }
 
-                SectionLabel("What it says")
-                MessageChoiceRow(
-                    "What the cover says",
-                    draft.message,
-                    { onDraftChange(draft.copy(message = it)) },
-                    enabled = editable,
-                )
-
-                SectionLabel("Afterwards")
-                OptionRow(
-                    Icons.Default.Edit,
-                    "How do you feel now?",
-                    description = "Your moods to tap, once the time open after the pause is over; without one, a minute after you leave these apps",
-                ) { ObsidianToggle(rules.moodAfter, { on -> setRules { it.copy(moodAfter = on) } }) }
-
-                SectionLabel("When it can be changed")
-                OptionRow(
-                    Icons.Default.Lock,
-                    "Changeable only at certain hours",
-                    description = "Outside them it can't be edited or deleted",
-                    enabled = editable,
+                // ---------------------------------------------------------------- more options
+                FoldSection(
+                    title = "More options",
+                    summary = limitMoreSummary(draft, draft.editWindow?.let { "${formatMinuteOfDay(context, it.startMinute)}–${formatMinuteOfDay(context, it.endMinute)}" }),
+                    open = open == FOLD_MORE,
+                    onToggle = { toggle(FOLD_MORE) },
                 ) {
-                    ObsidianToggle(
-                        draft.editWindow != null,
-                        { on -> onDraftChange(draft.copy(editWindow = if (on) EditWindow() else null)) },
-                        enabled = editable,
-                    )
-                }
-                AnimatedVisibility(draft.editWindow != null) {
-                    val window = draft.editWindow ?: EditWindow()
-                    Column(Modifier.padding(top = 8.dp)) {
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            TimeTile("From", formatMinuteOfDay(context, window.startMinute), Modifier.weight(1f), enabled = editable, onClick = onEditWindowStart)
-                            TimeTile(
-                                "Until",
-                                formatMinuteOfDay(context, window.endMinute),
-                                Modifier.weight(1f),
-                                caption = if (window.endMinute <= window.startMinute) "next day" else null,
-                                enabled = editable,
-                                onClick = onEditWindowEnd,
+                    MessageChoiceRow("What the cover says", draft.message, { onDraftChange(draft.copy(message = it)) }, enabled = editable)
+                    OptionRow(
+                        Icons.Default.Edit,
+                        "How do you feel now?",
+                        description = "Your moods to tap, once the time open after the pause is over; without one, a minute after you leave these apps",
+                    ) { ObsidianToggle(rules.moodAfter, { on -> setRules { it.copy(moodAfter = on) } }) }
+                    OptionRow(Icons.Default.Lock, "Changeable only at certain hours", description = "Outside them it can't be edited or deleted", enabled = editable) {
+                        ObsidianToggle(draft.editWindow != null, { on -> onDraftChange(draft.copy(editWindow = if (on) EditWindow() else null)) }, enabled = editable)
+                    }
+                    AnimatedVisibility(draft.editWindow != null) {
+                        val window = draft.editWindow ?: EditWindow()
+                        Column(Modifier.padding(top = 8.dp)) {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                TimeTile("From", formatMinuteOfDay(context, window.startMinute), Modifier.weight(1f), enabled = editable, onClick = onEditWindowStart)
+                                TimeTile(
+                                    "Until",
+                                    formatMinuteOfDay(context, window.endMinute),
+                                    Modifier.weight(1f),
+                                    caption = if (window.endMinute <= window.startMinute) "next day" else null,
+                                    enabled = editable,
+                                    onClick = onEditWindowEnd,
+                                )
+                            }
+                            Text(
+                                "Outside these hours this page is read-only, and the limit can't be deleted. Loosening it still waits for midnight either way.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = c.textMuted,
+                                modifier = Modifier.padding(top = 10.dp),
                             )
                         }
-                        Text(
-                            "Outside these hours this page is read-only, and the limit can't be deleted. " +
-                                "Loosening it still waits for midnight either way.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = c.textMuted,
-                            modifier = Modifier.padding(top = 10.dp),
-                        )
                     }
                 }
 

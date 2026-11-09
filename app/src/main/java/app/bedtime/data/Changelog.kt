@@ -13,6 +13,20 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            92,
+            "0.9.46",
+            listOf(
+                "A first-run setup: your distracting apps, a day's budget, a bedtime, limits for your most used apps, always-available apps, the one permission and the quiet home screen. Each step can be left for now; settings › about › set up again goes through it from what you have.",
+                "A tour of what else refuge does (habits, notes and the microjournal, voice notes, check-ins, Obsidian, widgets, search, gestures), from the end of setup or settings › about.",
+                "A schedule's page has four folds: what it shuts, how the phone feels, leaving early, more options. It shuts \"these apps\" or \"all but these\", and its quiet home screen has its own list of apps.",
+                "Leaving early shows only the steps you add, with + for more; gentle, firm and strict are starting points to change. Notifications read as who can ring, what's silenced and refuge's lock screen, with as usual, quiet and silent to start from.",
+                "Switching off the emergency break asks first, as some apps may ask you to switch refuge off before they open.",
+                "Greyscale greys refuge's own screens too. Covering Android's off switches and the full-screen reminder are one switch each on settings' first page, and can't be changed while a session runs.",
+                "A limit's page matches: start from a pause or minutes a day, then before it opens, each day, when it runs out and more options.",
+                "Waiting it out keeps counting with the screen off or the phone locked; it only pauses while you're in another app.",
+            ),
+        ),
+        ChangelogEntry(
             91,
             "0.9.45",
             listOf(

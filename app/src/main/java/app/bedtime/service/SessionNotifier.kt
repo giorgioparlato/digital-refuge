@@ -150,7 +150,7 @@ object SessionNotifier {
         val others = state.active.size - 1
         return buildList {
             if (others > 0) add("+$others more")
-            if (state.minimalAllowlist != null) add("minimal home")
+            if (state.minimalOccurrence != null) add("quiet home screen")
             if (state.blocked.isNotEmpty()) add("${state.blocked.size} apps blocked")
             if (state.greyscale) add("greyscale")
             if (state.dnd != DndMode.OFF) add("do not disturb")

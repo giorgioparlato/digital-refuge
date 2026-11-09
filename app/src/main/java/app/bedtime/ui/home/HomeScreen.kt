@@ -477,7 +477,7 @@ private fun HomeHeader(
                         modifier = Modifier.clickable { onUnlock(current.schedule.id) }.padding(vertical = 2.dp),
                     )
                     if (state.blocked.isNotEmpty()) Tag("${pluralApps(state.blocked.size)} blocked")
-                    if (state.minimalAllowlist != null) Tag("minimal mode")
+                    if (state.minimalOccurrence != null) Tag("quiet home screen")
                     if (state.greyscale) Tag("greyscale")
                     if (state.dnd != DndMode.OFF) Tag("do not disturb")
                 }

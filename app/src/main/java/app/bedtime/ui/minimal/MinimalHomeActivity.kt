@@ -347,8 +347,9 @@ private fun MinimalHomeScreen(
         installed = installed.map { it.packageName },
         favourites = settings.homeFavourites,
         hidden = settings.hiddenApps,
-        minimal = if (occurrence != null) state?.minimalAllowlist.orEmpty() else null,
+        minimal = if (occurrence != null) state?.quietHomeApps else null,
         blocked = if (state?.isActive == true) state?.blocked.orEmpty() else emptySet(),
+        allowed = if (state?.isActive == true) state?.allowlist else null,
         alwaysAvailable = settings.alwaysAvailable,
         dialer = dialer,
     )

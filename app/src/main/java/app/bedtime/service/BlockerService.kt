@@ -80,7 +80,6 @@ class BlockerService : AccessibilityService() {
 
     /** Whether the screen in front is the recent-apps view, which minimal mode lets through. */
     private var recentsInFront = false
-    private var homeInFront = false
 
     /** The settle timer for the window change we have not acted on yet. */
     private val handler = Handler(Looper.getMainLooper())
@@ -116,9 +115,6 @@ class BlockerService : AccessibilityService() {
     private var packagesReadAt = 0L
     private var watchersRegistered = false
 
-    /** Our screens that stay in colour while greyscale is on (if the home style says so). */
-    private val colourScreens = setOf(MinimalHomeActivity::class.java.name, LockScreenActivity::class.java.name)
-
     /** Do Not Disturb switched off from quick settings mid-session: switch it straight back on. */
     private val zenReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -137,7 +133,6 @@ class BlockerService : AccessibilityService() {
         override fun onReceive(context: Context, intent: Intent) {
             if (ModeGreyscale.isSelfChange()) return
             val owner = state?.active?.firstOrNull { it.schedule.greyscale } ?: return
-            if (homeInFront && state?.keepHomeInColour == true) return
             if (!ModeGreyscale.isUserDeactivation(context, intent)) return
             ModeGreyscale.apply(context, on = true, reassert = true)
             notice("Greyscale stays on during ${owner.schedule.name}.")
@@ -295,11 +290,6 @@ class BlockerService : AccessibilityService() {
         // left the app actually in front unexamined when the session came back.
         if (pkg in overlays) return
         val className: String? = event.className?.toString()
-        val home = pkg == packageName && className != null && className in colourScreens
-        if (home != homeInFront) {
-            homeInFront = home
-            applyGreyscale()
-        }
         // First, and on every window of Settings: its fragments and dialogs are not activities of their
         // own, and the cover over them can't wait for the settle either — the event's text dies with it.
         if (guardSettings(pkg, event)) return
@@ -336,7 +326,7 @@ class BlockerService : AccessibilityService() {
     private fun syncAfterObsidian(locked: Boolean) {
         val shortcut = settings.afterNoteShortcut ?: return
         if (!settings.syncAfterObsidian) return
-        if (locked) app.bedtime.data.Notes.syncWhenUnlocked(this) else releaseScope.launch { Shortcuts.start(this@BlockerService, shortcut) }
+        if (locked) app.bedtime.data.Notes.syncWhenUnlocked(this) else releaseScope.launch { Shortcuts.start(this@BlockerService, shortcut, passing = true) }
     }
 
     private fun settle(pkg: String) {
@@ -367,12 +357,7 @@ class BlockerService : AccessibilityService() {
         return true
     }
 
-    private fun applyGreyscale() =
-        GreyscaleController.apply(
-            this,
-            wanted = state?.greyscale == true,
-            pausedForHome = homeInFront && state?.keepHomeInColour == true,
-        )
+    private fun applyGreyscale() = GreyscaleController.apply(this, wanted = state?.greyscale == true)
 
     /**
      * Screen just went off: put the clock over the lock screen for next time, mid-session, or always
@@ -447,7 +432,7 @@ class BlockerService : AccessibilityService() {
         val arrived = limitTracker.moveTo(pkg)
         distractionClock.moveTo(pkg)
         if (pkg == null) return
-        when (Enforcement.decide(pkg, packageName, state, alwaysAllowed, settings.alwaysAvailable, recentsInFront, ::opensAsApp)) {
+        when (Enforcement.decide(pkg, packageName, state, alwaysAllowed, settings.alwaysAvailable, recentsInFront, ::opensAsApp, homePackages)) {
             Verdict.LET_THROUGH -> Unit
             Verdict.COVER -> Problems.attempt("covering a blocked app") { startActivity(BlockedActivity.intent(this, pkg)) }
             // In minimal mode the stock launcher and recents are "not allowed" too, so Home lands here.

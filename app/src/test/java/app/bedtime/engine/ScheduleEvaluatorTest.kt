@@ -100,20 +100,40 @@ class ScheduleEvaluatorTest {
 
     @Test
     fun combinesOverlappingSchedules() {
+        // Saved before "all but these" was a choice of its own: the quiet home screen meant it.
         val a = night.copy(id = "a", blockedApps = setOf("x"), greyscale = false, minimalMode = true, allowedApps = setOf("p", "q"))
-        val b = night.copy(id = "b", blockedApps = setOf("y"), greyscale = true, minimalMode = true, allowedApps = setOf("q", "r"))
-        val state = eval(at(monday, 23), a, b)
-        assertEquals(setOf("x", "y"), state.blocked)
+        val b = night.copy(id = "b", blockedApps = setOf("y"), greyscale = true, allowOnly = true, allowedApps = setOf("q", "r"))
+        val c = night.copy(id = "c", blockedApps = setOf("z"), allowOnly = false)
+        val state = eval(at(monday, 23), a, b, c)
+        // "All but these" shuts by what it allows, so its own list of names adds nothing.
+        assertEquals(setOf("z"), state.blocked)
         assertTrue(state.greyscale)
-        assertEquals(setOf("q"), state.minimalAllowlist)
+        assertEquals(setOf("q"), state.allowlist)
         assertEquals("a", state.blockerOf("x")?.schedule?.id)
-        assertEquals("a", state.blockerOf("r")?.schedule?.id) // not allowed by a's minimal mode
+        assertEquals("a", state.blockerOf("r")?.schedule?.id) // not allowed by a
+        assertEquals("c", state.blockerOf("z")?.schedule?.id)
         assertNull(state.blockerOf("q"))
     }
 
     @Test
-    fun noMinimalModeMeansNoAllowlist() {
-        assertNull(eval(at(monday, 23), night).minimalAllowlist)
+    fun shuttingByNameMeansNoAllowlist() {
+        assertNull(eval(at(monday, 23), night).allowlist)
+        // The quiet home screen is only a look once "all but these" is its own choice.
+        assertNull(eval(at(monday, 23), night.copy(minimalMode = true, allowOnly = false)).allowlist)
+    }
+
+    @Test
+    fun theQuietHomeScreenShowsItsOwnList() {
+        val trimmed = night.copy(minimalMode = true, allowOnly = true, allowedApps = setOf("p", "q"), homeApps = setOf("q", "x"))
+        // Never an app it doesn't let open.
+        assertEquals(setOf("q"), eval(at(monday, 23), trimmed).quietHomeApps)
+        assertEquals(setOf("p", "q"), eval(at(monday, 23), trimmed.copy(homeApps = null)).quietHomeApps)
+        val shutting = night.copy(minimalMode = true, allowOnly = false, blockedApps = setOf("x"))
+        // None of its own: your usual home apps, less the shut ones.
+        assertNull(eval(at(monday, 23), shutting).quietHomeApps)
+        assertEquals(setOf("q"), eval(at(monday, 23), shutting.copy(homeApps = setOf("q", "x"))).quietHomeApps)
+        // Without the quiet home screen, nothing to show.
+        assertNull(eval(at(monday, 23), trimmed.copy(minimalMode = false)).quietHomeApps)
     }
 
     @Test
