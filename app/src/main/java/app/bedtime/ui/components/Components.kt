@@ -554,7 +554,8 @@ fun Callout(
     val c = Obsidian.colors
     val color = when (kind) {
         CalloutKind.NOTE -> c.accent
-        CalloutKind.INFO -> c.blue
+        // Neutral: the theme's blue sat apart from its greens.
+        CalloutKind.INFO -> c.textMuted
         CalloutKind.WARNING -> c.orange
         CalloutKind.SUCCESS -> c.green
     }

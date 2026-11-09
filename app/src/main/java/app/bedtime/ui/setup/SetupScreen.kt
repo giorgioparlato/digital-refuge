@@ -11,6 +11,18 @@ import android.os.PowerManager
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.Icon
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -49,14 +61,10 @@ import app.bedtime.ui.pluralApps
 import app.bedtime.service.DndController
 import app.bedtime.service.GreyscaleController
 import app.bedtime.service.SystemApps
-import app.bedtime.ui.components.Callout
-import app.bedtime.ui.components.CalloutKind
 import app.bedtime.ui.components.CtaButton
 import app.bedtime.ui.components.ObsidianTopBar
 import app.bedtime.ui.components.PlainButton
 import app.bedtime.ui.components.SectionCard
-import app.bedtime.ui.components.StatusDot
-import app.bedtime.ui.components.StatusPill
 import app.bedtime.ui.theme.Obsidian
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -182,6 +190,7 @@ internal fun SetupContent(
     onChooseHome: () -> Unit = {},
 ) {
     val c = Obsidian.colors
+    val steps = listOf(serviceOn, alwaysAvailableCount > 0, batteryOk, dndOk, notificationsOk, overlayOk)
     Scaffold(containerColor = c.bgPrimary, topBar = { ObsidianTopBar("Setup", onBack = onBack) }) { padding ->
         Column(
             Modifier
@@ -189,150 +198,184 @@ internal fun SetupContent(
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = PageGutter, vertical = 4.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
-                "A few one-time steps so digital refuge can do its job. Nothing ever leaves your phone.",
+                "A few switches so refuge can do its job. Nothing ever leaves your phone.",
                 style = MaterialTheme.typography.bodyLarge,
                 color = c.textMuted,
-                modifier = Modifier.padding(horizontal = 4.dp),
             )
+            Progress(steps.count { it }, steps.size)
 
-            StepCard(1, "Let digital refuge see which app is open", done = serviceOn, badge = "Required") {
-                Body("This is what notices when a blocked app opens. It only sees which app is in front: it can't read what's on your screen or what you type.")
-                // Before Android's own warning, which reads the same for every app that uses this switch.
-                Callout(
-                    title = "About Android's warning",
-                    kind = CalloutKind.INFO,
-                    body = "When you switch this on, Android warns that the app can \u201cview and control the screen\u201d. It shows that warning for every app that uses this switch.\n\n" +
-                        "What digital refuge actually has: it's told when a different app comes to the front, and the name of that app or Settings page. " +
-                        "It can't read what's on the screen or what you type, and it can't tap or swipe for you.\n\n" +
-                        "Digital refuge has no internet access at all: Android doesn't let it go online, so no data from it can ever leave your phone.\n\n" +
-                        "What it uses that for: blocking an app the moment it opens; keeping blocking from being switched off in Settings during a session; " +
-                        "turning the screen off from refuge's lock screen; and noticing when you unlock.",
-                )
+            Group("Needed")
+            Step("See which app is open", serviceOn, "How refuge notices a blocked app the moment it opens. It only learns which app is in front.") {
                 if (!serviceOn) {
-                    Body("Android hides this switch for apps installed outside the Play Store, so there are two parts. Do them in this order:")
-                    NumberedLine(1, "Tap “Allow restricted settings” below. In App info, tap ⋮ in the top-right corner, then “Allow restricted settings”. If that menu item isn't there, skip to step 2 — your phone doesn't need it.")
-                    NumberedLine(2, "Tap “Open accessibility settings” below, find digital refuge blocker (under “Downloaded apps” on most phones), open it and switch it on. Confirm the permission Android asks about.")
-                    PlainButton("1 · Allow restricted settings", onClick = onOpenAppInfo, modifier = Modifier.fillMaxWidth())
-                    CtaButton("2 · Open accessibility settings", onClick = onOpenAccessibility, modifier = Modifier.fillMaxWidth())
-                    Callout(
-                        title = "Switch still greyed out?",
-                        kind = CalloutKind.INFO,
-                        body = "Go back to step 1 and check the ⋮ menu again: the option only appears once, and it disappears after you've used it. " +
-                            "After a reinstall you have to do it again.",
-                    )
-                } else {
+                    // Android hides the switch for apps from outside the Play Store: two parts, in order.
+                    Part(1, "Allow restricted settings", "In app info, tap ⋮ at the top right, then \u201callow restricted settings\u201d. Not there? Skip to 2.")
+                    PlainButton("Open app info", onClick = onOpenAppInfo, modifier = Modifier.fillMaxWidth())
+                    Part(2, "Switch on digital refuge blocker", "In accessibility settings, usually under \u201cdownloaded apps\u201d. Confirm what Android asks.")
                     CtaButton("Open accessibility settings", onClick = onOpenAccessibility, modifier = Modifier.fillMaxWidth())
-                }
-            }
-
-            StepCard(2, "Allow greyscale", done = greyscaleOk, badge = "Optional") {
-                if (greyscaleViaModes) {
-                    Body("Greyscale works through Do Not Disturb access (step 3): allow that, and sessions can fade apps to black and white.")
+                    Faint("Switch still greyed out? Check the ⋮ menu in app info again: the option shows only once, and again after a reinstall.")
                 } else {
-                    Body("Greyscale needs Android 15 or newer, where it works through Do Not Disturb access. On older versions Android doesn't let apps switch it on.")
+                    Link("Accessibility settings", onOpenAccessibility)
                 }
-                if (greyscaleOk) {
-                    PlainButton(
-                        if (previewing) "Previewing…" else "Try it for 5 seconds",
-                        onClick = onPreview,
-                        enabled = canPreview,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
+                AndroidWarning()
             }
 
-            StepCard(3, "Allow Do Not Disturb", done = dndOk, badge = "Optional") {
-                Body("Lets schedules and blocks silence your phone and hold notifications back until they end. Find digital refuge in the list and switch it on.")
-                PlainButton("Open Do Not Disturb access", onClick = onOpenDnd, modifier = Modifier.fillMaxWidth())
-            }
-
-            StepCard(4, "Show a lotus while a session runs", done = notificationsOk, badge = "Optional") {
-                Body("A quiet notification puts a small lotus in the status bar during schedules and blocks, with the time left. It never makes a sound.")
-                if (!notificationsOk) {
-                    PlainButton("Allow notifications", onClick = onAllowNotifications, modifier = Modifier.fillMaxWidth())
+            Group("Recommended")
+            Step(
+                "Always-available apps",
+                alwaysAvailableCount > 0,
+                "Usable in every session, from the emergency button: maps, rides, your authenticator. Keep the list short.",
+            ) {
+                if (alwaysAvailableCount == 0) {
+                    PlainButton("Choose apps", onClick = onAlwaysAvailable, modifier = Modifier.fillMaxWidth())
+                } else {
+                    Link("Change · ${pluralApps(alwaysAvailableCount)}", onAlwaysAvailable)
                 }
             }
-
-            StepCard(5, "Allow the full-screen reminder", done = overlayOk, badge = "Optional") {
-                Body(
-                    "If blocking is ever switched off while a session is running, digital refuge fills the screen until you " +
-                        "switch it back on. That needs permission to display over other apps.",
-                )
-                if (!overlayOk) {
-                    PlainButton("Allow display over other apps", onClick = onOpenOverlay, modifier = Modifier.fillMaxWidth())
-                }
+            Step("Keep refuge running", batteryOk, "Some phones put background apps to sleep, and blocking with them. Battery usage set to unrestricted keeps it awake.") {
+                if (!batteryOk) PlainButton("Open battery settings", onClick = onOpenBattery, modifier = Modifier.fillMaxWidth())
             }
 
-            StepCard(6, "Choose always-available apps", done = alwaysAvailableCount > 0, badge = "Recommended") {
-                Body(
-                    "Apps that stay usable during every session, reached from the emergency button: maps, rides, your authenticator. " +
-                        "Keep the list short. You can change it later in settings → apps.",
-                )
-                PlainButton(
-                    if (alwaysAvailableCount == 0) "Choose apps" else "Edit · ${pluralApps(alwaysAvailableCount)}",
-                    onClick = onAlwaysAvailable,
-                    modifier = Modifier.fillMaxWidth(),
-                )
+            Group("Optional")
+            Step(
+                if (greyscaleViaModes) "Do not disturb and greyscale" else "Do not disturb",
+                dndOk,
+                if (greyscaleViaModes) {
+                    "Sessions can silence the phone, hold notifications until they end, and fade apps to black and white."
+                } else {
+                    "Sessions can silence the phone and hold notifications until they end. Greyscale needs Android 15 or newer."
+                },
+            ) {
+                if (!dndOk) PlainButton("Open do not disturb access", onClick = onOpenDnd, modifier = Modifier.fillMaxWidth())
+                if (greyscaleOk) Link(if (previewing) "Greyscale for 5 seconds…" else "Try greyscale for 5 seconds", onPreview.takeIf { canPreview })
             }
-
-            StepCard(7, "Keep digital refuge running", done = batteryOk, badge = "Recommended") {
-                Body("Some phones (Samsung, Xiaomi, OnePlus…) put background apps to sleep. If blocking ever stops working, set digital refuge's battery usage to Unrestricted.")
-                PlainButton("Open battery settings", onClick = onOpenBattery, modifier = Modifier.fillMaxWidth())
+            Step("A lotus while a session runs", notificationsOk, "A silent notification: a small lotus in the status bar, with the time left.") {
+                if (!notificationsOk) PlainButton("Allow notifications", onClick = onAllowNotifications, modifier = Modifier.fillMaxWidth())
+            }
+            Step("The full-screen reminder", overlayOk, "If blocking is switched off during a session, refuge covers the screen until it's back on.") {
+                if (!overlayOk) PlainButton("Allow display over other apps", onClick = onOpenOverlay, modifier = Modifier.fillMaxWidth())
             }
 
             // The everyday launcher is a choice, not a step: it's in settings › home screen.
-            Text(
-                "Want refuge's home screen all the time, not just in sessions? That's in settings › home screen › everyday launcher.",
-                style = MaterialTheme.typography.bodySmall,
-                color = c.textMuted,
-                modifier = Modifier.padding(horizontal = 4.dp),
-            )
+            Faint("Refuge's home screen all the time, not only in sessions: settings › home screen › everyday launcher.", Modifier.padding(top = 8.dp))
             Spacer(Modifier.height(8.dp))
         }
     }
 }
 
+/** How many are done, in words and as a thin bar. */
 @Composable
-private fun StepCard(number: Int, title: String, done: Boolean, badge: String, content: @Composable ColumnScope.() -> Unit) {
+private fun Progress(done: Int, of: Int) {
+    val c = Obsidian.colors
+    Column(Modifier.padding(top = 4.dp)) {
+        Text(if (done == of) "All done" else "$done of $of done", style = MaterialTheme.typography.labelLarge, color = c.textNormal)
+        Box(Modifier.padding(top = 8.dp).fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)).background(c.interactive)) {
+            Box(Modifier.fillMaxWidth(done.toFloat() / of).height(4.dp).clip(RoundedCornerShape(2.dp)).background(c.accentFill))
+        }
+    }
+}
+
+@Composable
+private fun Group(name: String) {
+    Text(name, style = MaterialTheme.typography.labelLarge, color = Obsidian.colors.textFaint, modifier = Modifier.padding(top = 12.dp))
+}
+
+/**
+ * One step: its tick, its name and what it's for; under them, what to do while it's undone, or a
+ * quiet way back to it once it's done.
+ */
+@Composable
+private fun Step(title: String, done: Boolean, about: String, content: @Composable ColumnScope.() -> Unit = {}) {
     val c = Obsidian.colors
     SectionCard {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            StatusDot(done, number)
-            Spacer(Modifier.width(12.dp))
-            Text(title, style = MaterialTheme.typography.titleMedium, color = c.textNormal, modifier = Modifier.weight(1f))
-            Spacer(Modifier.width(8.dp))
-            if (done) {
-                StatusPill("Done", c.green)
-            } else {
-                StatusPill(badge, if (badge == "Required") c.orange else c.textMuted)
+        Row {
+            Tick(done)
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column {
+                    Text(title, style = MaterialTheme.typography.titleMedium, color = c.textNormal)
+                    Text(about, style = MaterialTheme.typography.bodyMedium, color = c.textMuted, modifier = Modifier.padding(top = 2.dp))
+                }
+                content()
             }
         }
-        Spacer(Modifier.height(14.dp))
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) { content() }
     }
 }
 
+/** Done: filled, with a check. Not yet: an empty ring. */
 @Composable
-private fun NumberedLine(number: Int, text: String) {
+private fun Tick(done: Boolean) {
     val c = Obsidian.colors
-    Row {
-        Text(
-            "$number.",
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = c.accentText,
-            modifier = Modifier.width(22.dp),
-        )
-        Text(text, style = MaterialTheme.typography.bodyMedium, color = c.textNormal)
+    Box(
+        Modifier
+            .padding(top = 2.dp)
+            .size(22.dp)
+            .clip(CircleShape)
+            .background(if (done) c.accentFill else Color.Transparent)
+            .border(1.5.dp, if (done) c.accentFill else c.textFaint, CircleShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (done) Icon(Icons.Default.Check, contentDescription = "done", tint = c.textOnAccent, modifier = Modifier.size(14.dp))
     }
 }
 
+/** A part of a step, numbered: what it is, then where to find it. */
 @Composable
-private fun Body(text: String) {
-    Text(text, style = MaterialTheme.typography.bodyMedium, color = Obsidian.colors.textMuted)
+private fun Part(number: Int, title: String, how: String) {
+    val c = Obsidian.colors
+    Row(Modifier.padding(top = 4.dp)) {
+        Text("$number", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = c.accentText, modifier = Modifier.width(20.dp))
+        Column {
+            Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, color = c.textNormal)
+            Text(how, style = MaterialTheme.typography.bodySmall, color = c.textMuted)
+        }
+    }
+}
+
+/** A quiet action, as text: for steps already done. */
+@Composable
+private fun Link(label: String, onClick: (() -> Unit)?) {
+    val c = Obsidian.colors
+    Text(
+        "$label ›",
+        style = MaterialTheme.typography.labelLarge,
+        color = if (onClick != null) c.accentText else c.textFaint,
+        modifier = Modifier.clip(RoundedCornerShape(8.dp)).then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier).padding(vertical = 4.dp),
+    )
+}
+
+@Composable
+private fun Faint(text: String, modifier: Modifier = Modifier) {
+    Text(text, style = MaterialTheme.typography.bodySmall, color = Obsidian.colors.textFaint, modifier = modifier)
+}
+
+/**
+ * What Android's warning for the switch means, folded to one line: it reads the same for every app that
+ * uses it, and says far more than refuge is given.
+ */
+@Composable
+private fun AndroidWarning() {
+    val c = Obsidian.colors
+    var open by rememberSaveable { mutableStateOf(false) }
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(c.interactive.copy(alpha = 0.5f)).padding(horizontal = 12.dp, vertical = 10.dp)) {
+        Row(
+            Modifier.fillMaxWidth().clickable(onClickLabel = if (open) "fold" else "read it") { open = !open },
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("About Android's warning", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, color = c.textNormal, modifier = Modifier.weight(1f))
+            Text(if (open) "▴" else "▾", style = MaterialTheme.typography.bodyMedium, color = c.textMuted)
+        }
+        if (open) {
+            listOf(
+                "Android says the app can \u201cview and control the screen\u201d. It shows that for every app that uses this switch.",
+                "What refuge actually gets: a word when a different app comes to the front, and the name of that app or Settings page. It can't read what's on the screen or what you type, and it can't tap or swipe for you.",
+                "Refuge has no internet access at all: Android doesn't let it go online, so nothing from it can leave your phone.",
+                "What it's used for: blocking an app the moment it opens, keeping blocking from being switched off in Settings during a session, turning the screen off from refuge's lock screen, and noticing when you unlock.",
+            ).forEach { Text(it, style = MaterialTheme.typography.bodySmall, color = c.textMuted, modifier = Modifier.padding(top = 8.dp)) }
+        }
+    }
 }
 
 private fun Context.tryStart(intent: Intent) {
@@ -345,12 +388,11 @@ object SetupSteps {
         context.getSystemService(PowerManager::class.java)?.isIgnoringBatteryOptimizations(context.packageName) == true
 
     /**
-     * Steps 1–7 not yet done. Using refuge as your launcher (step 8) is a choice, not a step left.
-     * Greyscale counts only where this phone can have it.
+     * The six steps not yet done. Greyscale comes with do not disturb access, so it's no step of its own;
+     * using refuge as your launcher is a choice, not a step left.
      */
     fun left(context: Context, alwaysAvailableCount: Int): Int = listOf(
         SystemApps.isAccessibilityServiceEnabled(context),
-        GreyscaleController.isAvailable(context) || Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM,
         DndController.hasAccess(context),
         NotificationManagerCompat.from(context).areNotificationsEnabled(),
         Settings.canDrawOverlays(context),

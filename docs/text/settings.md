@@ -191,45 +191,49 @@ Home screen, lock screen, apps, shortcuts and about & backup are lists of rows f
 <sub>[SetupScreen.kt](../../app/src/main/java/app/bedtime/ui/setup/SetupScreen.kt)</sub>
 
 - Setup
-- A few one-time steps so digital refuge can do its job. Nothing ever leaves your phone.
-- Let digital refuge see which app is open
-- Required
-- This is what notices when a blocked app opens. It only sees which app is in front: it can't read what's on your screen or what you type.
-- About Android's warning
-- When you switch this on, Android warns that the app can “view and control the screen”. It shows that warning for every app that uses this switch.  What digital refuge actually has: it's told when a different app comes to the front, and the name of that app or Settings page. It can't read what's on the screen or what you type, and it can't tap or swipe for you.  Digital refuge has no internet access at all: Android doesn't let it go online, so no data from it can ever leave your phone.  What it uses that for: blocking an app the moment it opens; keeping blocking from being switched off in Settings during a session; turning the screen off from refuge's lock screen; and noticing when you unlock.
-- Android hides this switch for apps installed outside the Play Store, so there are two parts. Do them in this order:
-- Tap “Allow restricted settings” below. In App info, tap ⋮ in the top-right corner, then “Allow restricted settings”. If that menu item isn't there, skip to step 2 — your phone doesn't need it.
-- Tap “Open accessibility settings” below, find digital refuge blocker (under “Downloaded apps” on most phones), open it and switch it on. Confirm the permission Android asks about.
-- 1 · Allow restricted settings
-- 2 · Open accessibility settings
-- Switch still greyed out?
-- Go back to step 1 and check the ⋮ menu again: the option only appears once, and it disappears after you've used it. After a reinstall you have to do it again.
+- A few switches so refuge can do its job. Nothing ever leaves your phone.
+- Needed
+- See which app is open
+- How refuge notices a blocked app the moment it opens. It only learns which app is in front.
+- Allow restricted settings
+- In app info, tap ⋮ at the top right, then “allow restricted settings”. Not there? Skip to 2.
+- Open app info
+- Switch on digital refuge blocker
+- In accessibility settings, usually under “downloaded apps”. Confirm what Android asks.
 - Open accessibility settings
-- Allow greyscale
-- Optional
-- Greyscale works through Do Not Disturb access (step 3): allow that, and sessions can fade apps to black and white.
-- Greyscale needs Android 15 or newer, where it works through Do Not Disturb access. On older versions Android doesn't let apps switch it on.
-- Previewing…
-- Try it for 5 seconds
-- Allow Do Not Disturb
-- Lets schedules and blocks silence your phone and hold notifications back until they end. Find digital refuge in the list and switch it on.
-- Open Do Not Disturb access
-- Show a lotus while a session runs
-- A quiet notification puts a small lotus in the status bar during schedules and blocks, with the time left. It never makes a sound.
-- Allow notifications
-- Allow the full-screen reminder
-- If blocking is ever switched off while a session is running, digital refuge fills the screen until you switch it back on. That needs permission to display over other apps.
-- Allow display over other apps
-- Choose always-available apps
+- Switch still greyed out? Check the ⋮ menu in app info again: the option shows only once, and again after a reinstall.
+- Accessibility settings
 - Recommended
-- Apps that stay usable during every session, reached from the emergency button: maps, rides, your authenticator. Keep the list short. You can change it later in settings → apps.
+- Always-available apps
+- Usable in every session, from the emergency button: maps, rides, your authenticator. Keep the list short.
 - Choose apps
-- Edit · …
-- Keep digital refuge running
-- Some phones (Samsung, Xiaomi, OnePlus…) put background apps to sleep. If blocking ever stops working, set digital refuge's battery usage to Unrestricted.
+- Change · …
+- Keep refuge running
+- Some phones put background apps to sleep, and blocking with them. Battery usage set to unrestricted keeps it awake.
 - Open battery settings
-- Want refuge's home screen all the time, not just in sessions? That's in settings › home screen › everyday launcher.
-- Done
+- Optional
+- Do not disturb and greyscale
+- Do not disturb
+- Sessions can silence the phone, hold notifications until they end, and fade apps to black and white.
+- Sessions can silence the phone and hold notifications until they end. Greyscale needs Android 15 or newer.
+- Open do not disturb access
+- Greyscale for 5 seconds…
+- Try greyscale for 5 seconds
+- A lotus while a session runs
+- A silent notification: a small lotus in the status bar, with the time left.
+- Allow notifications
+- The full-screen reminder
+- If blocking is switched off during a session, refuge covers the screen until it's back on.
+- Allow display over other apps
+- Refuge's home screen all the time, not only in sessions: settings › home screen › everyday launcher.
+- All done
+- {done} of {of} done
+- {label} ›
+- About Android's warning
+- Android says the app can “view and control the screen”. It shows that for every app that uses this switch.
+- What refuge actually gets: a word when a different app comes to the front, and the name of that app or Settings page. It can't read what's on the screen or what you type, and it can't tap or swipe for you.
+- Refuge has no internet access at all: Android doesn't let it go online, so nothing from it can leave your phone.
+- What it's used for: blocking an app the moment it opens, keeping blocking from being switched off in Settings during a session, turning the screen off from refuge's lock screen, and noticing when you unlock.
 
 ## look, widgets, gestures and lock-screen notifications
 

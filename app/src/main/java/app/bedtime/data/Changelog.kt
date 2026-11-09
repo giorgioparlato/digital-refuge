@@ -13,6 +13,15 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            90,
+            "0.9.44",
+            listOf(
+                "Setup is clearer: needed, recommended and optional, with how many are done; each step says what it's for in a line, and done ones keep only a quiet link.",
+                "Greyscale is part of the do not disturb step, as it comes with that access. Android's warning for the accessibility switch is explained a tap away.",
+                "Info boxes are a calm grey instead of blue.",
+            ),
+        ),
+        ChangelogEntry(
             89,
             "0.9.43",
             listOf(
