@@ -271,12 +271,6 @@ One file serves the look, widgets, gestures and notifications pages, for both sc
 - Show
 - Android's status bar
 - On both screens. Off hides it; a swipe down from the top edge shows it
-- The refuge mark
-- Bottom left; a tap opens digital refuge
-- The arrow to all apps
-- At the foot; swiping up works either way
-- A notes button
-- Bottom right; a tap opens refuge notes
 - Last heard …; hidden when over 3 hours old.
 - On the home screen
 - On the lock screen
@@ -375,6 +369,22 @@ One file serves the look, widgets, gestures and notifications pages, for both sc
 - Mark as read, where the app has the button; cleared otherwise
 - Quiet until…: its app or conversation, for a while
 - Reply, to a message; anything else opens to read
+- The refuge mark
+- Unlock
+- All apps
+- Notes
+- Habits
+- Insights
+- Emergency
+- Buttons at the foot
+- Unlock and emergency in sessions, and up to three more. Hold one and drag it to move it
+- In sessions
+- Three chosen: remove one to add another
+- Add
+- Words on unlock and emergency
+- Off, their icons alone
+- Spread them out
+- Evenly across the width, rather than gathered at its ends
 
 <sub>[WidgetOptions.kt](../../app/src/main/java/app/bedtime/ui/homestyle/WidgetOptions.kt)</sub>
 

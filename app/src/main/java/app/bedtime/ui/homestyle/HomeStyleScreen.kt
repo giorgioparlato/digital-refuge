@@ -68,6 +68,8 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.foundation.layout.Spacer
 import android.Manifest
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
@@ -105,6 +107,8 @@ import app.bedtime.apps.AppCatalog
 import app.bedtime.apps.AppEntry
 import app.bedtime.data.AppSettings
 import app.bedtime.data.HomeStyle
+import app.bedtime.data.FootButtons
+import app.bedtime.data.FootButton
 import app.bedtime.data.Quote
 import app.bedtime.data.Quotes
 import app.bedtime.data.Repository
@@ -497,19 +501,9 @@ internal fun HomeStyleContent(
                     OptionRow(Icons.Default.Notifications, "Android's status bar", description = "On both screens. Off hides it; a swipe down from the top edge shows it") {
                         ObsidianToggle(!style.hideStatusBar, { onChange(style.copy(hideStatusBar = !it)) })
                     }
-                    // The rest are the home screen's own: the lock screen has no app list around them.
-                    if (screen == Screen.HOME) {
-                        OptionRow(BedtimeIcons.Refuge, "The refuge mark", description = "Bottom left; a tap opens digital refuge") {
-                            ObsidianToggle(style.showLogo, { onChange(style.copy(showLogo = it)) })
-                        }
-                        OptionRow(Icons.Default.KeyboardArrowUp, "The arrow to all apps", description = "At the foot; swiping up works either way") {
-                            ObsidianToggle(style.showSwipeArrow, { onChange(style.copy(showSwipeArrow = it)) })
-                        }
-                        OptionRow(Icons.Default.Edit, "A notes button", description = "Bottom right; a tap opens refuge notes") {
-                            ObsidianToggle(style.showNotesButton, { onChange(style.copy(showNotesButton = it)) })
-                        }
-                    }
                 }
+                // The home screen's own: the lock screen has no app list around them.
+                if (screen == Screen.HOME) FootButtonsCard(style, onChange)
             }
             if (page == StylePage.SHOWN) {
                 // Each widget's options, opened in place from its row: the same list holding the widget shows.
@@ -1076,6 +1070,74 @@ private fun SwipeChoiceRow(title: String, chosen: NoteSwipe, onChoose: (NoteSwip
                     },
                 )
             }
+        }
+    }
+}
+
+/** What each foot button is called, and its mark, in the list where they're chosen and ordered. */
+private fun footName(button: FootButton): Pair<String, androidx.compose.ui.graphics.vector.ImageVector> = when (button) {
+    FootButton.MARK -> "The refuge mark" to BedtimeIcons.Refuge
+    FootButton.UNLOCK -> "Unlock" to Icons.Default.Lock
+    FootButton.ARROW -> "All apps" to Icons.Default.KeyboardArrowUp
+    FootButton.NOTES -> "Notes" to Icons.Default.Edit
+    FootButton.HABITS -> "Habits" to Icons.Default.CheckCircle
+    FootButton.INSIGHTS -> "Insights" to BedtimeIcons.Leaf
+    FootButton.EMERGENCY -> "Emergency" to Icons.Default.Warning
+}
+
+/**
+ * The buttons at the home screen's foot: unlock and emergency always (in sessions), up to three more of
+ * your choice, all in the order you drag them to; with or without words, gathered at the ends or spread.
+ */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun FootButtonsCard(style: HomeStyle, onChange: (HomeStyle) -> Unit) {
+    val c = Obsidian.colors
+    val foot = style.foot()
+    val chosen = foot.count { !it.fixed }
+    SectionCard(title = "Buttons at the foot", subtitle = "Unlock and emergency in sessions, and up to three more. Hold one and drag it to move it") {
+        DragList(foot, key = { it.name }, onMoved = { onChange(style.copy(footButtons = it)) }, wholeRow = true) { button ->
+            val (name, icon) = footName(button)
+            Row(Modifier.weight(1f).padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(icon, contentDescription = null, tint = c.textMuted, modifier = Modifier.padding(start = 8.dp).size(20.dp))
+                Text(name, style = MaterialTheme.typography.bodyLarge, color = c.textNormal, modifier = Modifier.padding(start = 14.dp).weight(1f))
+                if (button.fixed) {
+                    Text("In sessions", style = MaterialTheme.typography.labelSmall, color = c.textFaint, modifier = Modifier.padding(end = 12.dp))
+                } else {
+                    Box(Modifier.size(40.dp).clip(CircleShape).clickable(onClickLabel = "remove $name") { onChange(style.copy(footButtons = FootButtons.without(foot, button))) }, contentAlignment = Alignment.Center) {
+                        Icon(Icons.Default.Clear, contentDescription = "remove", tint = c.textFaint, modifier = Modifier.size(18.dp))
+                    }
+                }
+            }
+        }
+        val more = FootButton.entries.filter { !it.fixed && it !in foot }
+        if (more.isNotEmpty()) {
+            Text(
+                if (chosen >= FootButtons.MAX_CHOSEN) "Three chosen: remove one to add another" else "Add",
+                style = MaterialTheme.typography.labelMedium,
+                color = c.textMuted,
+                modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
+            )
+            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                more.forEach { button ->
+                    val enabled = chosen < FootButtons.MAX_CHOSEN
+                    Text(
+                        "+ " + footName(button).first,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = if (enabled) c.textNormal else c.textFaint,
+                        modifier = Modifier.clip(RoundedCornerShape(50)).border(1.dp, c.border, RoundedCornerShape(50))
+                            .clickable(enabled = enabled) { onChange(style.copy(footButtons = FootButtons.with(foot, button))) }
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        OptionRow(Icons.Default.Lock, "Words on unlock and emergency", description = "Off, their icons alone") {
+            ObsidianToggle(style.footWords, { onChange(style.copy(footWords = it)) })
+        }
+        OptionRow(Icons.Default.Menu, "Spread them out", description = "Evenly across the width, rather than gathered at its ends") {
+            ObsidianToggle(style.footSpread, { onChange(style.copy(footSpread = it)) })
         }
     }
 }

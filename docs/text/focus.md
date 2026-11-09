@@ -534,6 +534,7 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 - no calendar app opened it
 - more for …
 - nothing to open right now. enjoy the quiet.
+- your habits
 - favourite or hide this quote
 - web search
 - Wikipedia

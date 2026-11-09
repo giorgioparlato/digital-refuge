@@ -63,6 +63,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.material3.IconButton
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import app.bedtime.ui.components.BedtimeIcons
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.rememberLauncherForActivityResult
 import android.widget.Toast
@@ -627,6 +628,8 @@ private fun MinimalHomeScreen(
             onOpenRefuge = { AppCatalog.launch(context, context.packageName) },
             onRefugeHold = { blocksOpen = true },
             onOpenNotes = { notesOpen = true },
+            onOpenHabits = { runCatching { context.startActivity(app.bedtime.MainActivity.intent(context, app.bedtime.Routes.HABITS)) } },
+            onOpenInsights = { runCatching { context.startActivity(app.bedtime.MainActivity.intent(context, app.bedtime.Routes.INSIGHTS)) } },
             // Held: straight to writing, as the notes tab and focus's notes button offer.
             notesShortcuts = listOf<Pair<String, () -> Unit>>(
                 "New note" to { runCatching { context.startActivity(app.bedtime.MainActivity.intent(context, app.bedtime.Routes.note(java.util.UUID.randomUUID().toString()))) } },
@@ -873,6 +876,9 @@ internal fun MinimalHomeContent(
     onRefugeHold: (() -> Unit)? = null,
     /** The notes button at the bottom right, where you've switched it on. */
     onOpenNotes: () -> Unit = {},
+    /** The habits and insights buttons at the foot, where you've put them. */
+    onOpenHabits: (() -> Unit)? = null,
+    onOpenInsights: (() -> Unit)? = null,
     /** What a long press on the notes button offers. */
     notesShortcuts: List<Pair<String, () -> Unit>> = emptyList(),
     /** A long press on a widget: its own sheet, to hide or change it. */
@@ -1026,48 +1032,69 @@ internal fun MinimalHomeContent(
                     }
                 }
             }
-            val emergencyButton = @Composable { onClick: () -> Unit ->
-                TextButton(onClick = onClick) {
-                    Icon(Icons.Default.Warning, contentDescription = null, tint = p.faint, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("emergency", color = p.faint)
+            // With their words, or (asked for) their icons alone.
+            val worded = @Composable { icon: androidx.compose.ui.graphics.vector.ImageVector, word: String, onClick: () -> Unit ->
+                if (style.footWords) {
+                    // Never broken over two lines, with the mark and notes beside them.
+                    TextButton(onClick = onClick, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp, vertical = 8.dp)) {
+                        Icon(icon, contentDescription = null, tint = p.faint, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(word, color = p.faint, maxLines = 1, softWrap = false)
+                    }
+                } else {
+                    IconButton(onClick = onClick) { Icon(icon, contentDescription = word, tint = p.faint, modifier = Modifier.size(20.dp)) }
                 }
             }
-            if (onUnlock == null) {
-                // Your everyday home: the way to all apps (digital refuge itself is among them), and its mark if you like.
-                // A session without the minimal screen still has its emergency way out, at the right.
-                if (style.showLogo || style.showSwipeArrow || style.showNotesButton || onEmergency != null) Box(Modifier.fillMaxWidth()) {
-                    if (style.showLogo) Box(Modifier.align(Alignment.CenterStart)) { logo() }
-                    Row(Modifier.align(Alignment.CenterEnd), verticalAlignment = Alignment.CenterVertically) {
-                        if (style.showNotesButton) notesButton()
-                        onEmergency?.let { emergencyButton(it) }
-                    }
-                    if (style.showSwipeArrow) {
-                        IconButton(onClick = onOpenDrawer, modifier = Modifier.align(Alignment.Center)) {
-                            Icon(Icons.Default.KeyboardArrowUp, contentDescription = "all apps and search", tint = p.faint)
-                        }
-                    }
+            val emergencyButton = @Composable { onClick: () -> Unit -> worded(Icons.Default.Warning, "emergency", onClick) }
+            val arrow = @Composable {
+                IconButton(onClick = onOpenDrawer) {
+                    Icon(Icons.Default.KeyboardArrowUp, contentDescription = "all apps and search", tint = p.faint)
                 }
-            } else Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                if (style.showLogo) logo()
+            }
+            val unlockOrUndo = @Composable {
                 if (onUndo != null) {
                     TextButton(onClick = onUndo) { Text("undo", color = p.accent, fontWeight = FontWeight.SemiBold) }
+                } else if (onUnlock != null) {
+                    worded(Icons.Default.Lock, "unlock", onUnlock)
+                }
+            }
+            val plain = @Composable { icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit ->
+                IconButton(onClick = onClick) { Icon(icon, contentDescription = label, tint = p.faint, modifier = Modifier.size(22.dp)) }
+            }
+            // The foot's buttons in your order; unlock and emergency only in sessions.
+            val all = style.foot().mapNotNull<app.bedtime.data.FootButton, @Composable () -> Unit> { button ->
+                when (button) {
+                    app.bedtime.data.FootButton.MARK -> logo
+                    app.bedtime.data.FootButton.UNLOCK -> if (onUnlock != null) unlockOrUndo else null
+                    app.bedtime.data.FootButton.ARROW -> arrow
+                    app.bedtime.data.FootButton.NOTES -> notesButton
+                    app.bedtime.data.FootButton.HABITS -> onOpenHabits?.let { go -> @Composable { plain(Icons.Default.CheckCircle, "your habits", go) } }
+                    app.bedtime.data.FootButton.INSIGHTS -> onOpenInsights?.let { go -> @Composable { plain(app.bedtime.ui.components.BedtimeIcons.Leaf, "insights", go) } }
+                    app.bedtime.data.FootButton.EMERGENCY -> onEmergency?.let { go -> @Composable { emergencyButton(go) } }
+                }
+            }
+            if (all.isNotEmpty()) Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = when {
+                    !style.footSpread -> androidx.compose.foundation.layout.Arrangement.Start
+                    all.size == 1 -> androidx.compose.foundation.layout.Arrangement.Center
+                    else -> androidx.compose.foundation.layout.Arrangement.SpaceBetween
+                },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (style.footSpread) {
+                    all.forEach { it() }
                 } else {
-                    TextButton(onClick = onUnlock) {
-                        Icon(Icons.Default.Lock, contentDescription = null, tint = p.faint, modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("unlock", color = p.faint)
-                    }
-                }
-                Spacer(Modifier.weight(1f))
-                if (style.showSwipeArrow) {
-                    IconButton(onClick = onOpenDrawer) {
-                        Icon(Icons.Default.KeyboardArrowUp, contentDescription = "all apps and search", tint = p.faint)
-                    }
+                    // Gathered at the ends: half at the left, half at the right, an odd one in the middle.
+                    val (left, middle, right) = app.bedtime.data.FootButtons.gathered(all.size)
+                    all.take(left).forEach { it() }
                     Spacer(Modifier.weight(1f))
+                    if (middle == 1) {
+                        all[left]()
+                        Spacer(Modifier.weight(1f))
+                    }
+                    all.takeLast(right).forEach { it() }
                 }
-                if (style.showNotesButton) notesButton()
-                onEmergency?.let { emergencyButton(it) }
             }
         }
     }

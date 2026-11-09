@@ -227,6 +227,31 @@ data class LockLook(
     val habitsPlace: HabitsPlace? = null,
 )
 
+/** A button at the home screen's foot. Unlock and emergency are always there in sessions; the rest are chosen. */
+@Serializable
+enum class FootButton {
+    MARK, UNLOCK, ARROW, NOTES, HABITS, INSIGHTS, EMERGENCY;
+
+    val fixed: Boolean get() = this == UNLOCK || this == EMERGENCY
+}
+
+object FootButtons {
+    /** Chosen ones at most, so with unlock and emergency there are never more than five. */
+    const val MAX_CHOSEN = 3
+
+    /** [list] with [button] added at the end, if there's room for it. */
+    fun with(list: List<FootButton>, button: FootButton): List<FootButton> =
+        if (button in list || list.count { !it.fixed } >= MAX_CHOSEN) list else list + button
+
+    fun without(list: List<FootButton>, button: FootButton): List<FootButton> = if (button.fixed) list else list - button
+
+    /**
+     * The buttons gathered at the ends: half at the left, half at the right, an odd one out in the middle
+     * (as the arrow always sat between unlock and emergency).
+     */
+    fun gathered(count: Int): Triple<Int, Int, Int> = Triple(count / 2, count % 2, count / 2)
+}
+
 /** Where the habits widget's dots sit: a row of their own, under the date, or beside the clock. */
 @Serializable
 enum class HabitsPlace { ROW, UNDER_DATE, BESIDE_CLOCK }
@@ -334,6 +359,12 @@ data class HomeStyle(
     val lockNoteBesideClock: Boolean = false,
     /** A notes button at the bottom right of the minimal screen, opening refuge notes. */
     val showNotesButton: Boolean = false,
+    /** The buttons at the foot, in their order; null until changed, following the switches above until then. Read through [foot]. */
+    val footButtons: List<FootButton>? = null,
+    /** "unlock" and "emergency" written beside their icons at the foot; off, the icons alone. */
+    val footWords: Boolean = true,
+    /** The foot's buttons spread evenly across the width rather than gathered at its ends. */
+    val footSpread: Boolean = false,
     /** With nothing coming today, a small calendar icon where the next event would be, opening the week ahead; on each screen. */
     val calendarIconWhenEmpty: Boolean = true,
     val lockCalendarIconWhenEmpty: Boolean = true,
@@ -463,6 +494,15 @@ data class HomeStyle(
         weatherUnit = from.weatherUnit, calendarNamesOnLock = from.calendarNamesOnLock,
         hourCalmColor = from.hourCalmColor, hourDistractedColor = from.hourDistractedColor,
     )
+
+    /** The foot's buttons in order: as chosen, or as the older switches had them (mark, unlock, arrow, notes, emergency). */
+    fun foot(): List<FootButton> = (footButtons ?: listOfNotNull(
+        FootButton.MARK.takeIf { showLogo },
+        FootButton.UNLOCK,
+        FootButton.ARROW.takeIf { showSwipeArrow },
+        FootButton.NOTES.takeIf { showNotesButton },
+        FootButton.EMERGENCY,
+    )).let { list -> list + listOf(FootButton.UNLOCK, FootButton.EMERGENCY).filter { it !in list } }
 
     fun useWidgetFor(screen: Screen): UseWidget = if (screen == Screen.HOME) useWidget else lockUseWidget ?: useWidget
 

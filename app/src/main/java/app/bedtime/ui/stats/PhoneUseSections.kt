@@ -2,6 +2,7 @@ package app.bedtime.ui.stats
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.fillMaxSize
 import app.bedtime.data.HeatDay
 import app.bedtime.data.UseHeat
@@ -197,6 +198,9 @@ internal fun PhoneStats(
         fromDays
     }
     val against = versusWords(period, versus, start == currentStart, start, picked)
+    // The week's bars and figures: the whole phone, or distracting apps alone; and a day tapped among them.
+    var weekWhole by rememberSaveable { mutableStateOf(true) }
+    var weekGlance by rememberSaveable { mutableStateOf<Long?>(null) }
 
     if (period == UsePeriod.MONTH) {
         // The whole phone first; distracting apps a tap away.
@@ -273,15 +277,26 @@ internal fun PhoneStats(
     } else SectionCard(
         title = if (period == UsePeriod.DAY) "By the hour" else "By the day",
         subtitle = buildString {
-            append("All of it, and the part in distracting apps")
+            if (period == UsePeriod.WEEK) {
+                append(if (weekWhole) "Each day's time on the phone, the part in distracting apps in green" else "Each day's time in distracting apps")
+            } else {
+                append("All of it, and the part in distracting apps")
+            }
             if (comparison?.slots?.isNotEmpty() == true) append("; outlined, $against")
-            if (period == UsePeriod.DAY) append(". The dots are unlocks") else append(". Tap a day for its hours")
+            if (period == UsePeriod.DAY) append(". Unlocks by the hour under it") else append(". Tap a day to see it against ${dayWords(versus)}")
         },
     ) {
         val todayIndex = dates.indexOf(today).takeIf { it >= 0 && period != UsePeriod.DAY }
+        if (period == UsePeriod.WEEK) {
+            SegmentedChoice(options = listOf("On the phone", "Distracting"), selected = if (weekWhole) 0 else 1, onSelect = { weekWhole = it == 0 })
+            Spacer(Modifier.height(12.dp))
+        }
+        // A week in distracting apps alone: those bars, and those outlines.
+        val distractingOnly = period == UsePeriod.WEEK && !weekWhole
         Bars(
-            slots = totals.slots,
-            ghost = comparison?.slots,
+            slots = if (distractingOnly) totals.slots.map { (_, d, u) -> Triple(d, d, u) } else totals.slots,
+            ghost = if (distractingOnly) comparison?.distracted else comparison?.slots,
+            figures = if (period == UsePeriod.WEEK) { i -> totals.slots[i].let { if (distractingOnly) it.second else it.first }.takeIf { dates[i] <= today }?.let(::barTime) } else null,
             axis = { i ->
                 when (period) {
                     UsePeriod.DAY -> if (i % 6 == 0) "$i" else null
@@ -292,9 +307,35 @@ internal fun PhoneStats(
             // A month's days are too narrow for their numbers: those of each week's first day go in a row of their own.
             axisEvery = if (period == UsePeriod.MONTH) 7 else null,
             picked = todayIndex,
-            dots = period == UsePeriod.DAY,
-            onPick = if (period == UsePeriod.DAY) null else { i -> openDay(dates[i]) },
+            onPick = when (period) {
+                UsePeriod.DAY -> null
+                UsePeriod.WEEK -> { i -> if (dates[i] <= today) weekGlance = dates[i].toEpochDay() }
+                UsePeriod.MONTH -> { i -> openDay(dates[i]) }
+            },
         )
+        // A day of the week tapped: it against its own day of what the week is set against, the week still behind.
+        weekGlance?.let(LocalDate::ofEpochDay)?.let { date ->
+            val (dayVersus, dayPicked) = UsePeriods.dayOfWeekVersus(date, versus)
+            WeekDayGlance(
+                date = date,
+                totals = UsePeriods.totals(use.days, listOf(date), slotsByHour = true, untilHour = if (date == today) nowHour else null),
+                then = UsePeriods.compare(use.days, UsePeriod.DAY, date, dayVersus, today, nowHour, dayPicked),
+                against = if (dayVersus == Versus.PICKED && dayPicked != null) "the " + dayPicked.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.getDefault()) + " before" else versusWords(UsePeriod.DAY, dayVersus, false, date),
+                wholePhone = weekWhole,
+                labels = labels,
+                distractingApps = use.distractingApps,
+                limitedApps = limitedApps,
+                today = today,
+                onOpen = {
+                    weekGlance = null
+                    openDay(date)
+                },
+                onDismiss = { weekGlance = null },
+            )
+        }
+        if (period == UsePeriod.DAY) {
+            UnlockBars(totals.slots.map { it.third }, totals.unlocks)
+        }
         if (period == UsePeriod.DAY) {
             // The day's worst hours, and those of what it's set against: the average day this year from the days kept.
             val here = UsePeriods.mostDistracted(totals.slots.map { it.second })
@@ -316,8 +357,7 @@ internal fun PhoneStats(
                 ghost = null,
                 axis = { i -> weeks[i].format(DateTimeFormatter.ofPattern("d/M")) },
                 picked = weeks.lastIndex,
-                dots = false,
-                height = 56,
+                    height = 56,
                 onPick = { i -> startDay = weeks[i].toEpochDay() },
             )
         }
@@ -598,6 +638,75 @@ private fun DayGlance(
     )
 }
 
+/** A time narrow enough to stand over a day's bar: "45m", "2h", "2h05". */
+internal fun barTime(seconds: Long): String {
+    val minutes = seconds / 60
+    return when {
+        minutes < 60 -> "${minutes}m"
+        minutes % 60 == 0L -> "${minutes / 60}h"
+        else -> "${minutes / 60}h" + "%02d".format(minutes % 60)
+    }
+}
+
+/** What a week's day is set against, said of any day: "the same day a week before", "your usual one", "a year back". */
+private fun dayWords(versus: Versus): String = when (versus) {
+    Versus.USUAL -> "your usual one of that weekday"
+    Versus.YEAR -> "the same day a year back"
+    else -> "the same day a week before"
+}
+
+/**
+ * A day of the week, set against its own day of the comparison: its three figures and how each moved,
+ * then the apps that took most of it with their change; the whole day a tap further.
+ */
+@Composable
+private fun WeekDayGlance(
+    date: LocalDate,
+    totals: app.bedtime.data.UseTotals,
+    then: UseComparison?,
+    against: String,
+    wholePhone: Boolean,
+    labels: Map<String, String>,
+    distractingApps: Set<String>,
+    limitedApps: Set<String>,
+    today: LocalDate,
+    onOpen: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val c = Obsidian.colors
+    val top = totals.apps.filter { (pkg, seconds) -> seconds >= 60 && (wholePhone || pkg in distractingApps) }
+        .toList().sortedByDescending { it.second }.take(6)
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = c.bgSecondary,
+        title = { Text(periodLabel(UsePeriod.DAY, date, today)) },
+        text = {
+            Column(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState())) {
+                Row(Modifier.fillMaxWidth()) {
+                    Figure(UseWords.short(totals.total), "on the phone", totals.total, then?.total, Modifier.weight(1f))
+                    Figure(UseWords.short(totals.distracting), "distracting", totals.distracting, then?.distracting, Modifier.weight(1f))
+                    Figure(totals.unlocks?.toString() ?: "–", "unlocks", totals.unlocks?.toLong(), then?.unlocks?.toLong(), Modifier.weight(1f))
+                }
+                Text(
+                    "against $against" + (if (then == null) " · nothing to compare with" else "") + (if (date == today) ", so far" else ""),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = c.textMuted,
+                    modifier = Modifier.padding(top = 8.dp, bottom = 8.dp),
+                )
+                if (top.isEmpty()) {
+                    Text("No app took a minute.", style = MaterialTheme.typography.bodySmall, color = c.textFaint)
+                } else {
+                    top.forEach { (pkg, s) ->
+                        AppRow(labels[pkg] ?: pkg, s, totals.opens[pkg] ?: 0, then = then?.let { it.apps[pkg] ?: 0L }, distracting = pkg in distractingApps, limited = pkg in limitedApps)
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onOpen) { Text("The whole day ›", color = c.accentText) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Close", color = c.textMuted) } },
+    )
+}
+
 /** A day's budget, for the whole phone ([wholePhone]) or distracting apps: a few usual amounts, or any other. */
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
@@ -739,7 +848,7 @@ private fun Figure(value: String, label: String, now: Long?, then: Long?, modifi
 
 /**
  * Columns, one a slot: all of it in the soft tone, the distracting part in the accent from the foot, the
- * compared period as a faint outline behind, and with [dots] a dot above for unlocks, darker for more.
+ * compared period as a faint outline behind.
  */
 @Composable
 private fun Bars(
@@ -747,23 +856,23 @@ private fun Bars(
     ghost: List<Long>?,
     axis: (Int) -> String?,
     picked: Int?,
-    dots: Boolean,
     height: Int = 110,
     onPick: ((Int) -> Unit)? = null,
     /** Labels only every so many slots, in a row under the bars, each as wide as its slots: for narrow ones. */
     axisEvery: Int? = null,
+    /** Each slot's own figure over its bar, its time; null for none. */
+    figures: ((Int) -> String?)? = null,
 ) {
     val c = Obsidian.colors
     val most = maxOf(slots.maxOfOrNull { it.first } ?: 0L, ghost?.maxOrNull() ?: 0L).coerceAtLeast(1)
-    val mostUnlocks = slots.maxOfOrNull { it.third }?.coerceAtLeast(1) ?: 1
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(if (slots.size > 10) 2.dp else 6.dp), verticalAlignment = Alignment.Bottom) {
         slots.forEachIndexed { i, (all, distracting, unlocks) ->
             Column(
                 Modifier.weight(1f).clip(RoundedCornerShape(4.dp)).then(if (onPick != null) Modifier.clickable { onPick(i) } else Modifier),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                if (dots) {
-                    Box(Modifier.size(4.dp).clip(CircleShape).background(if (unlocks > 0) c.textNormal.copy(alpha = 0.3f + 0.7f * unlocks / mostUnlocks) else Color.Transparent))
+                if (figures != null) {
+                    Text(figures(i) ?: "", style = MaterialTheme.typography.labelSmall, color = if (i == picked) c.textNormal else c.textMuted, maxLines = 1, softWrap = false)
                     Spacer(Modifier.height(4.dp))
                 }
                 Box(Modifier.fillMaxWidth().height(height.dp), contentAlignment = Alignment.BottomCenter) {
@@ -787,6 +896,38 @@ private fun Bars(
         Row(Modifier.fillMaxWidth().padding(top = 4.dp)) {
             slots.indices.chunked(axisEvery).forEach { group ->
                 Text("${group.first() + 1}", style = MaterialTheme.typography.labelSmall, color = c.textFaint, maxLines = 1, modifier = Modifier.weight(group.size.toFloat()))
+            }
+        }
+    }
+}
+
+/**
+ * A day's unlocks by the hour, a small chart of their own under its time: each hour as tall as its
+ * unlocks against the most in one hour, its count over it, lined up with the hours above.
+ */
+@Composable
+private fun UnlockBars(byHour: List<Int>, total: Int?) {
+    val c = Obsidian.colors
+    val most = byHour.maxOrNull()?.coerceAtLeast(1) ?: 1
+    Spacer(Modifier.height(16.dp))
+    Row(verticalAlignment = Alignment.Bottom) {
+        Text("Unlocks", style = MaterialTheme.typography.labelMedium, color = c.textMuted)
+        Text(
+            total?.let { " · $it, the most ${byHour.maxOrNull() ?: 0} in an hour" } ?: "",
+            style = MaterialTheme.typography.labelSmall,
+            color = c.textFaint,
+        )
+    }
+    Spacer(Modifier.height(6.dp))
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.Bottom) {
+        byHour.forEachIndexed { h, n ->
+            Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(if (n > 0) "$n" else "", fontSize = 8.sp, color = c.textMuted, maxLines = 1, softWrap = false)
+                Box(Modifier.fillMaxWidth().height(32.dp), contentAlignment = Alignment.BottomCenter) {
+                    Box(Modifier.fillMaxWidth().height(1.dp).background(c.border))
+                    if (n > 0) Box(Modifier.fillMaxWidth().height((32f * n / most).dp.coerceAtLeast(2.dp)).clip(RoundedCornerShape(2.dp)).background(c.textNormal.copy(alpha = 0.45f)))
+                }
+                Text(if (h % 6 == 0) "$h" else "", style = MaterialTheme.typography.labelSmall, color = c.textFaint, maxLines = 1, softWrap = false)
             }
         }
     }

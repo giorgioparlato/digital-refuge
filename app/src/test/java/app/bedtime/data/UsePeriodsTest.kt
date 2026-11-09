@@ -133,4 +133,16 @@ class UsePeriodsTest {
         assertEquals(300L, UsePeriods.yearHours(days, wed)[8])
         assertEquals(emptyList<Long>(), UsePeriods.yearHours(days, LocalDate.of(2026, 1, 1)))
     }
+
+    @Test
+    fun aWeeksDayIsSetAgainstItsOwnDay() {
+        val wed = LocalDate.of(2026, 11, 4)
+        // The week before: that very weekday, a week back; usual and a year back carry over as they are.
+        assertEquals(Versus.PICKED to LocalDate.of(2026, 10, 28), UsePeriods.dayOfWeekVersus(wed, Versus.LAST))
+        assertEquals(Versus.USUAL to null, UsePeriods.dayOfWeekVersus(wed, Versus.USUAL))
+        assertEquals(Versus.YEAR to null, UsePeriods.dayOfWeekVersus(wed, Versus.YEAR))
+        assertEquals("45m", app.bedtime.ui.stats.barTime(45 * 60))
+        assertEquals("2h", app.bedtime.ui.stats.barTime(120 * 60))
+        assertEquals("2h05", app.bedtime.ui.stats.barTime(125 * 60))
+    }
 }

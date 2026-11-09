@@ -80,10 +80,14 @@ insights
 - A day on average: all of it, and the part in distracting apps
 - By the hour
 - By the day
+- Each day's time on the phone, the part in distracting apps in green
+- Each day's time in distracting apps
 - All of it, and the part in distracting apps
 - ; outlined, {against}
-- . The dots are unlocks
-- . Tap a day for its hours
+- . Unlocks by the hour under it
+- . Tap a day to see it against …
+- On the phone
+- Distracting
 - Most distracted
 - this day
 - The last eight weeks
@@ -97,8 +101,6 @@ insights
 - All …
 - Each day
 - Against a day's budget, the same in every month. Tap a day for its time and top apps
-- On the phone
-- Distracting
 - in distracting apps
 - Budget: … a day {what}
 - No budget chosen yet, so … a day {what} is suggested. Choose yours
@@ -113,6 +115,9 @@ insights
 - No app took a minute.
 - The whole day ›
 - Close
+- your usual one of that weekday
+- the same day a year back
+- the same day a week before
 - A day on the phone
 - A day in distracting apps
 - Save
@@ -132,6 +137,8 @@ insights
 - your average day this year
 - Compare
 - ↑ {change}%
+- Unlocks
+-  · {it}, the most … in an hour
 - the same
 
 <sub>[PhoneUse.kt](../../app/src/main/java/app/bedtime/ui/components/PhoneUse.kt)</sub>

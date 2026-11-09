@@ -13,6 +13,17 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            91,
+            "0.9.45",
+            listOf(
+                "The week in insights shows each day's time over its bar, on the phone or in distracting apps, as you switch.",
+                "Tap a day of the week to see it against the same day of what you compare with: its time, unlocks and top apps, and how each moved.",
+                "A day's unlocks have a small chart of their own under its hours, with how many in each.",
+                "The home screen's foot: choose up to three buttons besides unlock and emergency (the refuge mark, all apps, notes, habits, insights) and drag all five into your order; settings › home screen › look.",
+                "Unlock and emergency can be icons alone, and the foot's buttons can be spread evenly across the width.",
+            ),
+        ),
+        ChangelogEntry(
             90,
             "0.9.44",
             listOf(

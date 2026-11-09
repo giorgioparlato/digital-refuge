@@ -51,7 +51,7 @@ data class UseComparison(
     val unlocks: Int?,
     val slots: List<Long>,
     val apps: Map<String, Long>,
-    /** A day's comparison only: seconds in distracting apps by hour then, for its most distracted hours. */
+    /** Seconds in distracting apps by slot then: a day's hours, for its most distracted ones; a week's days, for their outlines. */
     val distracted: List<Long> = emptyList(),
 )
 
@@ -145,7 +145,7 @@ object UsePeriods {
         val slotCount = compared.maxOf { it.second.slots.size }
         val slots = (0 until slotCount).map { i -> compared.sumOf { it.second.slots.getOrNull(i)?.first ?: 0L } / n }
         val apps = parts.flatMap { it.apps.keys }.toSet().associateWith { pkg -> parts.sumOf { it.apps[pkg] ?: 0L } / n }
-        val distracted = if (byHour) (0 until slotCount).map { i -> compared.sumOf { it.second.slots.getOrNull(i)?.second ?: 0L } / n } else emptyList()
+        val distracted = (0 until slotCount).map { i -> compared.sumOf { it.second.slots.getOrNull(i)?.second ?: 0L } / n }
         return UseComparison(parts.sumOf { it.total } / n, parts.sumOf { it.distracting } / n, unlocks, slots, apps, distracted)
     }
 
@@ -165,6 +165,17 @@ object UsePeriods {
     /** The [count] hours with most time in distracting apps among [byHour], in the order of the day. */
     fun mostDistracted(byHour: List<Long>, count: Int = 2): List<Int> =
         byHour.withIndex().filter { it.value >= DISTRACTED_SECONDS }.sortedByDescending { it.value }.take(count).map { it.index }.sorted()
+
+    /**
+     * What a day of a week is set against when the week is set against [versus]: the same day of the
+     * week before, your usual one of that weekday, or the day a year back. With the date for "the week
+     * before", as that's a day picked.
+     */
+    fun dayOfWeekVersus(date: LocalDate, versus: Versus): Pair<Versus, LocalDate?> = when (versus) {
+        Versus.LAST -> Versus.PICKED to date.minusWeeks(1)
+        Versus.USUAL, Versus.YEAR -> versus to null
+        else -> Versus.PICKED to date.minusWeeks(1)
+    }
 
     /** "9–10 and 20–21". */
     fun hourWords(hours: List<Int>): String {
