@@ -23,6 +23,17 @@ class CalendarLineTest {
     }
 
     @Test
+    fun theLineIsAboutTheEventOnNowOrElseTheNext() {
+        val standup = CalendarEvent("standup", now - 5, now + 100, id = 1)
+        val dentist = CalendarEvent("dentist", now + 500, now + 900, id = 2)
+        assertEquals(standup, lineEvent(listOf(standup, dentist), now))
+        // Hidden, the line moves on to the next.
+        assertEquals("next · dentist at t${now + 500}", calendarLine(listOf(standup, dentist).filter { it.key != standup.key }, now, true, time))
+        // A repeating event's other times are other keys.
+        assertEquals(false, standup.key == standup.copy(begin = now + 86_400_000L).key)
+    }
+
+    @Test
     fun anEmptyRestOfTheDayShowsNoLine() {
         assertNull(calendarLine(emptyList(), now, showNames = true, time))
         // An event that already ended isn't "next".

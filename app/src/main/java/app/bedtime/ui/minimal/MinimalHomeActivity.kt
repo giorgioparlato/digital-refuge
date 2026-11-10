@@ -714,6 +714,7 @@ private fun MinimalHomeScreen(
                 open = { route -> runCatching { context.startActivity(app.bedtime.MainActivity.intent(context, route)) } },
                 habitShown = { id, shown -> scope.launch { repo.updateSettings { s -> s.copy(habits = s.habits.map { if (it.id == id) it.withShownOn(Screen.HOME, shown) else it }) } } },
                 openApp = breezy?.takeIf { module == Module.WEATHER }?.let { app -> { AppCatalog.launch(context, app) } },
+                hideEvent = { scope.launch { hideLineEvent(context, style) } },
             ),
             onDismiss = { holding = null },
             notes = allNotes,

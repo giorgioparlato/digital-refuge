@@ -532,6 +532,7 @@ private fun LockScreen(
                 open = onOpenRoute,
                 habitShown = { id, shown -> onConfirmed { scope.launch { repo.updateSettings { s -> s.copy(habits = s.habits.map { if (it.id == id) it.withShownOn(Screen.LOCK, shown) else it }) } } } },
                 openApp = breezy?.takeIf { module == Module.WEATHER }?.let { app -> { onOpenApp(app) } },
+                hideEvent = { onConfirmed { scope.launch { app.bedtime.ui.minimal.hideLineEvent(context, lockStyle) } } },
             ),
             onDismiss = { holding = null },
             notes = allNotes,

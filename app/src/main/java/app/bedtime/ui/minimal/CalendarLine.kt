@@ -20,7 +20,9 @@ import androidx.core.content.ContextCompat
 import app.bedtime.data.HomeStyle
 import app.bedtime.data.ParsedEvent
 import app.bedtime.ui.formatTime
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.LocalDate
@@ -43,7 +45,14 @@ data class CalendarEvent(
     val location: String = "",
     val description: String = "",
     val calendar: String = "",
-)
+) {
+    /** This one time of it: a repeating event's other days are other keys. */
+    val key: String get() = "$id@$begin"
+}
+
+/** The event the line is about: the one on now, or else the next. */
+fun lineEvent(events: List<CalendarEvent>, now: Long): CalendarEvent? =
+    events.firstOrNull { it.begin <= now && it.end > now } ?: events.firstOrNull { it.begin > now }
 
 /**
  * The calendar already on the phone, as your calendar apps have synced it. Nothing is fetched: the
@@ -146,11 +155,10 @@ object CalendarSource {
  * only once nothing's left today.
  */
 fun calendarLine(events: List<CalendarEvent>, now: Long, showNames: Boolean, time: (Long) -> String, midnight: Long? = null): String? {
-    val current = events.firstOrNull { it.begin <= now && it.end > now }
-    if (current != null) {
-        return if (showNames && current.title.isNotBlank()) "now · ${current.title} until ${time(current.end)}" else "an event until ${time(current.end)}"
+    val next = lineEvent(events, now) ?: return null
+    if (next.begin <= now) {
+        return if (showNames && next.title.isNotBlank()) "now · ${next.title} until ${time(next.end)}" else "an event until ${time(next.end)}"
     }
-    val next = events.firstOrNull { it.begin > now } ?: return null
     val named = showNames && next.title.isNotBlank()
     if (midnight != null && next.begin >= midnight) {
         return if (named) "tomorrow · ${next.title} at ${time(next.begin)}" else "tomorrow, first event at ${time(next.begin)}"
@@ -198,6 +206,29 @@ suspend fun loadCalendarWeek(context: Context, now: LocalDateTime): List<Calenda
     return calendarWeek(events, now.toLocalDate(), zone)
 }
 
+/** The events the line picks from at [now]: today's (and tomorrow's, if asked for), less the ones you've hidden. */
+private suspend fun lineEvents(context: Context, style: HomeStyle, now: LocalDateTime, hidden: Set<String>): List<CalendarEvent> {
+    val zone = ZoneId.systemDefault()
+    val start = now.atZone(zone).toInstant().toEpochMilli()
+    val midnight = now.toLocalDate().plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
+    // With tomorrow asked for, read on to the end of it; the line still puts today first.
+    val until = if (style.calendarTomorrow) now.toLocalDate().plusDays(2).atStartOfDay(zone).toInstant().toEpochMilli() else midnight
+    return withContext(Dispatchers.IO) { CalendarSource.upcoming(context, start, until) }.filter { it.key !in hidden }
+}
+
+/**
+ * From the event widget's long press: hides the event its line shows now until it's over, so the line
+ * moves on to the next. Nothing if there's none.
+ */
+suspend fun hideLineEvent(context: Context, style: HomeStyle) {
+    if (!CalendarSource.hasPermission(context)) return
+    val repo = app.bedtime.data.Repository.get(context)
+    val now = LocalDateTime.now()
+    val hidden = repo.runtime.first().hiddenEvents.keys
+    val event = lineEvent(lineEvents(context, style, now, hidden), now.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()) ?: return
+    repo.hideEvent(event.key, event.end)
+}
+
 /** The calendar line for [style], refreshed each minute; null when it's switched off or not allowed. */
 @Composable
 fun rememberCalendarLine(style: HomeStyle, now: LocalDateTime, onLockScreen: Boolean): String? {
@@ -205,7 +236,9 @@ fun rememberCalendarLine(style: HomeStyle, now: LocalDateTime, onLockScreen: Boo
     var line by remember { mutableStateOf<String?>(null) }
     val minute = now.withSecond(0).withNano(0)
     val shown = Modules.isOn(style, if (onLockScreen) Screen.LOCK else Screen.HOME, Module.EVENT)
-    LaunchedEffect(shown, style.calendarNamesOnLock, style.calendarTomorrow, onLockScreen, minute) {
+    val runtime by remember { app.bedtime.data.Repository.get(context).runtime }.collectAsStateWithLifecycle(initialValue = null)
+    val hidden = runtime?.hiddenEvents?.keys.orEmpty()
+    LaunchedEffect(shown, style.calendarNamesOnLock, style.calendarTomorrow, onLockScreen, minute, hidden) {
         if (!shown || !CalendarSource.hasPermission(context)) {
             line = null
             return@LaunchedEffect
@@ -213,10 +246,7 @@ fun rememberCalendarLine(style: HomeStyle, now: LocalDateTime, onLockScreen: Boo
         val zone = ZoneId.systemDefault()
         val start = now.atZone(zone).toInstant().toEpochMilli()
         val midnight = now.toLocalDate().plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
-        // With tomorrow asked for, read on to the end of it; the line still puts today first.
-        val until = if (style.calendarTomorrow) now.toLocalDate().plusDays(2).atStartOfDay(zone).toInstant().toEpochMilli() else midnight
-        val events = withContext(Dispatchers.IO) { CalendarSource.upcoming(context, start, until) }
-        line = calendarLine(events, start, showNames = !onLockScreen || style.calendarNamesOnLock, time = { formatTime(context, it) }, midnight = midnight.takeIf { style.calendarTomorrow })
+        line = calendarLine(lineEvents(context, style, now, hidden), start, showNames = !onLockScreen || style.calendarNamesOnLock, time = { formatTime(context, it) }, midnight = midnight.takeIf { style.calendarTomorrow })
     }
     return if (shown) line else null
 }

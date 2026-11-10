@@ -73,15 +73,8 @@ class SummaryTest {
     }
 
     @Test
-    fun leavingEarlyStartsWithTheEmergencyBreak() {
-        val stepped = bare.copy(pauseEnabled = true, breakMinutes = 2, unlock = UnlockConfig(waitEnabled = true, waitSeconds = 60, textEnabled = false))
-        assertTrue(leavingEarlySummary(stepped, false).startsWith("emergency break 2 min · wait 1 min"))
-        assertTrue(leavingEarlySummary(stepped.copy(pauseEnabled = false), false).startsWith("no emergency break · wait 1 min"))
-    }
-
-    @Test
     fun moreOptionsNameWhatsSetOrWhatsInThem() {
-        assertEquals("the cover's words, ask why, widgets, changing it", moreSummary(bare, null))
-        assertEquals("asks why · changeable 08:00–20:00", moreSummary(bare.copy(askWhy = true), "08:00–20:00"))
+        assertEquals("emergency break 1 min", moreSummary(bare.copy(pauseEnabled = true, breakMinutes = 1), null))
+        assertEquals("no emergency break · asks why · changeable 08:00–20:00", moreSummary(bare.copy(pauseEnabled = false, askWhy = true), "08:00–20:00"))
     }
 }

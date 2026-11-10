@@ -244,13 +244,12 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 - lock screen: only these
 - lock screen: none
 - as usual
-- emergency break … min · 
-- no emergency break · 
+- emergency break … min
+- no emergency break
 - asks why
 - its own widgets
 - changeable after leaving early
 - changeable {changeable}
-- the cover's words, ask why, widgets, changing it
 - a single tap — no steps picked
 - ends the block
 - off until its next start
@@ -319,14 +318,6 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 - Grant it once in Setup so digital refuge can quiet your phone.
 - Open setup
 - Leaving early
-- Keep the emergency break?
-- Some apps, banking ones especially, may ask you to switch digital refuge off before they'll open, for security reasons. The emergency break lets you do that for a minute without unlocking. Without it, the only way is the steps.
-- Keep it on
-- Turn it off
-- Emergency break
-- For what can't wait, with no steps
-- How long it lasts
-- emergency break
 - Unlocking it, step by step
 - What unlocking gets you
 - End it
@@ -346,6 +337,14 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 - Your moods to tap, once the break is over
 - More options
 - What the cover says
+- Keep the emergency break?
+- Some apps, banking ones especially, may ask you to switch digital refuge off before they'll open, for security reasons. The emergency break lets you do that for a minute without unlocking. Without it, the only way is the steps.
+- Keep it on
+- Turn it off
+- Emergency break
+- For what can't wait, with no steps
+- How long it lasts
+- emergency break
 - Ask why after each unlock
 - While it runs: a question, a box to write in and how you feel; going on is a tap
 - Words, at least
@@ -609,6 +608,7 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 <sub>[WidgetSheet.kt](../../app/src/main/java/app/bedtime/ui/minimal/WidgetSheet.kt)</sub>
 
 - Open the … app
+- Hide this event until it's over
 - Other…
 - Custom
 - Show on the home screen

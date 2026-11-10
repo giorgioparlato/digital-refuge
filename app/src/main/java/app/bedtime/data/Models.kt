@@ -200,6 +200,8 @@ data class RuntimeState(
     val activeRuns: Map<String, Run> = emptyMap(),
     /** Non-null means Do Not Disturb is currently managed by us. */
     val savedZen: SavedZen? = null,
+    /** Events hidden from the event widget until they're over: their key ([app.bedtime.ui.minimal.CalendarEvent.key]) and end. */
+    val hiddenEvents: Map<String, Long> = emptyMap(),
 )
 
 /** Size of app names in the minimal home's list, on top of [TextSize]; small sizes fit many apps and a quote. */

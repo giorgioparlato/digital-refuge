@@ -460,17 +460,14 @@ internal fun feelsSummary(draft: Schedule): String = buildList {
     }
 }.ifEmpty { listOf("as usual") }.joinToString(" · ")
 
-/** The line "leaving early" shows while it is shut: the emergency break, then the steps and what they buy. */
-internal fun leavingEarlySummary(draft: Schedule, hasNewPassword: Boolean): String =
-    (if (draft.pauseEnabled) "emergency break ${draft.breakMinutes} min · " else "no emergency break · ") + leavingSummary(draft, hasNewPassword)
-
 /** The line "more options" shows while it is shut: what's set beyond the usual, or what's in it. */
 internal fun moreSummary(draft: Schedule, changeable: String?): String = buildList {
+    add(if (draft.pauseEnabled) "emergency break ${draft.breakMinutes} min" else "no emergency break")
     if (draft.askWhy) add("asks why")
     if (draft.homeModules != null || draft.lockModules != null) add("its own widgets")
     if (draft.editAfterUnlock) add("changeable after leaving early")
     if (changeable != null) add("changeable $changeable")
-}.ifEmpty { listOf("the cover's words, ask why, widgets, changing it") }.joinToString(" · ")
+}.joinToString(" · ")
 
 /** The line "how hard to leave" shows while it is shut: the steps in order, then what they buy. */
 internal fun leavingSummary(draft: Schedule, hasNewPassword: Boolean): String {
@@ -825,58 +822,10 @@ internal fun ScheduleEditContent(
                 // ---------------------------------------------------------------- leaving early
                 FoldSection(
                     title = "Leaving early",
-                    summary = leavingEarlySummary(draft, newPassword.isNotBlank()),
+                    summary = leavingSummary(draft, newPassword.isNotBlank()),
                     open = open == SECTION_LEAVING,
                     onToggle = { toggle(SECTION_LEAVING) },
                 ) {
-                    // Switching it off asks first: some apps won't open while refuge watches, and this is the way to let them.
-                    var confirmNoBreak by remember { mutableStateOf(false) }
-                    if (confirmNoBreak) {
-                        AlertDialog(
-                            onDismissRequest = { confirmNoBreak = false },
-                            containerColor = c.bgSecondary,
-                            title = { Text("Keep the emergency break?") },
-                            text = {
-                                Text(
-                                    "Some apps, banking ones especially, may ask you to switch digital refuge off before they'll open, for security reasons. " +
-                                        "The emergency break lets you do that for a minute without unlocking. Without it, the only way is the steps.",
-                                    color = c.textMuted,
-                                )
-                            },
-                            confirmButton = { TextButton(onClick = { confirmNoBreak = false }) { Text("Keep it on", color = c.accentText, fontWeight = FontWeight.SemiBold) } },
-                            dismissButton = {
-                                TextButton(onClick = {
-                                    confirmNoBreak = false
-                                    onDraftChange(draft.copy(pauseEnabled = false))
-                                }) { Text("Turn it off", color = c.textMuted) }
-                            },
-                        )
-                    }
-                    OptionRow(
-                        BedtimeIcons.Hourglass,
-                        "Emergency break",
-                        description = "For what can't wait, with no steps",
-                        enabled = editable,
-                    ) {
-                        ObsidianToggle(
-                            draft.pauseEnabled,
-                            { on -> if (on) onDraftChange(draft.copy(pauseEnabled = true)) else confirmNoBreak = true },
-                            enabled = editable,
-                        )
-                    }
-                    AnimatedVisibility(draft.pauseEnabled) {
-                        SubOptionRow("How long it lasts") {
-                            NumberStepper(
-                                draft.breakMinutes,
-                                { v -> onDraftChange(draft.copy(breakMinutes = v)) },
-                                1..60,
-                                suffix = " min",
-                                enabled = editable,
-                                presets = listOf(1, 2, 3, 5, 10),
-                                title = "emergency break",
-                            )
-                        }
-                    }
                     SectionLabel("Unlocking it, step by step")
                     StartFrom(Strictness.entries.map { it.label }, Strictness.of(unlock)?.ordinal, editable) { i ->
                         onDraftChange(draft.copy(unlock = Strictness.entries[i].applied(unlock)))
@@ -944,6 +893,54 @@ internal fun ScheduleEditContent(
                         { onDraftChange(draft.copy(message = it)) },
                         enabled = editable,
                     )
+                    // Switching it off asks first: some apps won't open while refuge watches, and this is the way to let them.
+                    var confirmNoBreak by remember { mutableStateOf(false) }
+                    if (confirmNoBreak) {
+                        AlertDialog(
+                            onDismissRequest = { confirmNoBreak = false },
+                            containerColor = c.bgSecondary,
+                            title = { Text("Keep the emergency break?") },
+                            text = {
+                                Text(
+                                    "Some apps, banking ones especially, may ask you to switch digital refuge off before they'll open, for security reasons. " +
+                                        "The emergency break lets you do that for a minute without unlocking. Without it, the only way is the steps.",
+                                    color = c.textMuted,
+                                )
+                            },
+                            confirmButton = { TextButton(onClick = { confirmNoBreak = false }) { Text("Keep it on", color = c.accentText, fontWeight = FontWeight.SemiBold) } },
+                            dismissButton = {
+                                TextButton(onClick = {
+                                    confirmNoBreak = false
+                                    onDraftChange(draft.copy(pauseEnabled = false))
+                                }) { Text("Turn it off", color = c.textMuted) }
+                            },
+                        )
+                    }
+                    OptionRow(
+                        BedtimeIcons.Hourglass,
+                        "Emergency break",
+                        description = "For what can't wait, with no steps",
+                        enabled = editable,
+                    ) {
+                        ObsidianToggle(
+                            draft.pauseEnabled,
+                            { on -> if (on) onDraftChange(draft.copy(pauseEnabled = true)) else confirmNoBreak = true },
+                            enabled = editable,
+                        )
+                    }
+                    AnimatedVisibility(draft.pauseEnabled) {
+                        SubOptionRow("How long it lasts") {
+                            NumberStepper(
+                                draft.breakMinutes,
+                                { v -> onDraftChange(draft.copy(breakMinutes = v)) },
+                                1..60,
+                                suffix = " min",
+                                enabled = editable,
+                                presets = listOf(1, 2, 3, 5, 10),
+                                title = "emergency break",
+                            )
+                        }
+                    }
                     OptionRow(Icons.Default.Info, "Ask why after each unlock", description = "While it runs: a question, a box to write in and how you feel; going on is a tap", enabled = editable) {
                         ObsidianToggle(draft.askWhy, { on -> onDraftChange(draft.copy(askWhy = on)) }, enabled = editable)
                     }

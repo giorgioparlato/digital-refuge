@@ -273,6 +273,10 @@ class Repository private constructor(context: Context) {
     suspend fun updateRuntime(transform: (RuntimeState) -> RuntimeState) =
         update(RUNTIME, RuntimeState.serializer(), RuntimeState(), transform)
 
+    /** Hides one event from the event widget until it ends ([end]); the ones already over are forgotten. */
+    suspend fun hideEvent(key: String, end: Long, now: Long = System.currentTimeMillis()) =
+        updateRuntime { it.copy(hiddenEvents = it.hiddenEvents.filterValues { over -> over > now } + (key to end)) }
+
     suspend fun updateSettings(transform: (AppSettings) -> AppSettings) =
         update(SETTINGS, AppSettings.serializer(), AppSettings(), transform)
 

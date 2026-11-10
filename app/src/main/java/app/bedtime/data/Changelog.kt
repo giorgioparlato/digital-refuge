@@ -13,6 +13,15 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            93,
+            "0.9.47",
+            listOf(
+                "Long-press the event widget to hide that event until it's over; the line moves on to the next one.",
+                "The emergency break sits in more options, on blocks and schedules alike.",
+                "Writing why or a few lines: moods fold behind \"how do you feel?\", the question moves up and shrinks while the keyboard is up, and the word count stays in view inside the box.",
+            ),
+        ),
+        ChangelogEntry(
             92,
             "0.9.46",
             listOf(

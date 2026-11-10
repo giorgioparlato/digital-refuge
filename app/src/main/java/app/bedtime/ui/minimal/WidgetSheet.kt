@@ -58,6 +58,8 @@ class WidgetHandlers(
     val habitShown: (habitId: String, shown: Boolean) -> Unit = { _, _ -> },
     /** The app behind the widget, such as the weather app, when there is one. */
     val openApp: (() -> Unit)? = null,
+    /** The event widget's: hides the event it shows until that's over. */
+    val hideEvent: (() -> Unit)? = null,
 )
 
 /**
@@ -103,6 +105,7 @@ internal fun WidgetSheetContent(
     ) {
         Text(module.label, style = MaterialTheme.typography.titleMedium, color = p.text, modifier = Modifier.padding(horizontal = 22.dp).padding(bottom = 6.dp))
         handlers.openApp?.let { open -> Action(Icons.AutoMirrored.Filled.KeyboardArrowRight, "Open the ${module.label.lowercase()} app", p) { open(); onDone() } }
+        handlers.hideEvent?.takeIf { module == Module.EVENT }?.let { hide -> Action(Icons.Default.Clear, "Hide this event until it's over", p) { hide(); onDone() } }
         // The same options, in the same order, as on the Widgets page; hints are left to that page.
         val options = WidgetOptions.of(module, style, screen, handlers.change, notes, habits, handlers.habitShown)
         Column(Modifier.heightIn(max = 460.dp).verticalScroll(rememberScrollState())) {

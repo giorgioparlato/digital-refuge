@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -148,6 +150,8 @@ internal fun WhyScreen(
     var words by rememberSaveable { mutableStateOf("") }
     var picked by rememberSaveable { mutableStateOf(emptyList<String>()) }
     val written = Why.words(words)
+    // With the keyboard up, the question moves up and gets smaller, so the box and its count stay in view.
+    val typing = WindowInsets.isImeVisible
     Column(
         Modifier
             .fillMaxSize()
@@ -158,27 +162,38 @@ internal fun WhyScreen(
             .padding(horizontal = 28.dp, vertical = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Spacer(Modifier.height(40.dp))
+        Spacer(Modifier.height(if (typing) 0.dp else 40.dp))
         about?.let {
             Text(it, style = MaterialTheme.typography.labelLarge, color = c.textMuted)
             Spacer(Modifier.height(10.dp))
         }
-        Text(question, fontSize = 26.sp, color = c.textNormal, textAlign = TextAlign.Center)
+        Text(question, fontSize = if (typing) 19.sp else 26.sp, color = c.textNormal, textAlign = TextAlign.Center)
         if (moods.isNotEmpty()) {
-            Spacer(Modifier.height(18.dp))
-            // A mood of your own joins the others for next time, and is picked now.
-            val context = androidx.compose.ui.platform.LocalContext.current
-            val scope = androidx.compose.runtime.rememberCoroutineScope()
-            MoodChips(
-                (moods + picked).distinct(),
-                picked,
-                onAdd = { mood ->
-                    if (mood !in picked) picked = picked + mood
-                    scope.launch { Repository.get(context).addMoodTag(mood) }
-                },
-            ) { mood -> picked = if (mood in picked) picked - mood else picked + mood }
+            Spacer(Modifier.height(if (typing) 10.dp else 18.dp))
+            // Folded each time: a line saying how you feel, the chips a tap away.
+            var moodsOpen by remember { mutableStateOf(false) }
+            Text(
+                (if (picked.isEmpty()) "how do you feel?" else "feeling " + picked.joinToString(", ")) + if (moodsOpen) " ‹" else " ›",
+                style = MaterialTheme.typography.labelLarge,
+                color = if (picked.isEmpty()) c.textMuted else c.accentText,
+                modifier = Modifier.clip(RoundedCornerShape(50)).clickable { moodsOpen = !moodsOpen }.padding(horizontal = 12.dp, vertical = 6.dp),
+            )
+            if (moodsOpen) {
+                Spacer(Modifier.height(8.dp))
+                // A mood of your own joins the others for next time, and is picked now.
+                val context = androidx.compose.ui.platform.LocalContext.current
+                val scope = androidx.compose.runtime.rememberCoroutineScope()
+                MoodChips(
+                    (moods + picked).distinct(),
+                    picked,
+                    onAdd = { mood ->
+                        if (mood !in picked) picked = picked + mood
+                        scope.launch { Repository.get(context).addMoodTag(mood) }
+                    },
+                ) { mood -> picked = if (mood in picked) picked - mood else picked + mood }
+            }
         }
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(if (typing) 12.dp else 20.dp))
         // Room to write it out: as much as you like, or nothing; with a minimum, typed rather than pasted.
         androidx.compose.runtime.CompositionLocalProvider(
             androidx.compose.ui.platform.LocalTextToolbar provides if (minWords > 0) app.bedtime.unlock.NoPasting else androidx.compose.ui.platform.LocalTextToolbar.current,
@@ -191,25 +206,21 @@ internal fun WhyScreen(
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = 180.dp)
+                    .heightIn(min = if (typing) 120.dp else 180.dp)
                     .clip(RoundedCornerShape(14.dp))
                     .background(c.bgSecondary)
                     .border(1.dp, c.border, RoundedCornerShape(14.dp))
                     .padding(16.dp),
                 decorationBox = { field ->
-                    androidx.compose.foundation.layout.Box {
-                        if (words.isEmpty()) Text(if (minWords > 0) "At least $minWords words…" else "Write it down, if you want…", style = MaterialTheme.typography.bodyLarge, color = c.textFaint)
-                        field()
+                    Column {
+                        // The count at the top of the box, where it stays in view above the keyboard.
+                        if (minWords > 0) WordCount(written, minWords, Modifier.align(Alignment.End).padding(bottom = 6.dp))
+                        androidx.compose.foundation.layout.Box {
+                            if (words.isEmpty()) Text(if (minWords > 0) "At least $minWords words…" else "Write it down, if you want…", style = MaterialTheme.typography.bodyLarge, color = c.textFaint)
+                            field()
+                        }
                     }
                 },
-            )
-        }
-        if (minWords > 0) {
-            Text(
-                if (written >= minWords) "$written words · enough" else "$written of $minWords words",
-                style = MaterialTheme.typography.labelMedium,
-                color = if (written >= minWords) c.accentText else c.textFaint,
-                modifier = Modifier.padding(top = 8.dp),
             )
         }
         Spacer(Modifier.height(32.dp))
@@ -280,3 +291,14 @@ private fun MoodChip(label: String, on: Boolean, onClick: () -> Unit) {
     )
 }
 
+/** "12 of 30 words", or "31 words · enough" once there are; shared by every box that asks for a few. */
+@Composable
+internal fun WordCount(written: Int, needed: Int, modifier: Modifier = Modifier) {
+    val c = Obsidian.colors
+    Text(
+        if (written >= needed) "$written words · enough" else "$written of $needed words",
+        style = MaterialTheme.typography.labelMedium,
+        color = if (written >= needed) c.accentText else c.textFaint,
+        modifier = modifier,
+    )
+}

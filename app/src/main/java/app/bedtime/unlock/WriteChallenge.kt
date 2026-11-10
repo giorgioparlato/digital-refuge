@@ -76,14 +76,15 @@ internal fun WriteChallenge(words: Int, prompts: List<Pair<String, String?>>, on
                 .clip(RoundedCornerShape(14.dp))
                 .border(1.dp, c.border, RoundedCornerShape(14.dp))
                 .padding(14.dp),
+            decorationBox = { field ->
+                Column {
+                    // The count at the top of the box, where it stays in view above the keyboard.
+                    app.bedtime.ui.blocked.WordCount(written, words, Modifier.align(Alignment.End).padding(bottom = 6.dp))
+                    field()
+                }
+            },
         )
         }
-        Text(
-            if (written >= words) "$written words · enough" else "$written of $words words",
-            style = MaterialTheme.typography.labelMedium,
-            color = if (written >= words) c.accentText else c.textFaint,
-            modifier = Modifier.padding(top = 8.dp),
-        )
         Spacer(Modifier.height(16.dp))
         SoftPillButton("Continue", onClick = { onPassed(prompt, text) }, enabled = written >= words)
     }
