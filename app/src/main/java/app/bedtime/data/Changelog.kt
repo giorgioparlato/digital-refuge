@@ -13,6 +13,16 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            95,
+            "0.9.49",
+            listOf(
+                "Fixed: since 0.9.46 a schedule could start or end late, or seem not to, while the phone slept.",
+                "Search finds the folders inside your folder of files too, and opens them in the files app.",
+                "An unlock budget, just to keep track: the tracker reads \"12 of 40 unlocks\", insights count against it, and the month's \"each day\" can show unlocks with their own budget.",
+                "Distracting apps: \"an hour counts as distracted after\" takes any number of minutes up to 45, in these apps or on the phone at all.",
+            ),
+        ),
+        ChangelogEntry(
             94,
             "0.9.48",
             listOf(

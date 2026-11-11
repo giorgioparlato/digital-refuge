@@ -82,4 +82,13 @@ class UseWordsTest {
         assertEquals(false, set.chosen(true))
         assertEquals(180, fresh.withAllowance(true, 180).allowance(true))
     }
+
+    @Test
+    fun unlocksAreToldAgainstTheirBudgetWhenThereIsOne() {
+        assertEquals("1 unlock", UseWords.unlocks(1))
+        assertEquals("12 of 40 unlocks", UseWords.unlocks(12, 40))
+        val today = UseToday(total = 0, distracting = 0, unlocks = 12)
+        assertEquals("12 of 40 unlocks today", UseWords.line(UseWidget(unlocks = true, unlockBudget = 40), today))
+        assertEquals("12 unlocks today", UseWords.line(UseWidget(unlocks = true), today))
+    }
 }

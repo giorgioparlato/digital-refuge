@@ -455,7 +455,7 @@ private fun ResultRow(
             }
             is DrawerResult.Setting -> "settings: ${result.page.name.lowercase()}"
             is DrawerResult.VaultNote -> "${FolderIndex.title(result.file)} · obsidian"
-            is DrawerResult.File -> result.file.name
+            is DrawerResult.File -> if (result.file.isFolder) "${result.file.name} · folder" else result.file.name
             is DrawerResult.Shortcut -> "${result.shortcut.label.lowercase()} · ${result.shortcut.app.lowercase()}"
             is DrawerResult.Meaning -> "${result.definition.word}: ${app.bedtime.data.StarDicts.preview(result.definition)}"
         }
@@ -474,7 +474,7 @@ private fun ResultRow(
             is DrawerResult.Clock -> Icons.Default.Notifications
             is DrawerResult.Setting -> Icons.Default.Settings
             is DrawerResult.VaultNote -> Icons.Default.Create
-            is DrawerResult.File -> Icons.AutoMirrored.Filled.List
+            is DrawerResult.File -> if (result.file.isFolder) app.bedtime.ui.components.BedtimeIcons.Folder else Icons.AutoMirrored.Filled.List
             else -> Icons.Default.Edit
         }
         Box(Modifier.size((30 * names).dp), contentAlignment = Alignment.Center) {

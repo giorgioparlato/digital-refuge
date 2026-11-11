@@ -161,6 +161,15 @@ fun StatsScreen(onBack: (() -> Unit)?, initialSection: Int = 0, onOpen: (String)
                 }
             }
         },
+        // One unlock budget, kept on both trackers so either shows it.
+        onUnlockBudget = { n ->
+            scope.launch {
+                repo.updateSettings { s ->
+                    val style = s.homeStyle
+                    s.copy(homeStyle = style.copy(useWidget = style.useWidget.copy(unlockBudget = n), lockUseWidget = style.lockUseWidget?.copy(unlockBudget = n)))
+                }
+            }
+        },
         onOpen = onOpen,
         moods = settings?.takeIf { it.moodsOn && it.insightsMoods }?.let { s ->
             {
@@ -228,6 +237,7 @@ internal fun StatsContent(
     sectionsShown: List<Boolean>? = null,
     onSectionsShown: (sessions: Boolean, habits: Boolean, moods: Boolean) -> Unit = { _, _, _ -> },
     onBudget: (Boolean, Int) -> Unit = { _, _ -> },
+    onUnlockBudget: (Int) -> Unit = {},
     onOpen: (String) -> Unit = {},
     /** Your moods, as a section of their own when they're on. */
     moods: (@Composable () -> Unit)? = null,
@@ -301,6 +311,7 @@ internal fun StatsContent(
                     onVersus = onVersus,
                     homeStyle = homeStyle,
                     onBudget = onBudget,
+                    onUnlockBudget = onUnlockBudget,
                     onOpen = onOpen,
                 )
                 Spacer(Modifier.height(16.dp))

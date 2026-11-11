@@ -62,7 +62,7 @@ fun UseWidgetView(
         Modifier
     }
     val small = MaterialTheme.typography.labelMedium
-    val unlocks = today?.unlocks?.takeIf { widget.unlocks }?.let(UseWords::unlocks)
+    val unlocks = today?.unlocks?.takeIf { widget.unlocks }?.let { UseWords.unlocks(it, widget.unlockBudget) }
     when (if (today == null) UseLook.DOTS else widget.look) {
         UseLook.DOTS -> Column(modifier) {
             if (states != null) HourDots(states, p.text, p.accent, calmColor = style.hourCalmColor, distractedColor = style.hourDistractedColor, onClick = onClick, onLongClick = onLongClick)

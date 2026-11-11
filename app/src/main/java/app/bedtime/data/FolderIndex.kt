@@ -5,8 +5,10 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.DocumentsContract
 
-/** A file found in a folder you chose: its name, where it sits in that folder, and how to open it. */
-data class IndexedFile(val name: String, val path: String, val uri: String, val mime: String)
+/** A file (or a folder inside) found in a folder you chose: its name, where it sits in that folder, and how to open it. */
+data class IndexedFile(val name: String, val path: String, val uri: String, val mime: String) {
+    val isFolder: Boolean get() = mime == DocumentsContract.Document.MIME_TYPE_DIR
+}
 
 /**
  * The files in a folder you picked, read through Android's file picker permission only (no storage
@@ -16,8 +18,11 @@ object FolderIndex {
     private const val MAX = 5_000
     const val OBSIDIAN = "md.obsidian"
 
-    /** Every file under [tree], folders inside included, but none whose name starts with a dot (.obsidian, .trash). */
-    fun list(context: Context, tree: Uri, keep: (String) -> Boolean = { true }): List<IndexedFile> = runCatching {
+    /**
+     * Every file under [tree], folders inside included, but none whose name starts with a dot (.obsidian, .trash).
+     * With [folders], the folders inside are found too, to open in the files app.
+     */
+    fun list(context: Context, tree: Uri, folders: Boolean = false, keep: (String) -> Boolean = { true }): List<IndexedFile> = runCatching {
         val resolver = context.contentResolver
         val out = mutableListOf<IndexedFile>()
         val columns = arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_DISPLAY_NAME, DocumentsContract.Document.COLUMN_MIME_TYPE)
@@ -32,6 +37,7 @@ object FolderIndex {
                     if (name.startsWith(".")) continue
                     if (mime == DocumentsContract.Document.MIME_TYPE_DIR) {
                         pending.add(id to "$prefix$name/")
+                        if (folders) out.add(IndexedFile(name, "$prefix$name/", DocumentsContract.buildDocumentUriUsingTree(tree, id).toString(), mime))
                     } else if (keep(name)) {
                         out.add(IndexedFile(name, "$prefix$name", DocumentsContract.buildDocumentUriUsingTree(tree, id).toString(), mime))
                     }
@@ -67,7 +73,7 @@ object FolderIndex {
             .setPackage(OBSIDIAN)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
-    /** Opens [file] in whichever app takes its kind, allowed to read just that file. */
+    /** Opens [file] in whichever app takes its kind, allowed to read just that file; a folder, in the files app. */
     fun openIntent(file: IndexedFile): Intent =
         Intent(Intent.ACTION_VIEW)
             .setDataAndType(Uri.parse(file.uri), file.mime.ifEmpty { "*/*" })

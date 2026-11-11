@@ -66,6 +66,7 @@ import androidx.compose.ui.unit.sp
 import app.bedtime.data.UseComparison
 import app.bedtime.data.UseDay
 import app.bedtime.data.UseMonths
+import app.bedtime.data.UseWidget
 import app.bedtime.data.UseWords
 import app.bedtime.data.UsePeriod
 import app.bedtime.data.UsePeriods
@@ -115,6 +116,8 @@ internal fun PhoneStats(
     homeStyle: app.bedtime.data.HomeStyle = app.bedtime.data.HomeStyle(),
     /** Sets the day's allowance for the whole phone (true) or distracting apps. */
     onBudget: (Boolean, Int) -> Unit = { _, _ -> },
+    /** Sets the unlocks a day you mean to keep under, just to track. */
+    onUnlockBudget: (Int) -> Unit = {},
     /** Another page of the app: which apps are distracting. */
     onOpen: (String) -> Unit = {},
     /** The month heatmap's colours, and choosing them. */
@@ -201,16 +204,18 @@ internal fun PhoneStats(
     var weekGlance by rememberSaveable { mutableStateOf<Long?>(null) }
 
     if (period == UsePeriod.MONTH) {
-        // The whole phone first; distracting apps a tap away.
-        var wholePhone by rememberSaveable { mutableStateOf(true) }
-        val heat = UseHeat.month(YearMonth.from(start), use.days, months[UseMonths.key(start.toEpochDay())], wholePhone, today)
+        // The whole phone first; distracting apps and unlocks a tap away.
+        var heatOf by rememberSaveable { mutableStateOf(HeatOf.PHONE) }
+        val wholePhone = heatOf != HeatOf.DISTRACTING
+        val heat = if (heatOf == HeatOf.UNLOCKS) UseHeat.unlocks(YearMonth.from(start), use.days, today)
+        else UseHeat.month(YearMonth.from(start), use.days, months[UseMonths.key(start.toEpochDay())], wholePhone, today)
         // A day tapped: its total and top apps at a glance, the month still behind; the whole day a tap further.
         var glance by rememberSaveable { mutableStateOf<Long?>(null) }
         glance?.let(LocalDate::ofEpochDay)?.let { date ->
             DayGlance(
                 date,
                 use.days[date.toEpochDay()],
-                heat.firstOrNull { it.date == date }?.seconds,
+                heat.takeIf { heatOf != HeatOf.UNLOCKS }?.firstOrNull { it.date == date }?.amount,
                 wholePhone,
                 labels,
                 use.distractingApps,
@@ -226,10 +231,11 @@ internal fun PhoneStats(
         MonthHeat(
             heat,
             homeStyle,
-            wholePhone = wholePhone,
-            onWholePhone = { wholePhone = it },
+            of = heatOf,
+            onOf = { heatOf = it },
             onDay = { glance = it.toEpochDay() },
             onBudget = onBudget,
+            onUnlockBudget = onUnlockBudget,
             today = today,
         )
     }
@@ -238,7 +244,8 @@ internal fun PhoneStats(
         Row(Modifier.fillMaxWidth()) {
             Figure(UseWords.short(totals.total), "on the phone", totals.total, comparison?.total, Modifier.weight(1f))
             Figure(UseWords.short(totals.distracting), "distracting", totals.distracting, comparison?.distracting, Modifier.weight(1f))
-            Figure(totals.unlocks?.toString() ?: "–", "unlocks", totals.unlocks?.toLong(), comparison?.unlocks?.toLong(), Modifier.weight(1f))
+            // Against your unlock budget, over the days so far, where you've chosen one.
+            Figure(totals.unlocks?.toString() ?: "–", unlockBudgetOf(homeStyle)?.let { "of ${it * elapsed} unlocks" } ?: "unlocks", totals.unlocks?.toLong(), comparison?.unlocks?.toLong(), Modifier.weight(1f))
         }
         Spacer(Modifier.height(12.dp))
         Box {
@@ -458,6 +465,12 @@ internal object HeatColours {
     }
 }
 
+/** What the month's heatmap shows: time on the phone, in distracting apps, or unlocks. */
+internal enum class HeatOf { PHONE, DISTRACTING, UNLOCKS }
+
+/** The unlocks a day you mean to keep under, from the home screen's tracker or the lock screen's; null for none. */
+internal fun unlockBudgetOf(style: app.bedtime.data.HomeStyle): Int? = listOfNotNull(style.useWidget, style.lockUseWidget).firstNotNullOfOrNull { it.unlockBudget }
+
 /**
  * The month a day at a time, each coloured by its time against the tracker's daily budget: green
  * within it, cream at it, deepening to red at the month's worst day. A tap shows that day at a
@@ -467,36 +480,63 @@ internal object HeatColours {
 private fun MonthHeat(
     heat: List<HeatDay>,
     style: app.bedtime.data.HomeStyle,
-    wholePhone: Boolean,
-    onWholePhone: (Boolean) -> Unit,
+    of: HeatOf,
+    onOf: (HeatOf) -> Unit,
     onDay: (LocalDate) -> Unit,
     onBudget: (Boolean, Int) -> Unit,
+    onUnlockBudget: (Int) -> Unit,
     today: LocalDate,
 ) {
     val c = Obsidian.colors
+    val unlocks = of == HeatOf.UNLOCKS
+    val wholePhone = of == HeatOf.PHONE
     // Your budget where you have one, on the home screen's tracker or the lock screen's.
     val widget = listOfNotNull(style.useWidget, style.lockUseWidget).firstOrNull { it.chosen(wholePhone) } ?: style.useWidget
-    // Each against its own budget: the phone's, or the distracting apps'.
-    val budget = widget.allowance(wholePhone) * 60L
+    val unlockBudget = unlockBudgetOf(style)
+    // Each against its own budget: the phone's, the distracting apps', or the unlocks'.
+    val budget = if (unlocks) (unlockBudget ?: UseWidget.SUGGESTED_UNLOCKS).toLong() else widget.allowance(wholePhone) * 60L
+    val chosen = if (unlocks) unlockBudget != null else widget.chosen(wholePhone)
+    // The amounts in words: times, or unlocks.
+    fun amount(n: Long) = if (unlocks) UseWords.unlocks(n.toInt()) else UseWords.short(n)
+    fun narrow(n: Long) = if (unlocks) "$n" else UseWords.compact((n / 60).toInt())
+    val budgetWords = if (unlocks) "$budget unlocks" else formatMinutes(budget / 60)
     var settingBudget by remember { mutableStateOf(false) }
     if (settingBudget) {
-        BudgetDialog(wholePhone, widget.allowance(wholePhone), onDismiss = { settingBudget = false }) { minutes ->
-            settingBudget = false
-            onBudget(wholePhone, minutes)
+        if (unlocks) {
+            BudgetDialog("Unlocks in a day", budget.toInt(), UseWords.UNLOCK_BUDGETS, UseWords.UNLOCK_RANGE, { "$it" }, onDismiss = { settingBudget = false }) { n ->
+                settingBudget = false
+                onUnlockBudget(n)
+            }
+        } else {
+            BudgetDialog(
+                if (wholePhone) "A day on the phone" else "A day in distracting apps",
+                widget.allowance(wholePhone),
+                if (wholePhone) UseWords.PHONE_BUDGETS else UseWords.DISTRACTING_BUDGETS,
+                UseWords.BUDGET_RANGE,
+                UseWords::compact,
+                onDismiss = { settingBudget = false },
+            ) { minutes ->
+                settingBudget = false
+                onBudget(wholePhone, minutes)
+            }
         }
     }
     // The worst day of the month is the reddest; within your budget, nothing is red.
-    val top = UseHeat.most(heat)?.seconds ?: 0L
-    fun colour(seconds: Long): Color = HeatColours.at(seconds, budget, top)
+    val top = UseHeat.most(heat)?.amount ?: 0L
+    fun colour(n: Long): Color = HeatColours.at(n, budget, top)
     SectionCard(title = "Each day", subtitle = "Against a day's budget, the same in every month. Tap a day for its time and top apps") {
-        SegmentedChoice(options = listOf("On the phone", "Distracting"), selected = if (wholePhone) 0 else 1, onSelect = { onWholePhone(it == 0) })
+        SegmentedChoice(options = listOf("On the phone", "Distracting", "Unlocks"), selected = of.ordinal, onSelect = { onOf(HeatOf.entries[it]) })
         Spacer(Modifier.height(8.dp))
         // The budget it's set against, and a way to choose it; until you have, a nudge to.
-        val what = if (wholePhone) "on the phone" else "in distracting apps"
+        val what = when (of) {
+            HeatOf.PHONE -> " on the phone"
+            HeatOf.DISTRACTING -> " in distracting apps"
+            HeatOf.UNLOCKS -> ""
+        }
         LinkLine(
-            if (widget.chosen(wholePhone)) "Budget: ${formatMinutes(budget / 60)} a day $what"
-            else "No budget chosen yet, so ${formatMinutes(budget / 60)} a day $what is suggested. Choose yours",
-            strong = !widget.chosen(wholePhone),
+            if (chosen) "Budget: $budgetWords a day$what" + (if (unlocks) ", just to keep track" else "")
+            else "No budget chosen yet, so $budgetWords a day$what is suggested. Choose yours",
+            strong = !chosen,
         ) { settingBudget = true }
         Spacer(Modifier.height(8.dp))
         // Monday first, as the weeks are.
@@ -514,7 +554,7 @@ private fun MonthHeat(
                     val day = week.getOrNull(i)
                     Box(Modifier.weight(1f).aspectRatio(1f)) {
                         if (day != null) {
-                            val seconds = day.seconds
+                            val seconds = day.amount
                             val shape = RoundedCornerShape(8.dp)
                             // Today stands out, outlined in the accent, and always opens.
                             val isToday = day.date == today
@@ -554,19 +594,19 @@ private fun MonthHeat(
             val at = (budget.toFloat() / end).coerceIn(0.05f, 0.95f)
             Text("0", style = MaterialTheme.typography.labelSmall, color = c.textFaint)
             Spacer(Modifier.weight(at))
-            Text("${UseWords.compact((budget / 60).toInt())} budget", style = MaterialTheme.typography.labelSmall, color = c.textFaint)
+            Text("${narrow(budget)} budget", style = MaterialTheme.typography.labelSmall, color = c.textFaint)
             Spacer(Modifier.weight(1f - at))
-            if (top > budget) Text(UseWords.compact((top / 60).toInt()), style = MaterialTheme.typography.labelSmall, color = c.textFaint)
+            if (top > budget) Text(narrow(top), style = MaterialTheme.typography.labelSmall, color = c.textFaint)
         }
         Spacer(Modifier.height(10.dp))
         // Today, so far: a way into its page.
         heat.firstOrNull { it.date == today }?.let { day ->
-            LinkLine("Today so far: ${UseWords.short(day.seconds ?: 0)} of ${formatMinutes(budget / 60)}", strong = true) { onDay(today) }
+            LinkLine("Today so far: " + if (unlocks) UseWords.unlocks((day.amount ?: 0).toInt(), budget.toInt()) else "${UseWords.short(day.amount ?: 0)} of $budgetWords", strong = true) { onDay(today) }
         }
         val most = UseHeat.most(heat)
         Text(
-            most?.let { "Most: ${UseWords.short(it.seconds ?: 0)}, " + it.date.format(DateTimeFormatter.ofPattern("EEEE d", Locale.getDefault())) }
-                ?: "Nothing kept for these days yet.",
+            most?.let { "Most: ${amount(it.amount ?: 0)}, " + it.date.format(DateTimeFormatter.ofPattern("EEEE d", Locale.getDefault())) }
+                ?: if (unlocks) "No unlocks kept for these days." else "Nothing kept for these days yet.",
             style = MaterialTheme.typography.bodyMedium,
             color = c.textMuted,
         )
@@ -621,6 +661,7 @@ private fun DayGlance(
                 if (wholePhone && day != null && day.distractingTotal > 0) {
                     Text("${UseWords.short(day.distractingTotal)} of it distracting", style = MaterialTheme.typography.bodySmall, color = c.textMuted)
                 }
+                day?.unlocks?.let { Text(UseWords.unlocks(it), style = MaterialTheme.typography.bodySmall, color = c.textMuted) }
                 Spacer(Modifier.height(12.dp))
                 when {
                     day == null -> Text("Only the day's total is kept this far back.", style = MaterialTheme.typography.bodySmall, color = c.textFaint)
@@ -705,23 +746,31 @@ private fun WeekDayGlance(
     )
 }
 
-/** A day's budget, for the whole phone ([wholePhone]) or distracting apps: a few usual amounts, or any other. */
+/** A day's budget, in minutes or unlocks ([format]): a few usual amounts ([presets]), or any other in [range]. */
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
-private fun BudgetDialog(wholePhone: Boolean, current: Int, onDismiss: () -> Unit, onSave: (Int) -> Unit) {
+private fun BudgetDialog(
+    title: String,
+    current: Int,
+    presets: List<Int>,
+    range: IntRange,
+    format: (Int) -> String,
+    onDismiss: () -> Unit,
+    onSave: (Int) -> Unit,
+) {
     val c = Obsidian.colors
     var minutes by remember { mutableStateOf(current) }
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = c.bgSecondary,
-        title = { Text(if (wholePhone) "A day on the phone" else "A day in distracting apps") },
+        title = { Text(title) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    (if (wholePhone) UseWords.PHONE_BUDGETS else UseWords.DISTRACTING_BUDGETS).forEach { m ->
+                    presets.forEach { m ->
                         val on = m == minutes
                         Text(
-                            UseWords.compact(m),
+                            format(m),
                             style = MaterialTheme.typography.labelLarge,
                             color = if (on) c.bgPrimary else c.textMuted,
                             modifier = Modifier
@@ -733,7 +782,7 @@ private fun BudgetDialog(wholePhone: Boolean, current: Int, onDismiss: () -> Uni
                         )
                     }
                 }
-                app.bedtime.ui.components.NumberStepper(minutes, { minutes = it }, UseWords.BUDGET_RANGE, step = 5, suffix = " min")
+                app.bedtime.ui.components.NumberStepper(minutes, { minutes = it }, range, step = 5, format = format)
             }
         },
         confirmButton = { TextButton(onClick = { onSave(minutes) }) { Text("Save", color = c.accentText) } },

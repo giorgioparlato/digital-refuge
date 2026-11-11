@@ -455,6 +455,8 @@ One file serves the look, widgets, gestures and notifications pages, for both sc
 - Today so far
 - Unlocks
 - How many times today; refuge counts them itself
+- A day's unlocks
+- No budget
 - The budget counts
 - Distracting apps
 - The whole phone
@@ -707,11 +709,11 @@ One file serves the look, widgets, gestures and notifications pages, for both sc
 - Your day as 24 hours: an hour counts as distracted when you spent more than its minutes in these apps, or, if you like, on the phone at all. Only which app was open is counted, never what was in it.
 - The apps
 - None yet
-- An hour counts after
+- An hour counts as distracted after
 - In these apps
 - {it} min
 - Or on the phone at all, in any app
-- {m} min
+- On the phone at all
 - Off
 - To see it on your home or lock screen, switch on the distraction tracker in Widgets; its look and colours are there too.
 

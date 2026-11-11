@@ -52,6 +52,11 @@ object BedtimeIcons {
         icon("Grid") { path("M4,4 H10 V10 H4 Z M14,4 H20 V10 H14 Z M4,14 H10 V20 H4 Z M14,14 H20 V20 H14 Z") }
     }
 
+    /** A folder, for the folders search finds. */
+    val Folder: ImageVector by lazy {
+        icon("Folder") { path("M10,4 H4 C2.9,4 2,4.9 2,6 V18 C2,19.1 2.9,20 4,20 H20 C21.1,20 22,19.1 22,18 V8 C22,6.9 21.1,6 20,6 H12 Z") }
+    }
+
     /** Concentric rings, for focus. */
     val Target: ImageVector by lazy {
         icon("Target") {

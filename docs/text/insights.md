@@ -72,6 +72,7 @@ insights
 - the one before
 - the one after
 - on the phone
+- of … unlocks
 - against {against}
 -  · nothing to compare with
 - , so far
@@ -99,17 +100,24 @@ insights
 - Which apps are distracting
 - Fewer
 - All …
+- {budget} unlocks
+- Unlocks in a day
+- A day on the phone
+- A day in distracting apps
 - Each day
 - Against a day's budget, the same in every month. Tap a day for its time and top apps
-- in distracting apps
-- Budget: … a day {what}
-- No budget chosen yet, so … a day {what} is suggested. Choose yours
-- … budget
-- Today so far: … of …
-- Nothing kept for these days yet.
-- {text} ›
+- Unlocks
 -  on the phone
 -  in distracting apps
+- Budget: {budgetWords} a day{what}
+- , just to keep track
+- No budget chosen yet, so {budgetWords} a day{what} is suggested. Choose yours
+- … budget
+- Today so far: 
+- … of {budgetWords}
+- No unlocks kept for these days.
+- Nothing kept for these days yet.
+- {text} ›
 - … of it distracting
 - Only the day's total is kept this far back.
 - No app took a minute.
@@ -118,8 +126,6 @@ insights
 - your usual one of that weekday
 - the same day a year back
 - the same day a week before
-- A day on the phone
-- A day in distracting apps
 - Save
 - Cancel
 - this week
@@ -137,7 +143,6 @@ insights
 - your average day this year
 - Compare
 - ↑ {change}%
-- Unlocks
 -  · {it}, the most … in an hour
 - the same
 

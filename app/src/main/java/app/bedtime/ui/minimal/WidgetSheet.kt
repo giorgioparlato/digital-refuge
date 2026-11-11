@@ -126,9 +126,9 @@ internal fun WidgetSheetContent(
                         Label(option.label, p)
                         var other by remember { mutableStateOf(false) }
                         FlowRow(Modifier.padding(horizontal = 22.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            option.presets.forEach { m -> Chip(app.bedtime.data.UseWords.compact(m), m == option.value, p) { option.set(m) } }
+                            option.presets.forEach { m -> Chip(option.format(m), m == option.value, p) { option.set(m) } }
                             // Your own amount shows as itself; "other…" asks for one.
-                            if (option.value !in option.presets) Chip(app.bedtime.data.UseWords.compact(option.value), true, p) { other = true }
+                            if (option.value !in option.presets) Chip(option.format(option.value), true, p) { other = true }
                             Chip("Other…", false, p) { other = true }
                         }
                         if (other) OtherMinutes(option) { other = false }
@@ -224,7 +224,7 @@ private fun OtherMinutes(option: WidgetOption.Minutes, onDone: () -> Unit) {
         title = { Text(option.label) },
         text = {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                app.bedtime.ui.components.NumberStepper(minutes, { minutes = it }, option.range, step = 5, presets = option.presets, title = option.label, format = app.bedtime.data.UseWords::compact)
+                app.bedtime.ui.components.NumberStepper(minutes, { minutes = it }, option.range, step = option.step, presets = option.presets, title = option.label, format = option.format)
             }
         },
         confirmButton = {

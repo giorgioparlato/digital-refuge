@@ -23,6 +23,8 @@ data class UseWidget(
     /** Whether you've chosen each allowance yourself; until then it's the one suggested, and you're asked to choose. */
     val budgetChosen: Boolean = false,
     val phoneBudgetChosen: Boolean = false,
+    /** Unlocks you mean to keep a day under, just to track; null for none. Shown as "12 of 40 unlocks". */
+    val unlockBudget: Int? = null,
 ) {
     /**
      * Whether you've chosen the allowance for the whole phone ([wholePhone]) or distracting apps. Saved
@@ -50,6 +52,9 @@ data class UseWidget(
     companion object {
         const val SUGGESTED_DISTRACTING = 30
         const val SUGGESTED_PHONE = 60
+
+        /** The unlocks a day suggested on the month's heatmap until you choose your own. */
+        const val SUGGESTED_UNLOCKS = 40
     }
 }
 
@@ -101,12 +106,23 @@ object UseWords {
         else -> "${minutes / 60}h ${minutes % 60}m"
     }
 
-    fun unlocks(count: Int): String = if (count == 1) "1 unlock" else "$count unlocks"
+    /** "12 unlocks", or against a budget "12 of 40 unlocks". */
+    fun unlocks(count: Int, budget: Int? = null): String = when {
+        budget != null -> "$count of $budget unlocks"
+        count == 1 -> "1 unlock"
+        else -> "$count unlocks"
+    }
+
+    /** The unlock budgets to choose from. */
+    val UNLOCK_BUDGETS = listOf(20, 30, 40, 50, 60, 80, 100)
+
+    /** Any unlock budget, in fives. */
+    val UNLOCK_RANGE = 5..500
 
     private fun figures(widget: UseWidget, today: UseToday): List<String> = buildList {
         if (widget.total) add("${short(today.total)} on the phone")
         if (widget.distracting) add("${short(today.distracting)} distracting")
-        if (widget.unlocks && today.unlocks != null) add(unlocks(today.unlocks))
+        if (widget.unlocks && today.unlocks != null) add(unlocks(today.unlocks, widget.unlockBudget))
     }
 
     /** The line: the figures chosen, or the distracting time with none; a single one says "today". */
@@ -142,6 +158,6 @@ object UseWords {
 
     /** All of it on one line: the total, unlocks if chosen, then the top apps by [label]. */
     fun appsLine(widget: UseWidget, today: UseToday, label: (String) -> String): String =
-        (listOf(short(today.total)) + listOfNotNull(today.unlocks?.takeIf { widget.unlocks }?.let(::unlocks)) + top(today).map { (pkg, s) -> "${label(pkg)} ${short(s)}" })
+        (listOf(short(today.total)) + listOfNotNull(today.unlocks?.takeIf { widget.unlocks }?.let { unlocks(it, widget.unlockBudget) }) + top(today).map { (pkg, s) -> "${label(pkg)} ${short(s)}" })
             .joinToString(" · ")
 }

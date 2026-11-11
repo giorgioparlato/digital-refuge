@@ -62,8 +62,16 @@ sealed interface WidgetOption {
         val set: (Boolean) -> Unit,
     ) : WidgetOption
 
-    /** A number of minutes: any in [range], with [presets] to hand. */
-    class Minutes(override val label: String, val value: Int, val presets: List<Int>, val range: IntRange, val set: (Int) -> Unit) : WidgetOption
+    /** A number, minutes unless [format] says otherwise: any in [range] by [step], with [presets] to hand. */
+    class Minutes(
+        override val label: String,
+        val value: Int,
+        val presets: List<Int>,
+        val range: IntRange,
+        val step: Int = 5,
+        val format: (Int) -> String = UseWords::compact,
+        val set: (Int) -> Unit,
+    ) : WidgetOption
 
     /** A colour from a set, or [automatic] (null) where there is one. */
     class Colour(
@@ -212,6 +220,14 @@ object WidgetOptions {
                 if (figures) WidgetOption.Switch("Time on the phone", "All of today, in any app", use.total) { set(use.copy(total = it)) } else null,
                 if (figures) WidgetOption.Switch("Time in distracting apps", "Today so far", use.distracting) { set(use.copy(distracting = it)) } else null,
                 WidgetOption.Switch("Unlocks", "How many times today; refuge counts them itself", use.unlocks) { set(use.copy(unlocks = it)) },
+                // Only to keep track: "12 of 40 unlocks". Nothing is shut when it runs out.
+                if (use.unlocks) {
+                    WidgetOption.Minutes("A day's unlocks", use.unlockBudget ?: 0, listOf(0) + UseWords.UNLOCK_BUDGETS, 0..UseWords.UNLOCK_RANGE.last, format = { if (it == 0) "No budget" else "$it" }) {
+                        set(use.copy(unlockBudget = it.takeIf { n -> n > 0 }))
+                    }
+                } else {
+                    null
+                },
                 if (use.look == UseLook.BUDGET) {
                     WidgetOption.Choice("The budget counts", listOf("Distracting apps" to false, "The whole phone" to true), use.budgetWholePhone) {
                         set(use.copy(budgetWholePhone = it))
@@ -299,7 +315,7 @@ internal fun WidgetOptionsPage(options: List<WidgetOption>, onOpen: (String) -> 
                 is WidgetOption.Minutes -> {
                     Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text(option.label, style = MaterialTheme.typography.bodyLarge, color = c.textNormal, modifier = Modifier.weight(1f))
-                        NumberStepper(option.value, option.set, option.range, step = 5, presets = option.presets, title = option.label, format = UseWords::compact)
+                        NumberStepper(option.value, option.set, option.range, step = option.step, presets = option.presets, title = option.label, format = option.format)
                     }
                     Spacer12()
                 }

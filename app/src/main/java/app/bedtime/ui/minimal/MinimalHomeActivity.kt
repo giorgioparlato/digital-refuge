@@ -295,7 +295,7 @@ private fun MinimalHomeScreen(
     }
     val folderFiles by produceState(emptyList<IndexedFile>(), drawer, settings.fileFolders) {
         val trees = settings.fileFolders
-        if (drawer && trees.isNotEmpty()) value = withContext(Dispatchers.IO) { trees.flatMap { FolderIndex.list(context, Uri.parse(it)) } }
+        if (drawer && trees.isNotEmpty()) value = withContext(Dispatchers.IO) { trees.flatMap { FolderIndex.list(context, Uri.parse(it), folders = true) } }
     }
     // An event waiting for calendar access, saved once it's given.
     var pendingEvent by remember { mutableStateOf<ParsedEvent?>(null) }

@@ -1,5 +1,8 @@
 package app.bedtime.ui.settings
 
+import androidx.compose.ui.Alignment
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -31,7 +34,6 @@ import app.bedtime.ui.components.ObsidianTopBar
 import app.bedtime.ui.components.OptionRow
 import app.bedtime.ui.components.PageGutter
 import app.bedtime.ui.components.SectionCard
-import app.bedtime.ui.components.SegmentedChoice
 import app.bedtime.ui.components.Text
 import app.bedtime.ui.pluralApps
 import app.bedtime.ui.theme.Obsidian
@@ -94,25 +96,21 @@ internal fun DistractionContent(
             SectionCard {
                 OptionRow(BedtimeIcons.Grid, "The apps", description = if (appCount == 0) "None yet" else pluralApps(appCount), onClick = onPick) { Chevron() }
             }
-            SectionCard(title = "An hour counts after") {
-                Text("In these apps", style = MaterialTheme.typography.labelMedium, color = c.textMuted, modifier = Modifier.padding(bottom = 8.dp))
-                SegmentedChoice(
-                    options = HourlyUse.THRESHOLDS.map { "$it min" },
-                    selected = HourlyUse.THRESHOLDS.indexOf(minutes).coerceAtLeast(0),
-                    onSelect = { onMinutes(HourlyUse.THRESHOLDS[it]) },
-                )
-                Text(
-                    "Or on the phone at all, in any app",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = c.textMuted,
-                    modifier = Modifier.padding(top = 16.dp, bottom = 8.dp),
-                )
-                val totals = listOf<Int?>(null) + HourlyUse.TOTAL_THRESHOLDS
-                SegmentedChoice(
-                    options = totals.map { it?.let { m -> "$m min" } ?: "Off" },
-                    selected = totals.indexOf(totalMinutes).coerceAtLeast(0),
-                    onSelect = { onTotalMinutes(totals[it]) },
-                )
+            // Any number of minutes up to 45, the usual ones to hand; on the phone at all can be off (0).
+            SectionCard(title = "An hour counts as distracted after") {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text("In these apps", style = MaterialTheme.typography.bodyLarge, color = c.textNormal, modifier = Modifier.weight(1f))
+                    app.bedtime.ui.components.NumberStepper(
+                        minutes, onMinutes, 1..45, presets = HourlyUse.THRESHOLDS, title = "In these apps", format = { "$it min" },
+                    )
+                }
+                Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("Or on the phone at all, in any app", style = MaterialTheme.typography.bodyLarge, color = c.textNormal, modifier = Modifier.weight(1f))
+                    app.bedtime.ui.components.NumberStepper(
+                        totalMinutes ?: 0, { onTotalMinutes(it.takeIf { m -> m > 0 }) }, 0..45,
+                        presets = listOf(0) + HourlyUse.TOTAL_THRESHOLDS, title = "On the phone at all", format = { if (it == 0) "Off" else "$it min" },
+                    )
+                }
             }
             Text(
                 "To see it on your home or lock screen, switch on the distraction tracker in Widgets; its look and colours are there too.",

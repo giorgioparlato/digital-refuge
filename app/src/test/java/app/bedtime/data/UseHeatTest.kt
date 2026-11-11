@@ -19,12 +19,12 @@ class UseHeatTest {
         val kept = UsageMonth("2026-10", daily = mapOf(2 to 3_600L), dailyDistracting = mapOf(2 to 600L))
         val heat = UseHeat.month(october, days, kept, wholePhone = true, today)
         assertEquals(31, heat.size)
-        assertEquals(7_200L, heat[29].seconds)
-        assertEquals(3_600L, heat[1].seconds)
-        assertNull(heat[0].seconds)
-        assertEquals(600L, UseHeat.month(october, days, kept, wholePhone = false, today)[1].seconds)
+        assertEquals(7_200L, heat[29].amount)
+        assertEquals(3_600L, heat[1].amount)
+        assertNull(heat[0].amount)
+        assertEquals(600L, UseHeat.month(october, days, kept, wholePhone = false, today)[1].amount)
         // Days still to come are nothing yet.
-        assertNull(UseHeat.month(YearMonth.of(2026, 11), emptyMap(), UsageMonth("2026-11", daily = mapOf(5 to 60L)), true, today)[4].seconds)
+        assertNull(UseHeat.month(YearMonth.of(2026, 11), emptyMap(), UsageMonth("2026-11", daily = mapOf(5 to 60L)), true, today)[4].amount)
     }
 
     @Test
@@ -50,5 +50,14 @@ class UseHeatTest {
         val merged = UseMonths.merge(mapOf("2026-09" to UsageMonth("2026-09", total = 99_000)), months.associateBy { it.month })
         assertEquals(99_000L, merged.getValue("2026-09").total)
         assertEquals(mapOf(14 to 5_000L), merged.getValue("2026-09").daily)
+    }
+
+    @Test
+    fun aMonthsUnlocksComeFromItsDaysOnly() {
+        val days = mapOf(LocalDate.of(2026, 10, 30).let { it.toEpochDay() to UseDay(it.toEpochDay(), unlocks = 42) })
+        val heat = UseHeat.unlocks(YearMonth.of(2026, 10), days, today)
+        assertEquals(42L, heat[29].amount)
+        assertNull(heat[1].amount)
+        assertNull(UseHeat.unlocks(YearMonth.of(2026, 11), days, today)[0].amount)
     }
 }

@@ -40,14 +40,16 @@ object Engine {
 
     @OptIn(ExperimentalCoroutinesApi::class)
     private fun build(repo: Repository): StateFlow<ActiveState?> =
-        combine(repo.schedules, repo.runtime, repo.settings, tick) { schedules, runtime, settings, _ ->
+        combine(repo.schedules, repo.runtime, repo.settings, tick) { schedules, runtime, settings, tick ->
             // Covering Android's off switches and the full-screen reminder are one switch each, for every session.
             val cover = settings.coversOffSwitches(schedules)
             val remind = settings.remindsFullScreen
-            schedules.map { it.copy(lockSettings = cover, fullScreenAlert = remind) } to runtime
+            Triple(schedules.map { it.copy(lockSettings = cover, fullScreenAlert = remind) }, runtime, tick)
         }
+            // The tick is kept in, so a refresh (a session's alarm, the screen coming on) always looks again,
+            // while a settings change that leaves the schedules as they were doesn't.
             .distinctUntilChanged()
-            .flatMapLatest { (schedules, runtime) ->
+            .flatMapLatest { (schedules, runtime, _) ->
                 flow {
                     while (true) {
                         val now = System.currentTimeMillis()
