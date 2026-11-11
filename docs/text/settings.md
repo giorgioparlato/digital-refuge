@@ -65,6 +65,7 @@ Home screen, lock screen, apps, shortcuts and about & backup are lists of rows f
 - {it} min
 - Off
 - digital refuge {version} · everything stays on this phone
+- github.com/giorgioparlato/digital-refuge ›
 - Permissions & setup
 - All set
 - 1 step left

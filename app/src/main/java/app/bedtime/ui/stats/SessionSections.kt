@@ -160,7 +160,7 @@ internal fun SessionStats(
                 Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(label, style = MaterialTheme.typography.bodySmall, color = c.textMuted, modifier = Modifier.width(96.dp))
                     Box(Modifier.weight(1f)) {
-                        if (n > 0) Box(Modifier.fillMaxWidth(n.toFloat() / most).height(10.dp).clip(RoundedCornerShape(50)).background(Color(0xFFD9762B)))
+                        if (n > 0) Box(Modifier.fillMaxWidth(n.toFloat() / most).height(10.dp).clip(RoundedCornerShape(50)).background(c.accent))
                     }
                     Text("$n", style = MaterialTheme.typography.labelMedium, color = c.textNormal, modifier = Modifier.width(28.dp).padding(start = 8.dp))
                 }

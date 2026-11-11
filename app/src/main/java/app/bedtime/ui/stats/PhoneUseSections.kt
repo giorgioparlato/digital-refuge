@@ -88,8 +88,6 @@ import java.util.Locale
 
 private fun time(seconds: Long) = formatMinutes(seconds / 60)
 
-/** More than before: told in a warm colour, as less is told in the accent. */
-private val More = Color(0xFFD9762B)
 
 /**
  * Phone use one period at a time: a day, a week or a month, stepped back through with the arrows. Three
@@ -840,7 +838,8 @@ private fun Figure(value: String, label: String, now: Long?, then: Long?, modifi
             color = when {
                 change == null || change == 0 -> c.textFaint
                 change < 0 -> c.accentText
-                else -> More
+                // More than before: the brighter grey, as less is told in the accent.
+                else -> c.textNormal
             },
         )
     }
@@ -983,7 +982,7 @@ private fun AppRow(label: String, seconds: Long, opens: Int, then: Long?, distra
                     },
                     style = MaterialTheme.typography.labelSmall,
                     color = when {
-                        then < 60 || diff > 0 -> More
+                        then < 60 || diff > 0 -> c.textNormal
                         diff < 0 -> c.accentText
                         else -> c.textFaint
                     },

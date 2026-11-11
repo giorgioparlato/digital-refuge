@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -460,7 +461,7 @@ fun SoftPillButton(text: String, onClick: () -> Unit, modifier: Modifier = Modif
     }
 }
 
-/** "New schedule", "new limit": a small tinted circle with a plus, no shadow, named for screen readers. */
+/** "New schedule", "new limit": a small solid tinted circle with a plus, no shadow, named for screen readers. */
 @Composable
 fun AddCircleButton(label: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val c = Obsidian.colors
@@ -468,7 +469,8 @@ fun AddCircleButton(label: String, onClick: () -> Unit, modifier: Modifier = Mod
         modifier
             .size(52.dp)
             .clip(CircleShape)
-            .background(c.accent.copy(alpha = 0.18f))
+            // Solid: the tint laid over the page's colour, so a list scrolling underneath never shows through.
+            .background(c.accent.copy(alpha = 0.18f).compositeOver(c.bgPrimary))
             .clickable(onClickLabel = label, role = Role.Button, onClick = onClick)
             .semantics { contentDescription = label },
         contentAlignment = Alignment.Center,
@@ -556,7 +558,8 @@ fun Callout(
         CalloutKind.NOTE -> c.accent
         // Neutral: the theme's blue sat apart from its greens.
         CalloutKind.INFO -> c.textMuted
-        CalloutKind.WARNING -> c.orange
+        // The page's brightest grey with a warning sign, rather than the theme's orange.
+        CalloutKind.WARNING -> c.textNormal
         CalloutKind.SUCCESS -> c.green
     }
     val icon = when (kind) {

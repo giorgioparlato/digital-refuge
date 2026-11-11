@@ -13,6 +13,15 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            94,
+            "0.9.48",
+            listOf(
+                "The + buttons are solid, so what scrolls under them no longer shows through.",
+                "Fewer colours from outside the theme: warnings are grey with a warning sign, \"more than before\" in insights is grey, and the \"when you break\" bars are green.",
+                "Credits thank Primary, by Cecilia May, the Obsidian theme refuge's colours come from; settings' foot links to refuge on GitHub.",
+            ),
+        ),
+        ChangelogEntry(
             93,
             "0.9.47",
             listOf(

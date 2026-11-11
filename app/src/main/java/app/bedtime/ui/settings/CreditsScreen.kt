@@ -42,6 +42,7 @@ private val THANKS = listOf(
     Credit("Clicks Communicator", "A phone for talking to people rather than scrolling: the people who matter first.", "https://clicksphone.com/communicator"),
     Credit("Alfred", "Typing to find anything, with a word before it for where: the look-up.", "https://www.alfredapp.com"),
     Credit("Loop Habit Tracker", "Habits and their strength, kept on the phone.", "https://loophabits.org"),
+    Credit("Primary, by Cecilia May", "The theme for Obsidian whose colours refuge wears: warm greys with a green accent.", "https://github.com/primary-theme/obsidian"),
 )
 
 /** Code and fonts refuge is built with, and their licences: in the app's own files, or on the web. */

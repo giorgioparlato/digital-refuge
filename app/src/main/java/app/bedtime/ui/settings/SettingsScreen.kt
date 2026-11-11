@@ -447,6 +447,18 @@ private fun Footer(version: String) {
         color = Obsidian.colors.textFaint,
         modifier = Modifier.fillMaxWidth().padding(start = 2.dp),
     )
+    // Where refuge's code and releases live; a tap opens it in the browser.
+    val context = LocalContext.current
+    Text(
+        "github.com/giorgioparlato/digital-refuge ›",
+        style = MaterialTheme.typography.bodySmall,
+        color = Obsidian.colors.textFaint,
+        modifier = Modifier
+            .clickable(onClickLabel = "open on github") {
+                runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/giorgioparlato/digital-refuge")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+            }
+            .padding(start = 2.dp, top = 4.dp, bottom = 4.dp),
+    )
 }
 
 /**
