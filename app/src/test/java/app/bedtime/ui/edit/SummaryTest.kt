@@ -75,6 +75,6 @@ class SummaryTest {
     @Test
     fun moreOptionsNameWhatsSetOrWhatsInThem() {
         assertEquals("emergency break 1 min", moreSummary(bare.copy(pauseEnabled = true, breakMinutes = 1), null))
-        assertEquals("no emergency break · asks why · changeable 08:00–20:00", moreSummary(bare.copy(pauseEnabled = false, askWhy = true), "08:00–20:00"))
+        assertEquals("no emergency break · journal after unlocking · changeable 08:00–20:00", moreSummary(bare.copy(pauseEnabled = false, askWhy = true), "08:00–20:00"))
     }
 }

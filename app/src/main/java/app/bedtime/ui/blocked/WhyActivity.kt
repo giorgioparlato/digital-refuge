@@ -170,8 +170,9 @@ internal fun WhyScreen(
         Text(question, fontSize = if (typing) 19.sp else 26.sp, color = c.textNormal, textAlign = TextAlign.Center)
         if (moods.isNotEmpty()) {
             Spacer(Modifier.height(if (typing) 10.dp else 18.dp))
-            // Folded each time: a line saying how you feel, the chips a tap away.
-            var moodsOpen by remember { mutableStateOf(false) }
+            // Open to start with; folded into a line saying how you feel once the keyboard comes up, a tap to open again.
+            var moodsOpen by remember { mutableStateOf(true) }
+            androidx.compose.runtime.LaunchedEffect(typing) { if (typing) moodsOpen = false }
             Text(
                 (if (picked.isEmpty()) "how do you feel?" else "feeling " + picked.joinToString(", ")) + if (moodsOpen) " ‹" else " ›",
                 style = MaterialTheme.typography.labelLarge,

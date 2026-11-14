@@ -90,6 +90,15 @@ class Repository private constructor(context: Context) {
         notes.map { if (it.id == id) it.copy(text = text, editedAt = System.currentTimeMillis()) else it }
     }
 
+    /** A word from the look-up, and a little of its meaning, at the foot of the words note, begun if need be; once only. */
+    suspend fun saveWord(word: String, meaning: String, at: Long = System.currentTimeMillis()) = update(NOTES, notesSerializer, emptyList()) { notes ->
+        val note = notes.firstOrNull { it.id == Notes.WORDS_ID }
+        when {
+            note == null -> listOf(Note(Notes.WORDS_ID, "# words\n" + Notes.wordLine(word, meaning) + "\n", at)) + notes
+            else -> Notes.withWord(note.text, word, meaning)?.let { text -> notes.map { if (it.id == Notes.WORDS_ID) it.copy(text = text, editedAt = at) else it } } ?: notes
+        }
+    }
+
     /** Adds [words] to the to-do note as an unticked item, starting the note if there isn't one yet. */
     suspend fun addTodo(words: String, at: Long = System.currentTimeMillis()) = update(NOTES, notesSerializer, emptyList()) { notes ->
         val item = Notes.line(words, LocalDateTime.now(), NoteStyle.TASK, withDate = false)

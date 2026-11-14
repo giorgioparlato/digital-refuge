@@ -60,6 +60,7 @@ Home screen, lock screen, apps, shortcuts and about & backup are lists of rows f
 - Find a setting
 - set up once, then left alone
 - Nothing by that name.
+- Writing & habits
 - A nudge after time in a row
 - After so long on the phone without the screen going off, in any app, a full screen asks if it's still what you meant to do. Never during a call.
 - {it} min
@@ -84,9 +85,9 @@ Home screen, lock screen, apps, shortcuts and about & backup are lists of rows f
 - Search
 - What it offers, keywords, contacts, folders, the calendar
 - search keyword keywords web maps contacts messaging whatsapp signal telegram alarm timer calculator settings pages files folder obsidian spotify blocks calendar events dictionary dictionaries look up definition meaning
-- Check-ins
-- Ask why · moods · a nudge after time in a row
-- check-ins checkins pause ask why mood moods how do you feel nudge
+- Focus
+- Off switches · reminder · cover messages · journal · moods · a nudge
+- focus sessions check-ins checkins pause journal ask why mood moods how do you feel nudge cover
 -  · can't be changed while a session runs
 - Cover Android's off switches
 - While a session runs, covers the Settings screens that switch blocking off or uninstall refuge{locked}
@@ -745,12 +746,8 @@ One file serves the look, widgets, gestures and notifications pages, for both sc
 - Export to another folder
 - A Markdown file a note, by its title, and the microjournal a file a day: into your Obsidian vault, say. Nothing comes back from the folder
 - Microjournal
-- An entry a day in your notes, a line at a time, each with its time; from the quick note and the share menu too
-- Prompts while writing
-- A button away, hidden until you ask; off, no button at all
-- Sections and prompts
-- Start from the suggestions; change, delete or add your own
-- Moods
+- On · prompts, moods
+- Off
 - Your files
 - Up to …. Each note is added at the end; tap one to change how
 - your words

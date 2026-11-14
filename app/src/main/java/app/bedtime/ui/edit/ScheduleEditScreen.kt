@@ -463,7 +463,7 @@ internal fun feelsSummary(draft: Schedule): String = buildList {
 /** The line "more options" shows while it is shut: what's set beyond the usual, or what's in it. */
 internal fun moreSummary(draft: Schedule, changeable: String?): String = buildList {
     add(if (draft.pauseEnabled) "emergency break ${draft.breakMinutes} min" else "no emergency break")
-    if (draft.askWhy) add("asks why")
+    if (draft.askWhy) add("journal after unlocking")
     if (draft.homeModules != null || draft.lockModules != null) add("its own widgets")
     if (draft.editAfterUnlock) add("changeable after leaving early")
     if (changeable != null) add("changeable $changeable")
@@ -941,7 +941,7 @@ internal fun ScheduleEditContent(
                             )
                         }
                     }
-                    OptionRow(Icons.Default.Info, "Ask why after each unlock", description = "While it runs: a question, a box to write in and how you feel; going on is a tap", enabled = editable) {
+                    OptionRow(Icons.Default.Info, "Journal after each unlock", description = "While it runs: a question, a box to write in and how you feel; going on is a tap", enabled = editable) {
                         ObsidianToggle(draft.askWhy, { on -> onDraftChange(draft.copy(askWhy = on)) }, enabled = editable)
                     }
                     AnimatedVisibility(draft.askWhy) {

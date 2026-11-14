@@ -351,7 +351,7 @@ internal fun HomeContent(
             // The check-ins live in settings; a way there from here too.
             item(key = "why") {
                 Text(
-                    "Check-ins: ask why, moods, a nudge ›",
+                    "Focus settings: covers, journal, moods, a nudge ›",
                     style = MaterialTheme.typography.labelLarge,
                     color = c.textMuted,
                     modifier = Modifier.padding(horizontal = PageGutter).clip(RoundedCornerShape(8.dp)).clickable(onClick = onWhy).padding(vertical = 12.dp),

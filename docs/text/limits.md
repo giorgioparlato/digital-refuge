@@ -82,7 +82,6 @@ The steps for more use the same rows as a block's steps: see the editor in focus
 - no pause
 - a … wait
 - type … characters
-- ask why
 - harder each time
 - then open {it} min
 - then open until you leave
@@ -123,7 +122,7 @@ The steps for more use the same rows as a block's steps: see the editor in focus
 - No pause
 - A wait
 - Typing
-- Ask why
+- Journal
 - Wait
 - A question and a box to write in; going on is a tap. What you write goes to its note.
 - Words, at least

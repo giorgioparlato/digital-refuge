@@ -47,7 +47,7 @@ focus
 - + add a limit
 - No blocks yet · add one
 - No schedules yet · add one
-- Check-ins: ask why, moods, a nudge ›
+- Focus settings: covers, journal, moods, a nudge ›
 - new block, schedule or limit
 - {title} · {count}
 - digital refuge
@@ -246,7 +246,7 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 - as usual
 - emergency break … min
 - no emergency break
-- asks why
+- journal after unlocking
 - its own widgets
 - changeable after leaving early
 - changeable {changeable}
@@ -345,7 +345,7 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 - For what can't wait, with no steps
 - How long it lasts
 - emergency break
-- Ask why after each unlock
+- Journal after each unlock
 - While it runs: a question, a box to write in and how you feel; going on is a tap
 - Words, at least
 - Its own widgets
@@ -659,6 +659,8 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 - refuge notes{later}
 - All
 - the whole entry ›
+- in your words note
+- + save to words
 - Notes
 - ‹ back
 

@@ -13,6 +13,19 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            96,
+            "0.9.50",
+            listOf(
+                "A voice note that can't reach your folder says why in a notice that stays, and in recent problems; it's kept safe and filed when refuge next opens. The record screen says \"saving\" until it's really there.",
+                "If transcribing ever closes refuge, it's noted, and after twice the recording is kept without its words rather than tried again and again.",
+                "Save a word from the dictionary look-up: it goes, with a little of its meaning, into a note called words.",
+                "Settings, rearranged: apps right under setup; a focus page with the off switches, the full-screen reminder, cover messages and the check-ins; notes, the microjournal (now a page of its own) and habits under writing & habits; shortcuts at the foot.",
+                "\"Ask why\" is called \"journal\" now, in settings, schedules and limits.",
+                "Writing why or a few lines: the moods start open and fold away once the keyboard comes up.",
+                "Insights: distracting time is in orange, each chart says what its colours and outlines are, and the six months show each one's day on average, with more about a month a tap away.",
+            ),
+        ),
+        ChangelogEntry(
             95,
             "0.9.49",
             listOf(

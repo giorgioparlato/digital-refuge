@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -129,6 +130,8 @@ internal fun WordResults(
     val refugeNotes by produceState(emptyList<app.bedtime.data.Note>(), notes) {
         if (notes) repo.notes.collect { value = it }
     }
+    // Whether a word's already in the words note, whatever the look-up searches.
+    val refugeWords by repo.notes.collectAsStateWithLifecycle(initialValue = emptyList())
     // The vault's notes by name, listed once.
     val vaultFiles by produceState(emptyList<app.bedtime.data.IndexedFile>(), notes, vault) {
         if (notes && vault != null) value = withContext(Dispatchers.IO) { app.bedtime.data.FolderIndex.list(context, android.net.Uri.parse(vault)) { it.endsWith(".md") } }
@@ -175,12 +178,25 @@ internal fun WordResults(
                     val full = whole || d.dictionary in opened
                     var cut by remember(d) { mutableStateOf(false) }
                     EntryText(d, style, maxLines = if (full) Int.MAX_VALUE else 3, onCut = { cut = it }, onWord = onWord)
-                    if (!full && cut) {
+                    Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        if (!full && cut) {
+                            Text(
+                                "the whole entry ›",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = p.accent,
+                                modifier = Modifier.clip(RoundedCornerShape(50)).clickable { opened = opened + d.dictionary }.padding(vertical = 2.dp),
+                            )
+                        }
+                        // Kept in the words note, with a little of its meaning; once is enough.
+                        val wordsNote = refugeWords.firstOrNull { it.id == app.bedtime.data.Notes.WORDS_ID }?.text.orEmpty()
+                        val kept = wordsNote.lines().any { it.startsWith("- **${d.word}**", ignoreCase = true) }
                         Text(
-                            "the whole entry ›",
+                            if (kept) "in your words note" else "+ save to words",
                             style = MaterialTheme.typography.labelLarge,
-                            color = p.accent,
-                            modifier = Modifier.padding(top = 4.dp).clip(RoundedCornerShape(50)).clickable { opened = opened + d.dictionary }.padding(vertical = 2.dp),
+                            color = if (kept) p.faint else p.accent,
+                            modifier = Modifier.clip(RoundedCornerShape(50))
+                                .clickable(enabled = !kept) { scope.launch { repo.saveWord(d.word, StarDicts.preview(d, 120)) } }
+                                .padding(vertical = 2.dp),
                         )
                     }
                 }

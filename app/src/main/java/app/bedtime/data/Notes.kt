@@ -152,6 +152,17 @@ object Notes {
     /** The to-do note's id among the app's notes; it's kept first in the list. */
     const val TODO_ID = "todo"
 
+    /** The note words saved from the dictionary look-up go in. */
+    const val WORDS_ID = "words"
+
+    /** A word's line in the words note: the word in bold, then a little of its meaning. */
+    fun wordLine(word: String, meaning: String): String = "- **$word** — $meaning".trimEnd(' ', '—')
+
+    /** [text] with [word]'s line added at the foot, or null if the word is there already. */
+    fun withWord(text: String, word: String, meaning: String): String? =
+        if (text.lines().any { it.startsWith("- **$word**", ignoreCase = true) }) null
+        else text.trimEnd() + "\n" + wordLine(word, meaning) + "\n"
+
     /** The to-do note as a place quick notes and the search can add to, each as an unticked item. */
     val TODO = NoteTarget("To-do", "refuge:todo", NoteStyle.TASK, withDate = false)
 

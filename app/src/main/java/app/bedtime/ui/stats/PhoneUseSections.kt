@@ -276,14 +276,29 @@ internal fun PhoneStats(
 
     // A month's days are on the heatmap; under its figures, how it sits among the months before.
     if (period == UsePeriod.MONTH) {
-        SectionCard(title = "The last six months", subtitle = "A day on average: all of it, and the part in distracting apps") {
-            MonthBars(UseMonths.last(months, YearMonth.from(start)))
+        SectionCard(title = "The last six months", subtitle = "A day on average in each month. Tap one for more") {
+            val six = UseMonths.last(months, YearMonth.from(start))
+            var tapped by rememberSaveable { mutableStateOf<String?>(null) }
+            MonthBars(six) { tapped = it.month }
+            Spacer(Modifier.height(10.dp))
+            ChartKey(all = true, distracting = true, outline = null)
+            tapped?.let { key -> six.firstOrNull { it.month == key } }?.let { month ->
+                MonthGlance(
+                    month,
+                    before = months[YearMonth.parse(month.month).minusMonths(1).toString()],
+                    onOpen = {
+                        tapped = null
+                        go(UsePeriod.MONTH, YearMonth.parse(month.month).atDay(1))
+                    },
+                    onDismiss = { tapped = null },
+                )
+            }
         }
     } else SectionCard(
         title = if (period == UsePeriod.DAY) "By the hour" else "By the day",
         subtitle = buildString {
             if (period == UsePeriod.WEEK) {
-                append(if (weekWhole) "Each day's time on the phone, the part in distracting apps in green" else "Each day's time in distracting apps")
+                append(if (weekWhole) "Each day's time on the phone, the part in distracting apps in orange" else "Each day's time in distracting apps")
             } else {
                 append("All of it, and the part in distracting apps")
             }
@@ -318,6 +333,9 @@ internal fun PhoneStats(
                 UsePeriod.MONTH -> { i -> openDay(dates[i]) }
             },
         )
+        Spacer(Modifier.height(10.dp))
+        // What the grey, the green and the outlines are.
+        ChartKey(all = !distractingOnly, distracting = true, outline = against.takeIf { comparison?.slots?.isNotEmpty() == true })
         // A day of the week tapped: it against its own day of what the week is set against, the week still behind.
         weekGlance?.let(LocalDate::ofEpochDay)?.let { date ->
             val (dayVersus, dayPicked) = UsePeriods.dayOfWeekVersus(date, versus)
@@ -930,7 +948,7 @@ private fun Bars(
                     val bar = (height * all.toFloat() / most).dp
                     Box(Modifier.fillMaxWidth().height(bar).clip(RoundedCornerShape(3.dp)).background(c.textNormal.copy(alpha = if (i == picked) 0.35f else 0.18f))) {
                         val part = if (all > 0) distracting.toFloat() / all else 0f
-                        Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(bar * part).background(c.accent.copy(alpha = if (i == picked) 1f else 0.8f)))
+                        Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(bar * part).background(c.orange.copy(alpha = if (i == picked) 1f else 0.8f)))
                     }
                 }
                 if (axisEvery == null) {
@@ -983,18 +1001,24 @@ private fun UnlockBars(byHour: List<Int>, total: Int?) {
 
 /** A column a month, as tall as its daily average on the phone, the distracting part in the accent. */
 @Composable
-private fun MonthBars(months: List<UsageMonth>) {
+private fun MonthBars(months: List<UsageMonth>, onMonth: (UsageMonth) -> Unit) {
     val c = Obsidian.colors
     val most = months.maxOf { it.perDay ?: 0L }.coerceAtLeast(1)
-    Row(Modifier.fillMaxWidth().height(90.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Bottom) {
+    Row(Modifier.fillMaxWidth().height(106.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Bottom) {
         months.forEachIndexed { i, month ->
             val current = i == months.lastIndex
-            Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.Bottom, horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(
+                Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(4.dp)).then(if (month.perDay != null) Modifier.clickable(onClickLabel = "this month at a glance") { onMonth(month) } else Modifier),
+                verticalArrangement = Arrangement.Bottom,
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
                 val all = month.perDay ?: 0L
+                // The day on average, over its bar.
+                if (all > 0) Text(barTime(all), style = MaterialTheme.typography.labelSmall, color = if (current) c.textNormal else c.textMuted, maxLines = 1, softWrap = false)
                 val bar = (64 * all.toFloat() / most).dp
                 Box(Modifier.fillMaxWidth().height(bar).clip(RoundedCornerShape(3.dp)).background(c.textNormal.copy(alpha = if (current) 0.3f else 0.16f))) {
                     val part = if (all > 0) (month.distractingPerDay ?: 0L).toFloat() / all else 0f
-                    Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(bar * part).background(c.accent.copy(alpha = if (current) 1f else 0.7f)))
+                    Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(bar * part).background(c.orange.copy(alpha = if (current) 1f else 0.7f)))
                 }
                 Spacer(Modifier.height(4.dp))
                 Text(
@@ -1007,12 +1031,81 @@ private fun MonthBars(months: List<UsageMonth>) {
     }
 }
 
+/** What a chart's marks are: the grey for all of it, the green for distracting apps, the outline for what it's set against. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun ChartKey(all: Boolean, distracting: Boolean, outline: String?) {
+    val c = Obsidian.colors
+    @Composable
+    fun Swatch(fill: Color?, label: String) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(end = 14.dp, bottom = 4.dp)) {
+            Box(
+                Modifier.size(10.dp).clip(RoundedCornerShape(2.dp))
+                    .then(if (fill != null) Modifier.background(fill) else Modifier.border(1.dp, c.textFaint, RoundedCornerShape(2.dp))),
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(label, style = MaterialTheme.typography.labelSmall, color = c.textMuted)
+        }
+    }
+    androidx.compose.foundation.layout.FlowRow {
+        if (all) Swatch(c.textNormal.copy(alpha = 0.25f), "on the phone")
+        if (distracting) Swatch(c.orange, "in distracting apps")
+        if (outline != null) Swatch(null, outline)
+    }
+}
+
+/**
+ * A month from the six at a glance: its day on average, on the phone and in distracting apps, how
+ * much of it was distracting, against the month before, its busiest day; then the month itself.
+ */
+@Composable
+private fun MonthGlance(month: UsageMonth, before: UsageMonth?, onOpen: () -> Unit, onDismiss: () -> Unit) {
+    val c = Obsidian.colors
+    val ym = YearMonth.parse(month.month)
+    val all = month.perDay ?: 0L
+    val distracting = month.distractingPerDay ?: 0L
+    fun change(now: Long, then: Long?): String? = then?.takeIf { it > 0 }?.let { UsePeriods.change(now, it) }?.let {
+        when {
+            it == 0 -> "the same as the month before"
+            it < 0 -> "↓ ${-it}% on the month before"
+            else -> "↑ $it% on the month before"
+        }
+    }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = c.bgSecondary,
+        title = { Text(ym.month.getDisplayName(TextStyle.FULL, Locale.getDefault()) + " " + ym.year) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column {
+                    Text("${UseWords.short(all)} a day on the phone", style = MaterialTheme.typography.titleMedium, color = c.textNormal)
+                    change(all, before?.perDay)?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = c.textMuted) }
+                }
+                Column {
+                    Text("${UseWords.short(distracting)} a day in distracting apps" + (if (all > 0) ", ${distracting * 100 / all}% of it" else ""), style = MaterialTheme.typography.bodyMedium, color = c.textNormal)
+                    change(distracting, before?.distractingPerDay)?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = c.textMuted) }
+                }
+                Text("${UseWords.short(month.total)} in all, over ${month.days} days with any use", style = MaterialTheme.typography.bodySmall, color = c.textMuted)
+                month.daily.maxByOrNull { it.value }?.let { (day, seconds) ->
+                    Text(
+                        "Busiest: ${UseWords.short(seconds)}, " + ym.atDay(day).format(DateTimeFormatter.ofPattern("EEEE d", Locale.getDefault())),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = c.textMuted,
+                    )
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onOpen) { Text("The month ›", color = c.accentText) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Close", color = c.textMuted) } },
+    )
+}
+
 /** An app over the period: its time and opens, and how it moved against the comparison ("+20 min", "new"). */
 @Composable
 private fun AppRow(label: String, seconds: Long, opens: Int, then: Long?, distracting: Boolean, limited: Boolean) {
     val c = Obsidian.colors
     Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(8.dp).clip(CircleShape).background(if (distracting) c.accent else Color.Transparent))
+        Box(Modifier.size(8.dp).clip(CircleShape).background(if (distracting) c.orange else Color.Transparent))
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
             VerbatimText(label, style = MaterialTheme.typography.bodyMedium, color = c.textNormal)

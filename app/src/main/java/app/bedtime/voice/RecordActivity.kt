@@ -175,7 +175,8 @@ class RecordActivity : ComponentActivity() {
                                 SoftPillButton("As a new note", onClick = { VoiceRecorder.stop(this@RecordActivity, app.bedtime.data.VoiceTo.NewNote) }, modifier = Modifier.fillMaxWidth())
                             }
                             VoiceRecorder.State.Saving -> Text(
-                                if (target == app.bedtime.data.VoiceTo.Journal) "Kept. The words follow in the microjournal." else "Kept. The words follow in your notes.",
+                                // Kept here already; "kept" in your folder is said once it's there.
+                                if (target == app.bedtime.data.VoiceTo.Journal) "Saving it. The words follow in the microjournal." else "Saving it. The words follow in your notes.",
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = c.textNormal,
                             )

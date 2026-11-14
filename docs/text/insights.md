@@ -78,10 +78,10 @@ insights
 - , so far
 - a day you pick…
 - The last six months
-- A day on average: all of it, and the part in distracting apps
+- A day on average in each month. Tap one for more
 - By the hour
 - By the day
-- Each day's time on the phone, the part in distracting apps in green
+- Each day's time on the phone, the part in distracting apps in orange
 - Each day's time in distracting apps
 - All of it, and the part in distracting apps
 - ; outlined, {against}
@@ -144,6 +144,15 @@ insights
 - Compare
 - ↑ {change}%
 -  · {it}, the most … in an hour
+- in distracting apps
+- the same as the month before
+- ↓ …% on the month before
+- ↑ {it}% on the month before
+- … a day on the phone
+- … a day in distracting apps
+- , …% of it
+- … in all, over … days with any use
+- The month ›
 - the same
 
 <sub>[PhoneUse.kt](../../app/src/main/java/app/bedtime/ui/components/PhoneUse.kt)</sub>

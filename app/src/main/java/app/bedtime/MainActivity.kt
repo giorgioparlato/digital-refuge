@@ -154,7 +154,8 @@ object Routes {
     const val SETTINGS_APPS = "settings/apps"
     const val SETTINGS_SHORTCUTS = "settings/shortcuts"
     const val SETTINGS_ABOUT = "settings/about"
-    const val SETTINGS_CHECKINS = "settings/checkins"
+    const val SETTINGS_FOCUS = "settings/focus"
+    const val SETTINGS_JOURNAL = "settings/journal"
     const val APP_LIST = "settings/applist"
     const val COVER_MESSAGES = "settings/messages"
     const val PROBLEMS = "settings/problems"
@@ -164,7 +165,7 @@ object Routes {
     /** Settings' own pages: each has the search icon at the top right. */
     val SETTINGS_PAGES by lazy {
         setOf(
-            SETTINGS_HOME, SETTINGS_LOCK, SETTINGS_APPS, SETTINGS_SHORTCUTS, SETTINGS_ABOUT, SETTINGS_CHECKINS, APP_LIST, COVER_MESSAGES, PROBLEMS,
+            SETTINGS_HOME, SETTINGS_LOCK, SETTINGS_APPS, SETTINGS_SHORTCUTS, SETTINGS_ABOUT, SETTINGS_FOCUS, APP_LIST, COVER_MESSAGES, PROBLEMS,
             HOME_STYLE, HOME_STYLE_LOCK, STYLE_SHOWN, STYLE_SHOWN_LOCK, STYLE_SWIPES, STYLE_NOTIFICATIONS, STYLE_GESTURES,
             SEARCH, DISTRACTION, GROUPS, ALWAYS_AVAILABLE, QUICK_NOTES, JOURNAL_PROMPTS, WHY, MOODS, LAUNCHER, QUOTES, SETUP,
         )
@@ -335,7 +336,7 @@ private fun BedtimeNavigation(pendingRoute: String?, onRouteConsumed: () -> Unit
                         notesShortcuts = notesMenu.items(),
                         // With a notes tab of their own, the button at the top would only say it twice.
                         notesButton = loaded?.notesTab != true,
-                        onWhy = { push(Routes.SETTINGS_CHECKINS) },
+                        onWhy = { push(Routes.SETTINGS_FOCUS) },
                         onEditLimit = { id -> push(Routes.LIMIT + id) },
                         onCreateLimit = { push(Routes.LIMIT) },
                     )
@@ -386,8 +387,14 @@ private fun BedtimeNavigation(pendingRoute: String?, onRouteConsumed: () -> Unit
             top == Routes.NOTES -> NotesScreen(onBack = ::pop, onSettings = { push(Routes.QUICK_NOTES) })
             top == Routes.JOURNAL_TODAY -> NotesScreen(onBack = ::pop, onSettings = { push(Routes.QUICK_NOTES) }, openJournal = true)
             top.startsWith(Routes.JOURNAL_TODAY + "/") -> NotesScreen(onBack = ::pop, onSettings = { push(Routes.QUICK_NOTES) }, journalDay = top.substringAfterLast('/').toLongOrNull())
-            top == Routes.QUICK_NOTES -> NoteTargetsScreen(onBack = ::pop, onOpenNotes = { push(Routes.NOTES) }, onOpenJournalPrompts = { push(Routes.JOURNAL_PROMPTS) }, onOpenMoods = { push(Routes.MOODS) })
+            top == Routes.QUICK_NOTES -> NoteTargetsScreen(onBack = ::pop, onOpenNotes = { push(Routes.NOTES) }, onOpenJournalSettings = { push(Routes.SETTINGS_JOURNAL) })
             top == Routes.JOURNAL_PROMPTS -> app.bedtime.ui.notes.JournalPromptsScreen(onBack = ::pop)
+            top == Routes.SETTINGS_JOURNAL -> app.bedtime.ui.notes.MicrojournalSettingsScreen(
+                onBack = ::pop,
+                onOpenToday = { push(Routes.JOURNAL_TODAY) },
+                onOpenPrompts = { push(Routes.JOURNAL_PROMPTS) },
+                onOpenMoods = { push(Routes.MOODS) },
+            )
             top == Routes.WHY -> app.bedtime.ui.settings.WhySettingsScreen(onBack = ::pop, onOpenAnswers = { push(Routes.JOURNAL_TODAY) }, onOpenMoods = { push(Routes.MOODS) })
             top == Routes.MOODS -> app.bedtime.ui.settings.MoodsScreen(onBack = ::pop)
             top == Routes.LAUNCHER -> app.bedtime.ui.settings.LauncherScreen(onBack = ::pop)

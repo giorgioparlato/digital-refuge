@@ -97,16 +97,16 @@ object VoiceFiling {
         val day = at.toLocalDate().toEpochDay()
         val journal = to == VoiceTo.Journal
         if (pending.file == null) {
-            val tree = settings.voiceFolder?.let(Uri::parse) ?: return@withLock say(context, "choose a folder for voice notes; the recording waits till then")
+            val tree = settings.voiceFolder?.let(Uri::parse) ?: return@withLock stuck(context, pending, "there's no folder for voice notes yet: choose one in settings › quick notes")
             // The microjournal's in a folder of their own; a note's in yours.
             val folder = (if (journal) subfolder(context, tree, Voice.JOURNAL_FOLDER) else top(tree))
-                ?: return@withLock say(context, "couldn't write to the voice notes folder; choose it again")
+                ?: return@withLock stuck(context, pending, "refuge can't write to the voice notes folder: choose it again in settings › quick notes")
             val name = Voice.fileName(at, names(context, tree, folder))
             val encoded = File(context.cacheDir, "voice-$start.m4a")
             encode(samples, encoded)
             val copied = copyInto(context, folder, name, encoded)
             encoded.delete()
-            if (!copied) return@withLock say(context, "couldn't write to the voice notes folder; choose it again")
+            if (!copied) return@withLock stuck(context, pending, "refuge can't write to the voice notes folder: choose it again in settings › quick notes")
             val line = Voice.line(at.format(DateTimeFormatter.ofPattern("HH:mm")), pending.seconds, name)
             when (to) {
                 VoiceTo.Journal -> repo.addVoiceLine(day, line)
@@ -117,12 +117,24 @@ object VoiceFiling {
             write(context, pending)
             // A page open on it takes the line in too, so its own saving doesn't write over it.
             VoiceRecorder.edits.tryEmit(VoiceRecorder.Companion.Edit.Added(to, day, line))
+            // Filed at last: any "waiting" notice about it goes.
+            context.getSystemService(NotificationManager::class.java)?.cancel(notice(pending.start))
             say(context, if (journal) "voice note kept in the microjournal" else "voice note kept in your notes")
         }
         val name = pending.file ?: return@withLock
         // The words, when there's a model to hear them with; without, the line keeps just the recording.
         val model = VoiceRecorder.modelFile(context)
-        val words = if (model.exists() && Whisper.available) Whisper.words(model.path, FloatArray(samples.size) { samples[it] / 32768f }, settings.voiceLanguage) else null
+        val words = when {
+            !model.exists() || !Whisper.available -> null
+            // Twice begun and never finished: it's what closed refuge, so it's kept without its words.
+            pending.tries >= 2 -> null.also { Problems.note("transcribing a voice note closed refuge twice, so it's kept without its words") }
+            else -> {
+                // Written down first, so a crash in Whisper is known next time.
+                write(context, pending.copy(tries = pending.tries + 1))
+                Whisper.words(model.path, FloatArray(samples.size) { samples[it] / 32768f }, settings.voiceLanguage)
+                    .also { if (it == null) Problems.note("transcribing a voice note: Whisper couldn't load the model, or failed") }
+            }
+        }
         if (journal) repo.voiceTranscribed(day, name, words) else repo.voiceNoteTranscribed(name, words)
         VoiceRecorder.edits.tryEmit(VoiceRecorder.Companion.Edit.Heard(name, words))
         forget(context, start)
@@ -140,6 +152,7 @@ object VoiceFiling {
         if (VoiceRecorder.state.value !is VoiceRecorder.State.Idle) return
         scope.launch {
             waiting.forEach { p ->
+                if (p.tries > 0) Problems.note("transcribing a voice note didn't finish last time (refuge was closed, or crashed); trying again")
                 if (p.to == null) ask(app, p) else runCatching { process(app, p.start) }.onFailure { Problems.note("finishing a voice note", it) }
             }
         }
@@ -147,10 +160,7 @@ object VoiceFiling {
 
     /** "A voice note is waiting": where should it go? Asked from a notification, after refuge was closed. */
     private fun ask(context: Context, pending: PendingVoice) {
-        val system = context.getSystemService(NotificationManager::class.java)
-        if (system.getNotificationChannel(CHANNEL) == null) {
-            system.createNotificationChannel(NotificationChannel(CHANNEL, "voice notes waiting", NotificationManager.IMPORTANCE_DEFAULT))
-        }
+        val system = channel(context)
         val choose = { code: Int, to: String ->
             PendingIntent.getBroadcast(
                 context, (pending.start % 100_000).toInt() * 2 + code,
@@ -166,7 +176,34 @@ object VoiceFiling {
             .addAction(0, "to the microjournal", choose(0, "journal"))
             .addAction(0, "to a note", choose(1, "note"))
             .build()
-        runCatching { system.notify((pending.start % Int.MAX_VALUE).toInt(), notification) }
+        runCatching { system.notify(notice(pending.start), notification) }
+    }
+
+    /** One notice per recording: where it goes, or why it's still waiting. */
+    private fun notice(start: Long) = (start % Int.MAX_VALUE).toInt()
+
+    private fun channel(context: Context): NotificationManager {
+        val system = context.getSystemService(NotificationManager::class.java)
+        if (system.getNotificationChannel(CHANNEL) == null) {
+            system.createNotificationChannel(NotificationChannel(CHANNEL, "voice notes waiting", NotificationManager.IMPORTANCE_DEFAULT))
+        }
+        return system
+    }
+
+    /**
+     * The recording couldn't reach your folder: why, kept in recent problems and told in a notice that
+     * stays (not a toast gone in a blink), with the reassurance that it's safe and tried again.
+     */
+    private fun stuck(context: Context, pending: PendingVoice, why: String) {
+        Problems.note("filing a voice note: $why")
+        val text = "$why. it's kept safe in refuge, and filed when refuge next opens."
+        val notification = NotificationCompat.Builder(context, CHANNEL)
+            .setSmallIcon(R.drawable.ic_tile)
+            .setContentTitle("a voice note is waiting")
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .build()
+        runCatching { channel(context).notify(notice(pending.start), notification) }
     }
 
     /** The answer to "a voice note is waiting", from its notification. */
@@ -174,7 +211,7 @@ object VoiceFiling {
         override fun onReceive(context: Context, intent: Intent) {
             val start = intent.getLongExtra(EXTRA_START, 0L)
             val to = Voice.target(intent.getStringExtra(EXTRA_TO)) ?: return
-            context.getSystemService(NotificationManager::class.java)?.cancel((start % Int.MAX_VALUE).toInt())
+            context.getSystemService(NotificationManager::class.java)?.cancel(notice(start))
             choose(context, start, to)
             val app = context.applicationContext
             scope.launch { runCatching { process(app, start) }.onFailure { Problems.note("finishing a voice note", it) } }

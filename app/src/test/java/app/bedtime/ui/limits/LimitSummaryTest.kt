@@ -13,7 +13,7 @@ class LimitSummaryTest {
     fun thePauseSaysWhatItIsAndWhatComesAfter() {
         assertEquals("no pause", pauseSummary(LimitRules(pauseSeconds = null)))
         assertEquals("a 10 s wait · then open until you leave", pauseSummary(LimitRules(pauseSeconds = 10)))
-        assertEquals("ask why · then open 15 min", pauseSummary(LimitRules(pauseSeconds = 10, pauseKind = PauseKind.ASK, pauseGrowth = 50, openMinutes = 15)))
+        assertEquals("journal · then open 15 min", pauseSummary(LimitRules(pauseSeconds = 10, pauseKind = PauseKind.ASK, pauseGrowth = 50, openMinutes = 15)))
     }
 
     @Test

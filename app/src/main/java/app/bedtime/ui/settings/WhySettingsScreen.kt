@@ -66,7 +66,7 @@ fun WhySettingsScreen(onBack: () -> Unit, onOpenAnswers: () -> Unit, onOpenMoods
     val s = settings ?: return
     val change = { update: (AppSettings) -> AppSettings -> scope.launch { repo.updateSettings(update) } }
     val c = Obsidian.colors
-    Scaffold(containerColor = c.bgPrimary, topBar = { ObsidianTopBar("Ask why", onBack = onBack, subtitle = "A question after you unlock") }) { padding ->
+    Scaffold(containerColor = c.bgPrimary, topBar = { ObsidianTopBar("Journal after unlocking", onBack = onBack, subtitle = "A question after you unlock") }) { padding ->
         Column(
             Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = PageGutter, vertical = 4.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -180,13 +180,13 @@ fun WhyAppQuestionsScreen(onBack: () -> Unit) {
     val s = settings ?: return
     val change = { update: (AppSettings) -> AppSettings -> scope.launch { repo.updateSettings(update) } }
     val c = Obsidian.colors
-    Scaffold(containerColor = c.bgPrimary, topBar = { ObsidianTopBar("Ask why", onBack = onBack, subtitle = "Before a limit's apps") }) { padding ->
+    Scaffold(containerColor = c.bgPrimary, topBar = { ObsidianTopBar("Journal", onBack = onBack, subtitle = "Before a limit's apps") }) { padding ->
         Column(
             Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = PageGutter, vertical = 4.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(
-                "When a limit's pause is “ask why”: “about to open Instagram”, one of these in turn, and a box to write in. Every limit that asks uses these.",
+                "When a limit's pause is “journal”: “about to open Instagram”, one of these in turn, and a box to write in. Every limit that asks uses these.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = c.textMuted,
             )

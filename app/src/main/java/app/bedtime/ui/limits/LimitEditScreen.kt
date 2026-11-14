@@ -277,7 +277,7 @@ internal fun pauseSummary(rules: LimitRules): String {
     val what = when (rules.pauseKind) {
         PauseKind.WAIT -> "a ${formatWaitSeconds(seconds)} wait"
         PauseKind.TYPING -> "type ${rules.pauseTextLength} characters"
-        PauseKind.ASK -> "ask why"
+        PauseKind.ASK -> "journal"
     }
     return listOfNotNull(
         what,
@@ -470,7 +470,7 @@ internal fun LimitEditContent(
                     // One kind of pause, or none: only the chosen one's settings show.
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         QuickChip("No pause", !paused, editable) { setRules { it.copy(pauseSeconds = null) } }
-                        listOf(PauseKind.WAIT to "A wait", PauseKind.TYPING to "Typing", PauseKind.ASK to "Ask why").forEach { (kind, label) ->
+                        listOf(PauseKind.WAIT to "A wait", PauseKind.TYPING to "Typing", PauseKind.ASK to "Journal").forEach { (kind, label) ->
                             QuickChip(label, paused && rules.pauseKind == kind, editable) {
                                 setRules { it.copy(pauseSeconds = it.pauseSeconds?.takeIf { s -> s > 0 } ?: 10, pauseKind = kind) }
                             }

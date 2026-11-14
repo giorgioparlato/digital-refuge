@@ -1,0 +1,5 @@
+{
+    // whisper.cpp (app/cpp/whisper.cpp) is pinned to one tested version; without this, VS Code lists it as a
+    // repository of its own and its sync button pulls the newest code. Update it on purpose instead.
+    "git.detectSubmodules": false
+}

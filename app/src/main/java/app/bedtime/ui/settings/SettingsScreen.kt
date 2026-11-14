@@ -110,7 +110,7 @@ import java.time.LocalDate
 enum class SettingsPlace(val route: String, val title: String, val intro: String) {
     HOME(Routes.SETTINGS_HOME, "Home screen", "Refuge's home screen takes over in sessions with minimal mode. It can be your everyday launcher too."),
     LOCK(Routes.SETTINGS_LOCK, "Lock screen", "Over Android's own lock screen: the clock and your widgets. A tap, or a swipe from the bottom, unlocks."),
-    CHECKINS(Routes.SETTINGS_CHECKINS, "Check-ins", "Moments that ask you to pause: why you picked up the phone, how you feel, and a nudge after a long stretch on it."),
+    FOCUS(Routes.SETTINGS_FOCUS, "Focus", "How every session holds, what a blocked app's cover says, and the moments that ask you to pause: a few lines after unlocking, how you feel, and a nudge after a long stretch."),
     APPS(Routes.SETTINGS_APPS, "Apps", "Groups to tick many at once, the apps no session blocks, and the ones that count as distracting."),
     SHORTCUTS(Routes.SETTINGS_SHORTCUTS, "Shortcuts", "Two ways to start a block without opening the app."),
     ABOUT(Routes.SETTINGS_ABOUT, "About & backup", "How sessions work, and your settings in a file of their own."),
@@ -385,7 +385,11 @@ internal fun SettingsContent(
                         // Not a preference but a health check: the one row that can be wrong, so it sits alone.
                         Rows(first.take(1))
                         Spacer(Modifier.height(14.dp))
-                        Rows(first.drop(1))
+                        Rows(first.drop(1).filter { it.group == 1 })
+                        SectionLabel("Writing & habits", Modifier.padding(start = 2.dp))
+                        Rows(first.filter { it.group == 2 })
+                        Spacer(Modifier.height(14.dp))
+                        Rows(first.filter { it.group == 3 })
                         Footer(version)
                     }
                 } else {
@@ -499,6 +503,8 @@ private fun settingsEntries(
                 go(Routes.SETUP),
             ),
         )
+        // Apps first after setup: what every session and limit is made of.
+        add(Entry(null, BedtimeIcons.Grid, "Apps", "Groups · always available · distracting", "apps", go(SettingsPlace.APPS.route)))
         add(
             Entry(
                 null,
@@ -536,19 +542,18 @@ private fun settingsEntries(
         add(
             Entry(
                 null,
-                Icons.Default.Info,
-                "Check-ins",
-                "Ask why · moods · a nudge after time in a row",
-                "check-ins checkins pause ask why mood moods how do you feel nudge",
-                go(SettingsPlace.CHECKINS.route),
+                BedtimeIcons.Target,
+                "Focus",
+                "Off switches · reminder · cover messages · journal · moods · a nudge",
+                "focus sessions check-ins checkins pause journal ask why mood moods how do you feel nudge cover",
+                go(SettingsPlace.FOCUS.route),
             ),
         )
-        add(Entry(null, BedtimeIcons.Grid, "Apps", "Groups · always available · distracting", "apps", go(SettingsPlace.APPS.route)))
         // Both guard every session, so neither can be switched off while one runs.
         val locked = " · can't be changed while a session runs".takeIf { inSession }.orEmpty()
         add(
             Entry(
-                null,
+                SettingsPlace.FOCUS,
                 Icons.Default.Lock,
                 "Cover Android's off switches",
                 "While a session runs, covers the Settings screens that switch blocking off or uninstall refuge$locked",
@@ -558,7 +563,7 @@ private fun settingsEntries(
         )
         add(
             Entry(
-                null,
+                SettingsPlace.FOCUS,
                 BedtimeIcons.Contrast,
                 "Full-screen reminder",
                 "If blocking is switched off while a session runs, the screen is taken over until it's back on$locked",
@@ -566,12 +571,14 @@ private fun settingsEntries(
                 trailing = { ObsidianToggle(s.remindsFullScreen, { on -> onChange { it.copy(fullScreenReminder = on) } }, enabled = !inSession) },
             ),
         )
-        add(Entry(null, Icons.Default.Edit, "Notes", "Where quick notes go, and the to-do", "notes note quick to-do todo obsidian daily file", go(Routes.QUICK_NOTES)))
-        add(Entry(null, Icons.Default.Edit, "Microjournal", "An entry a day, with prompts by section", "journal journalling microjournal prompts struthless vent gratitude mindset diary", go(Routes.QUICK_NOTES), searchOnly = true))
+        add(Entry(null, Icons.Default.Edit, "Notes", "Where quick notes go · the to-do · words · voice notes", "notes note quick to-do todo obsidian daily file words voice", go(Routes.QUICK_NOTES), group = 2))
+        add(Entry(null, Icons.Default.DateRange, "Microjournal", if (s.journalOn) "An entry a day · prompts · moods" else "Off", "journal journalling microjournal prompts struthless vent gratitude mindset diary", go(Routes.SETTINGS_JOURNAL), group = 2))
+        // Habits live in insights, or a tab of their own; here too, to be found.
+        add(Entry(null, Icons.Default.CheckCircle, "Habits", "Your habits, their sets, and a tab of their own", "habits habit streak sets tab", go(Routes.HABITS), group = 2))
         add(Entry(null, Icons.Default.Edit, "Journal sections and prompts", "Change, delete or add your own", "journal prompts sections struthless vent obligations mindset gratitude ideation trajectory", go(Routes.JOURNAL_PROMPTS), searchOnly = true))
         add(
             Entry(
-                null,
+                SettingsPlace.FOCUS,
                 BedtimeIcons.Block,
                 "Cover messages",
                 "What a blocked app's cover says · ${app.bedtime.data.CoverMessages.all(s).size} messages",
@@ -579,10 +586,9 @@ private fun settingsEntries(
                 go(Routes.COVER_MESSAGES),
             ),
         )
-        add(Entry(null, Icons.Default.Star, "Shortcuts", "Home-screen widget and quick-settings tile", "shortcuts widget tile quick settings start block", go(SettingsPlace.SHORTCUTS.route)))
-        add(Entry(null, Icons.Default.Info, "About & backup", "How it works · the intro · export and import", "about backup version help", go(SettingsPlace.ABOUT.route)))
-        // Habits live in insights; found by the search too.
-        add(Entry(null, Icons.Default.CheckCircle, "Habits", "Tick them off, here or on your screens", "habits habit streak", go(Routes.HABITS), searchOnly = true))
+        add(Entry(null, Icons.Default.Star, "Shortcuts", "Home-screen widget and quick-settings tile", "shortcuts widget tile quick settings start block", go(SettingsPlace.SHORTCUTS.route), group = 3))
+        add(Entry(null, Icons.Default.Info, "About & backup", "How it works · the intro · export and import", "about backup version help", go(SettingsPlace.ABOUT.route), group = 3))
+
 
         // ---------------------------------------------------------------- home screen
         val home = SettingsPlace.HOME
@@ -642,9 +648,9 @@ private fun settingsEntries(
         )
         add(Entry(lock, Icons.Default.KeyboardArrowUp, "Gestures", "An app, the camera, screen off…", "gesture gestures swipe double tap lock camera screen off", go(Routes.STYLE_SWIPES)))
 
-        // ---------------------------------------------------------------- check-ins
-        val checkins = SettingsPlace.CHECKINS
-        add(Entry(checkins, Icons.Default.Info, "Ask why after unlocking", whyWords(s.askOnUnlock), "why unlock unlocking question journal struthless", go(Routes.WHY)))
+        // ---------------------------------------------------------------- focus: after its switches and covers, the check-ins
+        val checkins = SettingsPlace.FOCUS
+        add(Entry(checkins, Icons.Default.Info, "Journal after unlocking", whyWords(s.askOnUnlock), "why ask why unlock unlocking question journal struthless", go(Routes.WHY)))
         add(
             Entry(
                 checkins,
@@ -889,6 +895,8 @@ private class Entry(
     val onClick: (() -> Unit)? = null,
     val trailing: (@Composable () -> Unit)? = null,
     val searchOnly: Boolean = false,
+    /** On the first page: 1 the main list, 2 writing & habits, 3 at the foot. */
+    val group: Int = 1,
 ) {
     fun matches(query: String): Boolean {
         val q = query.trim().lowercase()

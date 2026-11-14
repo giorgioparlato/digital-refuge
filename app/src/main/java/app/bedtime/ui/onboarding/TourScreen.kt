@@ -81,7 +81,7 @@ fun TourScreen(onBack: () -> Unit, onOpen: (String) -> Unit) {
                 "Check-ins and moods",
                 "A question when you pick up the phone (why now?), moods to tap there and in the microjournal, and a nudge after a long stretch. What you answer shows in insights.",
                 "Check-ins",
-                { onOpen(Routes.SETTINGS_CHECKINS) },
+                { onOpen(Routes.SETTINGS_FOCUS) },
             )
             Feature(
                 "Obsidian",

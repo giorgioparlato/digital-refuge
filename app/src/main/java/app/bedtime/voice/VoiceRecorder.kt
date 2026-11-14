@@ -143,7 +143,10 @@ class VoiceRecorder : Service() {
                 recording = false
                 thread?.join(2_000)
                 val bytes = synchronized(heard) { heard.toByteArray() }
-                if (bytes.size / 2 < RATE) return done()
+                if (bytes.size / 2 < RATE) {
+                    scope.launch { say("too short to keep") }
+                    return done()
+                }
                 val kept = VoiceFiling.keep(this, since, bytes, target.value)
                 if (target.value == null) {
                     _state.value = State.Waiting(kept.seconds)

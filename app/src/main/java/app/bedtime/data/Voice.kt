@@ -15,7 +15,14 @@ sealed interface VoiceTo {
  * ([to], null while you're asked), and its file in your folder once it's there.
  */
 @kotlinx.serialization.Serializable
-data class PendingVoice(val start: Long, val seconds: Int, val to: String? = null, val file: String? = null)
+data class PendingVoice(
+    val start: Long,
+    val seconds: Int,
+    val to: String? = null,
+    val file: String? = null,
+    /** Times Whisper began on it without getting to the end: refuge was closed, or it crashed. */
+    val tries: Int = 0,
+)
 
 /**
  * Voice notes: a recording kept as a file in your folder (the microjournal's in a folder of their own
