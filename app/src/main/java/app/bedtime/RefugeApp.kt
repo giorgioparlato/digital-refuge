@@ -10,6 +10,8 @@ class RefugeApp : Application() {
         super.onCreate()
         Problems.init(this)
         BlockingState.init(this)
+        // Notes out to your folder on each change, once that's switched on.
+        app.bedtime.service.AutoExport.start(this)
         val previous = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, error ->
             Problems.note("crash in ${thread.name}", error)

@@ -52,6 +52,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
@@ -71,7 +72,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -123,7 +126,10 @@ fun NotesScreen(onBack: (() -> Unit)?, initialOpen: String? = null, onSettings: 
         // A voice note's recordings, a tap from your audio player.
         onPlay = settings?.voiceFolder?.let { folder -> { file -> scope.launch { app.bedtime.voice.VoicePlayer.open(context, folder, file) } } },
         onRecord = settings?.takeIf { app.bedtime.data.Voice.ready(it) }?.let { { id -> context.startActivity(app.bedtime.voice.RecordActivity.intent(context, note = id)) } },
+        view = settings?.notesView ?: app.bedtime.data.NotesView.LIST,
+        onView = { v -> scope.launch { repo.updateSettings { it.copy(notesView = v) } } },
         shelf = ShelfHandlers(
+            colour = { id, color -> scope.launch { repo.colourNote(id, color) } },
             move = { from, into -> scope.launch { repo.moveNote(from, into) } },
             merge = { ids -> scope.launch { repo.mergeNotes(ids) } },
             pin = { id, pinned -> scope.launch { repo.pinNote(id, pinned) } },
@@ -140,8 +146,9 @@ fun NotesScreen(onBack: (() -> Unit)?, initialOpen: String? = null, onSettings: 
     )
 }
 
-/** What a held note can do: move into another, merge with others, be pinned, labelled, put back, or remind you. */
+/** What a held note can do: move into another, merge with others, be pinned, labelled, coloured, put back, or remind you. */
 internal class ShelfHandlers(
+    val colour: (String, Long?) -> Unit = { _, _ -> },
     val move: (from: String, into: String) -> Unit = { _, _ -> },
     val merge: (List<String>) -> Unit = {},
     val pin: (String, Boolean) -> Unit = { _, _ -> },
@@ -175,6 +182,9 @@ internal fun NotesContent(
     shelf: ShelfHandlers = ShelfHandlers(),
     /** Notes deleted in the last month, to put back. */
     trash: List<TrashedNote> = emptyList(),
+    /** A list, cards in two columns, or titles alone; and choosing which. */
+    view: app.bedtime.data.NotesView = app.bedtime.data.NotesView.LIST,
+    onView: (app.bedtime.data.NotesView) -> Unit = {},
 ) {
     // The note open to edit, by id; a new one gets its id as it opens.
     var open by rememberSaveable { mutableStateOf(initialOpen) }
@@ -302,6 +312,16 @@ internal fun NotesContent(
             labelling = null
         }
     }
+    var colouring by remember { mutableStateOf<Note?>(null) }
+    colouring?.let { note ->
+        ColourDialog(note.color, onDismiss = { colouring = null }) { color ->
+            shelf.colour(note.id, color)
+            colouring = null
+        }
+    }
+    // A note's colour, tinting its card over the usual one; none leaves it as it was.
+    val cardColour = { note: Note -> note.color?.let { Color(it).copy(alpha = 0.22f).compositeOver(c.bgSecondary) } ?: c.bgSecondary }
+    val titles = view == app.bedtime.data.NotesView.TITLES
     // One note's card: tap to open (or pick, when merging), hold for its menu, swipe to the trash.
     val noteCard: @Composable (Note) -> Unit = { note ->
         val order = selected?.indexOf(note.id)?.takeIf { it >= 0 }
@@ -311,7 +331,7 @@ internal fun NotesContent(
                     Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(CardRadius))
-                        .background(if (order != null) c.accent.copy(alpha = 0.18f) else c.bgSecondary)
+                        .background(if (order != null) c.accent.copy(alpha = 0.18f) else cardColour(note))
                         .combinedClickable(
                             onClickLabel = if (selected != null) "pick" else "edit",
                             onLongClickLabel = "more",
@@ -323,9 +343,25 @@ internal fun NotesContent(
                                 else -> picking = selected + note.id
                             }
                         }
-                        .padding(16.dp),
+                        .padding(if (titles) 12.dp else 16.dp),
                 ) {
                     val reminder = note.remindAt?.takeIf { it > System.currentTimeMillis() }
+                    if (titles) {
+                        // Titles alone: one line each, its order when picking and its pin, then the title.
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            order?.let { Text("${it + 1}", style = MaterialTheme.typography.labelLarge, color = c.accentText) }
+                            if (note.pinned) Text("pinned", style = MaterialTheme.typography.labelSmall, color = c.accentText)
+                            VerbatimText(
+                                androidx.compose.ui.text.AnnotatedString(app.bedtime.data.NoteWidget.title(note.text).ifBlank { "a note" }),
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = c.textNormal,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f),
+                            )
+                            Text(whenWritten(LocalContext.current, note.editedAt), style = MaterialTheme.typography.labelSmall, color = c.textFaint)
+                        }
+                    } else {
                     if (note.pinned || note.labels.isNotEmpty() || order != null || reminder != null) {
                         Row(Modifier.padding(bottom = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                             order?.let { Text("${it + 1}", style = MaterialTheme.typography.labelLarge, color = c.accentText) }
@@ -348,6 +384,7 @@ internal fun NotesContent(
                         color = c.textFaint,
                         modifier = Modifier.padding(top = 8.dp),
                     )
+                    }
                 }
                 DropdownMenu(expanded = menuFor == note.id, onDismissRequest = { menuFor = null }, containerColor = c.bgSecondary) {
                     val item = @Composable { label: String, action: () -> Unit ->
@@ -358,6 +395,7 @@ internal fun NotesContent(
                     }
                     if (note.id != Notes.TODO_ID) item(if (note.pinned) "Unpin" else "Pin near the top") { shelf.pin(note.id, !note.pinned) }
                     item("Labels…") { labelling = note }
+                    item(if (note.color != null) "Colour…" else "A colour…") { colouring = note }
                     item(if (note.remindAt != null) "Reminder…" else "Remind me…") { reminding = note }
                     if (note.id != Notes.TODO_ID && notes.size > 1) item("Move into…") { moving = note }
                     if (notes.size > 1) item("Pick to merge") { picking = listOf(note.id) }
@@ -392,6 +430,22 @@ internal fun NotesContent(
             } else {
                 ObsidianTopBar("Notes", onBack = onBack, subtitle = "Written in Markdown, kept on this phone") {
                     IconButton(onClick = { searching = if (searching == null) "" else null }) { Icon(Icons.Default.Search, contentDescription = "search your notes", tint = c.textMuted) }
+                    // How they're shown: a list, cards in two columns, or titles alone.
+                    Box {
+                        var viewing by remember { mutableStateOf(false) }
+                        IconButton(onClick = { viewing = true }) { Icon(app.bedtime.ui.components.BedtimeIcons.Grid, contentDescription = "how notes are shown", tint = c.textMuted) }
+                        DropdownMenu(expanded = viewing, onDismissRequest = { viewing = false }, containerColor = c.bgSecondary) {
+                            listOf(app.bedtime.data.NotesView.LIST to "A list", app.bedtime.data.NotesView.CARDS to "Cards in two columns", app.bedtime.data.NotesView.TITLES to "Titles only").forEach { (v, label) ->
+                                DropdownMenuItem(
+                                    text = { Text(label, color = if (v == view) c.accentText else c.textNormal) },
+                                    onClick = {
+                                        viewing = false
+                                        onView(v)
+                                    },
+                                )
+                            }
+                        }
+                    }
                     if (onSettings != null) IconButton(onClick = onSettings) { Icon(Icons.Default.Settings, contentDescription = "notes settings", tint = c.textMuted) }
                 }
             }
@@ -408,12 +462,16 @@ internal fun NotesContent(
             )
             return@Scaffold
         }
-        LazyColumn(
-            Modifier.fillMaxSize().padding(padding).padding(horizontal = PageGutter),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+        // One lane for the list and titles, two for cards; everything but the notes spans the width.
+        val wide = androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan.FullLine
+        androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid(
+            columns = androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells.Fixed(if (view == app.bedtime.data.NotesView.CARDS) 2 else 1),
+            modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = PageGutter),
+            verticalItemSpacing = if (titles) 6.dp else 10.dp,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             searching?.let { typed ->
-                item(key = "search") {
+                item(key = "search", span = wide) {
                     val focus = remember { androidx.compose.ui.focus.FocusRequester() }
                     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
                     app.bedtime.ui.components.ObsidianTextField(
@@ -427,10 +485,10 @@ internal fun NotesContent(
             // The microjournal near the top: under your "why" answers when they're pinned, otherwise first.
             val journalRow = onJournal?.takeIf { selected == null && filter == null && query.isEmpty() }
             val whyOnTop = notes.any { it.id == app.bedtime.data.Why.NOTE_ID && it.pinned }
-            if (journalRow != null && !whyOnTop) item(key = "journal") { JournalRow(journalRow) }
-            // Your labels, to see only one's notes.
+            if (journalRow != null && !whyOnTop) item(key = "journal", span = wide) { JournalRow(journalRow) }
+            // Your labels and #tags, to see only one's notes.
             if (allLabels.isNotEmpty()) {
-                item(key = "labels") {
+                item(key = "labels", span = wide) {
                     androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         (listOf<String?>(null) + allLabels).forEach { label -> LabelChip(label ?: "All", on = label == filter) { filter = label } }
                     }
@@ -439,9 +497,9 @@ internal fun NotesContent(
             // The to-do first, then those pinned, then the rest.
             val shown = NoteShelf.labelled(NoteShelf.ordered(notes), filter).filter { query.isEmpty() || it.text.contains(query, ignoreCase = true) }
             if (query.isNotEmpty() && shown.isEmpty()) {
-                item(key = "none") { Text("No note has “$query”.", style = MaterialTheme.typography.bodyMedium, color = c.textMuted) }
+                item(key = "none", span = wide) { Text("No note has “$query”.", style = MaterialTheme.typography.bodyMedium, color = c.textMuted) }
             }
-            items(shown, key = { it.id }) { note ->
+            items(shown, key = { it.id }, span = { note -> if (note.id == app.bedtime.data.Why.NOTE_ID && whyOnTop && journalRow != null) wide else androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan.SingleLane }) { note ->
                 if (note.id == app.bedtime.data.Why.NOTE_ID && whyOnTop && journalRow != null) {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         noteCard(note)
@@ -453,7 +511,7 @@ internal fun NotesContent(
             }
             // Deleted notes, a month each.
             if (trash.isNotEmpty() && selected == null && query.isEmpty() && filter == null) {
-                item(key = "trash") {
+                item(key = "trash", span = wide) {
                     Text(
                         "Trash · ${trash.size} ›",
                         style = MaterialTheme.typography.labelLarge,
@@ -462,9 +520,40 @@ internal fun NotesContent(
                     )
                 }
             }
-            item(key = "foot") { Spacer(Modifier.height(80.dp)) }
+            item(key = "foot", span = wide) { Spacer(Modifier.height(80.dp)) }
         }
     }
+}
+
+/** A note's colour: one of a few soft ones, or none, as it starts. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun ColourDialog(current: Long?, onDismiss: () -> Unit, onPick: (Long?) -> Unit) {
+    val c = Obsidian.colors
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = c.bgSecondary,
+        title = { Text("A colour") },
+        text = {
+            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                (listOf<Long?>(null) + NoteShelf.COLOURS).forEach { colour ->
+                    val on = colour == current
+                    Box(
+                        Modifier
+                            .size(36.dp)
+                            .clip(androidx.compose.foundation.shape.CircleShape)
+                            .background(colour?.let { Color(it).copy(alpha = 0.55f).compositeOver(c.bgSecondary) } ?: c.bgPrimary)
+                            .border(if (on) 2.dp else 1.dp, if (on) c.textNormal else c.border, androidx.compose.foundation.shape.CircleShape)
+                            .clickable(onClickLabel = if (colour == null) "no colour" else "this colour") { onPick(colour) },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (colour == null) Text("–", color = c.textMuted)
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Close", color = c.textMuted) } },
+    )
 }
 
 /** Notes deleted in the last month: each put back where it was, or gone for good; or all of them, emptied. */

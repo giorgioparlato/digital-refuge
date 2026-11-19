@@ -82,10 +82,24 @@ object Onboarding {
      * greyscale, the quiet home screen and silence as chosen. It shuts those apps by name, whatever
      * the template does; the quiet home screen is only how the phone looks.
      */
-    fun bedtime(existing: Schedule?, start: Int, end: Int, apps: Set<String>, greyscale: Boolean, minimal: Boolean, quiet: Boolean): Schedule =
-        (existing ?: Templates.all.first { it.key == "bedtime" }.build { false }).copy(
+    fun bedtime(
+        existing: Schedule?,
+        start: Int,
+        end: Int,
+        apps: Set<String>,
+        greyscale: Boolean,
+        minimal: Boolean,
+        quiet: Boolean,
+        days: Set<Int> = (1..7).toSet(),
+        /** How hard leaving early is; null keeps the steps it has. */
+        strictness: Strictness? = null,
+    ): Schedule =
+        (existing ?: Templates.all.first { it.key == "bedtime" }.build { false }).let { base ->
+            base.copy(unlock = strictness?.applied(base.unlock) ?: base.unlock)
+        }.copy(
             startMinute = start,
             endMinute = end,
+            days = days.ifEmpty { (1..7).toSet() },
             blockedApps = apps,
             allowOnly = false,
             greyscale = greyscale,

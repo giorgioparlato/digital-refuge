@@ -33,14 +33,20 @@ object UsageReader {
     fun accessIntent(context: Context): Intent =
         Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS, Uri.fromParts("package", context.packageName, null)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
-    /** Apps whose time isn't phone use: digital refuge itself and the home screens. */
+    /**
+     * Apps whose time isn't phone use: the home screens, refuge's own home and lock screens among them.
+     * The rest of refuge (notes, insights, settings) counts like any app.
+     */
     fun excluded(context: Context): Set<String> {
         val homes = runCatching {
             context.packageManager.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), PackageManager.MATCH_DEFAULT_ONLY)
                 .map { it.activityInfo.packageName }
         }.getOrDefault(emptyList())
-        return (homes + context.packageName).toSet()
+        return (homes - context.packageName + app.bedtime.data.OwnScreens.homeAndLock(context.packageName)).toSet()
     }
+
+    /** For Android's monthly records, which can't tell refuge's screens apart: refuge left out altogether there. */
+    fun excludedMonths(context: Context): Set<String> = excluded(context) + context.packageName
 
     /** The events from [from] to [to], as far back as Android keeps them; empty without access. */
     /** Each app's time in Android's monthly records between [from] and [to]; empty without access. */
@@ -69,7 +75,7 @@ object UsageReader {
                     UsageEvents.Event.KEYGUARD_HIDDEN -> UseEvent.Kind.UNLOCK
                     else -> null
                 } ?: continue
-                out.add(UseEvent(e.timeStamp, kind, e.packageName.orEmpty()))
+                out.add(UseEvent(e.timeStamp, kind, app.bedtime.data.OwnScreens.marked(e.packageName.orEmpty(), e.className, context.packageName)))
             }
         }
         return out

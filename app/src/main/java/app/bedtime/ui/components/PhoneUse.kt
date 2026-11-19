@@ -89,7 +89,7 @@ fun rememberUseMonths(): Map<String, UsageMonth> {
             val zone = ZoneId.systemDefault()
             val today = LocalDate.now(zone)
             val from = today.minusMonths(6).withDayOfMonth(1).atStartOfDay(zone).toInstant().toEpochMilli()
-            UseMonths.fromBuckets(UsageReader.monthBuckets(context, from, System.currentTimeMillis()), zone, UsageReader.excluded(context), distracting, today)
+            UseMonths.fromBuckets(UsageReader.monthBuckets(context, from, System.currentTimeMillis()), zone, UsageReader.excludedMonths(context), distracting, today)
         }
     }
     val own = UseMonths.own(kept, PhoneUsage.fromRecords(usage).values)

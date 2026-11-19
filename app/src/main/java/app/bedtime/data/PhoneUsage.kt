@@ -32,6 +32,25 @@ data class UseEvent(val at: Long, val kind: Kind, val pkg: String = "") {
     enum class Kind { RESUMED, PAUSED, SCREEN_OFF, UNLOCK }
 }
 
+/**
+ * Refuge's own time is phone use like any app's, except on its home and lock screens: those are where
+ * you land, as on any launcher. Their time goes under [marked]'s name for them, which is never counted.
+ */
+object OwnScreens {
+    private val HOME_AND_LOCK = setOf(
+        "app.bedtime.ui.minimal.MinimalHomeActivity",
+        "app.bedtime.ui.lock.LockScreenActivity",
+        // The minimal home as your everyday launcher, by its alias.
+        "app.bedtime.Home",
+    )
+
+    /** The name refuge's home and lock screens are counted under: left out, as launchers are. */
+    fun homeAndLock(own: String) = "$own#home"
+
+    /** [pkg], or [homeAndLock] when it's refuge ([own]) showing one of those screens ([activity]). */
+    fun marked(pkg: String, activity: String?, own: String): String = if (pkg == own && activity in HOME_AND_LOCK) homeAndLock(own) else pkg
+}
+
 /** An app over a stretch of days: time, opens, and whether it's one of your distracting ones. */
 data class AppUse(val pkg: String, val seconds: Long, val opens: Int, val distracting: Boolean)
 

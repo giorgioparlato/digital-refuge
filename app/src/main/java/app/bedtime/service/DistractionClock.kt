@@ -39,13 +39,14 @@ class DistractionClock(private val repo: Repository, private val scope: Coroutin
         record(now)
         current = pkg
         since = now
-        if (pkg == null || pkg == ownPackage || now - lastWrite >= WRITE_EVERY_MS) write(now)
+        // Written on coming into refuge, so its own screens show what was just used.
+        if (pkg == null || pkg.startsWith(ownPackage) || now - lastWrite >= WRITE_EVERY_MS) write(now)
     }
 
-    /** Any app counts toward the day's use, except digital refuge itself (its home and lock screens). */
+    /** Any app counts toward the day's use, refuge too, except its home and lock screens ([OwnScreens]). */
     private fun record(now: Long) {
         val pkg = current ?: return
-        if (pkg == ownPackage) return
+        if (pkg == app.bedtime.data.OwnScreens.homeAndLock(ownPackage)) return
         val isDistracting = pkg in distracting
         HourlyUse.split(since, now, ZoneId.systemDefault()).forEach { (day, hours) ->
             val day0 = pending.getOrPut(day) { Pending() }

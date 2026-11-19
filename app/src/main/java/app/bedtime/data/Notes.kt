@@ -25,7 +25,13 @@ data class Note(
     val labels: List<String> = emptyList(),
     /** When to be reminded of it, as epoch millis; null for never. */
     val remindAt: Long? = null,
+    /** Its colour, as ARGB; null for none, as every note starts. */
+    val color: Long? = null,
 )
+
+/** How the notes page shows them: a list (as always), cards in two columns, or titles alone. */
+@kotlinx.serialization.Serializable
+enum class NotesView { LIST, CARDS, TITLES }
 
 /** A note in the trash: when it went, and where it was, to go back there. */
 @Serializable
@@ -53,10 +59,19 @@ object NoteShelf {
     }
 
     /** Only those with [label]; all of them with none. */
-    fun labelled(notes: List<Note>, label: String?): List<Note> = if (label == null) notes else notes.filter { label in it.labels }
+    fun labelled(notes: List<Note>, label: String?): List<Note> = if (label == null) notes else notes.filter { n -> labelsOf(n).any { it.equals(label, ignoreCase = true) } }
 
-    /** Every label in use, A–Z, each once. */
-    fun labels(notes: List<Note>): List<String> = notes.flatMap { it.labels }.distinctBy { it.lowercase() }.sortedBy { it.lowercase() }
+    /** Every label in use, A–Z, each once: those given and the #tags in the notes. */
+    fun labels(notes: List<Note>): List<String> = notes.flatMap(::labelsOf).distinctBy { it.lowercase() }.sortedBy { it.lowercase() }
+
+    /** A note's labels: those given it, and any #tag written in it, as Obsidian reads them. */
+    fun labelsOf(note: Note): List<String> = (note.labels + Notes.tags(note.text)).distinctBy { it.lowercase() }
+
+    /** [notes] with [id]'s colour set, or taken away with null. */
+    fun coloured(notes: List<Note>, id: String, color: Long?): List<Note> = notes.map { if (it.id == id) it.copy(color = color) else it }
+
+    /** The colours a note can have: soft ones from the theme's family, tinting its card. */
+    val COLOURS = listOf(0xFFE0B243, 0xFFEF8839, 0xFFF7685E, 0xFFE47B8A, 0xFFA99BEA, 0xFF4DB2D1, 0xFF86BC9F)
 
     /**
      * [from] moved to the end of [into] and gone from the list: a single line as a list item (a to-do
@@ -151,6 +166,11 @@ object Notes {
 
     /** The to-do note's id among the app's notes; it's kept first in the list. */
     const val TODO_ID = "todo"
+
+    private val TAG = Regex("""(?<=^|\s)#([\p{L}_][\p{L}\p{N}_/-]*)""")
+
+    /** The #tags in [text], as Obsidian finds them: a letter after the #, so "# a heading" and "#1" aren't. */
+    fun tags(text: String): List<String> = TAG.findAll(text).map { it.groupValues[1] }.distinctBy { it.lowercase() }.toList()
 
     /** The note words saved from the dictionary look-up go in. */
     const val WORDS_ID = "words"

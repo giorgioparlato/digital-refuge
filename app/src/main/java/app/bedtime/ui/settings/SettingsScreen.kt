@@ -654,21 +654,23 @@ private fun settingsEntries(
         add(
             Entry(
                 checkins,
-                Icons.Default.Info,
-                "Moods",
-                moodsWords(s) + if (s.moodAfterMinutes > 0) " · how do you feel now? after ${s.moodAfterMinutes} min" else "",
-                "mood moods feeling feelings tag tags hungry angry lonely tired bored happy anxious how do you feel now",
-                go(Routes.MOODS),
-            ),
-        )
-        add(
-            Entry(
-                checkins,
                 Icons.Default.Notifications,
                 "A nudge after time in a row",
                 s.runNudgeMinutes?.let { "After $it min on the phone without a break" } ?: "Off",
                 "nudge time in a row long stretch reminder minutes break",
                 onChooseNudge,
+            ),
+        )
+        // Last of the check-ins.
+        add(
+            Entry(
+                checkins,
+                Icons.Default.Info,
+                "Moods",
+                // What they're for, not which they are: those are on their page.
+                moodsWords(s),
+                "mood moods feeling feelings tag tags hungry angry lonely tired bored happy anxious how do you feel now",
+                go(Routes.MOODS),
             ),
         )
 

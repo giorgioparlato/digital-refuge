@@ -208,6 +208,8 @@ class Repository private constructor(context: Context) {
     /** Gone from the trash for good: one, or all of it. */
     suspend fun forgetTrashed(id: String?) = update(NOTES_TRASH, trashSerializer, emptyList()) { trash -> if (id == null) emptyList() else trash.filterNot { it.note.id == id } }
 
+    suspend fun colourNote(id: String, color: Long?) = update(NOTES, notesSerializer, emptyList()) { NoteShelf.coloured(it, id, color) }
+
     suspend fun labelNote(id: String, labels: List<String>) = update(NOTES, notesSerializer, emptyList()) { NoteShelf.withLabels(it, id, labels) }
 
     /** Into the trash for a month, where it was kept; a note left empty just goes. */

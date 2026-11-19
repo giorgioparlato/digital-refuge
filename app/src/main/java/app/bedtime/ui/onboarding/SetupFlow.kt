@@ -67,6 +67,7 @@ import app.bedtime.ui.components.CtaButton
 import app.bedtime.ui.components.ObsidianToggle
 import app.bedtime.ui.components.PlainButton
 import app.bedtime.ui.components.QuickChip
+import app.bedtime.data.Strictness
 import app.bedtime.ui.components.SectionCard
 import app.bedtime.ui.components.SegmentedChoice
 import app.bedtime.ui.components.Text
@@ -135,6 +136,9 @@ fun SetupFlow(onDone: (List<String>) -> Unit) {
     var greyscale by rememberSaveable { mutableStateOf(existing?.greyscale ?: false) }
     var minimal by rememberSaveable { mutableStateOf(existing?.minimalMode ?: false) }
     var quiet by rememberSaveable { mutableStateOf(existing?.hideNotifications ?: false) }
+    var nights by rememberSaveable { mutableStateOf(existing?.days?.toList() ?: (1..7).toList()) }
+    // Firm to start with, or whichever the bedtime made before is; null for steps of its own.
+    var firmness by rememberSaveable { mutableStateOf(existing?.let { Strictness.of(it.unlock)?.name } ?: if (existing == null) Strictness.FIRM.name else null) }
     val limitChoices = remember { mutableStateMapOf<String, LimitChoice>() }
     var always by rememberSaveable { mutableStateOf(s.alwaysAvailable.toList()) }
     var launcher by rememberSaveable { mutableStateOf(s.homeScreen) }
@@ -152,7 +156,9 @@ fun SetupFlow(onDone: (List<String>) -> Unit) {
                     val minutes = budget.takeIf { it > 0 } ?: Onboarding.suggestedBudget((if (whole) weekAll else weekDistracting).toInt(), UseWidget().allowance(whole))
                     repo.updateSettings { it.copy(homeStyle = it.homeStyle.copy(useWidget = it.homeStyle.useWidget.withAllowance(whole, minutes))) }
                 }
-                SetupStep.BEDTIME -> repo.upsert(Onboarding.bedtime(Onboarding.existingBedtime(scheduleList), start, end, shuts, greyscale, minimal, quiet))
+                SetupStep.BEDTIME -> repo.upsert(
+                    Onboarding.bedtime(Onboarding.existingBedtime(scheduleList), start, end, shuts, greyscale, minimal, quiet, nights.toSet(), firmness?.let(Strictness::valueOf)),
+                )
                 SetupStep.LIMITS -> {
                     val limited = s.limits.flatMap { it.rules.apps }.toSet()
                     Onboarding.worst(list, shuts).filter { it.pkg !in limited }.forEach { app ->
@@ -208,6 +214,7 @@ fun SetupFlow(onDone: (List<String>) -> Unit) {
                     SetupStep.BEDTIME -> Bedtime(
                         start, { start = it }, end, { end = it },
                         greyscale, { greyscale = it }, minimal, { minimal = it }, quiet, { quiet = it }, shuts.size,
+                        nights.toSet(), { nights = it.toList() }, firmness?.let(Strictness::valueOf), { firmness = it.name },
                     )
                     SetupStep.LIMITS -> Limits(Onboarding.worst(list, shuts), s.limits.flatMap { it.rules.apps }.toSet(), limitChoices)
                     SetupStep.ALWAYS -> Always(list, always.toSet()) { pkg -> always = if (pkg in always) always - pkg else always + pkg }
@@ -306,10 +313,12 @@ internal fun Bedtime(
     minimal: Boolean, onMinimal: (Boolean) -> Unit,
     quiet: Boolean, onQuiet: (Boolean) -> Unit,
     apps: Int,
+    nights: Set<Int> = (1..7).toSet(), onNights: (Set<Int>) -> Unit = {},
+    firmness: Strictness? = Strictness.FIRM, onFirmness: (Strictness) -> Unit = {},
 ) {
     val context = LocalContext.current
     val c = Obsidian.colors
-    Title("A bedtime", "Hours when your distracting apps stay shut, every night. Getting out early asks for a 10-minute wait and a passage to copy, so the urge can pass.")
+    Title("A bedtime", "Hours when your distracting apps stay shut, on the nights you choose. Getting out early asks for a few steps first, so the urge can pass.")
     SectionCard {
         var picking by rememberSaveable { mutableStateOf<String?>(null) }
         picking?.let { which ->
@@ -328,6 +337,29 @@ internal fun Bedtime(
             color = c.textFaint,
             modifier = Modifier.padding(top = 10.dp, bottom = 4.dp),
         )
+        // The nights it starts on: every one, or those before a working day, or any you pick.
+        Text("Nights", style = MaterialTheme.typography.labelLarge, color = c.textMuted, modifier = Modifier.padding(top = 6.dp, bottom = 8.dp))
+        app.bedtime.ui.components.DaySelector(nights, onChange = onNights)
+        Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            QuickChip("Every night", nights.size == 7) { onNights((1..7).toSet()) }
+            QuickChip("Before a weekday", nights == setOf(7, 1, 2, 3, 4)) { onNights(setOf(7, 1, 2, 3, 4)) }
+        }
+        // How hard leaving early is: a starting point, its steps changed later on the bedtime's page.
+        Text("Leaving early", style = MaterialTheme.typography.labelLarge, color = c.textMuted, modifier = Modifier.padding(top = 16.dp, bottom = 8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Strictness.entries.forEach { s -> QuickChip(s.label, firmness == s) { onFirmness(s) } }
+        }
+        Text(
+            when (firmness) {
+                Strictness.GENTLE -> "A 30-second wait."
+                Strictness.FIRM -> "A 10-minute wait, then a passage to copy."
+                Strictness.STRICT -> "A 10-minute wait and a passage, each longer every time that night."
+                null -> "Steps of your own, kept as they are."
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = c.textFaint,
+            modifier = Modifier.padding(top = 6.dp, bottom = 10.dp),
+        )
         Line("Greyscale", "Colours drain away; on Android 15 and newer, with do not disturb access", greyscale, onGreyscale)
         Line("Refuge's quiet home screen", "The time and your few apps as words", minimal, onMinimal)
         Line("Silence notifications", "Held back until morning; alarms and music are never silenced", quiet, onQuiet)
@@ -338,6 +370,11 @@ internal fun Bedtime(
 internal fun Limits(worst: List<SetupApp>, limited: Set<String>, choices: MutableMap<String, LimitChoice>) {
     val c = Obsidian.colors
     Title("Limits for every day", "For your most used distracting apps, outside bedtime too: a pause asks for a few breaths before the app opens; minutes a day give it an allowance.")
+    Text(
+        "Here each app gets a limit of its own. A limit can hold several apps too, sharing one allowance, say all your social apps together: make one on focus › limits.",
+        style = MaterialTheme.typography.bodyMedium,
+        color = c.textMuted,
+    )
     if (worst.isEmpty()) {
         Text("No distracting apps chosen yet, so nothing to limit. Limits can be made any time on focus.", style = MaterialTheme.typography.bodyMedium, color = c.textFaint)
         return
@@ -366,7 +403,7 @@ internal fun Limits(worst: List<SetupApp>, limited: Set<String>, choices: Mutabl
 
 @Composable
 internal fun Always(apps: List<SetupApp>, chosen: Set<String>, onToggle: (String) -> Unit) {
-    Title("Always available", "Apps bedtime never shuts, a tap away from its emergency button: maps, rides, your authenticator, your bank. Keep it short.")
+    Title("Always available", "Apps bedtime never shuts, a tap away from its emergency button: maps, rides, your authenticator, your bank.")
     var everything by rememberSaveable { mutableStateOf(false) }
     val suggested = SystemApps.ALWAYS_AVAILABLE_SUGGESTIONS.toSet()
     val shown = if (everything) apps.sortedBy { it.label.lowercase() } else apps.filter { it.pkg in suggested || it.pkg in chosen }.sortedBy { it.label.lowercase() }

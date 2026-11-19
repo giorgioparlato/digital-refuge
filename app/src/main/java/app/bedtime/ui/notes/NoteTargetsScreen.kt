@@ -194,6 +194,8 @@ fun NoteTargetsScreen(onBack: () -> Unit, onOpenNotes: () -> Unit, onOpenJournal
         exportedTo = current.notesExportFolder?.let { exportName ?: "the folder chosen" },
         onExportAgain = { current.notesExportFolder?.let { exportTo(it) } },
         onExportTo = { pickExport.launch(null) },
+        autoExport = current.notesAutoExport,
+        onAutoExport = { on -> scope.launch { repo.updateSettings { it.copy(notesAutoExport = on) } } },
     )
     if (choosingShortcut) {
         ShortcutDialog(
@@ -273,6 +275,9 @@ internal fun NoteTargetsContent(
     exportedTo: String? = null,
     onExportAgain: () -> Unit = {},
     onExportTo: () -> Unit = {},
+    /** Written out again on each change, once a folder's chosen; off until asked for. */
+    autoExport: Boolean = false,
+    onAutoExport: (Boolean) -> Unit = {},
 ) {
     val c = Obsidian.colors
     Scaffold(containerColor = c.bgPrimary, topBar = { ObsidianTopBar("Quick notes", onBack = onBack, subtitle = "From the minimal home's search") }) { padding ->
@@ -291,7 +296,16 @@ internal fun NoteTargetsContent(
                     ObsidianToggle(notesTab, onNotesTab)
                 }
                 if (exportedTo != null) {
-                    OptionRow(Icons.Default.Refresh, "Export again", description = "Your notes and microjournal as Markdown files in $exportedTo, written over with what's here now", onClick = onExportAgain) { Chevron() }
+                    OptionRow(
+                        Icons.Default.Refresh,
+                        "Export on every change",
+                        description = "Each note and day written to $exportedTo a few seconds after you change it, and a note deleted here deleted there. Still one way: edits made there are written over",
+                    ) {
+                        ObsidianToggle(autoExport, onAutoExport)
+                    }
+                    if (!autoExport) {
+                        OptionRow(Icons.Default.Refresh, "Export again", description = "Your notes and microjournal as Markdown files in $exportedTo, written over with what's here now", onClick = onExportAgain) { Chevron() }
+                    }
                 }
                 OptionRow(
                     Icons.Default.Share,

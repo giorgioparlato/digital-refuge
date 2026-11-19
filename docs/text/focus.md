@@ -107,9 +107,12 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 <sub>[NotesScreen.kt](../../app/src/main/java/app/bedtime/ui/notes/NotesScreen.kt)</sub>
 
 - in the trash for a month
+- a note
 - Unpin
 - Pin near the top
 - Labels…
+- Colour…
+- A colour…
 - Reminder…
 - Remind me…
 - Move into…
@@ -125,12 +128,17 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 - Merge
 - Notes
 - Written in Markdown, kept on this phone
+- A list
+- Cards in two columns
+- Titles only
 - new note
 - Nothing yet. Type in the minimal home's search and pick “save in refuge notes”, or start one with +.
 - Words in any note
 - All
 - No note has “{query}”.
 - Trash · … ›
+- A colour
+- Close
 - Empty the trash?
 - The note in it goes for good.
 - The … notes in it go for good.

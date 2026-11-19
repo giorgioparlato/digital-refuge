@@ -91,6 +91,9 @@ class BlockerService : AccessibilityService() {
     /** Every app that can act as a home screen, so pressing Home still lands on the minimal one. */
     private var homePackages: Set<String> = emptySet()
 
+    /** The last of refuge's own activities in front, to tell its home and lock screens from the rest. */
+    private var ownScreen: String? = null
+
     /** Whether a package can be opened from the launcher. Asked once per package, not per window. */
     private val launchable = mutableMapOf<String, Boolean>()
 
@@ -298,6 +301,8 @@ class BlockerService : AccessibilityService() {
         // the phone sideways threw you out of an app the session allowed. Without a class name we can't
         // tell, so it counts as an app, as it always did.
         if (className != null && !isActivity(pkg, className)) return
+        // Which of refuge's screens: its home and lock screens aren't counted as use, the rest is.
+        if (pkg == packageName && className != null) ownScreen = className
         // Leaving Obsidian: what you wrote there goes out with the same sync as a quick note's, if asked.
         if (lastPackage == FolderIndex.OBSIDIAN && pkg != FolderIndex.OBSIDIAN) syncAfterObsidian(locked = false)
         lastPackage = pkg
@@ -430,7 +435,7 @@ class BlockerService : AccessibilityService() {
         pendingSettle = null
         // Counted first, before anything below can return: our own covers stop the clock too.
         val arrived = limitTracker.moveTo(pkg)
-        distractionClock.moveTo(pkg)
+        distractionClock.moveTo(pkg?.let { app.bedtime.data.OwnScreens.marked(it, ownScreen, packageName) })
         if (pkg == null) return
         when (Enforcement.decide(pkg, packageName, state, alwaysAllowed, settings.alwaysAvailable, recentsInFront, ::opensAsApp, homePackages)) {
             Verdict.LET_THROUGH -> Unit

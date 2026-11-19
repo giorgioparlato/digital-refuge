@@ -9,6 +9,15 @@ import java.time.LocalDateTime
 
 class NotesTest {
     @Test
+    fun hashTagsAreLabelsAsObsidianReadsThem() {
+        assertEquals(listOf("films", "to/watch"), Notes.tags("# a heading\nwatch perfect days #films #to/watch #1 and#not #Films"))
+        val note = Note(text = "buy bread #shopping", createdAt = 0, labels = listOf("home"))
+        assertEquals(listOf("home", "shopping"), NoteShelf.labelsOf(note))
+        assertEquals(listOf(note), NoteShelf.labelled(listOf(note, Note(text = "else", createdAt = 0)), "Shopping"))
+        assertEquals(listOf("home", "shopping"), NoteShelf.labels(listOf(note)))
+    }
+
+    @Test
     fun aQuickNoteIsOneMarkdownListItem() {
         assertEquals("- 2026-10-25 22:41 watch Perfect Days", Notes.line("  watch Perfect Days \n", LocalDateTime.of(2026, 10, 25, 22, 41)))
         assertEquals("- 2026-10-25 22:41 one two", Notes.line("one\n  two", LocalDateTime.of(2026, 10, 25, 22, 41)))

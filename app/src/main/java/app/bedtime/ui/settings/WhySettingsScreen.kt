@@ -102,12 +102,9 @@ fun WhySettingsScreen(onBack: () -> Unit, onOpenAnswers: () -> Unit, onOpenMoods
     }
 }
 
-/** "hungry, angry, tired and 4 more", or off. */
-internal fun moodsWords(s: AppSettings): String {
-    if (!s.moodsOn) return "Off"
-    val moods = Why.moods(s)
-    return if (moods.size <= 3) moods.joinToString(", ") else moods.take(3).joinToString(", ") + " and ${moods.size - 3} more"
-}
+/** What moods are for, said where they're reached; which moods they are is on their page. */
+internal fun moodsWords(s: AppSettings): String =
+    "An option to track how you feel when asked to journal" + if (s.moodsOn) "" else " · off"
 
 /**
  * The moods to tap, when answering why and in the microjournal: on or off, and yours to rename, take

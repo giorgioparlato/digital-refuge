@@ -46,4 +46,16 @@ class OnboardingTest {
         // Gone through again, the same bedtime changes rather than a second one.
         assertEquals(bed.id, Onboarding.bedtime(Onboarding.existingBedtime(listOf(bed)), 22 * 60, 7 * 60, emptySet(), false, false, true).id)
     }
+
+    @Test
+    fun aBedtimeTakesItsNightsAndHowHardLeavingEarlyIs() {
+        val weeknights = setOf(7, 1, 2, 3, 4)
+        val gentle = Onboarding.bedtime(null, 23 * 60, 7 * 60, setOf("x"), false, false, false, weeknights, Strictness.GENTLE)
+        assertEquals(weeknights, gentle.days)
+        assertEquals(Strictness.GENTLE, Strictness.of(gentle.unlock))
+        // No nights picked is every night; no starting point keeps the steps it had.
+        val kept = Onboarding.bedtime(gentle, 23 * 60, 7 * 60, setOf("x"), false, false, false, emptySet(), null)
+        assertEquals((1..7).toSet(), kept.days)
+        assertEquals(gentle.unlock, kept.unlock)
+    }
 }

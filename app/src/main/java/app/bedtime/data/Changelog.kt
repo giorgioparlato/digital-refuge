@@ -13,6 +13,18 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            97,
+            "0.9.51",
+            listOf(
+                "Notes can be shown as a list (as before), as cards in two columns, or as titles alone: the grid button at the top of notes. A note can have a colour too, from its menu.",
+                "A #word in a note, a quick note too, is a label, as Obsidian reads it.",
+                "Export on every change: once your notes go to a folder, each change can follow a few seconds later, a deleted note deleted there too. Off until you switch it on.",
+                "Refuge's own screens count as phone use now, except its home and lock screens, as with any launcher.",
+                "Setup: a bedtime picks its nights and how hard leaving early is; limits say one can hold several apps.",
+                "Moods come last among the check-ins, said for what they are.",
+            ),
+        ),
+        ChangelogEntry(
             96,
             "0.9.50",
             listOf(

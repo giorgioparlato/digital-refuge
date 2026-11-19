@@ -47,22 +47,55 @@ object NotesExport {
     /** How many notes and days went out, or null if the folder couldn't be written to. */
     data class Done(val notes: Int, val days: Int)
 
-    fun write(context: Context, tree: Uri, notes: List<Note>, journal: List<JournalEntry>, today: LocalDate): Done? = runCatching {
+    fun write(context: Context, tree: Uri, notes: List<Note>, journal: List<JournalEntry>, today: LocalDate): Done? =
+        writeChanged(context, tree, notes, journal, today, before = null)
+
+    /**
+     * What changed since [before] (the notes and days as last written; null writes them all): each note or
+     * day new or different written over its file; a note retitled or deleted in refuge takes its old file with it.
+     */
+    fun writeChanged(context: Context, tree: Uri, notes: List<Note>, journal: List<JournalEntry>, today: LocalDate, before: Written?): Done? = runCatching {
         val top = DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
         val here = children(context, tree, top)
-        named(notes).forEach { (name, note) -> put(context, top, here[name], name, withEmbeds(note.text.trimEnd()) + "\n") ?: return null }
-        if (journal.isNotEmpty()) {
+        val names = named(notes)
+        val (noteChanges, gone) = changes(names, before)
+        noteChanges.forEach { (name, note) -> put(context, top, here[name], name, withEmbeds(note.text.trimEnd()) + "\n") ?: return null }
+        gone.forEach { old -> here[old]?.let { runCatching { DocumentsContract.deleteDocument(context.contentResolver, it) } } }
+        val days = journal.filter { entry -> before?.days?.get(entry.day) != entry.text }
+        if (days.isNotEmpty()) {
             val folder = here[JOURNAL_FOLDER]
                 ?: DocumentsContract.createDocument(context.contentResolver, top, DocumentsContract.Document.MIME_TYPE_DIR, JOURNAL_FOLDER)
                 ?: return null
-            val days = children(context, tree, folder)
-            journal.forEach { entry ->
+            val existing = children(context, tree, folder)
+            days.forEach { entry ->
                 val (name, text) = journalFile(entry, today)
-                put(context, folder, days[name], name, text) ?: return null
+                put(context, folder, existing[name], name, text) ?: return null
             }
         }
-        Done(notes.size, journal.size)
+        Done(noteChanges.size, days.size)
     }.getOrNull()
+
+    /** What was last written: each note's file and text by its id, and each day's text. */
+    data class Written(val notes: Map<String, Pair<String, String>>, val days: Map<Long, String>) {
+        companion object {
+            fun of(notes: List<Note>, journal: List<JournalEntry>) =
+                Written(named(notes).associate { (name, note) -> note.id to (name to note.text) }, journal.associate { it.day to it.text })
+        }
+    }
+
+    /**
+     * The notes to write since [before] (new, or changed in text or name), and the files to remove: the old
+     * names of those renamed, and those of notes deleted in refuge.
+     */
+    fun changes(names: List<Pair<String, Note>>, before: Written?): Pair<List<Pair<String, Note>>, List<String>> {
+        if (before == null) return names to emptyList()
+        val changed = names.filter { (name, note) -> before.notes[note.id] != (name to note.text) }
+        val renamed = changed.mapNotNull { (name, note) -> before.notes[note.id]?.first?.takeIf { it != name } }
+        val ids = names.map { it.second.id }.toSet()
+        val deleted = before.notes.filterKeys { it !in ids }.values.map { it.first }
+        // Not one now taken by another note.
+        return changed to (renamed + deleted).distinct().filter { old -> names.none { it.first == old } }
+    }
 
     /** [text] into [existing], written over, or into a new file called [name] in [folder]. */
     private fun put(context: Context, folder: Uri, existing: Uri?, name: String, text: String): Uri? {

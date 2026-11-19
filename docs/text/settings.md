@@ -115,11 +115,10 @@ Home screen, lock screen, apps, shortcuts and about & backup are lists of rows f
 - Notifications
 - From the apps and people you choose
 - notifications messages reply replies people contacts circles groups lock screen rain alert weather your week sunday note
-- Moods
--  · how do you feel now? after … min
-- mood moods feeling feelings tag tags hungry angry lonely tired bored happy anxious how do you feel now
 - After {it} min on the phone without a break
 - nudge time in a row long stretch reminder minutes break
+- Moods
+- mood moods feeling feelings tag tags hungry angry lonely tired bored happy anxious how do you feel now
 - App groups
 - Tick many apps at once when choosing
 - 1 group
@@ -740,6 +739,8 @@ One file serves the look, widgets, gestures and notifications pages, for both sc
 - Kept on this phone, written in Markdown
 - A notes tab
 - Your notes and microjournal at refuge's foot, beside insights
+- Export on every change
+- Each note and day written to {exportedTo} a few seconds after you change it, and a note deleted here deleted there. Still one way: edits made there are written over
 - Export again
 - Your notes and microjournal as Markdown files in {exportedTo}, written over with what's here now
 - Export to a folder

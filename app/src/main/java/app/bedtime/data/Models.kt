@@ -775,10 +775,14 @@ data class AppSettings(
     val voiceLanguage: String = "auto",
     /** Where your notes were last exported as Markdown files (a document tree), to export to again. */
     val notesExportFolder: String? = null,
+    /** Each change to a note or the microjournal written out to that folder straight away; off until asked for. */
+    val notesAutoExport: Boolean = false,
     /** Your habits as a tab of their own at refuge's foot, like notes; off until asked for. */
     val habitsTab: Boolean = false,
     /** Your notes as a tab of their own at refuge's foot, beside insights. */
     val notesTab: Boolean = false,
+    /** How the notes page shows them; a list until you choose otherwise. */
+    val notesView: NotesView = NotesView.LIST,
     /** Insights' habits and moods sections, for those who use them. */
     val insightsSessions: Boolean = true,
     val insightsHabits: Boolean = true,
