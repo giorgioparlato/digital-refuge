@@ -3,11 +3,9 @@ package app.bedtime.ui.minimal
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -19,22 +17,34 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.luminance
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.ui.graphics.RectangleShape
 import app.bedtime.data.HomeStyle
 import app.bedtime.ui.homestyle.palette
 
-/** A sheet from the bottom of the screen, for what a widget's tap opens. A tap beside it or Back puts it away. */
+/**
+ * A sheet from the bottom of the screen, for what a widget's tap or hold opens. Dragging it down, a
+ * tap beside it or Back puts it away; a list inside it scrolls first, and only once it's back at its
+ * top does a drag down move the sheet. Material's sheet carries the motion; the look is [HomeSheet]'s
+ * own, so it's drawn transparent with no handle of its own.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun HomeSheetDialog(onDismiss: () -> Unit, content: @Composable () -> Unit) {
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
-        Box(
-            Modifier.fillMaxSize().pointerInput(onDismiss) { detectTapGestures { onDismiss() } },
-            contentAlignment = Alignment.BottomCenter,
-        ) { content() }
-    }
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        shape = RectangleShape,
+        containerColor = Color.Transparent,
+        tonalElevation = 0.dp,
+        scrimColor = Color.Black.copy(alpha = 0.45f),
+        dragHandle = null,
+        contentWindowInsets = { WindowInsets(0, 0, 0, 0) },
+    ) { content() }
 }
 
 private val SheetShape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp)
@@ -63,8 +73,7 @@ internal fun HomeSheet(background: Color, faint: Color, content: @Composable Col
 
 /**
  * What every sheet from the bottom stands on: a shade lifted from the screen's [background], rounded
- * at the top, clear of the gesture bar, and keeping taps to itself rather than letting them reach
- * the space behind, which puts it away.
+ * at the top and clear of the gesture bar.
  */
 internal fun Modifier.sheetSurface(background: Color, faint: Color): Modifier {
     val lift = if (background.luminance() > 0.5f) Color(0x14000000) else Color(0x1AFFFFFF)
@@ -72,7 +81,6 @@ internal fun Modifier.sheetSurface(background: Color, faint: Color): Modifier {
         .clip(SheetShape)
         .background(lift.compositeOver(background))
         .border(1.dp, faint.copy(alpha = 0.2f), SheetShape)
-        .pointerInput(Unit) { detectTapGestures { } }
         .navigationBarsPadding()
 }
 

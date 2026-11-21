@@ -13,6 +13,14 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            100,
+            "0.9.54",
+            listOf(
+                "You can drag the sheets from the widgets down to close them: rain, calendar, today's dots and a widget's options.",
+                "A list inside a sheet scrolls, like the rain by the hour. Once it's back at the top, dragging down closes the sheet.",
+            ),
+        ),
+        ChangelogEntry(
             99,
             "0.9.53",
             listOf(
