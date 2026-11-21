@@ -1,5 +1,6 @@
 package app.bedtime.ui.habits
 
+import androidx.compose.ui.text.font.FontWeight
 import app.bedtime.ui.components.LineIcons
 import app.bedtime.data.Screen
 import androidx.compose.material.icons.filled.Lock
@@ -87,6 +88,8 @@ fun HabitsScreen(onBack: (() -> Unit)?) {
     HabitsContent(
         habitsTab = settings?.habitsTab == true,
         onHabitsTab = { on -> scope.launch { repo.updateSettings { it.copy(habitsTab = on) } } },
+        weekShown = settings?.habitsWeekShown != false,
+        onWeekShown = { on -> scope.launch { repo.updateSettings { it.copy(habitsWeekShown = on) } } },
         habits = habits,
         marks = marks,
         today = HourlyUse.today(),
@@ -117,6 +120,8 @@ internal fun HabitsContent(
     /** Habits as a tab of their own at refuge's foot, or not. */
     habitsTab: Boolean = false,
     onHabitsTab: ((Boolean) -> Unit)? = null,
+    weekShown: Boolean = true,
+    onWeekShown: (Boolean) -> Unit = {},
 ) {
     val c = Obsidian.colors
     var editing by remember { mutableStateOf<Habit?>(null) }
@@ -129,7 +134,7 @@ internal fun HabitsContent(
             Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = PageGutter, vertical = 4.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            HabitsBody(habits, marks, today, editing, { editing = it }, onMark, onSave, onMove, onDelete)
+            HabitsBody(habits, marks, today, editing, { editing = it }, onMark, onSave, onMove, onDelete, weekShown, onWeekShown)
             // At the foot, once they're set up: a tab of their own, as notes can have.
             onHabitsTab?.let { set ->
                 app.bedtime.ui.components.SectionCard {
@@ -159,6 +164,8 @@ internal fun HabitsBody(
     onSave: (Habit) -> Unit = {},
     onMove: (List<Habit>) -> Unit = {},
     onDelete: (Habit) -> Unit = {},
+    weekShown: Boolean = true,
+    onWeekShown: (Boolean) -> Unit = {},
 ) {
     val c = Obsidian.colors
     var open by remember { mutableStateOf<String?>(null) }
@@ -188,7 +195,7 @@ internal fun HabitsBody(
         )
         return
     }
-    WeekSummary(habits, marks, today)
+    WeekSummary(habits, marks, today, weekShown, onWeekShown)
     Text("Today", style = MaterialTheme.typography.titleLarge, color = c.textNormal, modifier = Modifier.padding(top = 4.dp))
     if (habits.size > 1) Text("Hold one and drag it to change the order", style = MaterialTheme.typography.bodySmall, color = c.textFaint)
     Column {
@@ -285,7 +292,7 @@ private fun HabitCard(habit: Habit, marks: Map<Long, Int>, today: Long, onTick: 
  * tall as its share, with its count under it ("3/4").
  */
 @Composable
-private fun WeekSummary(habits: List<Habit>, marks: Map<String, Map<Long, Int>>, today: Long) {
+private fun WeekSummary(habits: List<Habit>, marks: Map<String, Map<Long, Int>>, today: Long, shown: Boolean, onShown: (Boolean) -> Unit) {
     val c = Obsidian.colors
     val days = ((today - 6)..today).map { day ->
         val kept = habits.count { h -> Habits.day(h, marks[h.id].orEmpty(), day).let { it == HabitDay.DONE || it == HabitDay.MET } }
@@ -293,27 +300,39 @@ private fun WeekSummary(habits: List<Habit>, marks: Map<String, Map<Long, Int>>,
     }
     val kept = days.sumOf { it.second }
     val possible = habits.size * days.size
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(CardRadius)).background(c.bgSecondary).padding(16.dp)) {
-        Row(verticalAlignment = Alignment.Bottom) {
-            Text("$kept of $possible", style = MaterialTheme.typography.headlineSmall, color = c.textNormal)
-            Spacer(Modifier.width(8.dp))
-            Text("kept in the last seven days", style = MaterialTheme.typography.bodyMedium, color = c.textMuted, modifier = Modifier.padding(bottom = 3.dp))
+    // Small, so today's habits come first: one line, and under it the week as short bars. A tap on the
+    // line folds the bars away, and it's remembered.
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(CardRadius)).background(c.bgSecondary)) {
+        Row(
+            Modifier.fillMaxWidth().clickable(onClickLabel = if (shown) "hide the week" else "show the week") { onShown(!shown) }
+                .padding(start = 16.dp, end = 10.dp, top = 12.dp, bottom = if (shown) 8.dp else 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("$kept of $possible", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium, color = c.textNormal)
+            Spacer(Modifier.width(6.dp))
+            Text("kept in the last seven days", style = MaterialTheme.typography.bodyMedium, color = c.textMuted, modifier = Modifier.weight(1f))
+            Icon(if (shown) LineIcons.KeyboardArrowUp else LineIcons.KeyboardArrowDown, contentDescription = null, tint = c.textMuted, modifier = Modifier.size(20.dp))
         }
-        Spacer(Modifier.height(14.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
-            days.forEach { (day, n) ->
-                val share = n.toFloat() / habits.size
-                Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Box(Modifier.fillMaxWidth().height(48.dp), contentAlignment = Alignment.BottomCenter) {
-                        Box(Modifier.fillMaxWidth().height(48.dp).clip(RoundedCornerShape(4.dp)).background(c.textNormal.copy(alpha = 0.08f)))
-                        Box(Modifier.fillMaxWidth().height((48 * share).dp).clip(RoundedCornerShape(4.dp)).background(c.accent.copy(alpha = if (day == today) 1f else 0.75f)))
+        if (shown) {
+            Row(
+                Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.Bottom,
+            ) {
+                days.forEach { (day, n) ->
+                    val share = n.toFloat() / habits.size
+                    Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Box(Modifier.fillMaxWidth().height(26.dp), contentAlignment = Alignment.BottomCenter) {
+                            Box(Modifier.fillMaxWidth().height(26.dp).clip(RoundedCornerShape(3.dp)).background(c.textNormal.copy(alpha = 0.08f)))
+                            Box(Modifier.fillMaxWidth().height((26 * share).dp).clip(RoundedCornerShape(3.dp)).background(c.accent.copy(alpha = if (day == today) 1f else 0.7f)))
+                        }
+                        Text(
+                            DateTimeFormatter.ofPattern("EEEEE", Locale.getDefault()).format(LocalDate.ofEpochDay(day)),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (day == today) c.textNormal else c.textFaint,
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
                     }
-                    Text("$n/${habits.size}", style = MaterialTheme.typography.labelSmall, color = c.textMuted, modifier = Modifier.padding(top = 4.dp))
-                    Text(
-                        DateTimeFormatter.ofPattern("EEEEE", Locale.getDefault()).format(LocalDate.ofEpochDay(day)),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (day == today) c.textNormal else c.textFaint,
-                    )
                 }
             }
         }

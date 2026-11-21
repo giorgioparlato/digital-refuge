@@ -190,6 +190,8 @@ fun StatsScreen(onBack: (() -> Unit)?, initialSection: Int = 0, onOpen: (String)
                 },
                 onMove = { moved -> scope.launch { repo.updateSettings { it.copy(habits = moved) } } },
                 onDelete = { habit -> scope.launch { repo.deleteHabit(habit.id) } },
+                weekShown = settings?.habitsWeekShown != false,
+                onWeekShown = { on -> scope.launch { repo.updateSettings { it.copy(habitsWeekShown = on) } } },
             )
         }),
         onAddHabit = { editingHabit = Habit() },

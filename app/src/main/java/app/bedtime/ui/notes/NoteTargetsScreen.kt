@@ -293,7 +293,7 @@ internal fun NoteTargetsContent(
             Spacer(Modifier.height(16.dp))
             SectionCard(title = "Refuge notes") {
                 OptionRow(LineIcons.Edit, "Your notes", description = "Kept on this phone, written in Markdown", onClick = onOpenNotes) { Chevron() }
-                OptionRow(BedtimeIcons.Book, "A notes tab", description = "Your notes and microjournal at refuge's foot, beside insights") {
+                OptionRow(LineIcons.Edit, "A notes tab", description = "Your notes and microjournal at refuge's foot, beside insights") {
                     ObsidianToggle(notesTab, onNotesTab)
                 }
                 if (exportedTo != null) {

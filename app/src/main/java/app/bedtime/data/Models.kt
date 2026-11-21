@@ -779,6 +779,8 @@ data class AppSettings(
     val notesAutoExport: Boolean = false,
     /** Your habits as a tab of their own at refuge's foot, like notes; off until asked for. */
     val habitsTab: Boolean = false,
+    /** The week at the top of habits, as small bars; folded to its one line when you'd rather not see it. */
+    val habitsWeekShown: Boolean = true,
     /** Your notes as a tab of their own at refuge's foot, beside insights. */
     val notesTab: Boolean = false,
     /** How the notes page shows them; a list until you choose otherwise. */

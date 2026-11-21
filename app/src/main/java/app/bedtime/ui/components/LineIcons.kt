@@ -15,7 +15,8 @@ import androidx.compose.ui.unit.dp
  * material, because the fill is the meaning.
  */
 object LineIcons {
-    val Edit by lazy { line("Edit", "M4,20 H8 L18,10 L14,6 L4,16 Z M13.5,6.5 L17.5,10.5") }
+    /** The pen stays filled (your choice, 2026-11-21): it's refuge's mark for notes, everywhere they appear. */
+    val Edit by lazy { filled("Edit", "M3,17.25 V21 H6.75 L17.81,9.94 L14.06,6.19 L3,17.25 Z M20.71,7.04 C21.1,6.65 21.1,6.02 20.71,5.63 L18.37,3.29 C17.98,2.9 17.35,2.9 16.96,3.29 L15.13,5.12 L18.88,8.87 L20.71,7.04 Z") }
     val Create: ImageVector get() = Edit
     val Close by lazy { line("Close", "M6,6 L18,18 M18,6 L6,18") }
     val Clear: ImageVector get() = Close
@@ -54,6 +55,11 @@ object LineIcons {
     val Menu by lazy { line("Menu", "M4,7 H20 M4,12 H20 M4,17 H20") }
     val LocationOn by lazy { line("LocationOn", "M12,21 C12,21 5,14.5 5,9.5 A7,7 0 0,1 19,9.5 C19,14.5 12,21 12,21 Z M12,7 A2.5,2.5 0 1,1 12,12 A2.5,2.5 0 1,1 12,7 Z") }
     val List by lazy { line("List", "M9,7 H20 M9,12 H20 M9,17 H20 M4.5,7 V7.1 M4.5,12 V12.1 M4.5,17 V17.1", mirrored = true) }
+
+    private fun filled(name: String, pathData: String): ImageVector =
+        ImageVector.Builder(name, 24.dp, 24.dp, 24f, 24f).apply {
+            addPath(pathData = addPathNodes(pathData), fill = SolidColor(Color.Black))
+        }.build()
 
     private fun line(name: String, pathData: String, mirrored: Boolean = false): ImageVector =
         ImageVector.Builder(name, 24.dp, 24.dp, 24f, 24f, autoMirror = mirrored).apply {

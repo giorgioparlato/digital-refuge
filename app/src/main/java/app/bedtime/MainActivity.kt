@@ -456,7 +456,7 @@ private fun TabShell(tab: String, notesTab: Boolean, habitsTab: Boolean = false,
                     TabItem(BedtimeIcons.Refuge, "focus", tab == Routes.HOME || tab == Routes.SCHEDULES) { onTab(Routes.HOME) }
                     if (notesTab) Box {
                         var menu by remember { mutableStateOf(false) }
-                        TabItem(BedtimeIcons.Book, "notes", tab == Routes.NOTES, onLongClick = notesMenu?.let { { menu = true } }) { onTab(Routes.NOTES) }
+                        TabItem(LineIcons.Edit, "notes", tab == Routes.NOTES, onLongClick = notesMenu?.let { { menu = true } }) { onTab(Routes.NOTES) }
                         // Held: straight to writing, without going through the list.
                         if (notesMenu != null) {
                             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }, containerColor = c.bgSecondary) {
@@ -470,7 +470,7 @@ private fun TabShell(tab: String, notesTab: Boolean, habitsTab: Boolean = false,
                         }
                     }
                     if (habitsTab) TabItem(LineIcons.CheckCircle, "habits", tab == Routes.HABITS) { onTab(Routes.HABITS) }
-                    TabItem(BedtimeIcons.Leaf, "insights", tab == Routes.INSIGHTS) { onTab(Routes.INSIGHTS) }
+                    TabItem(LineIcons.Insights, "insights", tab == Routes.INSIGHTS) { onTab(Routes.INSIGHTS) }
                     TabItem(LineIcons.Settings, "settings", tab == Routes.SETTINGS) { onTab(Routes.SETTINGS) }
                 }
             }
