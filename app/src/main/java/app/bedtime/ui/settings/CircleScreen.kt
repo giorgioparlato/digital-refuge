@@ -1,5 +1,6 @@
 package app.bedtime.ui.settings
 
+import app.bedtime.ui.components.LineIcons
 import android.Manifest
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
@@ -135,7 +136,7 @@ internal fun CircleContent(
             }
             SectionCard(title = "People", subtitle = "From your contacts, in any app: messages, calls, mail") {
                 OptionRow(
-                    Icons.Default.Person,
+                    LineIcons.Person,
                     if (circle.people.isEmpty()) "Choose people" else circle.people.sorted().joinToString(", "),
                     description = if (circle.people.isEmpty()) null else "Tap to change",
                     onClick = onPickPeople,
@@ -146,7 +147,7 @@ internal fun CircleContent(
                     Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
                         VerbatimText(g, style = MaterialTheme.typography.bodyLarge, color = c.textNormal, modifier = Modifier.weight(1f))
                         Box(Modifier.size(40.dp).clip(CircleShape).clickable(onClickLabel = "take $g out") { onChange(circle.copy(groups = circle.groups - g)) }, contentAlignment = Alignment.Center) {
-                            Icon(Icons.Default.Clear, contentDescription = "take $g out", tint = c.textFaint, modifier = Modifier.size(18.dp))
+                            Icon(LineIcons.Clear, contentDescription = "take $g out", tint = c.textFaint, modifier = Modifier.size(18.dp))
                         }
                     }
                 }

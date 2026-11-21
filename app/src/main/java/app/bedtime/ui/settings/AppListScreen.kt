@@ -1,5 +1,6 @@
 package app.bedtime.ui.settings
 
+import app.bedtime.ui.components.LineIcons
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -152,13 +153,13 @@ internal fun AppListContent(
                     Modifier.fillMaxWidth().clip(CircleShape).clickable(onClick = onPickFavourites).padding(vertical = 10.dp, horizontal = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = null, tint = c.accent, modifier = Modifier.size(20.dp))
+                    Icon(LineIcons.Add, contentDescription = null, tint = c.accent, modifier = Modifier.size(20.dp))
                     Text("Choose favourites", style = MaterialTheme.typography.bodyLarge, color = c.accentText, modifier = Modifier.padding(start = 10.dp))
                 }
             }
             SectionCard {
                 OptionRow(
-                    Icons.Default.Clear,
+                    LineIcons.Clear,
                     "Hidden apps",
                     description = if (settings.hiddenApps.isEmpty()) "None · they still open, and still follow sessions" else "${pluralApps(settings.hiddenApps.size)} left out of the lists and search",
                     onClick = onPickHidden,
@@ -215,6 +216,6 @@ private fun NamedRow(title: String, under: String, onRemove: () -> Unit) {
 @Composable
 private fun RemoveButton(label: String, onClick: () -> Unit) {
     Box(Modifier.size(40.dp).clip(CircleShape).clickable(onClickLabel = label, onClick = onClick), contentAlignment = Alignment.Center) {
-        Icon(Icons.Default.Clear, contentDescription = label, tint = Obsidian.colors.textFaint, modifier = Modifier.size(18.dp))
+        Icon(LineIcons.Clear, contentDescription = label, tint = Obsidian.colors.textFaint, modifier = Modifier.size(18.dp))
     }
 }

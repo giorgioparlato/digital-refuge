@@ -1,5 +1,6 @@
 package app.bedtime
 
+import app.bedtime.ui.components.LineIcons
 import androidx.lifecycle.lifecycleScope
 import app.bedtime.ui.settings.DistractionScreen
 import app.bedtime.ui.settings.SearchSettingsScreen
@@ -468,9 +469,9 @@ private fun TabShell(tab: String, notesTab: Boolean, habitsTab: Boolean = false,
                             }
                         }
                     }
-                    if (habitsTab) TabItem(Icons.Default.CheckCircle, "habits", tab == Routes.HABITS) { onTab(Routes.HABITS) }
+                    if (habitsTab) TabItem(LineIcons.CheckCircle, "habits", tab == Routes.HABITS) { onTab(Routes.HABITS) }
                     TabItem(BedtimeIcons.Leaf, "insights", tab == Routes.INSIGHTS) { onTab(Routes.INSIGHTS) }
-                    TabItem(Icons.Default.Settings, "settings", tab == Routes.SETTINGS) { onTab(Routes.SETTINGS) }
+                    TabItem(LineIcons.Settings, "settings", tab == Routes.SETTINGS) { onTab(Routes.SETTINGS) }
                 }
             }
         },

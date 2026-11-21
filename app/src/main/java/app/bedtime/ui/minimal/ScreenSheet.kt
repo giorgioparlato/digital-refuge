@@ -1,5 +1,6 @@
 package app.bedtime.ui.minimal
 
+import app.bedtime.ui.components.LineIcons
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -47,7 +48,7 @@ internal fun ScreenSheet(
     onOpen: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    Dialog(onDismissRequest = onDismiss) { ScreenSheetContent(screen, style, widgets, sessionOwned, onSwitch, { onOpen(it); onDismiss() }) }
+    HomeSheetDialog(onDismiss) { ScreenSheetContent(screen, style, widgets, sessionOwned, onSwitch, { onOpen(it); onDismiss() }) }
 }
 
 @Composable
@@ -60,14 +61,14 @@ internal fun ScreenSheetContent(
     onOpen: (String) -> Unit,
 ) {
     val p = style.palette()
+    // A sheet from the bottom, like everything a widget opens: the same shape whether you tap it or hold it.
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(24.dp))
-            .background(p.background)
-            .border(1.dp, p.faint.copy(alpha = 0.25f), RoundedCornerShape(24.dp))
-            .padding(vertical = 18.dp),
+            .sheetSurface(p.background, p.faint)
+            .padding(top = 10.dp, bottom = 18.dp),
     ) {
+        SheetHandle(p.faint)
         Text(if (screen == Screen.HOME) "This screen" else "The lock screen", style = MaterialTheme.typography.titleMedium, color = p.text, modifier = Modifier.padding(horizontal = 22.dp))
         Text(
             if (sessionOwned) "Its widgets while this session runs. Hold one on the screen for its own options." else "Its widgets. Hold one on the screen for its own options.",
@@ -82,7 +83,7 @@ internal fun ScreenSheetContent(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(choice.module.label, style = MaterialTheme.typography.bodyLarge, color = if (choice.on) p.text else p.faint, modifier = Modifier.weight(1f))
-                    if (choice.on) Icon(Icons.Default.Check, contentDescription = "shown", tint = p.accent, modifier = Modifier.size(18.dp))
+                    if (choice.on) Icon(LineIcons.Check, contentDescription = "shown", tint = p.accent, modifier = Modifier.size(18.dp))
                 }
             }
         }
@@ -99,6 +100,6 @@ private fun Link(label: String, p: app.bedtime.ui.homestyle.HomePalette, onClick
     Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 22.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(label, style = MaterialTheme.typography.bodyLarge, color = p.text, modifier = Modifier.weight(1f))
         Spacer(Modifier.width(8.dp))
-        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = p.faint, modifier = Modifier.size(18.dp))
+        Icon(LineIcons.KeyboardArrowRight, contentDescription = null, tint = p.faint, modifier = Modifier.size(18.dp))
     }
 }

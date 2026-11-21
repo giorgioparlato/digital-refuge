@@ -1,5 +1,6 @@
 package app.bedtime.ui.onboarding
 
+import app.bedtime.ui.components.LineIcons
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -80,17 +81,17 @@ private enum class Group(val title: String) { CORE("core features"), PRODUCTIVIT
 /** A feature with a page of its own: its name, its line on the list, its group and its icon. */
 private enum class Feature(val title: String, val line: String, val group: Group, val icon: ImageVector) {
     SESSION("when a session runs", "see what blocked apps show, and how to leave early", Group.CORE, BedtimeIcons.Block),
-    HOME_SCREEN("your home screen", "use refuge as your launcher", Group.CORE, Icons.Default.Home),
-    LOCK_SCREEN("the lock screen", "use refuge's lockscreen, with the widgets you choose", Group.CORE, Icons.Default.Lock),
+    HOME_SCREEN("your home screen", "use refuge as your launcher", Group.CORE, LineIcons.Home),
+    LOCK_SCREEN("the lock screen", "use refuge's lockscreen, with the widgets you choose", Group.CORE, LineIcons.Lock),
     WIDGETS("some widgets", "see what each widget does when you tap it", Group.CORE, BedtimeIcons.Grid),
     INSIGHTS("insights", "see your screen time against your budget", Group.CORE, BedtimeIcons.Leaf),
-    SEARCH("search", "search anything, and do things, as you type", Group.PRODUCTIVITY, Icons.Default.Search),
+    SEARCH("search", "search anything, and do things, as you type", Group.PRODUCTIVITY, LineIcons.Search),
     NOTES("notes", "notes in markdown, synced with obsidian if you like", Group.PRODUCTIVITY, BedtimeIcons.Book),
-    QUICK_NOTES("quick notes", "jot a note with a double tap, even locked", Group.PRODUCTIVITY, Icons.Default.Edit),
+    QUICK_NOTES("quick notes", "jot a note with a double tap, even locked", Group.PRODUCTIVITY, LineIcons.Edit),
     VOICE("voice notes", "speak your notes instead of typing", Group.PRODUCTIVITY, BedtimeIcons.Mic),
-    OBSIDIAN("obsidian", "find, add to and save notes in your vault", Group.PRODUCTIVITY, Icons.Default.Share),
-    HABITS("habits", "a simple habit tracker", Group.OTHER, Icons.Default.CheckCircle),
-    MICROJOURNAL("the microjournal", "a journal, one line at a time", Group.OTHER, Icons.Default.DateRange),
+    OBSIDIAN("obsidian", "find, add to and save notes in your vault", Group.PRODUCTIVITY, LineIcons.Share),
+    HABITS("habits", "a simple habit tracker", Group.OTHER, LineIcons.CheckCircle),
+    MICROJOURNAL("the microjournal", "a journal, one line at a time", Group.OTHER, LineIcons.DateRange),
     DICTIONARY("the dictionary", "look up a word without unlocking", Group.OTHER, BedtimeIcons.Book),
 }
 
@@ -371,7 +372,7 @@ private fun WidgetsPage() {
                 Row(Modifier.fillMaxWidth()) { Small("today · 50 min", Modifier.weight(1f)); Small("most first") }
                 listOf(Triple("instagram", 22, true), Triple("youtube", 14, true), Triple("messages", 8, false), Triple("maps", 6, false)).forEach { (name, m, distracting) ->
                     Row(Modifier.fillMaxWidth()) { Text(name, fontSize = 12.sp, color = c.textNormal, modifier = Modifier.weight(1f)); Small("$m min") }
-                    Bar(m / 22f, if (distracting) c.orange else c.textMuted)
+                    Bar(m / 22f, if (distracting) c.distracting else c.textMuted)
                 }
             }
             Sheet(slide(t, 0.54f, 0.57f, 0.71f, 0.74f)) {
@@ -437,7 +438,7 @@ private fun InsightsPage() {
             listOf(Triple("jun", 62, 0.35f), Triple("jul", 70, 0.42f), Triple("aug", 58, 0.38f), Triple("sep", 54, 0.3f), Triple("oct", 46, 0.26f), Triple("nov", 40, 0.22f)).forEach { (name, h, part) ->
                 Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                     Box(Modifier.fillMaxWidth().height(h.dp).clip(RoundedCornerShape(3.dp)).background(c.interactiveHover), contentAlignment = Alignment.BottomCenter) {
-                        Box(Modifier.fillMaxWidth().height((h * part).dp).background(c.orange))
+                        Box(Modifier.fillMaxWidth().height((h * part).dp).background(c.distracting))
                     }
                     Small(name, Modifier.padding(top = 4.dp))
                 }
@@ -445,7 +446,7 @@ private fun InsightsPage() {
         }
         Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             Swatch(c.interactiveHover, "on the phone")
-            Swatch(c.orange, "in distracting apps")
+            Swatch(c.distracting, "in distracting apps")
         }
     }
 }
@@ -909,7 +910,7 @@ private fun BoxScope.Sheet(shown: Float, full: Boolean = false, content: @Compos
     Column(
         Modifier.align(Alignment.BottomCenter).fillMaxWidth().then(if (full) Modifier.fillMaxSize() else Modifier)
             .graphicsLayer { translationY = (1f - shown) * size.height }
-            .clip(shape).background(c.bgSecondary).border(1.dp, c.border, shape).padding(horizontal = 18.dp, vertical = 14.dp),
+            .clip(shape).background(c.bgSecondary).padding(horizontal = 18.dp, vertical = 14.dp),
         verticalArrangement = Arrangement.spacedBy(7.dp),
         content = content,
     )

@@ -1,5 +1,6 @@
 package app.bedtime.ui.habits
 
+import app.bedtime.ui.components.LineIcons
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -165,7 +166,7 @@ fun HabitStepRows(habit: Habit, value: Int, text: Color, muted: Color, faint: Co
                 Box(
                     Modifier.size(22.dp).clip(CircleShape).background(if (ticked) accent else Color.Transparent).border(1.5.dp, if (ticked) accent else faint, CircleShape),
                     contentAlignment = Alignment.Center,
-                ) { if (ticked) Icon(Icons.Default.Check, contentDescription = null, tint = background(accent), modifier = Modifier.size(14.dp)) }
+                ) { if (ticked) Icon(LineIcons.Check, contentDescription = null, tint = background(accent), modifier = Modifier.size(14.dp)) }
                 Spacer(Modifier.width(16.dp))
                 Text(step.name, style = MaterialTheme.typography.bodyMedium, color = if (ticked) muted else text)
             }
@@ -259,7 +260,7 @@ fun HabitDetailContent(
             }
         }
         Row(Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "the month before", tint = faint, modifier = Modifier.clip(CircleShape).clickable { shown++ }.padding(4.dp))
+            Icon(LineIcons.KeyboardArrowLeft, contentDescription = "the month before", tint = faint, modifier = Modifier.clip(CircleShape).clickable { shown++ }.padding(4.dp))
             Text(
                 DateTimeFormatter.ofPattern("MMMM yyyy", Locale.getDefault()).format(month),
                 style = MaterialTheme.typography.labelLarge,
@@ -267,7 +268,7 @@ fun HabitDetailContent(
                 modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
             )
             if (shown > 0) {
-                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "the month after", tint = faint, modifier = Modifier.clip(CircleShape).clickable { shown-- }.padding(4.dp))
+                Icon(LineIcons.KeyboardArrowRight, contentDescription = "the month after", tint = faint, modifier = Modifier.clip(CircleShape).clickable { shown-- }.padding(4.dp))
             }
         }
         MonthGrid(habit, marks, month, today, text, faint, accent, onSet, picked = picked.takeIf { habit.kind == HabitKind.COUNT }, onPick = { picked = it })
@@ -335,8 +336,8 @@ private fun MonthGrid(
                                     .background(
                                         when {
                                             ahead -> Color.Transparent
-                                            state == HabitDay.DONE -> accent
-                                            state == HabitDay.PARTIAL -> accent.copy(alpha = 0.45f)
+                                            state == HabitDay.DONE -> accent.copy(alpha = 0.38f)
+                                            state == HabitDay.PARTIAL -> accent.copy(alpha = 0.16f)
                                             else -> Color.Transparent
                                         },
                                     )
@@ -359,7 +360,6 @@ private fun MonthGrid(
                                     style = MaterialTheme.typography.labelMedium,
                                     color = when {
                                         ahead -> faint.copy(alpha = 0.5f)
-                                        state == HabitDay.DONE -> background(accent)
                                         else -> text
                                     },
                                 )

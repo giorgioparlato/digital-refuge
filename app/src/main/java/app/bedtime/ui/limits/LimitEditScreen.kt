@@ -1,5 +1,6 @@
 package app.bedtime.ui.limits
 
+import app.bedtime.ui.components.LineIcons
 import app.bedtime.data.PauseKind
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
@@ -462,6 +463,7 @@ internal fun LimitEditContent(
                 val paused = (rules.pauseSeconds ?: 0) > 0
                 FoldSection(
                     title = "Before it opens",
+                    icon = BedtimeIcons.Hourglass,
                     summary = pauseSummary(rules),
                     open = open == FOLD_PAUSE,
                     onToggle = { toggle(FOLD_PAUSE) },
@@ -509,7 +511,7 @@ internal fun LimitEditContent(
                                         properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
                                     ) { app.bedtime.ui.settings.WhyAppQuestionsScreen(onBack = { questions = false }) }
                                 }
-                                OptionRow(Icons.Default.Edit, "The questions", description = "Asked in turn, shared by every limit that asks", onClick = { questions = true }) { Chevron() }
+                                OptionRow(LineIcons.Edit, "The questions", description = "Asked in turn, shared by every limit that asks", onClick = { questions = true }) { Chevron() }
                             }
                         }
                         if (rules.pauseKind != PauseKind.ASK) {
@@ -570,11 +572,12 @@ internal fun LimitEditContent(
                 val daily = rules.dailyMinutes != null || rules.dailyOpens != null
                 FoldSection(
                     title = "Each day",
+                    icon = LineIcons.DateRange,
                     summary = dailySummary(rules),
                     open = open == FOLD_DAILY,
                     onToggle = { toggle(FOLD_DAILY) },
                 ) {
-                    OptionRow(Icons.Default.Refresh, "Minutes a day", description = "Once used up, the apps are blocked until tomorrow", enabled = editable) {
+                    OptionRow(LineIcons.Refresh, "Minutes a day", description = "Once used up, the apps are blocked until tomorrow", enabled = editable) {
                         ObsidianToggle(rules.dailyMinutes != null, { on -> setRules { it.copy(dailyMinutes = if (on) 30 else null) } }, enabled = editable)
                     }
                     AnimatedVisibility(rules.dailyMinutes != null) {
@@ -618,6 +621,7 @@ internal fun LimitEditContent(
                 if (daily) {
                     FoldSection(
                         title = "When it runs out",
+                        icon = LineIcons.Lock,
                         summary = runsOutSummary(rules, newPassword.isNotBlank()),
                         open = open == FOLD_OUT,
                         onToggle = { toggle(FOLD_OUT) },
@@ -667,17 +671,18 @@ internal fun LimitEditContent(
                 // ---------------------------------------------------------------- more options
                 FoldSection(
                     title = "More options",
+                    icon = LineIcons.Settings,
                     summary = limitMoreSummary(draft, draft.editWindow?.let { "${formatMinuteOfDay(context, it.startMinute)}–${formatMinuteOfDay(context, it.endMinute)}" }),
                     open = open == FOLD_MORE,
                     onToggle = { toggle(FOLD_MORE) },
                 ) {
                     MessageChoiceRow("What the cover says", draft.message, { onDraftChange(draft.copy(message = it)) }, enabled = editable)
                     OptionRow(
-                        Icons.Default.Edit,
+                        LineIcons.Edit,
                         "How do you feel now?",
                         description = "Your moods to tap, once the time open after the pause is over; without one, a minute after you leave these apps",
                     ) { ObsidianToggle(rules.moodAfter, { on -> setRules { it.copy(moodAfter = on) } }) }
-                    OptionRow(Icons.Default.Lock, "Changeable only at certain hours", description = "Outside them it can't be edited or deleted", enabled = editable) {
+                    OptionRow(LineIcons.Lock, "Changeable only at certain hours", description = "Outside them it can't be edited or deleted", enabled = editable) {
                         ObsidianToggle(draft.editWindow != null, { on -> onDraftChange(draft.copy(editWindow = if (on) EditWindow() else null)) }, enabled = editable)
                     }
                     AnimatedVisibility(draft.editWindow != null) {

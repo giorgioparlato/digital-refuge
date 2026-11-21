@@ -1,5 +1,6 @@
 package app.bedtime.ui.homestyle
 
+import app.bedtime.ui.components.LineIcons
 import app.bedtime.ui.components.TimeTile
 
 import app.bedtime.ui.edit.TimePickerDialog
@@ -498,7 +499,7 @@ internal fun HomeStyleContent(
                     Text("Reset to default", color = c.textMuted)
                 }
                 SectionCard(title = "Show") {
-                    OptionRow(Icons.Default.Notifications, "Android's status bar", description = "On both screens. Off hides it; a swipe down from the top edge shows it") {
+                    OptionRow(LineIcons.Notifications, "Android's status bar", description = "On both screens. Off hides it; a swipe down from the top edge shows it") {
                         ObsidianToggle(!style.hideStatusBar, { onChange(style.copy(hideStatusBar = !it)) })
                     }
                 }
@@ -522,7 +523,7 @@ internal fun HomeStyleContent(
             if (page == StylePage.NOTIFICATIONS) {
                 SectionCard {
                     OptionRow(
-                        Icons.Default.Notifications,
+                        LineIcons.Notifications,
                         "Notifications",
                         description = if (style.lockNotifications && !notificationAccess) {
                             "Notification access is off, so none can show. Switch this on again to allow it"
@@ -543,7 +544,7 @@ internal fun HomeStyleContent(
                             onClick = onPickNotificationApps,
                         ) { Chevron() }
                         OptionRow(
-                            Icons.Default.Edit,
+                            LineIcons.Edit,
                             "Quick replies",
                             description = "${style.quickReplies.size} ready to send with a tap. Typing your own works too",
                             onClick = { editingReplies = true },
@@ -553,12 +554,12 @@ internal fun HomeStyleContent(
                     }
                 }
                 SectionCard(title = "Your week", subtitle = "Time in refuge, how sessions held, the phone and habits, against the week before") {
-                    OptionRow(Icons.Default.Notifications, "A note on Sunday evening", description = "Shows once the week is over, and in insights until Monday ends") {
+                    OptionRow(LineIcons.Notifications, "A note on Sunday evening", description = "Shows once the week is over, and in insights until Monday ends") {
                         ObsidianToggle(weeklyNote, onWeeklyNote)
                     }
                 }
                 SectionCard(title = "Rain today", subtitle = "From Breezy Weather's forecast (see the weather widget's options to set it up)") {
-                    OptionRow(Icons.Default.Notifications, "A rain alert", description = "A morning heads-up when rain is likely, with the chance and the time") {
+                    OptionRow(LineIcons.Notifications, "A rain alert", description = "A morning heads-up when rain is likely, with the chance and the time") {
                         ObsidianToggle(style.rainAlert, { onChange(style.copy(rainAlert = it)) })
                     }
                     if (style.rainAlert) {
@@ -608,7 +609,7 @@ internal fun HomeStyleContent(
                                 Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable(onClick = onAddCircle).padding(vertical = 10.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Icon(Icons.Default.Add, contentDescription = null, tint = c.accent, modifier = Modifier.size(18.dp))
+                                Icon(LineIcons.Add, contentDescription = null, tint = c.accent, modifier = Modifier.size(18.dp))
                                 Text("Add a circle", style = MaterialTheme.typography.bodyLarge, color = c.accentText, modifier = Modifier.padding(start = 10.dp))
                             }
                         }
@@ -617,7 +618,7 @@ internal fun HomeStyleContent(
             }
             if (page == StylePage.GESTURES) {
                 SectionCard {
-                    OptionRow(Icons.Default.KeyboardArrowUp, "Swipe up", description = "All apps and search")
+                    OptionRow(LineIcons.KeyboardArrowUp, "Swipe up", description = "All apps and search")
                     HomeGesture.entries.forEach { gesture ->
                         val action = style.homeGestures[gesture]
                         OptionRow(
@@ -674,10 +675,10 @@ enum class StylePage(val title: String, val intro: String) {
 }
 
 private fun HomeGesture.icon(): ImageVector = when (this) {
-    HomeGesture.SWIPE_DOWN -> Icons.Default.KeyboardArrowDown
-    HomeGesture.SWIPE_LEFT -> Icons.AutoMirrored.Filled.KeyboardArrowLeft
-    HomeGesture.SWIPE_RIGHT -> Icons.AutoMirrored.Filled.KeyboardArrowRight
-    HomeGesture.DOUBLE_TAP, HomeGesture.CLOCK_DOUBLE_TAP -> Icons.Default.Refresh
+    HomeGesture.SWIPE_DOWN -> LineIcons.KeyboardArrowDown
+    HomeGesture.SWIPE_LEFT -> LineIcons.KeyboardArrowLeft
+    HomeGesture.SWIPE_RIGHT -> LineIcons.KeyboardArrowRight
+    HomeGesture.DOUBLE_TAP, HomeGesture.CLOCK_DOUBLE_TAP -> LineIcons.Refresh
 }
 
 private fun HomeGesture.label(): String = when (this) {
@@ -774,11 +775,11 @@ private fun Swipe.label(): String = when (this) {
 }
 
 private fun Swipe.icon(): ImageVector = when (this) {
-    Swipe.DOUBLE_TAP, Swipe.CLOCK_DOUBLE_TAP -> Icons.Default.Refresh
-    Swipe.UP -> Icons.Default.KeyboardArrowUp
-    Swipe.DOWN -> Icons.Default.KeyboardArrowDown
-    Swipe.LEFT -> Icons.AutoMirrored.Filled.KeyboardArrowLeft
-    Swipe.RIGHT -> Icons.AutoMirrored.Filled.KeyboardArrowRight
+    Swipe.DOUBLE_TAP, Swipe.CLOCK_DOUBLE_TAP -> LineIcons.Refresh
+    Swipe.UP -> LineIcons.KeyboardArrowUp
+    Swipe.DOWN -> LineIcons.KeyboardArrowDown
+    Swipe.LEFT -> LineIcons.KeyboardArrowLeft
+    Swipe.RIGHT -> LineIcons.KeyboardArrowRight
 }
 
 /** What a lock-screen gesture does: nothing (a swipe just unlocks), an action right here, or an app once unlocked. */
@@ -856,7 +857,7 @@ internal fun SwatchRow(presets: List<Pair<String, Long>>, selected: Long, onPick
                 ) {
                     if (isSelected) {
                         Icon(
-                            Icons.Default.Check,
+                            LineIcons.Check,
                             contentDescription = "$name selected",
                             tint = if (colour.luminance() > 0.5f) Color.Black else Color.White,
                             modifier = Modifier.size(20.dp),
@@ -947,10 +948,10 @@ private fun WidgetList(
             ) {
                 Text(module.label, style = MaterialTheme.typography.bodyLarge, color = c.textNormal, modifier = Modifier.weight(1f))
                 if (module in withOptions) {
-                    Icon(if (opened) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown, contentDescription = null, tint = c.textFaint, modifier = Modifier.size(20.dp))
+                    Icon(if (opened) LineIcons.KeyboardArrowUp else LineIcons.KeyboardArrowDown, contentDescription = null, tint = c.textFaint, modifier = Modifier.size(20.dp))
                 }
                 Box(Modifier.size(40.dp).clip(CircleShape).clickable(onClickLabel = "hide ${module.label}") { switch(module, false) }, contentAlignment = Alignment.Center) {
-                    Icon(Icons.Default.Clear, contentDescription = "hide", tint = c.textFaint, modifier = Modifier.size(18.dp))
+                    Icon(LineIcons.Clear, contentDescription = "hide", tint = c.textFaint, modifier = Modifier.size(18.dp))
                 }
             }
             if (opened) Column(Modifier.padding(start = 8.dp, end = 8.dp, top = 4.dp, bottom = 12.dp)) { options(module) }
@@ -966,7 +967,7 @@ private fun WidgetList(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(choice.module.label, style = MaterialTheme.typography.bodyLarge, color = c.textMuted, modifier = Modifier.weight(1f))
-                Icon(Icons.Default.Add, contentDescription = "show", tint = c.accent, modifier = Modifier.size(20.dp))
+                Icon(LineIcons.Add, contentDescription = "show", tint = c.accent, modifier = Modifier.size(20.dp))
             }
         }
     }
@@ -1016,14 +1017,14 @@ private fun UseWidgetOptions(use: UseWidget, onChange: (UseWidget) -> Unit) {
     Spacer(Modifier.height(8.dp))
     if (use.look == UseLook.DOTS || use.look == UseLook.LINE) {
         val under = if (use.look == UseLook.DOTS) " in a small line under the dots" else ""
-        OptionRow(Icons.Default.Phone, "Time on the phone", description = "All of today, in any app$under") {
+        OptionRow(LineIcons.Phone, "Time on the phone", description = "All of today, in any app$under") {
             ObsidianToggle(use.total, { onChange(use.copy(total = it)) })
         }
-        OptionRow(Icons.Default.Warning, "Time in distracting apps", description = "Today so far$under") {
+        OptionRow(LineIcons.Warning, "Time in distracting apps", description = "Today so far$under") {
             ObsidianToggle(use.distracting, { onChange(use.copy(distracting = it)) })
         }
     }
-    OptionRow(Icons.Default.Lock, "Unlocks", description = "How many times today; refuge counts them itself, so nothing more is asked") {
+    OptionRow(LineIcons.Lock, "Unlocks", description = "How many times today; refuge counts them itself, so nothing more is asked") {
         ObsidianToggle(use.unlocks, { onChange(use.copy(unlocks = it)) })
     }
     if (use.look == UseLook.BUDGET) {
@@ -1059,7 +1060,7 @@ private fun SwipeChoiceRow(title: String, chosen: NoteSwipe, onChoose: (NoteSwip
     val c = Obsidian.colors
     var open by remember { mutableStateOf(false) }
     Box {
-        OptionRow(Icons.Default.Notifications, title, description = swipeWords(chosen), onClick = { open = true }) { Chevron() }
+        OptionRow(LineIcons.Notifications, title, description = swipeWords(chosen), onClick = { open = true }) { Chevron() }
         androidx.compose.material3.DropdownMenu(expanded = open, onDismissRequest = { open = false }, containerColor = c.bgSecondary) {
             NoteSwipe.entries.forEach { option ->
                 androidx.compose.material3.DropdownMenuItem(
@@ -1077,12 +1078,12 @@ private fun SwipeChoiceRow(title: String, chosen: NoteSwipe, onChoose: (NoteSwip
 /** What each foot button is called, and its mark, in the list where they're chosen and ordered. */
 private fun footName(button: FootButton): Pair<String, androidx.compose.ui.graphics.vector.ImageVector> = when (button) {
     FootButton.MARK -> "The refuge mark" to BedtimeIcons.Refuge
-    FootButton.UNLOCK -> "Unlock" to Icons.Default.Lock
-    FootButton.ARROW -> "All apps" to Icons.Default.KeyboardArrowUp
-    FootButton.NOTES -> "Notes" to Icons.Default.Edit
-    FootButton.HABITS -> "Habits" to Icons.Default.CheckCircle
-    FootButton.INSIGHTS -> "Insights" to BedtimeIcons.Leaf
-    FootButton.EMERGENCY -> "Emergency" to Icons.Default.Warning
+    FootButton.UNLOCK -> "Unlock" to LineIcons.Lock
+    FootButton.ARROW -> "All apps" to LineIcons.KeyboardArrowUp
+    FootButton.NOTES -> "Notes" to LineIcons.Edit
+    FootButton.HABITS -> "Habits" to LineIcons.CheckCircle
+    FootButton.INSIGHTS -> "Insights" to LineIcons.Insights
+    FootButton.EMERGENCY -> "Emergency" to LineIcons.Call
 }
 
 /**
@@ -1105,7 +1106,7 @@ private fun FootButtonsCard(style: HomeStyle, onChange: (HomeStyle) -> Unit) {
                     Text("In sessions", style = MaterialTheme.typography.labelSmall, color = c.textFaint, modifier = Modifier.padding(end = 12.dp))
                 } else {
                     Box(Modifier.size(40.dp).clip(CircleShape).clickable(onClickLabel = "remove $name") { onChange(style.copy(footButtons = FootButtons.without(foot, button))) }, contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.Clear, contentDescription = "remove", tint = c.textFaint, modifier = Modifier.size(18.dp))
+                        Icon(LineIcons.Clear, contentDescription = "remove", tint = c.textFaint, modifier = Modifier.size(18.dp))
                     }
                 }
             }
@@ -1133,10 +1134,10 @@ private fun FootButtonsCard(style: HomeStyle, onChange: (HomeStyle) -> Unit) {
             }
         }
         Spacer(Modifier.height(8.dp))
-        OptionRow(Icons.Default.Lock, "Words on unlock and emergency", description = "Off, their icons alone") {
+        OptionRow(LineIcons.Lock, "Words on unlock and emergency", description = "Off, their icons alone") {
             ObsidianToggle(style.footWords, { onChange(style.copy(footWords = it)) })
         }
-        OptionRow(Icons.Default.Menu, "Spread them out", description = "Evenly across the width, rather than gathered at its ends") {
+        OptionRow(LineIcons.Menu, "Spread them out", description = "Evenly across the width, rather than gathered at its ends") {
             ObsidianToggle(style.footSpread, { onChange(style.copy(footSpread = it)) })
         }
     }

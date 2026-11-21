@@ -1,5 +1,6 @@
 package app.bedtime.ui.stats
 
+import app.bedtime.ui.components.LineIcons
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.verticalScroll
@@ -145,7 +146,7 @@ internal fun PhoneStats(
     if (!use.fromAndroid && onAllowAccess != null) {
         SectionCard {
             OptionRow(
-                Icons.Default.Info,
+                LineIcons.Info,
                 "Allow usage access",
                 description = "For every app's time and the days from before refuge, from Android's own record. It stays on the phone. The hour dots work without it",
                 onClick = onAllowAccess,
@@ -158,9 +159,9 @@ internal fun PhoneStats(
         go(UsePeriod.entries[it], today)
     })
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Step(Icons.AutoMirrored.Filled.KeyboardArrowLeft, "the one before", enabled = true) { startDay = UsePeriods.shift(period, start, -1).toEpochDay() }
+        Step(LineIcons.KeyboardArrowLeft, "the one before", enabled = true) { startDay = UsePeriods.shift(period, start, -1).toEpochDay() }
         Text(periodLabel(period, start, today), style = MaterialTheme.typography.titleMedium, color = c.textNormal, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
-        Step(Icons.AutoMirrored.Filled.KeyboardArrowRight, "the one after", enabled = start < currentStart) { startDay = UsePeriods.shift(period, start, 1).toEpochDay() }
+        Step(LineIcons.KeyboardArrowRight, "the one after", enabled = start < currentStart) { startDay = UsePeriods.shift(period, start, 1).toEpochDay() }
     }
 
     // A day can be set against averages and a day you pick; a week or a month, against the one before when one of those is chosen.
@@ -948,7 +949,7 @@ private fun Bars(
                     val bar = (height * all.toFloat() / most).dp
                     Box(Modifier.fillMaxWidth().height(bar).clip(RoundedCornerShape(3.dp)).background(c.textNormal.copy(alpha = if (i == picked) 0.35f else 0.18f))) {
                         val part = if (all > 0) distracting.toFloat() / all else 0f
-                        Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(bar * part).background(c.orange.copy(alpha = if (i == picked) 1f else 0.8f)))
+                        Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(bar * part).background(c.distracting.copy(alpha = if (i == picked) 1f else 0.8f)))
                     }
                 }
                 if (axisEvery == null) {
@@ -1018,7 +1019,7 @@ private fun MonthBars(months: List<UsageMonth>, onMonth: (UsageMonth) -> Unit) {
                 val bar = (64 * all.toFloat() / most).dp
                 Box(Modifier.fillMaxWidth().height(bar).clip(RoundedCornerShape(3.dp)).background(c.textNormal.copy(alpha = if (current) 0.3f else 0.16f))) {
                     val part = if (all > 0) (month.distractingPerDay ?: 0L).toFloat() / all else 0f
-                    Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(bar * part).background(c.orange.copy(alpha = if (current) 1f else 0.7f)))
+                    Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(bar * part).background(c.distracting.copy(alpha = if (current) 1f else 0.7f)))
                 }
                 Spacer(Modifier.height(4.dp))
                 Text(
@@ -1049,7 +1050,7 @@ private fun ChartKey(all: Boolean, distracting: Boolean, outline: String?) {
     }
     androidx.compose.foundation.layout.FlowRow {
         if (all) Swatch(c.textNormal.copy(alpha = 0.25f), "on the phone")
-        if (distracting) Swatch(c.orange, "in distracting apps")
+        if (distracting) Swatch(c.distracting, "in distracting apps")
         if (outline != null) Swatch(null, outline)
     }
 }
@@ -1105,7 +1106,7 @@ private fun MonthGlance(month: UsageMonth, before: UsageMonth?, onOpen: () -> Un
 private fun AppRow(label: String, seconds: Long, opens: Int, then: Long?, distracting: Boolean, limited: Boolean) {
     val c = Obsidian.colors
     Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(8.dp).clip(CircleShape).background(if (distracting) c.orange else Color.Transparent))
+        Box(Modifier.size(8.dp).clip(CircleShape).background(if (distracting) c.distracting else Color.Transparent))
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
             VerbatimText(label, style = MaterialTheme.typography.bodyMedium, color = c.textNormal)

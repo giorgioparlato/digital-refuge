@@ -1,5 +1,6 @@
 package app.bedtime.ui.settings
 
+import app.bedtime.ui.components.LineIcons
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Notifications
@@ -426,7 +427,7 @@ internal fun SearchSettingsContent(
                             ) { mode -> if (choice.mode != mode) onChange(SearchOrder.setMode(list, choice.key, mode)) }
                         }
                         if (unused.isNotEmpty()) {
-                            OptionRow(Icons.Default.Add, "Add more", description = "${unused.size} more to choose from", onClick = { adding = category }) { Chevron() }
+                            OptionRow(LineIcons.Add, "Add more", description = "${unused.size} more to choose from", onClick = { adding = category }) { Chevron() }
                         }
                     }
                 }
@@ -445,7 +446,7 @@ internal fun SearchSettingsContent(
                 SectionCard(title = "Beside each contact", subtitle = "Up to ${ChatApp.MAX} ways to message them, in the order you pick them") {
                     chatApps.forEach { app ->
                         val on = app in chosenChats
-                        OptionRow(Icons.Default.Call, app.label.replaceFirstChar { it.uppercase() }, description = if (app.takesText) null else "A message typed after their name is copied, to paste") {
+                        OptionRow(LineIcons.Call, app.label.replaceFirstChar { it.uppercase() }, description = if (app.takesText) null else "A message typed after their name is copied, to paste") {
                             ObsidianToggle(
                                 on,
                                 { now -> onChats(if (now) chosenChats + app else chosenChats - app) },
@@ -458,7 +459,7 @@ internal fun SearchSettingsContent(
             if (list.any { it.key == SearchOrder.CALENDAR && it.on } && SearchCategory.DO !in categoriesOff) {
                 SectionCard(title = "Adding to your calendar", subtitle = "“dentist next friday 9” offers to add it, to this calendar") {
                     if (!calendarAccess) {
-                        OptionRow(Icons.Default.DateRange, "Allow calendar access", description = "Asked anyway the first time you add one", onClick = onAllowCalendar) { Chevron() }
+                        OptionRow(LineIcons.DateRange, "Allow calendar access", description = "Asked anyway the first time you add one", onClick = onAllowCalendar) { Chevron() }
                     } else if (calendars.isEmpty()) {
                         Text("No calendar on this phone can take new events.", style = MaterialTheme.typography.bodyMedium, color = c.textMuted)
                     } else {
@@ -467,7 +468,7 @@ internal fun SearchSettingsContent(
                         var choosing by remember { mutableStateOf(false) }
                         Box {
                             OptionRow(
-                                Icons.Default.DateRange,
+                                LineIcons.DateRange,
                                 calendars.first { it.first == chosen }.second,
                                 description = if (calendars.size > 1) "Tap to choose another" else null,
                                 onClick = if (calendars.size > 1) ({ choosing = true }) else null,
@@ -501,9 +502,9 @@ internal fun SearchSettingsContent(
                     Text("No dictionary yet: add one below to start.", style = MaterialTheme.typography.bodySmall, color = c.accentText, modifier = Modifier.padding(bottom = 4.dp))
                 }
                 dictionaries.forEach { name ->
-                    OptionRow(Icons.Default.Info, name, description = "Read on this phone") {
+                    OptionRow(LineIcons.Info, name, description = "Read on this phone") {
                         Icon(
-                            Icons.Default.Clear,
+                            LineIcons.Clear,
                             contentDescription = "take this dictionary away",
                             tint = c.textFaint,
                             modifier = Modifier.size(36.dp).clip(RoundedCornerShape(50)).clickable { onRemoveDictionary(name) }.padding(8.dp),
@@ -511,13 +512,13 @@ internal fun SearchSettingsContent(
                     }
                 }
                 OptionRow(
-                    Icons.Default.Add,
+                    LineIcons.Add,
                     "Add dictionaries from a folder",
                     description = "StarDict files (.ifo, .idx and .dict or .dict.dz), free for many languages; copied in, so the folder isn't needed after",
                     onClick = onAddDictionaries,
                 ) { Chevron() }
                 OptionRow(
-                    Icons.Default.Lock,
+                    LineIcons.Lock,
                     "Notes on the lock screen too",
                     description = "Found by their titles; a note opens only once you've unlocked, so what's in it never shows there",
                 ) { ObsidianToggle(lookUpNotes, onLookUpNotes) }
@@ -526,14 +527,14 @@ internal fun SearchSettingsContent(
                 folders.forEach { (key, title, chosen) ->
                     val removable = key.startsWith("${SearchOrder.FILES}:")
                     OptionRow(
-                        icon = if (key == SearchOrder.OBSIDIAN) Icons.Default.Create else Icons.AutoMirrored.Filled.List,
+                        icon = if (key == SearchOrder.OBSIDIAN) LineIcons.Create else LineIcons.List,
                         title = title,
                         description = chosen ?: "None chosen yet",
                         onClick = if (removable) null else ({ onFolder(key) }),
                         trailing = {
                             if (removable) {
                                 Icon(
-                                    Icons.Default.Clear,
+                                    LineIcons.Clear,
                                     contentDescription = "take this folder away",
                                     tint = c.textFaint,
                                     modifier = Modifier.size(36.dp).clip(RoundedCornerShape(50)).clickable { onRemoveFolder(key) }.padding(8.dp),
@@ -544,7 +545,7 @@ internal fun SearchSettingsContent(
                         },
                     )
                 }
-                OptionRow(Icons.Default.Add, "Add a folder of files", onClick = { onFolder(SearchOrder.FILES) }, trailing = { Chevron() })
+                OptionRow(LineIcons.Add, "Add a folder of files", onClick = { onFolder(SearchOrder.FILES) }, trailing = { Chevron() })
             }
             Spacer(Modifier.height(24.dp))
         }
@@ -584,7 +585,7 @@ private fun AddMoreDialog(category: SearchCategory, unused: List<Pair<String, St
                                 }
                             }
                             Text(label, style = MaterialTheme.typography.bodyLarge, color = c.textNormal, modifier = Modifier.weight(1f).padding(start = 14.dp))
-                            Icon(Icons.Default.Add, contentDescription = "add", tint = c.textFaint, modifier = Modifier.size(18.dp))
+                            Icon(LineIcons.Add, contentDescription = "add", tint = c.textFaint, modifier = Modifier.size(18.dp))
                         }
                     }
                 }
@@ -604,17 +605,17 @@ private fun appOf(key: String): String? = when {
 
 /** A sign for one of refuge's own actions. */
 private fun signOf(key: String): androidx.compose.ui.graphics.vector.ImageVector = when {
-    key.startsWith("note:") -> Icons.Default.Edit
-    key == SearchOrder.CALENDAR -> Icons.Default.DateRange
-    key == SearchOrder.CONTACTS -> Icons.Default.Person
-    key == SearchOrder.ALARM -> Icons.Default.Notifications
+    key.startsWith("note:") -> LineIcons.Edit
+    key == SearchOrder.CALENDAR -> LineIcons.DateRange
+    key == SearchOrder.CONTACTS -> LineIcons.Person
+    key == SearchOrder.ALARM -> LineIcons.Notifications
     key == SearchOrder.TIMER -> Icons.Default.PlayArrow
-    key == SearchOrder.SETTINGS -> Icons.Default.Settings
-    key == SearchOrder.BLOCKS -> Icons.Default.Lock
+    key == SearchOrder.SETTINGS -> LineIcons.Settings
+    key == SearchOrder.BLOCKS -> LineIcons.Lock
     key == SearchOrder.SHORTCUTS -> Icons.Default.Star
-    key == SearchOrder.DICTIONARY -> Icons.Default.Info
-    key == SearchOrder.FILES -> Icons.AutoMirrored.Filled.List
-    else -> Icons.Default.Add
+    key == SearchOrder.DICTIONARY -> LineIcons.Info
+    key == SearchOrder.FILES -> LineIcons.List
+    else -> LineIcons.Add
 }
 
 /** How the look-up is used, step by step, on the search page. */

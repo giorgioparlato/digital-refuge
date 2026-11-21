@@ -124,7 +124,7 @@ private fun MessageChoiceDialog(current: CoverMessage, onPick: (CoverMessage) ->
                                 )
                             }
                             Icon(
-                                Icons.Default.Close,
+                                LineIcons.Close,
                                 contentDescription = "delete",
                                 tint = c.textFaint,
                                 modifier = Modifier.size(32.dp).clip(CircleShape).clickable { updateCustom { it - message } }.padding(7.dp),

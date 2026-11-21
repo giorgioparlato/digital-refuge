@@ -1,5 +1,6 @@
 package app.bedtime.ui.settings
 
+import app.bedtime.ui.components.LineIcons
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -84,7 +85,7 @@ fun WhySettingsScreen(onBack: () -> Unit, onOpenAnswers: () -> Unit, onOpenMoods
                 )
             }
             SectionCard {
-                OptionRow(Icons.Default.Edit, "Moods", description = moodsWords(s), onClick = onOpenMoods) { Chevron() }
+                OptionRow(LineIcons.Edit, "Moods", description = moodsWords(s), onClick = onOpenMoods) { Chevron() }
             }
             SectionCard(title = "The questions", subtitle = "Asked in turn. Change any, delete some, add your own") {
                 QuestionList(
@@ -95,7 +96,7 @@ fun WhySettingsScreen(onBack: () -> Unit, onOpenAnswers: () -> Unit, onOpenMoods
                 )
             }
             SectionCard {
-                OptionRow(Icons.Default.Edit, "Your answers", description = "In the microjournal: a line in that day's entry, with its time", onClick = onOpenAnswers) { Chevron() }
+                OptionRow(LineIcons.Edit, "Your answers", description = "In the microjournal: a line in that day's entry, with its time", onClick = onOpenAnswers) { Chevron() }
             }
             Spacer(Modifier.height(24.dp))
         }
@@ -130,7 +131,7 @@ fun MoodsScreen(onBack: () -> Unit) {
                 color = c.textMuted,
             )
             SectionCard {
-                OptionRow(Icons.Default.Edit, "Moods to tap") { app.bedtime.ui.components.ObsidianToggle(s.moodsOn, { on -> change { it.copy(moodsOn = on) } }) }
+                OptionRow(LineIcons.Edit, "Moods to tap") { app.bedtime.ui.components.ObsidianToggle(s.moodsOn, { on -> change { it.copy(moodsOn = on) } }) }
             }
             if (s.moodsOn) {
                 SectionCard(title = "How do you feel now?", subtitle = "Your moods to tap after a stretch on the phone, to see how it leaves you") {
@@ -242,7 +243,7 @@ private fun MoodList(moods: List<String>, changed: Boolean, onChange: (List<Stri
                 ) {
                     Text(mood, style = MaterialTheme.typography.labelLarge, color = c.textNormal, modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClickLabel = "rename $mood") { renaming = mood }.padding(vertical = 6.dp))
                     Icon(
-                        Icons.Default.Clear,
+                        LineIcons.Clear,
                         contentDescription = "take $mood out",
                         tint = c.textFaint,
                         modifier = Modifier.size(32.dp).clip(RoundedCornerShape(50)).clickable { onChange(moods - mood) }.padding(8.dp),
@@ -275,7 +276,7 @@ private fun QuestionList(questions: List<String>, changed: Boolean, onChange: (L
                 // The last one stays: with none there'd be nothing to ask.
                 if (questions.size > 1) {
                     Icon(
-                        Icons.Default.Clear,
+                        LineIcons.Clear,
                         contentDescription = "delete this question",
                         tint = c.textFaint,
                         modifier = Modifier.size(40.dp).clip(RoundedCornerShape(50)).clickable { onChange(questions.filterIndexed { j, _ -> j != i }) }.padding(10.dp),

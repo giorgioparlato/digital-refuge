@@ -1,5 +1,6 @@
 package app.bedtime.ui.minimal
 
+import app.bedtime.ui.components.LineIcons
 import androidx.compose.material.icons.filled.Search
 import android.content.Context
 import android.content.Intent
@@ -183,24 +184,24 @@ internal fun AppActionsContent(
             }
             return@Column
         }
-        shortcuts.forEach { s -> ActionRow(Icons.AutoMirrored.Filled.KeyboardArrowRight, s.label, p) { handlers.shortcut(s); onDone() } }
+        shortcuts.forEach { s -> ActionRow(LineIcons.KeyboardArrowRight, s.label, p) { handlers.shortcut(s); onDone() } }
         if (shortcuts.isNotEmpty()) Spacer(Modifier.height(6.dp))
         ActionRow(if (favourite) Icons.Default.Favorite else Icons.Default.FavoriteBorder, if (favourite) "Take off the home screen" else "Add to the home screen", p) {
             handlers.toggleFavourite()
             onDone()
         }
         if (favourite) {
-            ActionRow(Icons.Default.KeyboardArrowUp, "Move up", p) { handlers.move(true) }
-            ActionRow(Icons.Default.KeyboardArrowDown, "Move down", p) { handlers.move(false) }
+            ActionRow(LineIcons.KeyboardArrowUp, "Move up", p) { handlers.move(true) }
+            ActionRow(LineIcons.KeyboardArrowDown, "Move down", p) { handlers.move(false) }
         }
-        ActionRow(Icons.Default.Edit, "Rename", p) { renaming = true }
-        ActionRow(Icons.Default.Search, if (keyword.isEmpty()) "Give it a keyword" else "Keyword: $keyword", p) { keying = true }
-        ActionRow(Icons.Default.Clear, if (hidden) "Show in the lists again" else "Hide from the lists", p) {
+        ActionRow(LineIcons.Edit, "Rename", p) { renaming = true }
+        ActionRow(LineIcons.Search, if (keyword.isEmpty()) "Give it a keyword" else "Keyword: $keyword", p) { keying = true }
+        ActionRow(LineIcons.Clear, if (hidden) "Show in the lists again" else "Hide from the lists", p) {
             handlers.toggleHidden()
             onDone()
         }
-        ActionRow(Icons.Default.Info, "App info", p) { handlers.info(); onDone() }
-        if (canUninstall) ActionRow(Icons.Default.Delete, "Uninstall", p) { handlers.uninstall(); onDone() }
+        ActionRow(LineIcons.Info, "App info", p) { handlers.info(); onDone() }
+        if (canUninstall) ActionRow(LineIcons.Delete, "Uninstall", p) { handlers.uninstall(); onDone() }
     }
 }
 

@@ -86,7 +86,7 @@ internal fun WriteChallenge(words: Int, prompts: List<Pair<String, String?>>, on
         )
         }
         Spacer(Modifier.height(16.dp))
-        SoftPillButton("Continue", onClick = { onPassed(prompt, text) }, enabled = written >= words)
+        SoftPillButton("Continue", onClick = { onPassed(prompt, text) }, enabled = written >= words, modifier = Modifier.fillMaxWidth())
     }
 }
 

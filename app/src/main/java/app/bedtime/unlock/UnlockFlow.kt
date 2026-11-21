@@ -1,10 +1,14 @@
 package app.bedtime.unlock
 
+import app.bedtime.ui.components.LineIcons
 import android.os.SystemClock
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.semantics.semantics
+import app.bedtime.ui.components.ProgressRing
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.border
@@ -159,7 +163,10 @@ internal fun UnlockSteps(
     var index by rememberSaveable(key) { mutableIntStateOf(0) }
     var succeeded by remember { mutableStateOf(false) }
 
+    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
     fun passCurrent() {
+        // Two light ticks: a step done.
+        haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
         if (index + 1 < challenges.size) {
             index++
         } else if (!succeeded) {
@@ -214,12 +221,12 @@ internal fun UnlockSteps(
         action = when {
             succeeded -> null
             challenges.isEmpty() -> {
-                { SoftPillButton("Unlock", onClick = ::passCurrent) }
+                { SoftPillButton("Unlock", onClick = ::passCurrent, modifier = Modifier.fillMaxWidth()) }
             }
             step == Challenge.WAIT -> {
                 {
                     val done = remaining == 0L
-                    SoftPillButton(if (done) "Continue" else "Waiting\u2026", onClick = ::passCurrent, enabled = done)
+                    SoftPillButton(if (done) "Continue" else "Waiting\u2026", onClick = ::passCurrent, enabled = done, modifier = Modifier.fillMaxWidth())
                 }
             }
             else -> null
@@ -303,15 +310,24 @@ internal fun UnlockLayout(
                     Brush.verticalGradient(listOf(deep, c.bgPrimary))
                 },
             )
-            .padding(horizontal = 20.dp, vertical = 18.dp),
+            .padding(horizontal = 24.dp, vertical = 18.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
+        // Where you are, always at the top: what you're unlocking, and the steps by name.
         Text(
             "Unlocking $scheduleName",
             style = MaterialTheme.typography.bodyMedium,
-            color = c.textFaint,
+            color = c.textMuted,
             modifier = Modifier.fillMaxWidth(),
         )
+        if (stepLabels.size > 1) {
+            Spacer(Modifier.height(14.dp))
+            StepTrack(stepLabels, current)
+        }
+        if (note != null) {
+            Spacer(Modifier.height(12.dp))
+            Box(Modifier.fillMaxWidth()) { EscalationPill(note) }
+        }
         // The middle scrolls on its own, so the button and the small print stay at the foot of the
         // page instead of being pushed off it by a long passage or the keyboard.
         Column(
@@ -320,34 +336,26 @@ internal fun UnlockLayout(
             verticalArrangement = Arrangement.Center,
         ) {
             content()
-            if (stepLabels.size > 1) {
-                Spacer(Modifier.height(26.dp))
-                StepDots(stepLabels, current)
-            }
-            if (note != null) {
-                Spacer(Modifier.height(14.dp))
-                EscalationPill(note)
-            }
         }
         if (action != null) {
             Spacer(Modifier.height(16.dp))
             action()
         }
         if (showCancel) {
-            Spacer(Modifier.height(12.dp))
-            Text(
-                "Never mind, let's keep still",
-                style = MaterialTheme.typography.bodyLarge,
-                color = c.textMuted,
-                modifier = Modifier.clickable(onClick = onCancel).padding(8.dp),
-            )
+            Spacer(Modifier.height(6.dp))
+            Box(
+                Modifier.fillMaxWidth().heightIn(min = 48.dp).clip(RoundedCornerShape(50)).clickable(onClick = onCancel),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("Never mind, let's keep still", style = MaterialTheme.typography.bodyLarge, color = c.textMuted)
+            }
         }
         if (footnote != null) {
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(8.dp))
             Text(
                 footnote,
-                style = MaterialTheme.typography.labelSmall,
-                color = c.textFaint,
+                style = MaterialTheme.typography.bodySmall,
+                color = c.textMuted,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -355,26 +363,37 @@ internal fun UnlockLayout(
     }
 }
 
-/** Which step you are on, without spelling the steps out: a stretched dot for here, small ones after. */
+/**
+ * The steps as a track across the top: one segment each with its name under it, the ones done in a
+ * soft green, this one lit, the ones to come grey.
+ */
 @Composable
-private fun StepDots(labels: List<String>, current: Int) {
+private fun StepTrack(labels: List<String>, current: Int) {
     val c = Obsidian.colors
-    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-        labels.indices.forEach { index ->
-            Box(
-                Modifier
-                    .height(5.dp)
-                    .width(if (index == current) 18.dp else 5.dp)
-                    .clip(CircleShape)
-                    .background(if (index == current) c.accent else c.textFaint.copy(alpha = 0.35f)),
-            )
+    Row(Modifier.fillMaxWidth().semantics(mergeDescendants = true) {}, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        labels.forEachIndexed { index, label ->
+            val done = index < current
+            val here = index == current
+            Column(Modifier.weight(1f)) {
+                Box(
+                    Modifier.fillMaxWidth().height(3.dp).clip(RoundedCornerShape(50))
+                        .background(
+                            when {
+                                here -> c.accentText
+                                done -> c.accent.copy(alpha = 0.5f)
+                                else -> c.interactive
+                            },
+                        ),
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    label,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (here) c.textNormal else c.textMuted,
+                    maxLines = 1,
+                )
+            }
         }
-        Spacer(Modifier.width(8.dp))
-        Text(
-            "step ${(current + 1).coerceAtMost(labels.size)} of ${labels.size}",
-            style = MaterialTheme.typography.labelSmall,
-            color = c.textFaint,
-        )
     }
 }
 
@@ -404,7 +423,7 @@ internal fun UnlockSuccess(message: String) {
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Box(Modifier.size(88.dp).clip(CircleShape).background(c.green.copy(alpha = 0.15f)), contentAlignment = Alignment.Center) {
-            Icon(Icons.Default.Check, contentDescription = null, tint = c.green, modifier = Modifier.size(44.dp))
+            Icon(LineIcons.Check, contentDescription = null, tint = c.green, modifier = Modifier.size(44.dp))
         }
         Text("Unlocked", fontSize = 28.sp, fontWeight = FontWeight.Light, color = c.textNormal)
         Text(message, style = MaterialTheme.typography.bodyLarge, color = c.textMuted, textAlign = TextAlign.Center)
@@ -477,39 +496,36 @@ internal fun WaitChallengeContent(remaining: Long?, total: Long) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
             if (done) "Time's up." else "Take a breath.",
-            style = MaterialTheme.typography.titleLarge,
-            color = c.textMuted,
+            fontSize = 28.sp,
+            fontWeight = FontWeight.Light,
+            color = c.textNormal,
         )
-        Spacer(Modifier.height(34.dp))
-        Box(Modifier.size(264.dp), contentAlignment = Alignment.Center) {
-            Box(Modifier.fillMaxSize().border(1.dp, ring.copy(alpha = 0.12f), CircleShape))
-            CircularProgressIndicator(
-                progress = { if (remaining == null || total <= 0) 0f else 1f - remaining.toFloat() / total },
-                modifier = Modifier.size(228.dp),
+        Spacer(Modifier.height(30.dp))
+        // The ring is the time left; the disc inside it breathes. The words for the breath go in the
+        // disc, the minutes under the ring, so the two never compete inside one circle.
+        Box(Modifier.size(240.dp), contentAlignment = Alignment.Center) {
+            ProgressRing(
+                progress = if (remaining == null || total <= 0) 0f else 1f - remaining.toFloat() / total,
+                modifier = Modifier.fillMaxSize(),
+                stroke = 3.dp,
                 color = ring,
-                strokeWidth = 7.dp,
-                trackColor = ring.copy(alpha = 0.10f),
-                strokeCap = StrokeCap.Round,
             )
             // Something to do with the wait besides watching it: breathe with the disc.
-            Breathing(running = remaining != null && !done, color = ring, modifier = Modifier.size(200.dp)) { inhaling ->
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        remaining?.let(::formatCountdown) ?: "\u2026",
-                        style = MaterialTheme.typography.displaySmall.copy(fontSize = 26.sp, lineHeight = 32.sp, fontFeatureSettings = "tnum"),
-                        fontWeight = FontWeight.Light,
-                        color = if (done) c.green else c.textNormal,
-                    )
-                    if (!done) {
-                        Text(
-                            if (inhaling) "breathe in" else "breathe out",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = c.textFaint,
-                        )
-                    }
-                }
+            Breathing(running = remaining != null && !done, color = ring, modifier = Modifier.size(204.dp)) { inhaling ->
+                Text(
+                    if (done) "" else if (inhaling) "breathe in" else "breathe out",
+                    fontSize = 17.sp,
+                    color = c.textNormal,
+                )
             }
         }
+        Spacer(Modifier.height(26.dp))
+        Text(
+            remaining?.let(::formatCountdown) ?: "\u2026",
+            fontSize = 34.sp,
+            fontWeight = FontWeight.Light,
+            color = if (done) c.green else c.textNormal,
+        )
     }
 }
 
@@ -712,7 +728,7 @@ internal fun PasswordChallengeContent(
             if (checking) "Checking…" else "Continue",
             onClick = onSubmit,
             enabled = input.isNotEmpty() && !checking,
-            modifier = Modifier.align(Alignment.CenterHorizontally),
+            modifier = Modifier.fillMaxWidth(),
         )
     }
 }

@@ -1,5 +1,6 @@
 package app.bedtime.ui.minimal
 
+import app.bedtime.ui.components.LineIcons
 import androidx.compose.foundation.lazy.itemsIndexed
 import app.bedtime.data.Keywords
 import app.bedtime.data.ChatApp
@@ -296,7 +297,7 @@ private fun SearchField(query: String, onQuery: (String) -> Unit, p: HomePalette
         Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(p.text.copy(alpha = 0.07f)).padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Icons.Default.Search, contentDescription = null, tint = p.faint, modifier = Modifier.size(20.dp))
+        Icon(LineIcons.Search, contentDescription = null, tint = p.faint, modifier = Modifier.size(20.dp))
         Spacer(Modifier.width(10.dp))
         BasicTextField(
             value = query,
@@ -316,7 +317,7 @@ private fun SearchField(query: String, onQuery: (String) -> Unit, p: HomePalette
         )
         if (query.isNotEmpty()) {
             Icon(
-                Icons.Default.Close,
+                LineIcons.Close,
                 contentDescription = "clear",
                 tint = p.faint,
                 modifier = Modifier.size(20.dp).clip(CircleShape).clickable { onQuery("") },
@@ -462,20 +463,20 @@ private fun ResultRow(
         val icon: ImageVector? = when (result) {
             is DrawerResult.App -> null
             is DrawerResult.Search -> when (result.target.kind) {
-                SearchTarget.Kind.MAPS -> Icons.Default.LocationOn
-                SearchTarget.Kind.LOOKUP -> Icons.Default.Info
+                SearchTarget.Kind.MAPS -> LineIcons.LocationOn
+                SearchTarget.Kind.LOOKUP -> LineIcons.Info
                 SearchTarget.Kind.SPOTIFY -> Icons.Default.PlayArrow
-                else -> Icons.Default.Search
+                else -> LineIcons.Search
             }
-            is DrawerResult.AddEvent -> Icons.Default.DateRange
-            is DrawerResult.Contact -> Icons.Default.Call
-            is DrawerResult.Calculation -> Icons.Default.Add
+            is DrawerResult.AddEvent -> LineIcons.DateRange
+            is DrawerResult.Contact -> LineIcons.Call
+            is DrawerResult.Calculation -> LineIcons.Add
             is DrawerResult.StartBlock -> app.bedtime.ui.components.ScheduleIcons.of(result.block.icon)
-            is DrawerResult.Clock -> Icons.Default.Notifications
-            is DrawerResult.Setting -> Icons.Default.Settings
-            is DrawerResult.VaultNote -> Icons.Default.Create
-            is DrawerResult.File -> if (result.file.isFolder) app.bedtime.ui.components.BedtimeIcons.Folder else Icons.AutoMirrored.Filled.List
-            else -> Icons.Default.Edit
+            is DrawerResult.Clock -> LineIcons.Notifications
+            is DrawerResult.Setting -> LineIcons.Settings
+            is DrawerResult.VaultNote -> LineIcons.Create
+            is DrawerResult.File -> if (result.file.isFolder) app.bedtime.ui.components.BedtimeIcons.Folder else LineIcons.List
+            else -> LineIcons.Edit
         }
         Box(Modifier.size((30 * names).dp), contentAlignment = Alignment.Center) {
             if (result is DrawerResult.App) {

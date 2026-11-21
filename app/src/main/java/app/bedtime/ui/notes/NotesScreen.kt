@@ -1,5 +1,6 @@
 package app.bedtime.ui.notes
 
+import app.bedtime.ui.components.LineIcons
 import app.bedtime.data.TrashedNote
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Spacer
@@ -244,7 +245,7 @@ internal fun NotesContent(
                     }
                     if (note != null) {
                         IconButton(onClick = { reminding = note }) {
-                            Icon(Icons.Default.Notifications, contentDescription = "remind me", tint = if (note.remindAt != null) Obsidian.colors.accent else Obsidian.colors.textMuted)
+                            Icon(LineIcons.Notifications, contentDescription = "remind me", tint = if (note.remindAt != null) Obsidian.colors.accent else Obsidian.colors.textMuted)
                         }
                     }
                 },
@@ -429,7 +430,7 @@ internal fun NotesContent(
                 }
             } else {
                 ObsidianTopBar("Notes", onBack = onBack, subtitle = "Written in Markdown, kept on this phone") {
-                    IconButton(onClick = { searching = if (searching == null) "" else null }) { Icon(Icons.Default.Search, contentDescription = "search your notes", tint = c.textMuted) }
+                    IconButton(onClick = { searching = if (searching == null) "" else null }) { Icon(LineIcons.Search, contentDescription = "search your notes", tint = c.textMuted) }
                     // How they're shown: a list, cards in two columns, or titles alone.
                     Box {
                         var viewing by remember { mutableStateOf(false) }
@@ -446,7 +447,7 @@ internal fun NotesContent(
                             }
                         }
                     }
-                    if (onSettings != null) IconButton(onClick = onSettings) { Icon(Icons.Default.Settings, contentDescription = "notes settings", tint = c.textMuted) }
+                    if (onSettings != null) IconButton(onClick = onSettings) { Icon(LineIcons.Settings, contentDescription = "notes settings", tint = c.textMuted) }
                 }
             }
         },
@@ -674,7 +675,7 @@ private fun DoneTodos(done: List<DoneTodo>, today: java.time.LocalDate, onUntick
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text("$name · ${items.size}", style = MaterialTheme.typography.bodyMedium, color = c.textMuted, modifier = Modifier.weight(1f))
-                Icon(if (isOpen) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown, contentDescription = null, tint = c.textFaint)
+                Icon(if (isOpen) LineIcons.KeyboardArrowUp else LineIcons.KeyboardArrowDown, contentDescription = null, tint = c.textFaint)
             }
             if (isOpen) {
                 items.forEach { item ->
@@ -682,7 +683,7 @@ private fun DoneTodos(done: List<DoneTodo>, today: java.time.LocalDate, onUntick
                         Box(
                             Modifier.size(32.dp).clip(RoundedCornerShape(8.dp)).clickable(onClickLabel = "not done after all") { onUntick(item) },
                             contentAlignment = Alignment.Center,
-                        ) { Icon(Icons.Default.Check, contentDescription = null, tint = c.accent, modifier = Modifier.size(18.dp)) }
+                        ) { Icon(LineIcons.Check, contentDescription = null, tint = c.accent, modifier = Modifier.size(18.dp)) }
                         VerbatimText(
                             androidx.compose.ui.text.AnnotatedString(item.text),
                             style = MaterialTheme.typography.bodyMedium.copy(textDecoration = androidx.compose.ui.text.style.TextDecoration.LineThrough),
@@ -955,7 +956,7 @@ internal fun NoteEditor(
                     IconButton(onClick = {
                         finished = true
                         onDelete()
-                    }) { Icon(Icons.Default.Delete, contentDescription = "delete", tint = c.textMuted) }
+                    }) { Icon(LineIcons.Delete, contentDescription = "delete", tint = c.textMuted) }
                 }
             }
         },
@@ -1030,39 +1031,73 @@ private const val UNDO_STEPS = 100
 @Composable
 private fun MarkdownBar(canUndo: Boolean, canRedo: Boolean, onUndo: () -> Unit, onRedo: () -> Unit, onEdit: ((TextFieldValue) -> TextFieldValue) -> Unit) {
     val c = Obsidian.colors
+    // The keys in small groups that belong together, each group on its own soft pill.
     Row(
-        Modifier.fillMaxWidth().background(c.bgSecondary).horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp, vertical = 4.dp),
+        Modifier.fillMaxWidth().background(c.bgPrimaryAlt).horizontalScroll(rememberScrollState()).padding(horizontal = 10.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        BarKey("↶", "undo", enabled = canUndo, onClick = onUndo)
-        BarKey("↷", "redo", enabled = canRedo, onClick = onRedo)
-        BarKey("[", "bracket") { onEdit { Markdown.insert(it, "[") } }
-        BarKey("]", "closing bracket") { onEdit { Markdown.insert(it, "]") } }
-        BarKey("B", "bold", bold = true) { onEdit { Markdown.wrap(it, "**") } }
-        BarKey("I", "italic", italic = true) { onEdit { Markdown.wrap(it, "*") } }
-        BarKey("H", "heading: tap again for a smaller one") { onEdit { Markdown.cycleHeading(it) } }
-        BarKey("•", "list") { onEdit { Markdown.toggleLine(it, "- ") } }
-        BarKey("☐", "to-do") { onEdit { Markdown.toggleLine(it, "- [ ] ") } }
-        BarKey("→", "indent") { onEdit { Markdown.indent(it, inward = true) } }
-        BarKey("←", "outdent") { onEdit { Markdown.indent(it, inward = false) } }
+        KeyGroup {
+            BarKey("↶", "undo", icon = LineIcons.Undo, enabled = canUndo, onClick = onUndo)
+            BarKey("↷", "redo", icon = LineIcons.Redo, enabled = canRedo, onClick = onRedo)
+        }
+        KeyGroup {
+            BarKey("H", "heading: tap again for a smaller one") { onEdit { Markdown.cycleHeading(it) } }
+            BarKey("B", "bold", bold = true) { onEdit { Markdown.wrap(it, "**") } }
+            BarKey("I", "italic", italic = true) { onEdit { Markdown.wrap(it, "*") } }
+        }
+        KeyGroup {
+            BarKey("•", "list", icon = LineIcons.List) { onEdit { Markdown.toggleLine(it, "- ") } }
+            BarKey("☐", "to-do", icon = LineIcons.Todo) { onEdit { Markdown.toggleLine(it, "- [ ] ") } }
+        }
+        KeyGroup {
+            BarKey("→", "indent", icon = LineIcons.Indent) { onEdit { Markdown.indent(it, inward = true) } }
+            BarKey("←", "outdent", icon = LineIcons.Outdent) { onEdit { Markdown.indent(it, inward = false) } }
+        }
+        KeyGroup {
+            BarKey("[", "bracket") { onEdit { Markdown.insert(it, "[") } }
+            BarKey("]", "closing bracket") { onEdit { Markdown.insert(it, "]") } }
+        }
     }
 }
 
 @Composable
-private fun BarKey(label: String, description: String, bold: Boolean = false, italic: Boolean = false, enabled: Boolean = true, onClick: () -> Unit) {
+private fun KeyGroup(content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit) {
+    Row(
+        Modifier.clip(RoundedCornerShape(12.dp)).background(Obsidian.colors.bgSecondary).padding(2.dp),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        content = content,
+    )
+}
+
+@Composable
+private fun BarKey(
+    label: String,
+    description: String,
+    bold: Boolean = false,
+    italic: Boolean = false,
+    icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
+    enabled: Boolean = true,
+    onClick: () -> Unit,
+) {
     val c = Obsidian.colors
+    val tint = if (enabled) c.textNormal else c.textFaint.copy(alpha = 0.5f)
     Box(
         Modifier.size(44.dp).clip(RoundedCornerShape(10.dp)).clickable(enabled = enabled, onClickLabel = description, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        VerbatimText(
-            label,
-            color = if (enabled) c.textNormal else c.textFaint.copy(alpha = 0.5f),
-            style = MaterialTheme.typography.titleMedium.copy(
-                fontWeight = if (bold) FontWeight.Bold else FontWeight.Normal,
-                fontStyle = if (italic) FontStyle.Italic else FontStyle.Normal,
-            ),
-        )
+        if (icon != null) {
+            Icon(icon, contentDescription = description, tint = tint, modifier = Modifier.size(20.dp))
+        } else {
+            VerbatimText(
+                label,
+                color = tint,
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontWeight = if (bold) FontWeight.Bold else FontWeight.Normal,
+                    fontStyle = if (italic) FontStyle.Italic else FontStyle.Normal,
+                ),
+            )
+        }
     }
 }
 

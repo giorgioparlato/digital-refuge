@@ -1,5 +1,6 @@
 package app.bedtime.ui.minimal
 
+import app.bedtime.ui.components.LineIcons
 import java.util.Locale
 import java.time.format.DateTimeFormatter
 import app.bedtime.ui.components.VerbatimText
@@ -120,7 +121,7 @@ private fun EventDetail(event: CalendarEvent, style: HomeStyle, onBack: () -> Un
         if (event.allDay) ", all day" else ", ${formatTime(context, event.begin)}–${formatTime(context, event.end)}"
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(
-            Icons.AutoMirrored.Filled.ArrowBack,
+            LineIcons.ArrowBack,
             contentDescription = "the week",
             tint = p.faint,
             modifier = Modifier.clip(CircleShape).clickable(onClick = onBack).padding(4.dp).size(20.dp),
@@ -130,7 +131,7 @@ private fun EventDetail(event: CalendarEvent, style: HomeStyle, onBack: () -> Un
     Text(whenText, style = MaterialTheme.typography.bodyMedium, color = p.muted, modifier = Modifier.padding(top = 4.dp))
     if (event.location.isNotBlank()) {
         Row(Modifier.padding(top = 12.dp), verticalAlignment = Alignment.Top) {
-            Icon(Icons.Default.LocationOn, contentDescription = null, tint = p.faint, modifier = Modifier.padding(end = 8.dp).size(18.dp))
+            Icon(LineIcons.LocationOn, contentDescription = null, tint = p.faint, modifier = Modifier.padding(end = 8.dp).size(18.dp))
             VerbatimText(event.location, style = MaterialTheme.typography.bodyMedium, color = p.text)
         }
     }

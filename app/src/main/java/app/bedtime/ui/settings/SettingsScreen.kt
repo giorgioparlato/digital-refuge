@@ -1,5 +1,7 @@
 package app.bedtime.ui.settings
 
+import app.bedtime.ui.components.CardRadius
+import app.bedtime.ui.components.LineIcons
 import androidx.compose.runtime.LaunchedEffect
 
 import androidx.compose.ui.focus.focusRequester
@@ -440,7 +442,14 @@ private fun NudgeDialog(current: Int?, onDismiss: () -> Unit, onPick: (Int?) -> 
 
 @Composable
 private fun Rows(rows: List<Entry>) {
-    rows.forEachIndexed { i, e -> SettingsRow(e.icon, e.title, e.description, onClick = e.onClick, trailing = e.trailing ?: { Chevron() }, last = i == rows.lastIndex) }
+    if (rows.isEmpty()) return
+    // A group's rows share one rounded surface, so each group reads as one thing.
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(CardRadius)).background(Obsidian.colors.bgSecondary)
+            .padding(horizontal = 14.dp, vertical = 2.dp),
+    ) {
+        rows.forEachIndexed { i, e -> SettingsRow(e.icon, e.title, e.description, onClick = e.onClick, trailing = e.trailing ?: { Chevron() }, last = i == rows.lastIndex) }
+    }
 }
 
 @Composable
@@ -496,14 +505,14 @@ private fun settingsEntries(
             else -> "$stepsLeft steps left"
         }
         // Alone at the top: the one row that can be wrong, so its steps left show here too.
-        add(Entry(null, Icons.Default.Build, "Get started", "$steps · set up again · how it works · discover features", "get started start begin", go(SettingsPlace.START.route)))
+        add(Entry(null, LineIcons.Build, "Get started", "$steps · set up again · how it works · discover features", "get started start begin", go(SettingsPlace.START.route)))
 
         // ---------------------------------------------------------------- get started
         val start = SettingsPlace.START
         add(
             Entry(
                 start,
-                Icons.Default.Build,
+                LineIcons.Build,
                 "Permissions & setup",
                 steps,
                 "permissions setup accessibility greyscale dnd do not disturb battery overlay notifications launcher",
@@ -511,14 +520,14 @@ private fun settingsEntries(
             ),
         )
         add(Entry(start, BedtimeIcons.Leaf, "Set up again", "Go through setup again, starting from what you have now", "setup set up again intro walkthrough onboarding first run", go(Routes.WALKTHROUGH)))
-        add(Entry(start, Icons.Default.Info, "How it works", "What a session blocks, and how to leave early", "how it works help", go(Routes.ONBOARDING)))
+        add(Entry(start, LineIcons.Info, "How it works", "What a session blocks, and how to leave early", "how it works help", go(Routes.ONBOARDING)))
         add(Entry(start, Icons.Default.Star, "Discover features", "See what refuge does, each with a short look at how it works", "discover features tour what else habits notes quick notes voice obsidian widgets search dictionary home screen lock screen insights", go(Routes.DISCOVER)))
         // Apps first after setup: what every session and limit is made of.
         add(Entry(null, BedtimeIcons.Grid, "Apps", "Groups · always available · distracting", "apps", go(SettingsPlace.APPS.route)))
         add(
             Entry(
                 null,
-                Icons.Default.Home,
+                LineIcons.Home,
                 "Home screen",
                 (if (s.homeScreen) "Your launcher" else "In minimal sessions") + " · look, widgets, gestures, the app list",
                 "home screen minimal launcher",
@@ -528,7 +537,7 @@ private fun settingsEntries(
         add(
             Entry(
                 null,
-                Icons.Default.Lock,
+                LineIcons.Lock,
                 "Lock screen",
                 when {
                     s.homeScreen && style.lockAlways -> "All the time"
@@ -542,7 +551,7 @@ private fun settingsEntries(
         add(
             Entry(
                 null,
-                Icons.Default.Search,
+                LineIcons.Search,
                 "Search",
                 "What it offers, keywords, contacts, folders, the calendar",
                 "search keyword keywords web maps contacts messaging whatsapp signal telegram alarm timer calculator settings pages files folder obsidian spotify blocks calendar events dictionary dictionaries look up definition meaning",
@@ -564,7 +573,7 @@ private fun settingsEntries(
         add(
             Entry(
                 SettingsPlace.FOCUS,
-                Icons.Default.Lock,
+                LineIcons.Lock,
                 "Cover Android's off switches",
                 "During a session, blocks the Android settings that would turn refuge off or uninstall it$locked",
                 "cover off switches settings uninstall accessibility guard sessions",
@@ -581,11 +590,11 @@ private fun settingsEntries(
                 trailing = { ObsidianToggle(s.remindsFullScreen, { on -> onChange { it.copy(fullScreenReminder = on) } }, enabled = !inSession) },
             ),
         )
-        add(Entry(null, Icons.Default.Edit, "Notes", "Where quick notes go · the to-do · words · voice notes", "notes note quick to-do todo obsidian daily file words voice", go(Routes.QUICK_NOTES), group = 2))
-        add(Entry(null, Icons.Default.DateRange, "Microjournal", if (s.journalOn) "An entry a day · prompts · moods" else "Off", "journal journalling microjournal prompts struthless vent gratitude mindset diary", go(Routes.SETTINGS_JOURNAL), group = 2))
+        add(Entry(null, LineIcons.Edit, "Notes", "Where quick notes go · the to-do · words · voice notes", "notes note quick to-do todo obsidian daily file words voice", go(Routes.QUICK_NOTES), group = 2))
+        add(Entry(null, LineIcons.DateRange, "Microjournal", if (s.journalOn) "An entry a day · prompts · moods" else "Off", "journal journalling microjournal prompts struthless vent gratitude mindset diary", go(Routes.SETTINGS_JOURNAL), group = 2))
         // Habits live in insights, or a tab of their own; here too, to be found.
-        add(Entry(null, Icons.Default.CheckCircle, "Habits", "Your habits, habit sets, and a tab for them", "habits habit streak sets tab", go(Routes.HABITS), group = 2))
-        add(Entry(null, Icons.Default.Edit, "Journal sections and prompts", "Change, delete or add your own", "journal prompts sections struthless vent obligations mindset gratitude ideation trajectory", go(Routes.JOURNAL_PROMPTS), searchOnly = true))
+        add(Entry(null, LineIcons.CheckCircle, "Habits", "Your habits, habit sets, and a tab for them", "habits habit streak sets tab", go(Routes.HABITS), group = 2))
+        add(Entry(null, LineIcons.Edit, "Journal sections and prompts", "Change, delete or add your own", "journal prompts sections struthless vent obligations mindset gratitude ideation trajectory", go(Routes.JOURNAL_PROMPTS), searchOnly = true))
         add(
             Entry(
                 SettingsPlace.FOCUS,
@@ -596,8 +605,8 @@ private fun settingsEntries(
                 go(Routes.COVER_MESSAGES),
             ),
         )
-        add(Entry(null, Icons.Default.Star, "Shortcuts", "Home-screen widget and quick-settings tile", "shortcuts widget tile quick settings start block", go(SettingsPlace.SHORTCUTS.route), group = 3))
-        add(Entry(null, Icons.Default.Info, "About & backup", "Export and import · credits · recent problems", "about backup version help credits problems", go(SettingsPlace.ABOUT.route), group = 3))
+        add(Entry(null, LineIcons.Build, "Shortcuts", "Home-screen widget and quick-settings tile", "shortcuts widget tile quick settings start block", go(SettingsPlace.SHORTCUTS.route), group = 3))
+        add(Entry(null, LineIcons.Info, "About & backup", "Export and import · credits · recent problems", "about backup version help credits problems", go(SettingsPlace.ABOUT.route), group = 3))
 
 
         // ---------------------------------------------------------------- home screen
@@ -606,7 +615,7 @@ private fun settingsEntries(
         add(
             Entry(
                 home,
-                Icons.Default.Home,
+                LineIcons.Home,
                 "Everyday launcher",
                 when {
                     !s.homeScreen -> "Off · only during quiet sessions"
@@ -617,9 +626,9 @@ private fun settingsEntries(
                 go(Routes.LAUNCHER),
             ),
         )
-        add(Entry(home, Icons.Default.Edit, "Look", "Colours, sizes and fonts", "colour color theme background accent text font size top space look status bar logo mark arrow notes button", go(Routes.HOME_STYLE)))
+        add(Entry(home, LineIcons.Edit, "Look", "Colours, sizes and fonts", "colour color theme background accent text font size top space look status bar logo mark arrow notes button", go(Routes.HOME_STYLE)))
         add(Entry(home, BedtimeIcons.Grid, "Widgets", "Choose what it shows", WIDGET_WORDS, go(Routes.STYLE_SHOWN)))
-        add(Entry(home, Icons.Default.Refresh, "Gestures", "Open an app, write a note, start a block…", "gesture gestures swipe double tap home blocks", go(Routes.STYLE_GESTURES)))
+        add(Entry(home, LineIcons.Refresh, "Gestures", "Open an app, write a note, start a block…", "gesture gestures swipe double tap home blocks", go(Routes.STYLE_GESTURES)))
         add(
             Entry(
                 home,
@@ -633,38 +642,38 @@ private fun settingsEntries(
 
         // ---------------------------------------------------------------- lock screen
         val lock = SettingsPlace.LOCK
-        add(Entry(lock, Icons.Default.Lock, "In sessions", "Show it while a schedule or block runs", "lock screen sessions", trailing = { ObsidianToggle(style.lockScreen, onLockScreen) }))
+        add(Entry(lock, LineIcons.Lock, "In sessions", "Show it while a schedule or block runs", "lock screen sessions", trailing = { ObsidianToggle(style.lockScreen, onLockScreen) }))
         add(
             Entry(
                 lock,
-                Icons.Default.Lock,
+                LineIcons.Lock,
                 "Outside sessions too",
                 if (s.homeScreen) "All the time, as your launcher's" else "Only when refuge is your launcher",
                 "lock screen always launcher",
                 trailing = { ObsidianToggle(style.lockAlways && s.homeScreen, onLockAlways, enabled = s.homeScreen) },
             ),
         )
-        add(Entry(lock, Icons.Default.Edit, "Look", "Colours, sizes and fonts, separate from home", "lock screen colour color theme background accent font size look", go(Routes.HOME_STYLE_LOCK)))
+        add(Entry(lock, LineIcons.Edit, "Look", "Colours, sizes and fonts, separate from home", "lock screen colour color theme background accent font size look", go(Routes.HOME_STYLE_LOCK)))
         add(Entry(lock, BedtimeIcons.Grid, "Widgets", "Choose what it shows", "lock screen $WIDGET_WORDS", go(Routes.STYLE_SHOWN_LOCK)))
         add(
             Entry(
                 lock,
-                Icons.Default.Notifications,
+                LineIcons.Notifications,
                 "Notifications",
                 if (style.lockNotifications) "From the apps and people you choose" else "Off",
                 "notifications messages reply replies people contacts circles groups lock screen rain alert weather your week sunday note",
                 go(Routes.STYLE_NOTIFICATIONS),
             ),
         )
-        add(Entry(lock, Icons.Default.KeyboardArrowUp, "Gestures", "An app, the camera, screen off…", "gesture gestures swipe double tap lock camera screen off", go(Routes.STYLE_SWIPES)))
+        add(Entry(lock, LineIcons.KeyboardArrowUp, "Gestures", "An app, the camera, screen off…", "gesture gestures swipe double tap lock camera screen off", go(Routes.STYLE_SWIPES)))
 
         // ---------------------------------------------------------------- focus: after its switches and covers, the check-ins
         val checkins = SettingsPlace.FOCUS
-        add(Entry(checkins, Icons.Default.Info, "Journal after unlocking", whyWords(s.askOnUnlock), "why ask why unlock unlocking question journal struthless", go(Routes.WHY)))
+        add(Entry(checkins, LineIcons.Info, "Journal after unlocking", whyWords(s.askOnUnlock), "why ask why unlock unlocking question journal struthless", go(Routes.WHY)))
         add(
             Entry(
                 checkins,
-                Icons.Default.Notifications,
+                LineIcons.Notifications,
                 "A nudge after time in a row",
                 s.runNudgeMinutes?.let { "A reminder after $it min on the phone without a break" } ?: "Off",
                 "nudge time in a row long stretch reminder minutes break",
@@ -675,7 +684,7 @@ private fun settingsEntries(
         add(
             Entry(
                 checkins,
-                Icons.Default.Info,
+                LineIcons.Info,
                 "Moods",
                 // What they're for, not which they are: those are on their page.
                 moodsWords(s),
@@ -703,7 +712,7 @@ private fun settingsEntries(
         add(
             Entry(
                 apps,
-                Icons.Default.Warning,
+                LineIcons.Warning,
                 "Always-available apps",
                 when (s.alwaysAvailable.size) {
                     0 -> "None yet · like maps, rides or your authenticator"
@@ -734,15 +743,15 @@ private fun settingsEntries(
         val about = SettingsPlace.ABOUT
         val holds = "Saves your settings, history, notes, habits" + (if (s.backupJournal) ", screen time and microjournal" else " and screen time") +
             (if (backup.sealed) " in one file, sealed with your passphrase" else " in one file")
-        add(Entry(about, Icons.Default.Share, "Export settings", holds, "export backup save file", onExport))
+        add(Entry(about, LineIcons.Share, "Export settings", holds, "export backup save file", onExport))
         add(Entry(about, BedtimeIcons.Refuge, "Import settings", "Replaces everything with a saved file", "import restore backup file", onImport))
         add(Entry(about, Icons.Default.Star, "Credits", "The people and open-source projects refuge is built on", "credits thanks struthless minimal phone clicks communicator alfred loop habits open source licence license whisper", go(Routes.CREDITS)))
-        add(Entry(about, Icons.Default.Warning, "Recent problems", "Errors from the last days, to copy and send", "problems errors log crash bug", go(Routes.PROBLEMS)))
+        add(Entry(about, LineIcons.Warning, "Recent problems", "Errors from the last days, to copy and send", "problems errors log crash bug", go(Routes.PROBLEMS)))
         val folder = s.backupFolder
         add(
             Entry(
                 about,
-                Icons.Default.DateRange,
+                LineIcons.DateRange,
                 "Weekly backup",
                 when {
                     folder == null -> "Off · saves a backup every week to a folder you choose, keeping the last ${AutoBackup.KEEP}"
@@ -756,12 +765,12 @@ private fun settingsEntries(
             ),
         )
         if (folder != null && backup.writable) {
-            add(Entry(about, Icons.Default.Share, "Back up now", "Save this week's backup now", "backup now", backup.onNow))
+            add(Entry(about, LineIcons.Share, "Back up now", "Save this week's backup now", "backup now", backup.onNow))
         }
         add(
             Entry(
                 about,
-                Icons.Default.Lock,
+                LineIcons.Lock,
                 "Backup passphrase",
                 if (backup.sealed) "On · backups and exports open only with it" else "Off · anyone with the file can read it",
                 "backup passphrase password encrypt seal export",
@@ -867,7 +876,7 @@ private fun Shortcuts(blocks: List<Schedule>, tileBlockId: String?, canPinWidget
                     )
                 }
                 if (index < blocks.lastIndex) {
-                    HorizontalDivider(Modifier.padding(start = 52.dp), color = c.border.copy(alpha = 0.5f))
+                    HorizontalDivider(Modifier.padding(start = 50.dp), color = c.border.copy(alpha = 0.6f))
                 }
             }
         }
@@ -887,7 +896,7 @@ private fun SettingsRow(
     val c = Obsidian.colors
     Column {
         OptionRow(icon, title, description = description, onClick = onClick, trailing = trailing)
-        if (!last) HorizontalDivider(Modifier.padding(start = 52.dp), color = c.border.copy(alpha = 0.5f))
+        if (!last) HorizontalDivider(Modifier.padding(start = 50.dp), color = c.border.copy(alpha = 0.6f))
     }
 }
 
@@ -923,7 +932,7 @@ private fun SettingsSearch(query: String, onQuery: (String) -> Unit, focus: Bool
         Modifier.fillMaxWidth().padding(top = 14.dp).clip(RoundedCornerShape(14.dp)).background(c.bgSecondary).padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Icons.Default.Search, contentDescription = null, tint = c.textFaint, modifier = Modifier.size(20.dp))
+        Icon(LineIcons.Search, contentDescription = null, tint = c.textFaint, modifier = Modifier.size(20.dp))
         Spacer(Modifier.width(10.dp))
         BasicTextField(
             value = query,
@@ -941,7 +950,7 @@ private fun SettingsSearch(query: String, onQuery: (String) -> Unit, focus: Bool
             },
         )
         if (query.isNotEmpty()) {
-            Icon(Icons.Default.Clear, contentDescription = "clear", tint = c.textFaint, modifier = Modifier.size(20.dp).clip(RoundedCornerShape(50)).clickable { onQuery("") })
+            Icon(LineIcons.Clear, contentDescription = "clear", tint = c.textFaint, modifier = Modifier.size(20.dp).clip(RoundedCornerShape(50)).clickable { onQuery("") })
         }
     }
 }

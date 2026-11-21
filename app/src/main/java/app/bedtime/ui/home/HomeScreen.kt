@@ -1,5 +1,6 @@
 package app.bedtime.ui.home
 
+import app.bedtime.ui.components.LineIcons
 import app.bedtime.data.Habit
 import app.bedtime.data.HourRule
 import app.bedtime.data.DayHours
@@ -17,6 +18,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -55,6 +58,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.bedtime.ui.components.PageGutter
+import app.bedtime.ui.components.ProgressRing
 import app.bedtime.ui.components.SectionLabel
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.HorizontalDivider
@@ -267,7 +271,7 @@ internal fun HomeContent(
         } else {
             val today = todayUsage ?: app.bedtime.data.UsageDay(java.time.LocalDate.now().toEpochDay())
             items(limits.size, key = { "limit-" + limits[it].id }) { index ->
-                Box(Modifier.padding(horizontal = PageGutter).padding(bottom = 12.dp)) {
+                Box(Modifier.padding(horizontal = PageGutter).padding(bottom = 8.dp)) {
                     app.bedtime.ui.limits.LimitCard(limits[index], today, today.day, onClick = { onEditLimit(limits[index].id) })
                 }
             }
@@ -307,13 +311,18 @@ internal fun HomeContent(
                 // Blocks first, all of them: starting one is what you come here for most.
                 item(key = "blocks-heading") { FoldHeading("blocks", blocks.size, "blocks" in folded) { onFold("blocks", it) } }
                 if ("blocks" !in folded) item(key = "blocks") {
+                    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
                     val shape = RoundedCornerShape(CardRadius)
-                    Column(Modifier.padding(horizontal = PageGutter).fillMaxWidth().clip(shape).background(c.bgSecondary).border(1.dp, c.border, shape)) {
+                    Column(Modifier.padding(horizontal = PageGutter).fillMaxWidth().clip(shape).background(c.bgSecondary)) {
                         blocks.forEachIndexed { i, block ->
                             BlockRow(
                                 block = block,
                                 running = ui.active?.occurrenceOf(block.id),
-                                onStart = { onStartBlock(block, block.durationMinutes) },
+                                onStart = {
+                                    // One firm tick: the block has started.
+                                    haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                    onStartBlock(block, block.durationMinutes)
+                                },
                                 onEdit = { onEdit(block.id) },
                                 onLength = { editingLength = block },
                             )
@@ -343,7 +352,7 @@ internal fun HomeContent(
                     }
                 }
                 if ("schedules" !in folded) items(schedulesOnly.size, key = { schedulesOnly[it].id }) { index ->
-                    Box(Modifier.padding(horizontal = PageGutter).padding(bottom = 12.dp)) {
+                    Box(Modifier.padding(horizontal = PageGutter).padding(bottom = 8.dp)) {
                         ScheduleItem(schedulesOnly[index], ui.active, ui.history, ui.now, minuteOfDay, onEdit, onToggle, onDelete)
                     }
                 }
@@ -378,7 +387,7 @@ private fun FoldHeading(title: String, count: Int, folded: Boolean, modifier: Mo
     ) {
         SectionLabel(if (folded) "$title · $count" else title)
         Icon(
-            if (folded) Icons.AutoMirrored.Filled.KeyboardArrowRight else Icons.Default.KeyboardArrowDown,
+            if (folded) LineIcons.KeyboardArrowRight else LineIcons.KeyboardArrowDown,
             contentDescription = null,
             tint = c.accentText,
             modifier = Modifier.padding(start = 4.dp, top = 12.dp).size(18.dp),
@@ -411,7 +420,7 @@ private fun HomeHeader(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(BedtimeIcons.Refuge, contentDescription = null, tint = c.accent, modifier = Modifier.size(28.dp))
                 Spacer(Modifier.width(10.dp))
-                Text("digital refuge", style = MaterialTheme.typography.labelLarge, color = c.textFaint, modifier = Modifier.weight(1f))
+                Text("digital refuge", style = MaterialTheme.typography.labelLarge, color = c.textMuted, modifier = Modifier.weight(1f))
                 // Your notes, a tap away when they have no tab of their own; held, straight to writing.
                 if (notesButton) Box {
                     var menu by remember { mutableStateOf(false) }
@@ -423,7 +432,7 @@ private fun HomeHeader(
                         ),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(Icons.Default.Edit, contentDescription = "your notes", tint = c.textMuted, modifier = Modifier.size(20.dp))
+                        Icon(LineIcons.Edit, contentDescription = "your notes", tint = c.textMuted, modifier = Modifier.size(20.dp))
                     }
                     androidx.compose.material3.DropdownMenu(expanded = menu, onDismissRequest = { menu = false }, containerColor = c.bgSecondary) {
                         notesShortcuts.forEach { (label, go) ->
@@ -443,17 +452,21 @@ private fun HomeHeader(
                 } else {
                     "${state.active.size} sessions are on"
                 }
-                Text(title, fontSize = 28.sp, fontWeight = FontWeight.Light, color = c.textNormal)
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    "for another ${formatDuration(current.end - ui.now)}, until ${formatTime(context, current.end)}",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = c.textMuted,
-                )
-                Spacer(Modifier.height(18.dp))
                 val progress = ((ui.now - current.start).toFloat() / (current.end - current.start)).coerceIn(0f, 1f)
-                Box(Modifier.fillMaxWidth().height(2.dp).clip(RoundedCornerShape(50)).background(c.accent.copy(alpha = 0.18f))) {
-                    Box(Modifier.fillMaxWidth(progress).height(2.dp).clip(RoundedCornerShape(50)).background(c.accent))
+                // A small ring for how much has passed, beside the words: compact, so the page
+                // below still shows without scrolling.
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    ProgressRing(progress, Modifier.size(60.dp))
+                    Spacer(Modifier.width(16.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(title, fontSize = 28.sp, fontWeight = FontWeight.Light, color = c.textNormal)
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "for another ${formatDuration(current.end - ui.now)}, until ${formatTime(context, current.end)}",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = c.textMuted,
+                        )
+                    }
                 }
                 Spacer(Modifier.height(16.dp))
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -470,16 +483,22 @@ private fun HomeHeader(
                                 .padding(horizontal = 12.dp, vertical = 2.dp),
                         )
                     }
-                    Text(
-                        "leave early",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = c.accentText,
-                        modifier = Modifier.clickable { onUnlock(current.schedule.id) }.padding(vertical = 2.dp),
-                    )
-                    if (state.blocked.isNotEmpty()) Tag("${pluralApps(state.blocked.size)} blocked")
-                    if (state.minimalOccurrence != null) Tag("quiet home screen")
-                    if (state.greyscale) Tag("greyscale")
-                    if (state.dnd != DndMode.OFF) Tag("do not disturb")
+                    if (state.blocked.isNotEmpty()) StatusChip("${pluralApps(state.blocked.size)} blocked")
+                    if (state.minimalOccurrence != null) StatusChip("quiet home screen")
+                    if (state.greyscale) StatusChip("greyscale")
+                    if (state.dnd != DndMode.OFF) StatusChip("do not disturb")
+                }
+                Spacer(Modifier.height(6.dp))
+                // Quiet on purpose: leaving early is there, not suggested.
+                Row(
+                    Modifier.offset(x = (-10).dp).clip(RoundedCornerShape(50))
+                        .clickable(onClickLabel = "leave ${current.schedule.name} early") { onUnlock(current.schedule.id) }
+                        .heightIn(min = 44.dp).padding(horizontal = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(LineIcons.Lock, contentDescription = null, tint = c.textMuted, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("leave early", style = MaterialTheme.typography.labelLarge, color = c.textMuted)
                 }
             } else {
                 val paused = ui.schedules
@@ -502,6 +521,18 @@ private fun HomeHeader(
             }
         }
     }
+}
+
+/** What a session does, as a quiet outlined chip: facts to glance at, not buttons. */
+@Composable
+private fun StatusChip(text: String) {
+    val c = Obsidian.colors
+    Text(
+        text,
+        style = MaterialTheme.typography.labelLarge,
+        color = c.textMuted,
+        modifier = Modifier.border(1.dp, c.border, RoundedCornerShape(50)).padding(horizontal = 11.dp, vertical = 5.dp),
+    )
 }
 
 /** A block as a row: the row opens it, the circle starts it, its length changes with a tap. While it runs, it says so instead. */
@@ -545,18 +576,19 @@ private fun BlockRow(
                 ) {
                     Text(formatMinutes(block.durationMinutes.toLong()), style = MaterialTheme.typography.bodySmall, color = c.textNormal, maxLines = 1)
                     Spacer(Modifier.width(4.dp))
-                    Icon(Icons.Default.KeyboardArrowDown, contentDescription = null, tint = c.textFaint, modifier = Modifier.size(13.dp))
+                    Icon(LineIcons.KeyboardArrowDown, contentDescription = null, tint = c.textFaint, modifier = Modifier.size(13.dp))
                 }
             }
         }
         if (running == null) {
+            // Solid: starting a block is what this page is for.
             Box(
-                Modifier.size(36.dp).clip(CircleShape).background(c.accent.copy(alpha = 0.18f))
+                Modifier.size(40.dp).clip(CircleShape).background(c.accentFill)
                     .clickable(onClickLabel = "Start ${block.name}", onClick = onStart),
                 contentAlignment = Alignment.Center,
-            ) { Icon(Icons.Default.PlayArrow, contentDescription = null, tint = c.accent, modifier = Modifier.size(18.dp)) }
+            ) { Icon(Icons.Default.PlayArrow, contentDescription = null, tint = c.textOnAccent, modifier = Modifier.size(20.dp)) }
         } else {
-            Tag("on now")
+            Tag("on now", accent = true)
         }
     }
 }

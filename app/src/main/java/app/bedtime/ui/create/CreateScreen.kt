@@ -1,5 +1,6 @@
 package app.bedtime.ui.create
 
+import app.bedtime.ui.components.LineIcons
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -34,6 +35,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import app.bedtime.apps.AppCatalog
 import app.bedtime.data.ScheduleKind
 import app.bedtime.data.Template
@@ -68,15 +70,10 @@ internal fun CreateContent(onBack: () -> Unit, onPick: (String) -> Unit, isInsta
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             GroupTitle("Start from scratch")
-            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                ScratchCard(Icons.Default.DateRange, "Schedule", "On set days and times", Modifier.weight(1f)) {
-                    onPick(Templates.SCRATCH_SCHEDULE)
-                }
-                ScratchCard(BedtimeIcons.Hourglass, "Block", "Any time, for a set length", Modifier.weight(1f)) {
-                    onPick(Templates.SCRATCH_BLOCK)
-                }
-                ScratchCard(BedtimeIcons.Block, "Limit", "Every day, for the apps that pull", Modifier.weight(1f), onClick = onLimit)
-            }
+            // One row each, so the line saying what each one is has room to be read.
+            ScratchCard(BedtimeIcons.Hourglass, "Block", "Any time, for a set length") { onPick(Templates.SCRATCH_BLOCK) }
+            ScratchCard(LineIcons.DateRange, "Schedule", "On set days and times") { onPick(Templates.SCRATCH_SCHEDULE) }
+            ScratchCard(BedtimeIcons.Block, "Limit", "Every day, for the apps that pull", onClick = onLimit)
             TemplateGallery(onPick = onPick, isInstalled = isInstalled)
             Spacer(Modifier.height(8.dp))
         }
@@ -110,27 +107,30 @@ fun TemplateIcon.vector(): ImageVector = when (this) {
 private fun GroupTitle(title: String, subtitle: String? = null) {
     Column(Modifier.fillMaxWidth()) {
         SectionLabel(title)
-        if (subtitle != null) Text(subtitle, style = MaterialTheme.typography.bodySmall, color = Obsidian.colors.textFaint)
+        if (subtitle != null) Text(subtitle, style = MaterialTheme.typography.bodySmall, color = Obsidian.colors.textMuted)
     }
 }
 
 @Composable
-private fun ScratchCard(icon: ImageVector, title: String, description: String, modifier: Modifier, onClick: () -> Unit) {
+private fun ScratchCard(icon: ImageVector, title: String, description: String, onClick: () -> Unit) {
     val c = Obsidian.colors
     val shape = RoundedCornerShape(CardRadius)
-    Column(
-        modifier
-            .fillMaxHeight()
+    Row(
+        Modifier
+            .fillMaxWidth()
             .clip(shape)
             .background(c.bgSecondary)
-            .border(1.dp, c.border, shape)
             .clickable(onClick = onClick)
-            .padding(14.dp),
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        IconBadge(icon)
-        Spacer(Modifier.height(10.dp))
-        Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold, color = c.textNormal)
-        Text(description, style = MaterialTheme.typography.bodySmall, color = c.textMuted)
+        IconBadge(icon, size = 44.dp)
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text(title, fontSize = 17.sp, fontWeight = FontWeight.Medium, color = c.textNormal)
+            Text(description, style = MaterialTheme.typography.bodySmall, color = c.textMuted)
+        }
+        Chevron()
     }
 }
 
@@ -150,7 +150,6 @@ private fun TemplateCard(template: Template, isInstalled: (String) -> Boolean, o
             .fillMaxWidth()
             .clip(shape)
             .background(c.bgSecondary)
-            .border(1.dp, c.border, shape)
             .clickable(onClickLabel = "Use ${template.name}", onClick = onClick)
             .padding(14.dp),
         verticalAlignment = Alignment.CenterVertically,

@@ -177,6 +177,7 @@ internal fun PauseContent(appLabel: String, secondsLeft: Int, opens: Int, onOpen
         body = message ?: "Is this what you came to the phone for?",
         primary = CoverAction("Never mind", onHome),
         secondary = listOf(CoverAction(if (done) "Open $appLabel" else "Open $appLabel in a moment", onOpen, enabled = done)),
+        centered = true,
     )
 }
 

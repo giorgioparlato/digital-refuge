@@ -1,5 +1,6 @@
 package app.bedtime.ui.stats
 
+import app.bedtime.ui.components.LineIcons
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -44,7 +45,7 @@ internal fun LookBackCard(week: LookBack, appLabel: (String) -> String, onPutAwa
             Modifier.align(Alignment.TopEnd).padding(6.dp).size(40.dp).clip(CircleShape).clickable(onClickLabel = "put it away until next week", onClick = onPutAway),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(Icons.Default.Clear, contentDescription = "put it away", tint = c.textFaint, modifier = Modifier.size(18.dp))
+            Icon(LineIcons.Clear, contentDescription = "put it away", tint = c.textFaint, modifier = Modifier.size(18.dp))
         }
     }
 }

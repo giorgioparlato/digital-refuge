@@ -1,5 +1,6 @@
 package app.bedtime.ui.quotes
 
+import app.bedtime.ui.components.LineIcons
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -128,7 +129,7 @@ internal fun QuotesContent(
                         recent.forEach { q ->
                             QuoteRow(q) {
                                 FavouriteButton(q.text in prefs.favourites) { toggleFavourite(q) }
-                                SmallIcon(Icons.Default.Clear, "don't show again") { hide(q) }
+                                SmallIcon(LineIcons.Clear, "don't show again") { hide(q) }
                             }
                         }
                     }
@@ -154,14 +155,14 @@ internal fun QuotesContent(
                             } else {
                                 FavouriteButton(q.text in prefs.favourites) { toggleFavourite(q) }
                             }
-                            SmallIcon(Icons.Default.Edit, "edit") {
+                            SmallIcon(LineIcons.Edit, "edit") {
                                 editing = q.text
                                 text = q.text
                                 author = q.author
                                 work = q.work.orEmpty()
                                 pasting = false
                             }
-                            SmallIcon(Icons.Default.Delete, "delete") {
+                            SmallIcon(LineIcons.Delete, "delete") {
                                 if (editing == q.text) clearForm()
                                 onChange { it.removeMine(q.text) }
                             }
@@ -257,7 +258,7 @@ internal fun QuotesContent(
                                 ShowAgain { unhide(q) }
                             } else {
                                 FavouriteButton(q.text in prefs.favourites) { toggleFavourite(q) }
-                                SmallIcon(Icons.Default.Clear, "don't show again") { hide(q) }
+                                SmallIcon(LineIcons.Clear, "don't show again") { hide(q) }
                             }
                         }
                     }

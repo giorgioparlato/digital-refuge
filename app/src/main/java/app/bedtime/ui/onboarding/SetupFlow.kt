@@ -1,5 +1,6 @@
 package app.bedtime.ui.onboarding
 
+import app.bedtime.ui.components.LineIcons
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
@@ -502,7 +503,7 @@ private fun AppTick(app: SetupApp, on: Boolean, detail: String?, onToggle: () ->
         Box(
             Modifier.size(22.dp).clip(CircleShape).background(if (on) c.accentFill else Color.Transparent).border(1.5.dp, if (on) c.accentFill else c.textFaint, CircleShape),
             contentAlignment = Alignment.Center,
-        ) { if (on) Icon(Icons.Default.Check, contentDescription = null, tint = c.textOnAccent, modifier = Modifier.size(14.dp)) }
+        ) { if (on) Icon(LineIcons.Check, contentDescription = null, tint = c.textOnAccent, modifier = Modifier.size(14.dp)) }
     }
 }
 

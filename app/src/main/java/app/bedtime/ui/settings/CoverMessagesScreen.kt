@@ -1,5 +1,6 @@
 package app.bedtime.ui.settings
 
+import app.bedtime.ui.components.LineIcons
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -113,7 +114,7 @@ internal fun CoverMessagesContent(
                         }
                         ObsidianToggle(message.inRandom, { on -> onChange { list -> list.mapIndexed { j, m -> if (j == i) m.copy(inRandom = on) else m } } })
                         Box(Modifier.size(40.dp).clip(CircleShape).clickable(onClickLabel = "delete") { onChange { list -> list.filterIndexed { j, _ -> j != i } } }, contentAlignment = Alignment.Center) {
-                            Icon(Icons.Default.Clear, contentDescription = "delete", tint = c.textFaint, modifier = Modifier.size(18.dp))
+                            Icon(LineIcons.Clear, contentDescription = "delete", tint = c.textFaint, modifier = Modifier.size(18.dp))
                         }
                     }
                 }

@@ -1,5 +1,10 @@
 package app.bedtime.ui.minimal
 
+import androidx.compose.ui.unit.sp
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.border
+import app.bedtime.ui.components.LineIcons
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
@@ -66,28 +71,40 @@ internal fun EmergencyContent(
                 .padding(bottom = 20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            // Two that work no matter how the session is set up, so there is always something here.
+            // Calling first and largest: in a hurry, it's the one thing to find without reading.
+            Row(
+                Modifier.fillMaxWidth().height(84.dp).clip(RoundedCornerShape(22.dp)).background(c.accentFill)
+                    .clickable(onClickLabel = "open phone", onClick = onCall).padding(horizontal = 20.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(LineIcons.Call, contentDescription = null, tint = c.textOnAccent, modifier = Modifier.size(28.dp))
+                Spacer(Modifier.width(16.dp))
+                Text("phone", fontSize = 20.sp, color = c.textOnAccent, modifier = Modifier.weight(1f))
+                Icon(LineIcons.KeyboardArrowRight, contentDescription = null, tint = c.textOnAccent, modifier = Modifier.size(20.dp))
+            }
+
+            // Works no matter how the session is set up, so there is always something here.
             SectionCard(title = "always works") {
                 ActionRow(onClick = onOpenRefuge, label = "digital refuge") {
                     Box(
-                        Modifier.size(36.dp).clip(CircleShape).background(c.accent.copy(alpha = 0.16f)),
+                        Modifier.size(36.dp).clip(RoundedCornerShape(11.dp)).background(c.interactive),
                         contentAlignment = Alignment.Center,
-                    ) { Icon(BedtimeIcons.Refuge, contentDescription = null, tint = c.accent, modifier = Modifier.size(20.dp)) }
-                }
-                ActionRow(onClick = onCall, label = "phone") {
-                    Box(
-                        Modifier.size(36.dp).clip(CircleShape).background(c.accent.copy(alpha = 0.16f)),
-                        contentAlignment = Alignment.Center,
-                    ) { Icon(Icons.Default.Call, contentDescription = null, tint = c.accent, modifier = Modifier.size(20.dp)) }
+                    ) { Icon(BedtimeIcons.Refuge, contentDescription = null, tint = c.accentText, modifier = Modifier.size(20.dp)) }
                 }
             }
 
             if (pauseEnabled) {
-                SectionCard(title = "emergency break") {
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Body("steps out for $minutes. a full screen brings you back when it ends.")
-                        PlainButton("pause blocking for $minutes", onClick = onPauseBlocking, modifier = Modifier.fillMaxWidth())
-                    }
+                // The break is the last resort, so it sits quietly at the foot, outlined rather than filled.
+                Spacer(Modifier.height(8.dp))
+                HorizontalDivider(color = c.border)
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("emergency break", style = MaterialTheme.typography.bodyLarge, color = c.textNormal)
+                    Body("steps out for $minutes. a full screen brings you back when it ends.")
+                    Box(
+                        Modifier.fillMaxWidth().height(50.dp).clip(RoundedCornerShape(50))
+                            .border(1.dp, c.border, RoundedCornerShape(50)).clickable(onClick = onPauseBlocking),
+                        contentAlignment = Alignment.Center,
+                    ) { Text("pause blocking for $minutes", style = MaterialTheme.typography.bodyLarge, color = c.textNormal) }
                 }
             }
         }

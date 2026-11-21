@@ -1,5 +1,6 @@
 package app.bedtime.ui.lock
 
+import app.bedtime.ui.components.LineIcons
 import androidx.compose.ui.draw.drawBehind
 
 import androidx.compose.ui.graphics.Color
@@ -234,7 +235,7 @@ private fun SummaryLine(summary: String, p: HomePalette, onOpen: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(summary, style = MaterialTheme.typography.bodyMedium, color = p.text, modifier = Modifier.weight(1f))
-        Icon(Icons.Default.KeyboardArrowDown, contentDescription = null, tint = p.faint, modifier = Modifier.size(20.dp))
+        Icon(LineIcons.KeyboardArrowDown, contentDescription = null, tint = p.faint, modifier = Modifier.size(20.dp))
     }
 }
 
@@ -254,6 +255,8 @@ private fun NotificationRow(
     onQuieting: (Boolean) -> Unit = {},
 ) {
     val more = note.messages.isNotEmpty() || note.body != null
+    // The app's own buttons and "quiet until…", shown once "⋯" is tapped.
+    var allActions by remember(note.key) { mutableStateOf(false) }
     // Opened, by the arrow or a drag, it scrolls itself fully into view.
     val reveal = remember { BringIntoViewRequester() }
     LaunchedEffect(expanded) {
@@ -281,8 +284,6 @@ private fun NotificationRow(
                 .padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.Top,
         ) {
-            Box(Modifier.padding(top = 2.dp)) { AppIcon(note.packageName, note.app, 22.dp) }
-            Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(note.app, style = MaterialTheme.typography.labelMedium, color = p.faint, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
@@ -291,7 +292,7 @@ private fun NotificationRow(
                         Modifier.size(32.dp).clip(RoundedCornerShape(50)).clickable(onClickLabel = if (expanded) "fold" else "read it here") { onExpand(!expanded) },
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown, contentDescription = null, tint = p.faint, modifier = Modifier.size(20.dp))
+                        Icon(if (expanded) LineIcons.KeyboardArrowUp else LineIcons.KeyboardArrowDown, contentDescription = null, tint = p.faint, modifier = Modifier.size(20.dp))
                     }
                 }
                 val title = note.title ?: if (note.detail == NoteDetail.APP_ONLY) "New notification" else null
@@ -302,7 +303,7 @@ private fun NotificationRow(
             }
         }
         if (expanded) {
-            Column(Modifier.padding(start = 48.dp, end = 14.dp, bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(Modifier.padding(start = 14.dp, end = 14.dp, bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 when {
                     note.messages.isNotEmpty() -> note.messages.forEach { line ->
                         Text(
@@ -320,10 +321,16 @@ private fun NotificationRow(
                         NoteChip("‹", p) { onQuieting(false) }
                         handlers.quietChoices().forEach { (label, until) -> NoteChip(label, p) { handlers.quiet(note, until) } }
                     } else {
+                        // Reply and later first; the app's own buttons and "quiet until…" wait behind "⋯",
+                        // so the chips fit on one line.
                         if (reply != null && !replying) NoteChip("Reply", p) { onReply(true) }
-                        note.actions.filterNot { it.isReply }.forEach { action -> NoteChip(action.title, p) { handlers.act(note, action, null) } }
                         NoteChip("Later", p) { handlers.later(note) }
-                        NoteChip("Quiet until…", p) { onQuieting(true) }
+                        if (allActions) {
+                            note.actions.filterNot { it.isReply }.forEach { action -> NoteChip(action.title, p) { handlers.act(note, action, null) } }
+                            NoteChip("Quiet until…", p) { onQuieting(true) }
+                        } else {
+                            NoteChip("⋯", p) { allActions = true }
+                        }
                     }
                 }
                 if (replying && reply != null) {

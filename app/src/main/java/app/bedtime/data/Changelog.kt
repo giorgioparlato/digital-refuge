@@ -13,6 +13,19 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            99,
+            "0.9.53",
+            listOf(
+                "A calmer look all over: thin line icons, cards without outlines, and buttons shaped as pills.",
+                "Time in distracting apps is now a soft rose, so it stands apart from the rest of your phone time. Orange is only for the \"2nd time today\" note.",
+                "While a session runs, focus shows a small ring for the time that has passed.",
+                "Covers and unlock steps read top to bottom: the steps by name at the top, one main button at the foot. Your own cover message is the biggest text.",
+                "Emergency puts calling first. Notifications on the lock screen drop their icon, and the extra buttons wait behind ⋯.",
+                "Holding a widget opens a sheet from the bottom. Settings come in grouped cards, and setup folds the steps you've done.",
+                "Small text is easier to read, and you feel a light tick when you start a block or tick a habit.",
+            ),
+        ),
+        ChangelogEntry(
             98,
             "0.9.52",
             listOf(

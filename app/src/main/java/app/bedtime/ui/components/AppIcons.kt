@@ -68,12 +68,13 @@ fun LetterAvatar(label: String, size: Dp) {
         Modifier
             .size(size)
             .clip(RoundedCornerShape(size * 0.3f))
-            .background(c.accent.copy(alpha = 0.18f)),
+            // Neutral: a letter stands in for an app's icon, it isn't a button.
+            .background(c.interactive),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             label.firstOrNull()?.uppercase() ?: "?",
-            color = c.accentText,
+            color = c.textNormal,
             fontWeight = FontWeight.SemiBold,
             fontSize = (size.value * 0.42f).sp,
         )

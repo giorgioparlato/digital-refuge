@@ -1,5 +1,6 @@
 package app.bedtime.ui.lock
 
+import app.bedtime.ui.components.LineIcons
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -954,7 +955,7 @@ private fun TimerLine(end: Long, now: Long, style: HomeStyle, onHide: () -> Unit
             Text("left", style = MaterialTheme.typography.labelLarge, color = p.faint)
             Spacer(Modifier.width(4.dp))
             Box(Modifier.size(32.dp).clip(CircleShape).clickable(onClickLabel = "hide this timer", onClick = onHide), contentAlignment = Alignment.Center) {
-                Icon(Icons.Default.Close, contentDescription = null, tint = p.faint, modifier = Modifier.size(16.dp))
+                Icon(LineIcons.Close, contentDescription = null, tint = p.faint, modifier = Modifier.size(16.dp))
             }
         }
     }

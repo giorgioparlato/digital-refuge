@@ -1,5 +1,6 @@
 package app.bedtime.ui.notes
 
+import app.bedtime.ui.components.LineIcons
 import kotlinx.coroutines.flow.first
 import app.bedtime.data.NotesExport
 import androidx.compose.material.icons.filled.Share
@@ -291,30 +292,30 @@ internal fun NoteTargetsContent(
             )
             Spacer(Modifier.height(16.dp))
             SectionCard(title = "Refuge notes") {
-                OptionRow(Icons.Default.Edit, "Your notes", description = "Kept on this phone, written in Markdown", onClick = onOpenNotes) { Chevron() }
+                OptionRow(LineIcons.Edit, "Your notes", description = "Kept on this phone, written in Markdown", onClick = onOpenNotes) { Chevron() }
                 OptionRow(BedtimeIcons.Book, "A notes tab", description = "Your notes and microjournal at refuge's foot, beside insights") {
                     ObsidianToggle(notesTab, onNotesTab)
                 }
                 if (exportedTo != null) {
                     OptionRow(
-                        Icons.Default.Refresh,
+                        LineIcons.Refresh,
                         "Export on every change",
                         description = "Each note and day written to $exportedTo a few seconds after you change it, and a note deleted here deleted there. Still one way: edits made there are written over",
                     ) {
                         ObsidianToggle(autoExport, onAutoExport)
                     }
                     if (!autoExport) {
-                        OptionRow(Icons.Default.Refresh, "Export again", description = "Your notes and microjournal as Markdown files in $exportedTo, written over with what's here now", onClick = onExportAgain) { Chevron() }
+                        OptionRow(LineIcons.Refresh, "Export again", description = "Your notes and microjournal as Markdown files in $exportedTo, written over with what's here now", onClick = onExportAgain) { Chevron() }
                     }
                 }
                 OptionRow(
-                    Icons.Default.Share,
+                    LineIcons.Share,
                     if (exportedTo == null) "Export to a folder" else "Export to another folder",
                     description = "A Markdown file a note, by its title, and the microjournal a file a day: into your Obsidian vault, say. Nothing comes back from the folder",
                     onClick = onExportTo,
                 ) { Chevron() }
                 // Its own page in settings now; a way there from here too.
-                OptionRow(Icons.Default.DateRange, "Microjournal", description = if (journalOn) "On · prompts, moods" else "Off", onClick = onJournalSettings) { Chevron() }
+                OptionRow(LineIcons.DateRange, "Microjournal", description = if (journalOn) "On · prompts, moods" else "Off", onClick = onJournalSettings) { Chevron() }
             }
             voice?.let {
                 Spacer(Modifier.height(16.dp))
@@ -328,17 +329,17 @@ internal fun NoteTargetsContent(
                 targets.forEach { target ->
                     val example = Notes.line("your words", SAMPLE_TIME, target.style, target.withDate)
                     OptionRow(
-                        if (target.daily) Icons.Default.DateRange else Icons.Default.List,
+                        if (target.daily) LineIcons.DateRange else Icons.Default.List,
                         target.name,
                         description = if (target.daily) "Today's note, e.g. ${Notes.dailyPath(target.dailyFormat, SAMPLE_TIME.toLocalDate())} · adds “$example”" else "Adds “$example”",
                         onClick = { onEdit(target) },
                     ) {
-                        IconButton(onClick = { onRemove(target) }) { Icon(Icons.Default.Close, contentDescription = "remove", tint = c.textFaint) }
+                        IconButton(onClick = { onRemove(target) }) { Icon(LineIcons.Close, contentDescription = "remove", tint = c.textFaint) }
                     }
                 }
                 if (targets.size < Notes.MAX_TARGETS) {
-                    OptionRow(Icons.Default.Add, "Add a file", description = "Pick a note, then name it, e.g. scratchpad or movies list", onClick = onAdd) { Chevron() }
-                    OptionRow(Icons.Default.DateRange, "Add today's daily note", description = "Pick your daily-notes folder; today's note is made if it isn't there", onClick = onAddDaily) { Chevron() }
+                    OptionRow(LineIcons.Add, "Add a file", description = "Pick a note, then name it, e.g. scratchpad or movies list", onClick = onAdd) { Chevron() }
+                    OptionRow(LineIcons.DateRange, "Add today's daily note", description = "Pick your daily-notes folder; today's note is made if it isn't there", onClick = onAddDaily) { Chevron() }
                 }
                 Text(
                     "For Obsidian, pick the note inside your vault. Vaults in Documents work; one kept in Obsidian's own app folder can't be reached by other apps.",
@@ -350,13 +351,13 @@ internal fun NoteTargetsContent(
             Spacer(Modifier.height(16.dp))
             SectionCard(title = "Then", subtitle = "After a note goes into one of your files; from the lock screen, once you unlock") {
                 OptionRow(
-                    Icons.Default.Refresh,
+                    LineIcons.Refresh,
                     "Run an app's shortcut",
                     description = afterNote?.let { "${it.app} · ${it.label}" } ?: "Nothing. A sync app's “Sync now” sends the file on at once",
                     onClick = onPickAfterNote,
                 ) { Chevron() }
                 if (afterNote != null) {
-                    OptionRow(Icons.Default.Refresh, "Also when you leave Obsidian", description = "So what you wrote there is sent on too; on the lock screen, once you unlock") {
+                    OptionRow(LineIcons.Refresh, "Also when you leave Obsidian", description = "So what you wrote there is sent on too; on the lock screen, once you unlock") {
                         ObsidianToggle(syncAfterObsidian, onSyncAfterObsidian)
                     }
                 }
@@ -407,7 +408,7 @@ private fun TargetDialog(target: NoteTarget, isNew: Boolean, onChange: (NoteTarg
                     selected = target.style.ordinal,
                     onSelect = { onChange(target.copy(style = NoteStyle.entries[it])) },
                 )
-                OptionRow(Icons.Default.DateRange, "Date and time first") {
+                OptionRow(LineIcons.DateRange, "Date and time first") {
                     ObsidianToggle(target.withDate, { onChange(target.copy(withDate = it)) })
                 }
                 VerbatimText(

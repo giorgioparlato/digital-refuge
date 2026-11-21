@@ -1,5 +1,6 @@
 package app.bedtime.ui.components
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.layout.width
@@ -57,7 +58,17 @@ fun HourDots(
     /** A long press: the widget's own sheet. */
     onLongClick: (() -> Unit)? = null,
 ) {
-    val calm = calmColor?.let { Color(it) } ?: text.copy(alpha = 0.55f)
+    // In a greyscale session every colour turns to grey, so calm and distracted hours would look the
+    // same; there, the calm ones fade further and the distracted ones are what stand out.
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val greyscale = if (androidx.compose.ui.platform.LocalInspectionMode.current) {
+        false
+    } else {
+        val session by app.bedtime.engine.Engine.state(context).collectAsStateWithLifecycle()
+        session?.greyscale == true
+    }
+    val chosenCalm = calmColor?.let { Color(it) } ?: text.copy(alpha = 0.55f)
+    val calm = if (greyscale) chosenCalm.copy(alpha = chosenCalm.alpha * 0.45f) else chosenCalm
     val distracted = distractedColor?.let { Color(it) } ?: accent
     Row(
         modifier

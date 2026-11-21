@@ -1,5 +1,6 @@
 package app.bedtime.ui.edit
 
+import app.bedtime.ui.components.LineIcons
 import app.bedtime.ui.homestyle.ModuleListEditor
 import app.bedtime.data.Screen
 import app.bedtime.data.Modules
@@ -83,6 +84,7 @@ import app.bedtime.ui.apps.PickerMode
 import app.bedtime.ui.components.AppIconStack
 import app.bedtime.engine.Stats
 import app.bedtime.ui.components.BedtimeIcons
+import app.bedtime.ui.components.IconBadge
 import app.bedtime.ui.components.BottomActionBar
 import app.bedtime.ui.components.Callout
 import app.bedtime.ui.components.CalloutKind
@@ -638,6 +640,7 @@ internal fun ScheduleEditContent(
                 // ---------------------------------------------------------------- what it shuts
                 FoldSection(
                     title = "What it shuts",
+                    icon = BedtimeIcons.Block,
                     summary = shutsSummary(draft),
                     open = open == SECTION_SHUTS,
                     onToggle = { toggle(SECTION_SHUTS) },
@@ -687,6 +690,7 @@ internal fun ScheduleEditContent(
                 // ---------------------------------------------------------------- how the phone feels
                 FoldSection(
                     title = "How the phone feels",
+                    icon = BedtimeIcons.Contrast,
                     summary = feelsSummary(draft),
                     open = open == SECTION_FEELS,
                     onToggle = { toggle(SECTION_FEELS) },
@@ -698,7 +702,7 @@ internal fun ScheduleEditContent(
                         enabled = editable,
                     ) { ObsidianToggle(draft.greyscale, { onDraftChange(draft.copy(greyscale = it)) }, enabled = editable) }
                     OptionRow(
-                        Icons.Default.Home,
+                        LineIcons.Home,
                         "Quiet home screen",
                         description = "Minimal homescreen, shows the apps and widgets you choose",
                         enabled = editable,
@@ -771,14 +775,14 @@ internal fun ScheduleEditContent(
                     AnimatedVisibility(draft.lockNotes == LockNotes.OWN) {
                         Column {
                             OptionRow(
-                                Icons.Default.Notifications,
+                                LineIcons.Notifications,
                                 "From these apps",
                                 description = if (draft.lockNoteApps.isEmpty()) "None yet" else pluralApps(draft.lockNoteApps.size),
                                 enabled = editable,
                                 onClick = onPickNoteApps,
                             ) { Chevron() }
                             OptionRow(
-                                Icons.Default.Person,
+                                LineIcons.Person,
                                 "And these people",
                                 description = if (draft.lockNotePeople.isEmpty()) "Nobody yet" else draft.lockNotePeople.sorted().joinToString(", "),
                                 enabled = editable,
@@ -822,6 +826,7 @@ internal fun ScheduleEditContent(
                 // ---------------------------------------------------------------- leaving early
                 FoldSection(
                     title = "Leaving early",
+                    icon = LineIcons.Lock,
                     summary = leavingSummary(draft, newPassword.isNotBlank()),
                     open = open == SECTION_LEAVING,
                     onToggle = { toggle(SECTION_LEAVING) },
@@ -880,6 +885,7 @@ internal fun ScheduleEditContent(
                 // ---------------------------------------------------------------- more options
                 FoldSection(
                     title = "More options",
+                    icon = LineIcons.Settings,
                     summary = moreSummary(
                         draft,
                         draft.editWindow?.let { "${formatMinuteOfDay(context, it.startMinute)}–${formatMinuteOfDay(context, it.endMinute)}" },
@@ -941,7 +947,7 @@ internal fun ScheduleEditContent(
                             )
                         }
                     }
-                    OptionRow(Icons.Default.Info, "Journal after each unlock", description = "While it runs, asks why you unlocked and how you feel. One tap to skip", enabled = editable) {
+                    OptionRow(LineIcons.Info, "Journal after each unlock", description = "While it runs, asks why you unlocked and how you feel. One tap to skip", enabled = editable) {
                         ObsidianToggle(draft.askWhy, { on -> onDraftChange(draft.copy(askWhy = on)) }, enabled = editable)
                     }
                     AnimatedVisibility(draft.askWhy) {
@@ -986,7 +992,7 @@ internal fun ScheduleEditContent(
                     SectionLabel("Changing it")
                     // Whether this page itself can be changed: after leaving early, and at what hours.
                     OptionRow(
-                        Icons.Default.Lock,
+                        LineIcons.Lock,
                         "Keep this shut after leaving early",
                         description = "If you leave early, it stays blocked until it would have ended",
                         enabled = editable,
@@ -999,7 +1005,7 @@ internal fun ScheduleEditContent(
                     }
                     if (!isBlock) {
                         OptionRow(
-                            Icons.Default.Lock,
+                            LineIcons.Lock,
                             "Changeable only at certain hours",
                             description = "Outside them it can't be edited, switched off or deleted.",
                             enabled = editable,
@@ -1092,7 +1098,7 @@ internal fun EditorHeader(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
-                Icons.AutoMirrored.Filled.ArrowBack,
+                LineIcons.ArrowBack,
                 contentDescription = "Back",
                 tint = c.textMuted,
                 modifier = Modifier.clip(CircleShape).clickable(onClick = onBack).padding(4.dp).size(22.dp),
@@ -1115,17 +1121,17 @@ internal fun EditorHeader(
                     .padding(vertical = 4.dp, horizontal = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(name.ifBlank { placeholder }, style = MaterialTheme.typography.labelLarge, color = c.textFaint)
+                Text(name.ifBlank { placeholder }, fontSize = 17.sp, fontWeight = FontWeight.Medium, color = c.textNormal)
                 if (editable) {
-                    Spacer(Modifier.width(7.dp))
-                    Icon(Icons.Default.Create, contentDescription = null, tint = c.textFaint, modifier = Modifier.size(13.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Icon(LineIcons.Create, contentDescription = null, tint = c.textMuted, modifier = Modifier.size(15.dp))
                 }
             }
             if (onInfo != null) {
                 Icon(
-                    Icons.Default.Info,
+                    LineIcons.Info,
                     contentDescription = "How it works",
-                    tint = c.textFaint,
+                    tint = c.textMuted,
                     modifier = Modifier.clip(CircleShape).clickable(onClick = onInfo).padding(4.dp).size(20.dp),
                 )
             }
@@ -1245,6 +1251,8 @@ internal fun FoldSection(
     open: Boolean,
     onToggle: () -> Unit,
     note: String? = null,
+    /** A small tile before the title, so each section can be found by its shape as well as its name. */
+    icon: ImageVector? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val c = Obsidian.colors
@@ -1252,12 +1260,16 @@ internal fun FoldSection(
         Row(
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(10.dp))
+                .clip(RoundedCornerShape(12.dp))
                 .clickable(onClick = onToggle)
-                .heightIn(min = 58.dp)
-                .padding(vertical = 8.dp, horizontal = 2.dp),
+                .heightIn(min = 64.dp)
+                .padding(vertical = 10.dp, horizontal = 2.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            if (icon != null) {
+                IconBadge(icon, size = 36.dp)
+                Spacer(Modifier.width(14.dp))
+            }
             Column(Modifier.weight(1f).padding(end = 10.dp)) {
                 Text(
                     title,
@@ -1265,12 +1277,14 @@ internal fun FoldSection(
                     fontWeight = FontWeight.Medium,
                     color = if (open) c.accentText else c.textNormal,
                 )
-                Text(summary, style = MaterialTheme.typography.bodySmall, color = c.textFaint)
+                Spacer(Modifier.height(2.dp))
+                Text(summary, style = MaterialTheme.typography.bodySmall, color = c.textMuted)
             }
             Icon(
-                if (open) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                if (open) LineIcons.KeyboardArrowUp else LineIcons.KeyboardArrowDown,
                 contentDescription = null,
-                tint = c.textFaint,
+                tint = c.textMuted,
+                modifier = Modifier.size(20.dp),
             )
         }
         AnimatedVisibility(open) {
@@ -1279,7 +1293,7 @@ internal fun FoldSection(
                     Text(
                         note,
                         style = MaterialTheme.typography.bodySmall,
-                        color = c.textFaint,
+                        color = c.textMuted,
                         modifier = Modifier.padding(bottom = 4.dp),
                     )
                 }
@@ -1374,7 +1388,7 @@ internal fun StartFrom(labels: List<String>, chosen: Int?, enabled: Boolean, onP
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text("Start from", style = MaterialTheme.typography.bodySmall, color = Obsidian.colors.textFaint, modifier = Modifier.align(Alignment.CenterVertically))
+        Text("Start from", style = MaterialTheme.typography.bodySmall, color = Obsidian.colors.textMuted, modifier = Modifier.align(Alignment.CenterVertically))
         labels.forEachIndexed { i, label -> QuickChip(label, chosen == i, enabled) { onPick(i) } }
     }
 }

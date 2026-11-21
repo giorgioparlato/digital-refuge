@@ -55,6 +55,11 @@ data class ObsidianColors(
     val blue: Color,
     /** Between normal and muted: second lines that still need to be read, like a limit's details. */
     val textSoft: Color,
+    /**
+     * Time in distracting apps, wherever it's drawn: a clay rose, chosen 2026-11-21 so it stands
+     * apart from the tan of all phone time. [orange] stays only for the "2nd time today" pills.
+     */
+    val distracting: Color,
 )
 
 val DarkObsidian = ObsidianColors(
@@ -68,7 +73,7 @@ val DarkObsidian = ObsidianColors(
     interactiveHover = Color(0xFF424242),
     textNormal = Color(0xFFD7C0A3), // d-gray-20
     textMuted = Color(0xFFAB916D), // d-gray-40
-    textFaint = Color(0xFF917959), // d-gray-50
+    textFaint = Color(0xFFA08868), // d-gray-50 lifted (2026-11-21): 4.4:1 on the page, readable at 12 sp
     // A sage green, chosen in Claude Design (2026-10-17) over Primary's brighter one: calmer, and
     // still rich enough to tell from orange in the charts.
     accent = Color(0xFF58A87C),
@@ -80,6 +85,7 @@ val DarkObsidian = ObsidianColors(
     green = Color(0xFF86BC9F),
     blue = Color(0xFF4DB2D1), // d-blue-20
     textSoft = Color(0xFFC2A982),
+    distracting = Color(0xFFD9826F),
 )
 
 /** The app is dark only (2026-10-17). This palette stays for the archived design mock-up tests. */
@@ -104,6 +110,7 @@ val LightObsidian = ObsidianColors(
     green = Color(0xFF329562), // l-green-30
     blue = Color(0xFF3079B0),
     textSoft = Color(0xFF73593A),
+    distracting = Color(0xFFB8604D),
 )
 
 val Inter = FontFamily(
@@ -113,8 +120,9 @@ val Inter = FontFamily(
     Font(R.font.inter_700, FontWeight.Bold),
 )
 
+/** Inter, with tabular figures so times and counts keep their width as they tick. */
 private fun TextStyle.inter(weight: FontWeight? = null) =
-    copy(fontFamily = Inter, letterSpacing = 0.sp, fontWeight = weight ?: fontWeight)
+    copy(fontFamily = Inter, letterSpacing = 0.sp, fontWeight = weight ?: fontWeight, fontFeatureSettings = "tnum")
 
 private val ObsidianTypography = Typography().let { t ->
     Typography(

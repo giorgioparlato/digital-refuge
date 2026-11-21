@@ -1,5 +1,6 @@
 package app.bedtime.ui.setup
 
+import app.bedtime.ui.components.LineIcons
 import androidx.compose.runtime.mutableLongStateOf
 import app.bedtime.service.HomeRole
 import android.Manifest
@@ -299,16 +300,28 @@ private fun Group(name: String) {
 @Composable
 private fun Step(title: String, done: Boolean, about: String, content: @Composable ColumnScope.() -> Unit = {}) {
     val c = Obsidian.colors
+    // A done step folds to its name, so only what's left takes room; a tap opens it again.
+    var open by remember(title, done) { mutableStateOf(!done) }
     SectionCard {
-        Row {
+        Row(
+            if (done) Modifier.clip(RoundedCornerShape(10.dp)).clickable(onClickLabel = if (open) "fold" else "open") { open = !open } else Modifier,
+        ) {
             Tick(done)
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Column {
                     Text(title, style = MaterialTheme.typography.titleMedium, color = c.textNormal)
-                    Text(about, style = MaterialTheme.typography.bodyMedium, color = c.textMuted, modifier = Modifier.padding(top = 2.dp))
+                    if (open) Text(about, style = MaterialTheme.typography.bodyMedium, color = c.textMuted, modifier = Modifier.padding(top = 2.dp))
                 }
-                content()
+                if (open) content()
+            }
+            if (done) {
+                Icon(
+                    if (open) LineIcons.KeyboardArrowUp else LineIcons.KeyboardArrowDown,
+                    contentDescription = null,
+                    tint = c.textMuted,
+                    modifier = Modifier.padding(start = 8.dp).size(20.dp),
+                )
             }
         }
     }
@@ -327,7 +340,7 @@ private fun Tick(done: Boolean) {
             .border(1.5.dp, if (done) c.accentFill else c.textFaint, CircleShape),
         contentAlignment = Alignment.Center,
     ) {
-        if (done) Icon(Icons.Default.Check, contentDescription = "done", tint = c.textOnAccent, modifier = Modifier.size(14.dp))
+        if (done) Icon(LineIcons.Check, contentDescription = "done", tint = c.textOnAccent, modifier = Modifier.size(14.dp))
     }
 }
 

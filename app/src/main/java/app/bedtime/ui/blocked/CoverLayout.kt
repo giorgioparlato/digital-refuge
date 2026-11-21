@@ -7,10 +7,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.TextButton
@@ -37,8 +39,10 @@ internal data class CoverAction(val label: String, val onClick: () -> Unit, val 
 /**
  * Every full screen that stands between you and something — a blocked app, a locked Settings page,
  * the pause before opening, a day's minutes gone — is laid out the same way: an emblem, a pill
- * saying why, a large light title, a line of explanation, and at the foot one main way on with the
- * quieter ones under it. The fade is the one the unlock pages and the home header use.
+ * saying why, a large light title, a line of explanation, and at the foot one main way on, the full
+ * width, with the quieter ones under it. The words sit to the left, like the rest of the app, unless
+ * [centered] (the pause, whose emblem is the breathing disc). When there are words chosen for this
+ * cover, they're what you read first: the title becomes a small line above them.
  */
 @Composable
 internal fun CoverLayout(
@@ -50,17 +54,19 @@ internal fun CoverLayout(
     pill: String? = null,
     pillColor: Color = Obsidian.colors.accentText,
     secondary: List<CoverAction> = emptyList(),
-    /** Words chosen for this cover (yours, or one of the app's), set apart under the explanation. */
+    /** Words chosen for this cover (yours, or one of the app's), the largest words on it. */
     message: String? = null,
+    centered: Boolean = false,
 ) {
     val c = Obsidian.colors
+    val align = if (centered) TextAlign.Center else TextAlign.Start
     Column(
         modifier
             .fillMaxSize()
             .background(Brush.verticalGradient(listOf(c.fade, c.bgPrimary)))
             .safeDrawingPadding()
             .padding(horizontal = 28.dp, vertical = 24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+        horizontalAlignment = if (centered) Alignment.CenterHorizontally else Alignment.Start,
     ) {
         Spacer(Modifier.weight(1f))
         emblem()
@@ -69,27 +75,28 @@ internal fun CoverLayout(
             StatusPill(pill, pillColor)
             Spacer(Modifier.height(16.dp))
         }
-        Text(title, fontSize = 28.sp, fontWeight = FontWeight.Light, lineHeight = 34.sp, color = c.textNormal, textAlign = TextAlign.Center)
-        if (body != null) {
-            Spacer(Modifier.height(12.dp))
-            Text(body, style = MaterialTheme.typography.bodyLarge, color = c.textMuted, textAlign = TextAlign.Center)
-        }
         if (message != null) {
-            Spacer(Modifier.height(18.dp))
-            Text(
-                "“$message”",
-                style = MaterialTheme.typography.bodyLarge.copy(fontStyle = FontStyle.Italic),
-                color = c.textNormal,
-                textAlign = TextAlign.Center,
-            )
+            Text(title, style = MaterialTheme.typography.bodyLarge, color = c.textMuted, textAlign = align)
+            Spacer(Modifier.height(14.dp))
+            Text("“$message”", fontSize = 28.sp, fontWeight = FontWeight.Light, lineHeight = 35.sp, color = c.textNormal, textAlign = align)
+            if (body != null) {
+                Spacer(Modifier.height(14.dp))
+                Text(body, style = MaterialTheme.typography.bodyLarge, color = c.textMuted, textAlign = align)
+            }
+        } else {
+            Text(title, fontSize = 28.sp, fontWeight = FontWeight.Light, lineHeight = 34.sp, color = c.textNormal, textAlign = align)
+            if (body != null) {
+                Spacer(Modifier.height(12.dp))
+                Text(body, style = MaterialTheme.typography.bodyLarge, color = c.textMuted, textAlign = align)
+            }
         }
         Spacer(Modifier.weight(1.3f))
-        SoftPillButton(primary.label, onClick = primary.onClick, enabled = primary.enabled)
+        SoftPillButton(primary.label, onClick = primary.onClick, enabled = primary.enabled, modifier = Modifier.fillMaxWidth())
         secondary.forEachIndexed { i, action ->
             TextButton(
                 onClick = action.onClick,
                 enabled = action.enabled,
-                modifier = Modifier.fillMaxWidth().padding(top = if (i == 0) 4.dp else 0.dp),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(top = if (i == 0) 4.dp else 0.dp),
             ) {
                 Text(action.label, color = if (action.enabled) c.textMuted else c.textFaint)
             }
@@ -97,13 +104,11 @@ internal fun CoverLayout(
     }
 }
 
-/** The covers' emblem: an icon on two soft rings of the accent. */
+/** The covers' emblem: an icon on a small soft tile, quiet enough to leave the words in charge. */
 @Composable
 internal fun CoverEmblem(icon: ImageVector) {
     val c = Obsidian.colors
-    Box(Modifier.size(124.dp).clip(CircleShape).background(c.accent.copy(alpha = 0.08f)), contentAlignment = Alignment.Center) {
-        Box(Modifier.size(88.dp).clip(CircleShape).background(c.accent.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
-            Icon(icon, contentDescription = null, tint = c.accent, modifier = Modifier.size(44.dp))
-        }
+    Box(Modifier.size(56.dp).clip(RoundedCornerShape(18.dp)).background(c.bgSecondary), contentAlignment = Alignment.Center) {
+        Icon(icon, contentDescription = null, tint = c.accentText, modifier = Modifier.size(28.dp))
     }
 }

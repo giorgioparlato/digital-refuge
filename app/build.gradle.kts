@@ -20,12 +20,18 @@ android {
     namespace = "app.bedtime"
     compileSdk = 35
 
+    lint {
+        // Compose's check misfires here: it flags every produceState in the app, including ones whose
+        // first line is `value = …`. Every other check still runs before a release.
+        disable += "ProduceStateDoesNotAssignValue"
+    }
+
     defaultConfig {
         applicationId = "app.bedtime"
         minSdk = 26
         targetSdk = 35
-        versionCode = 98
-        versionName = "0.9.52"
+        versionCode = 99
+        versionName = "0.9.53"
         // Whisper, for transcribing voice notes: built for 64-bit phones only (cpp/CMakeLists.txt), the
         // rest of the app as before.
         externalNativeBuild {

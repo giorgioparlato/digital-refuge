@@ -1,5 +1,6 @@
 package app.bedtime.ui.minimal
 
+import app.bedtime.ui.components.LineIcons
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 
@@ -191,7 +192,7 @@ internal fun QuickNoteContent(
             }
             if (onClose != null) {
                 Box(Modifier.size(36.dp).clip(RoundedCornerShape(50)).clickable(onClickLabel = "close", onClick = onClose), contentAlignment = Alignment.Center) {
-                    Icon(Icons.Default.Close, contentDescription = null, tint = p.faint, modifier = Modifier.size(20.dp))
+                    Icon(LineIcons.Close, contentDescription = null, tint = p.faint, modifier = Modifier.size(20.dp))
                 }
             }
         }
@@ -281,7 +282,7 @@ internal fun QuickNoteContent(
                         target == null || target.uri.startsWith("refuge:") ->
                             Icon(BedtimeIcons.Refuge, contentDescription = "refuge notes", tint = p.accent, modifier = Modifier.size(22.dp))
                         vault != null && Notes.inFolder(target.uri, vault) -> AppIcon(FolderIndex.OBSIDIAN, "Obsidian", 22.dp)
-                        else -> Icon(if (target.daily) Icons.Default.DateRange else Icons.Default.Edit, contentDescription = null, tint = p.accent, modifier = Modifier.size(20.dp))
+                        else -> Icon(if (target.daily) LineIcons.DateRange else LineIcons.Edit, contentDescription = null, tint = p.accent, modifier = Modifier.size(20.dp))
                     }
                 }
                 Spacer(Modifier.width(14.dp))
@@ -403,12 +404,12 @@ private fun OfferRow(offer: DrawerResult, style: HomeStyle, onClick: () -> Unit)
         is DrawerResult.Clock -> Icons.Default.PlayArrow to app.bedtime.data.ClockActions.label(offer.action) { h, m ->
             app.bedtime.ui.formatTime(context, java.time.LocalDate.now().atTime(h, m).atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()).lowercase()
         }
-        is DrawerResult.AddEvent -> Icons.Default.DateRange to AppDrawer.eventLabel(offer.event) {
+        is DrawerResult.AddEvent -> LineIcons.DateRange to AppDrawer.eventLabel(offer.event) {
             app.bedtime.ui.formatTime(context, it.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli())
         }
         is DrawerResult.StartBlock -> app.bedtime.ui.components.ScheduleIcons.of(offer.block.icon) to
             "start ${offer.block.name.lowercase()} · ${app.bedtime.ui.formatMinutes(offer.block.durationMinutes.toLong())}"
-        is DrawerResult.Calculation -> Icons.Default.Add to "= ${offer.answer} · copy"
+        is DrawerResult.Calculation -> LineIcons.Add to "= ${offer.answer} · copy"
         else -> return
     }
     Row(

@@ -1,5 +1,8 @@
 package app.bedtime.ui.minimal
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.runtime.getValue
+import app.bedtime.ui.components.LineIcons
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.Icons
 import androidx.compose.ui.input.pointer.pointerInput
@@ -184,7 +187,7 @@ internal fun SessionHeader(
                 // Nothing coming today: a small calendar icon still opens the week ahead, unless you'd rather not.
                 Module.EVENT -> if (calendar == null && style.calendarIcon(screen) && (onCalendar != null || onHold != null)) {
                     Icon(
-                        Icons.Default.DateRange,
+                        LineIcons.DateRange,
                         contentDescription = "the week ahead",
                         tint = p.faint,
                         modifier = Modifier.padding(top = 6.dp).size(28.dp).clip(RoundedCornerShape(8.dp))
@@ -253,17 +256,38 @@ internal fun SessionHeader(
 private fun SessionPill(scheduleName: String?, until: String?, scheduleIcon: String?, style: HomeStyle) {
     if (scheduleName == null || until == null) return
     val p = style.palette()
+    // How much of the session has passed, as a thin line under the words: read from the running
+    // session itself, so the pill needs nothing more passed down to it.
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val progress = if (androidx.compose.ui.platform.LocalInspectionMode.current) {
+        null
+    } else {
+        val state by app.bedtime.engine.Engine.state(context).collectAsStateWithLifecycle()
+        val now = app.bedtime.ui.components.rememberNow(everySecond = false)
+        state?.active?.filter { it.schedule.name == scheduleName }?.maxByOrNull { it.end }?.let { o ->
+            val at = now.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+            ((at - o.start).toFloat() / (o.end - o.start).coerceAtLeast(1)).coerceIn(0f, 1f)
+        }
+    }
     Spacer(Modifier.height(16.dp))
-    Row(
+    Column(
         Modifier
-            .clip(RoundedCornerShape(50))
+            .width(androidx.compose.foundation.layout.IntrinsicSize.Max)
+            .clip(RoundedCornerShape(16.dp))
             .background(p.chip)
-            .padding(horizontal = 12.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .padding(horizontal = 14.dp, vertical = 8.dp),
     ) {
-        Icon(ScheduleIcons.of(scheduleIcon), contentDescription = null, tint = p.accent, modifier = Modifier.size(14.dp))
-        Spacer(Modifier.width(6.dp))
-        Text("$scheduleName · until $until", style = MaterialTheme.typography.labelLarge, color = p.muted)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(ScheduleIcons.of(scheduleIcon), contentDescription = null, tint = p.accent, modifier = Modifier.size(14.dp))
+            Spacer(Modifier.width(6.dp))
+            Text("$scheduleName · until $until", style = MaterialTheme.typography.labelLarge, color = p.muted)
+        }
+        if (progress != null) {
+            Spacer(Modifier.height(7.dp))
+            Box(Modifier.fillMaxWidth().height(2.dp).clip(RoundedCornerShape(50)).background(p.text.copy(alpha = 0.14f))) {
+                Box(Modifier.fillMaxWidth(progress).height(2.dp).clip(RoundedCornerShape(50)).background(p.muted))
+            }
+        }
     }
 }
 

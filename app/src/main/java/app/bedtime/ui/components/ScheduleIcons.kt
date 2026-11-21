@@ -38,8 +38,8 @@ object ScheduleIcons {
             "headphones" to BedtimeIcons.Headphones,
             "target" to BedtimeIcons.Target,
             "hourglass" to BedtimeIcons.Hourglass,
-            "work" to Icons.Default.Build,
-            "home" to Icons.Default.Home,
+            "work" to LineIcons.Build,
+            "home" to LineIcons.Home,
             "heart" to Icons.Default.Favorite,
             "star" to Icons.Default.Star,
         )

@@ -1,5 +1,6 @@
 package app.bedtime.ui.apps
 
+import app.bedtime.ui.components.LineIcons
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -180,7 +181,7 @@ internal fun AppPickerContent(
                 onValueChange = onQueryChange,
                 modifier = Modifier.padding(horizontal = PageGutter, vertical = 12.dp),
                 placeholder = "Search apps",
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = c.textMuted) },
+                leadingIcon = { Icon(LineIcons.Search, contentDescription = null, tint = c.textMuted) },
             )
             if (apps == null) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

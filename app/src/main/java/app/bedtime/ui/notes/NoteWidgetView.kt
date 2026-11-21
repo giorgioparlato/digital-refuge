@@ -1,5 +1,6 @@
 package app.bedtime.ui.notes
 
+import app.bedtime.ui.components.LineIcons
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.foundation.rememberScrollState
@@ -166,7 +167,7 @@ fun NoteWidgetView(
                             Modifier.size((19 * textScale).dp).clip(RoundedCornerShape(5.dp)).background(if (line.box) accent else text.copy(alpha = 0.18f)),
                             contentAlignment = Alignment.Center,
                         ) {
-                            if (line.box) androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size((14 * textScale).dp))
+                            if (line.box) androidx.compose.material3.Icon(LineIcons.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size((14 * textScale).dp))
                         }
                     }
                 }

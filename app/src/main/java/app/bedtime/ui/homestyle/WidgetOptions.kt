@@ -1,5 +1,6 @@
 package app.bedtime.ui.homestyle
 
+import app.bedtime.ui.components.LineIcons
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -363,6 +364,6 @@ private fun PickRow(name: String, chosen: Boolean, onClick: () -> Unit) {
     val c = Obsidian.colors
     Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
         VerbatimText(name, style = MaterialTheme.typography.bodyLarge, color = if (chosen) c.accentText else c.textNormal, modifier = Modifier.weight(1f))
-        if (chosen) Icon(Icons.Default.Check, contentDescription = "chosen", tint = c.accent, modifier = Modifier.size(18.dp))
+        if (chosen) Icon(LineIcons.Check, contentDescription = "chosen", tint = c.accent, modifier = Modifier.size(18.dp))
     }
 }

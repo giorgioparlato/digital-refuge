@@ -129,7 +129,7 @@ fun ObsidianTopBar(
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (onBack != null) {
                 Icon(
-                    Icons.AutoMirrored.Filled.ArrowBack,
+                    LineIcons.ArrowBack,
                     contentDescription = "Back",
                     tint = c.textMuted,
                     modifier = Modifier.clip(CircleShape).clickable(onClick = onBack).padding(4.dp).size(22.dp),
@@ -140,7 +140,7 @@ fun ObsidianTopBar(
             actions()
             LocalSettingsSearch.current?.let { search ->
                 Icon(
-                    Icons.Default.Search,
+                    LineIcons.Search,
                     contentDescription = "find a setting",
                     tint = c.textMuted,
                     modifier = Modifier.clip(CircleShape).clickable(onClick = search).padding(8.dp).size(22.dp),
@@ -149,26 +149,34 @@ fun ObsidianTopBar(
         }
         if (subtitle != null) {
             Spacer(Modifier.height(6.dp))
-            Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = c.textFaint)
+            // Muted rather than faint: faint is too low in contrast for text this small.
+            Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = c.textMuted)
         }
     }
 }
 
-/** A small green heading over a group of rows or controls. The one section label the app uses. */
+/**
+ * A small green heading over a group of rows or controls. The one section label the app uses: 13 sp
+ * semibold, with more room above it than below, so it reads as belonging to what follows.
+ */
 @Composable
 fun SectionLabel(text: String, modifier: Modifier = Modifier) {
     Text(
         text,
-        style = MaterialTheme.typography.labelLarge,
+        fontSize = 13.sp,
+        fontWeight = FontWeight.SemiBold,
         color = Obsidian.colors.accentText,
-        modifier = modifier.padding(top = 20.dp, bottom = 8.dp),
+        modifier = modifier.padding(top = 22.dp, bottom = 10.dp),
     )
 }
 
 /** Every card's corners, so lists, settings and stats all share one shape. */
 val CardRadius = 18.dp
 
-/** Rounded card grouping related settings. */
+/**
+ * Rounded card grouping related settings: one raised surface with no outline. The app is dark only,
+ * so the surface's own shade is enough to set it apart from the page.
+ */
 @Composable
 fun SectionCard(
     modifier: Modifier = Modifier,
@@ -183,7 +191,7 @@ fun SectionCard(
             .fillMaxWidth()
             .clip(shape)
             .background(c.bgSecondary)
-            .border(1.dp, c.border, shape)
+            .then(if (c.isDark) Modifier else Modifier.border(1.dp, c.border, shape))
             .padding(16.dp),
     ) {
         if (title != null) Text(title, style = MaterialTheme.typography.titleMedium, color = c.textNormal)
@@ -195,17 +203,23 @@ fun SectionCard(
     }
 }
 
-/** Icon on a soft tinted square. */
+/**
+ * Icon on a soft square. The square is the neutral raised grey and the icon carries the colour, so a
+ * page of rows reads as one calm list rather than a column of green tiles. A [tint] other than the
+ * accent (red for delete, say) still tints the square a little, to keep its warning.
+ */
 @Composable
-fun IconBadge(icon: ImageVector, tint: Color = Obsidian.colors.accent, size: Dp = 38.dp) {
+fun IconBadge(icon: ImageVector, tint: Color = Obsidian.colors.accentText, size: Dp = 36.dp) {
+    val c = Obsidian.colors
+    val neutral = tint == c.accentText || tint == c.accent
     Box(
         Modifier
             .size(size)
             .clip(RoundedCornerShape(size * 0.3f))
-            .background(tint.copy(alpha = 0.15f)),
+            .background(if (neutral) c.interactive else tint.copy(alpha = 0.15f)),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(size * 0.55f))
+        Icon(icon, contentDescription = null, tint = if (tint == c.accent) c.accentText else tint, modifier = Modifier.size(size * 0.52f))
     }
 }
 
@@ -258,7 +272,7 @@ fun SubOptionRow(label: String, content: @Composable () -> Unit) {
 @Composable
 fun Chevron() {
     Icon(
-        Icons.AutoMirrored.Filled.KeyboardArrowRight,
+        LineIcons.KeyboardArrowRight,
         contentDescription = null,
         tint = Obsidian.colors.textFaint,
         modifier = Modifier.padding(start = 4.dp),
@@ -281,7 +295,6 @@ fun TimeTile(
         modifier
             .clip(shape)
             .background(c.bgPrimaryAlt)
-            .border(1.dp, c.border, shape)
             .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 14.dp),
     ) {
@@ -316,16 +329,17 @@ fun styledTime(time: String, suffixSize: TextUnit): AnnotatedString {
 fun QuickChip(text: String, selected: Boolean, enabled: Boolean = true, onClick: () -> Unit) {
     val c = Obsidian.colors
     val shape = RoundedCornerShape(50)
+    // Picked: the solid deep green with light words, so the choice is clear at a glance.
     Text(
         text,
         modifier = Modifier
             .clip(shape)
-            .background(if (selected) c.accent.copy(alpha = 0.16f) else Color.Transparent)
-            .border(1.dp, if (selected) c.accent.copy(alpha = 0.5f) else c.border, shape)
+            .background(if (selected) c.accentFill else Color.Transparent)
+            .border(1.dp, if (selected) c.accentFill else c.border, shape)
             .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 8.dp),
+            .padding(horizontal = 14.dp, vertical = 9.dp),
         style = MaterialTheme.typography.labelLarge,
-        color = if (selected) c.accentText else c.textMuted,
+        color = if (selected) c.textOnAccent else c.textMuted,
     )
 }
 
@@ -351,7 +365,7 @@ fun StepChips(labels: List<String>, current: Int) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (done) {
-                    Icon(Icons.Default.Check, contentDescription = "Done", tint = c.green, modifier = Modifier.size(14.dp))
+                    Icon(LineIcons.Check, contentDescription = "Done", tint = c.green, modifier = Modifier.size(14.dp))
                     Spacer(Modifier.width(4.dp))
                 }
                 Text(
@@ -381,7 +395,7 @@ fun StatusDot(done: Boolean, number: Int? = null) {
         contentAlignment = Alignment.Center,
     ) {
         if (done) {
-            Icon(Icons.Default.Check, contentDescription = "Done", tint = c.textOnAccent, modifier = Modifier.size(16.dp))
+            Icon(LineIcons.Check, contentDescription = "Done", tint = c.textOnAccent, modifier = Modifier.size(16.dp))
         } else if (number != null) {
             Text("$number", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = c.textMuted)
         }
@@ -402,12 +416,14 @@ fun StatusPill(text: String, color: Color) {
     )
 }
 
-/** Bottom bar for the screen's main action; follows the keyboard and gesture bar. */
+/**
+ * Bottom bar for the screen's main action; follows the keyboard and gesture bar. No rule above it:
+ * the page fades into it, so the button seems to rest on the page rather than on a separate bar.
+ */
 @Composable
 fun BottomActionBar(content: @Composable () -> Unit) {
     val c = Obsidian.colors
-    Column(Modifier.fillMaxWidth().background(c.bgPrimary)) {
-        HorizontalDivider(color = c.border)
+    Column(Modifier.fillMaxWidth().background(Brush.verticalGradient(0f to c.bgPrimary.copy(alpha = 0f), 0.35f to c.bgPrimary))) {
         Box(
             Modifier
                 .navigationBarsPadding()
@@ -448,16 +464,19 @@ fun ObsidianToggle(checked: Boolean, onCheckedChange: (Boolean) -> Unit, enabled
 @Composable
 fun SoftPillButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
     val c = Obsidian.colors
+    // The deep green, which reads as calm rather than loud; while it can't be pressed yet, only an
+    // outline, so "waiting…" looks like waiting.
+    val shape = RoundedCornerShape(50)
     Box(
         modifier
-            .heightIn(min = 48.dp)
-            .clip(RoundedCornerShape(50))
-            .background(c.accent.copy(alpha = 0.16f))
+            .heightIn(min = 56.dp)
+            .clip(shape)
+            .then(if (enabled) Modifier.background(c.accentFill) else Modifier.border(1.dp, c.border, shape))
             .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
-            .padding(horizontal = 28.dp, vertical = 12.dp),
+            .padding(horizontal = 28.dp, vertical = 14.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text, fontSize = 16.sp, fontWeight = FontWeight.Medium, color = if (enabled) c.accentText else c.textMuted)
+        Text(text, fontSize = 16.sp, fontWeight = FontWeight.Medium, color = if (enabled) c.textOnAccent else c.textMuted)
     }
 }
 
@@ -475,7 +494,7 @@ fun AddCircleButton(label: String, onClick: () -> Unit, modifier: Modifier = Mod
             .semantics { contentDescription = label },
         contentAlignment = Alignment.Center,
     ) {
-        Icon(Icons.Default.Add, contentDescription = null, tint = c.accentText, modifier = Modifier.size(22.dp))
+        Icon(LineIcons.Add, contentDescription = null, tint = c.accentText, modifier = Modifier.size(22.dp))
     }
 }
 
@@ -488,13 +507,12 @@ fun CtaButton(
     compact: Boolean = false,
 ) {
     val c = Obsidian.colors
+    // A pill, like every other button in the app.
     Button(
         onClick = onClick,
-        modifier = modifier
-            .heightIn(min = if (compact) 40.dp else 50.dp)
-            .topHighlight(RoundedCornerShape(12.dp), if (c.isDark) 0.12f else 0.25f),
+        modifier = modifier.heightIn(min = if (compact) 40.dp else 52.dp),
         enabled = enabled,
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(50),
         colors = ButtonDefaults.buttonColors(
             containerColor = c.accentFill,
             contentColor = c.textOnAccent,
@@ -522,9 +540,9 @@ fun PlainButton(
     val c = Obsidian.colors
     Button(
         onClick = onClick,
-        modifier = modifier.heightIn(min = 48.dp).topHighlight(RoundedCornerShape(12.dp), if (c.isDark) 0.06f else 0.7f),
+        modifier = modifier.heightIn(min = 48.dp),
         enabled = enabled,
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(50),
         colors = ButtonDefaults.buttonColors(
             containerColor = c.interactive,
             contentColor = if (destructive) c.red else c.textNormal,
@@ -563,9 +581,9 @@ fun Callout(
         CalloutKind.SUCCESS -> c.green
     }
     val icon = when (kind) {
-        CalloutKind.WARNING -> Icons.Default.Warning
-        CalloutKind.SUCCESS -> Icons.Default.CheckCircle
-        else -> Icons.Default.Info
+        CalloutKind.WARNING -> LineIcons.Warning
+        CalloutKind.SUCCESS -> LineIcons.CheckCircle
+        else -> LineIcons.Info
     }
     Column(
         modifier
@@ -590,23 +608,21 @@ fun Callout(
     }
 }
 
-/** Obsidian tag pill. */
+/**
+ * A small pill naming a fact. Neutral grey by default, since green means something you can tap or a
+ * thing kept; [accent] for a live state like "on now".
+ */
 @Composable
-fun Tag(text: String, modifier: Modifier = Modifier) {
+fun Tag(text: String, modifier: Modifier = Modifier, accent: Boolean = false) {
     val c = Obsidian.colors
     Text(
         text,
         modifier = modifier
             .clip(RoundedCornerShape(50))
-            .background(c.accent.copy(alpha = 0.15f))
-            .drawBehind {
-                // Primary's tags sit on a slight inner shadow along the bottom edge.
-                val h = 1.5.dp.toPx()
-                drawRect(Color.Black.copy(alpha = if (c.isDark) 0.2f else 0.08f), Offset(0f, size.height - h), Size(size.width, h))
-            }
+            .background(if (accent) c.accent.copy(alpha = 0.15f) else c.interactive)
             .padding(horizontal = 9.dp, vertical = 3.dp),
         style = MaterialTheme.typography.labelMedium,
-        color = c.accentText,
+        color = if (accent) c.accentText else c.textMuted,
     )
 }
 
@@ -713,9 +729,9 @@ fun SegmentedChoice(options: List<String>, selected: Int, onSelect: (Int) -> Uni
     Row(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(c.bgPrimaryAlt)
-            .border(1.dp, c.border, RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(14.dp))
+            .background(c.bgSecondary)
+            .then(if (c.isDark) Modifier else Modifier.border(1.dp, c.border, RoundedCornerShape(14.dp)))
             .padding(4.dp),
     ) {
         options.forEachIndexed { index, label ->
@@ -723,8 +739,8 @@ fun SegmentedChoice(options: List<String>, selected: Int, onSelect: (Int) -> Uni
             Box(
                 Modifier
                     .weight(1f)
-                    .clip(RoundedCornerShape(9.dp))
-                    .background(if (on) (if (c.isDark) c.interactiveHover else c.bgSecondary) else Color.Transparent)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(if (on) c.interactive else Color.Transparent)
                     .clickable(enabled = enabled) { onSelect(index) }
                     .padding(vertical = 11.dp),
                 contentAlignment = Alignment.Center,

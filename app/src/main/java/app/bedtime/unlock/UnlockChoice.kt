@@ -65,6 +65,7 @@ internal fun UnlockLengthChoice(
             SoftPillButton(
                 if (picked == REST) "Continue · $restLabel" else "Continue · ${formatMinutes(picked.toLong())}",
                 onClick = { onChoose(picked.takeIf { it != REST }) },
+                modifier = Modifier.fillMaxWidth(),
             )
         },
     ) {

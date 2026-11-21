@@ -152,7 +152,8 @@ object Markdown {
      */
     fun styled(text: String, faint: Color, accent: Color): AnnotatedString = buildAnnotatedString {
         append(drawn(text))
-        val mark = SpanStyle(color = faint)
+        // The marks dimmer than the faint words, so they recede behind what they style.
+        val mark = SpanStyle(color = faint.copy(alpha = faint.alpha * 0.55f))
         var start = 0
         text.split("\n").forEach { line ->
             val end = start + line.length

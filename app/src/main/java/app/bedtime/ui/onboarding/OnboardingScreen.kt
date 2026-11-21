@@ -1,5 +1,6 @@
 package app.bedtime.ui.onboarding
 
+import app.bedtime.ui.components.LineIcons
 import androidx.compose.material.icons.filled.Edit
 
 import androidx.compose.material.icons.filled.Lock
@@ -109,19 +110,19 @@ fun OnboardingScreen(onDone: () -> Unit) {
             )
             Spacer(Modifier.height(24.dp))
             Point(
-                Icons.Default.Home,
+                LineIcons.Home,
                 "a quieter home screen",
                 "use refuge as your home screen: the time, a few widgets and your apps as words. use it only during " +
                     "sessions, or as your everyday launcher, with search for apps, people and more.",
             )
             Point(
-                Icons.Default.Lock,
+                LineIcons.Lock,
                 "a lock screen of its own",
                 "use refuge's lockscreen: the time, what's next today, and only the notifications from the apps and " +
                     "people you choose. tap or swipe up to unlock.",
             )
             Point(
-                Icons.Default.Edit,
+                LineIcons.Edit,
                 "notes and habits",
                 "jot a quick note from anywhere into refuge's notes or your own files, and tick off habits here or " +
                     "from your screens.",

@@ -1,5 +1,8 @@
 package app.bedtime.ui.minimal
 
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.border
+import app.bedtime.ui.components.LineIcons
 import app.bedtime.data.Shortcuts
 
 import app.bedtime.ui.components.rememberNow
@@ -1022,7 +1025,7 @@ internal fun MinimalHomeContent(
                         ),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(Icons.Default.Edit, contentDescription = "refuge notes", tint = p.faint, modifier = Modifier.size(22.dp))
+                        Icon(LineIcons.Edit, contentDescription = "refuge notes", tint = p.faint, modifier = Modifier.size(22.dp))
                     }
                     androidx.compose.material3.DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                         notesShortcuts.forEach { (label, go) ->
@@ -1034,34 +1037,45 @@ internal fun MinimalHomeContent(
                     }
                 }
             }
-            // With their words, or (asked for) their icons alone.
+            // The two ways out of a session: with their words, or (asked for) their icons alone, then
+            // in a thin ring so they still read apart from your own buttons.
             val worded = @Composable { icon: androidx.compose.ui.graphics.vector.ImageVector, word: String, onClick: () -> Unit ->
                 if (style.footWords) {
                     // Never broken over two lines, with the mark and notes beside them.
-                    TextButton(onClick = onClick, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp, vertical = 8.dp)) {
+                    TextButton(
+                        onClick = onClick,
+                        modifier = Modifier.heightIn(min = 48.dp),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 8.dp),
+                    ) {
                         Icon(icon, contentDescription = null, tint = p.faint, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(6.dp))
                         Text(word, color = p.faint, maxLines = 1, softWrap = false)
                     }
                 } else {
-                    IconButton(onClick = onClick) { Icon(icon, contentDescription = word, tint = p.faint, modifier = Modifier.size(20.dp)) }
+                    IconButton(onClick = onClick, modifier = Modifier.size(48.dp)) {
+                        Box(
+                            Modifier.size(40.dp).border(1.dp, p.faint.copy(alpha = 0.35f), CircleShape),
+                            contentAlignment = Alignment.Center,
+                        ) { Icon(icon, contentDescription = word, tint = p.faint, modifier = Modifier.size(19.dp)) }
+                    }
                 }
             }
-            val emergencyButton = @Composable { onClick: () -> Unit -> worded(Icons.Default.Warning, "emergency", onClick) }
+            // A phone rather than a warning sign: what's behind it is calling and the apps that always work.
+            val emergencyButton = @Composable { onClick: () -> Unit -> worded(LineIcons.Call, "emergency", onClick) }
             val arrow = @Composable {
-                IconButton(onClick = onOpenDrawer) {
-                    Icon(Icons.Default.KeyboardArrowUp, contentDescription = "all apps and search", tint = p.faint)
+                IconButton(onClick = onOpenDrawer, modifier = Modifier.size(48.dp)) {
+                    Icon(LineIcons.KeyboardArrowUp, contentDescription = "all apps and search", tint = p.faint, modifier = Modifier.size(22.dp))
                 }
             }
             val unlockOrUndo = @Composable {
                 if (onUndo != null) {
                     TextButton(onClick = onUndo) { Text("undo", color = p.accent, fontWeight = FontWeight.SemiBold) }
                 } else if (onUnlock != null) {
-                    worded(Icons.Default.Lock, "unlock", onUnlock)
+                    worded(LineIcons.Lock, "unlock", onUnlock)
                 }
             }
             val plain = @Composable { icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit ->
-                IconButton(onClick = onClick) { Icon(icon, contentDescription = label, tint = p.faint, modifier = Modifier.size(22.dp)) }
+                IconButton(onClick = onClick, modifier = Modifier.size(48.dp)) { Icon(icon, contentDescription = label, tint = p.faint, modifier = Modifier.size(22.dp)) }
             }
             // The foot's buttons in your order; unlock and emergency only in sessions.
             val all = style.foot().mapNotNull<app.bedtime.data.FootButton, @Composable () -> Unit> { button ->
@@ -1070,8 +1084,8 @@ internal fun MinimalHomeContent(
                     app.bedtime.data.FootButton.UNLOCK -> if (onUnlock != null) unlockOrUndo else null
                     app.bedtime.data.FootButton.ARROW -> arrow
                     app.bedtime.data.FootButton.NOTES -> notesButton
-                    app.bedtime.data.FootButton.HABITS -> onOpenHabits?.let { go -> @Composable { plain(Icons.Default.CheckCircle, "your habits", go) } }
-                    app.bedtime.data.FootButton.INSIGHTS -> onOpenInsights?.let { go -> @Composable { plain(app.bedtime.ui.components.BedtimeIcons.Leaf, "insights", go) } }
+                    app.bedtime.data.FootButton.HABITS -> onOpenHabits?.let { go -> @Composable { plain(LineIcons.CheckCircle, "your habits", go) } }
+                    app.bedtime.data.FootButton.INSIGHTS -> onOpenInsights?.let { go -> @Composable { plain(LineIcons.Insights, "insights", go) } }
                     app.bedtime.data.FootButton.EMERGENCY -> onEmergency?.let { go -> @Composable { emergencyButton(go) } }
                 }
             }

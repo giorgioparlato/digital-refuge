@@ -291,7 +291,7 @@ fun NowPlayingWidget(now: NowPlaying, text: Color, faint: Color, modifier: Modif
         MediaButton(if (now.playing) BedtimeIcons.Pause else Icons.Default.PlayArrow, if (now.playing) "pause" else "play", text, now.toggle)
         MediaButton(BedtimeIcons.Next, "next", faint, now.next)
         Box(Modifier.size(32.dp).clip(CircleShape).clickable(onClickLabel = "close the player", onClick = dismiss), contentAlignment = Alignment.Center) {
-            Icon(Icons.Default.Close, contentDescription = "close the player", tint = faint.copy(alpha = 0.7f), modifier = Modifier.size(16.dp))
+            Icon(LineIcons.Close, contentDescription = "close the player", tint = faint.copy(alpha = 0.7f), modifier = Modifier.size(16.dp))
         }
     }
 }

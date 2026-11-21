@@ -1,5 +1,6 @@
 package app.bedtime.ui.stats
 
+import app.bedtime.ui.components.LineIcons
 import java.time.LocalDateTime
 
 import app.bedtime.engine.LookBacks
@@ -362,7 +363,7 @@ private fun SectionsMenu(sessions: Boolean, habits: Boolean, moods: Boolean, onC
             listOf("Sessions" to sessions, "Habits" to habits, "Moods" to moods).forEach { (name, on) ->
                 androidx.compose.material3.DropdownMenuItem(
                     text = { Text(name, color = c.textNormal) },
-                    trailingIcon = { if (on) androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Default.Check, contentDescription = "shown", tint = c.accent) },
+                    trailingIcon = { if (on) androidx.compose.material3.Icon(LineIcons.Check, contentDescription = "shown", tint = c.accent) },
                     onClick = {
                         when (name) {
                             "Sessions" -> onChange(!sessions, habits, moods)

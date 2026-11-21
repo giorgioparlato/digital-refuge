@@ -111,7 +111,7 @@ fun <T> DragList(items: List<T>, key: (T) -> String, onMoved: (List<T>) -> Unit,
                                 }
                             },
                         contentAlignment = Alignment.Center,
-                    ) { Icon(Icons.Default.Menu, contentDescription = "drag to move", tint = c.textFaint, modifier = Modifier.size(20.dp)) }
+                    ) { Icon(LineIcons.Menu, contentDescription = "drag to move", tint = c.textFaint, modifier = Modifier.size(20.dp)) }
                 }
                 row(item)
             }

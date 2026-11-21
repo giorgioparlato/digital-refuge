@@ -1,5 +1,6 @@
 package app.bedtime.ui.homestyle
 
+import app.bedtime.ui.components.LineIcons
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -53,7 +54,7 @@ internal fun QuickRepliesDialog(replies: List<String>, onChange: (List<String>) 
                         Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                             Text("“$reply”", style = MaterialTheme.typography.bodyLarge, color = c.textNormal, modifier = Modifier.weight(1f))
                             Icon(
-                                Icons.Default.Close,
+                                LineIcons.Close,
                                 contentDescription = "delete",
                                 tint = c.textFaint,
                                 modifier = Modifier.size(32.dp).clip(CircleShape).clickable { onChange(replies - reply) }.padding(7.dp),

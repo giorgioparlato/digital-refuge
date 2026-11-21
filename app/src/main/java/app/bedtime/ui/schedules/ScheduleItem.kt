@@ -99,7 +99,7 @@ private fun ScheduleCard(
     Column(
         Modifier.fillMaxWidth().clip(shape)
             .background(if (running) c.accent.copy(alpha = 0.10f) else c.bgSecondary)
-            .border(1.dp, if (running) c.accent.copy(alpha = 0.45f) else c.border, shape)
+            .then(if (running) Modifier.border(1.dp, c.accentFill, shape) else Modifier)
             .clickable(onClickLabel = "Edit ${schedule.name}", onClick = onClick)
             .padding(18.dp),
     ) {
@@ -110,7 +110,7 @@ private fun ScheduleCard(
                     Text(schedule.name, style = MaterialTheme.typography.titleMedium, color = c.textNormal)
                     if (running) {
                         Spacer(Modifier.width(8.dp))
-                        Tag("on now")
+                        Tag("on now", accent = true)
                     }
                 }
                 Spacer(Modifier.height(3.dp))

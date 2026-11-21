@@ -1,5 +1,6 @@
 package app.bedtime.ui.stats
 
+import app.bedtime.ui.components.LineIcons
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -81,7 +82,7 @@ internal fun MoodStats(
     val written = entries.map { it.day }.toSet()
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(40.dp).clip(CircleShape).clickable { monthDay = month.minusMonths(1).atDay(1).toEpochDay() }, contentAlignment = Alignment.Center) {
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "the month before", tint = c.textMuted)
+            Icon(LineIcons.KeyboardArrowLeft, contentDescription = "the month before", tint = c.textMuted)
         }
         Text(
             month.atDay(1).format(DateTimeFormatter.ofPattern(if (month.year == today.year) "MMMM" else "MMMM yyyy", Locale.getDefault())),
@@ -92,7 +93,7 @@ internal fun MoodStats(
         )
         val latest = month >= YearMonth.from(today)
         Box(Modifier.size(40.dp).clip(CircleShape).clickable(enabled = !latest) { monthDay = month.plusMonths(1).atDay(1).toEpochDay() }, contentAlignment = Alignment.Center) {
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "the month after", tint = if (latest) c.textFaint.copy(alpha = 0.4f) else c.textMuted)
+            Icon(LineIcons.KeyboardArrowRight, contentDescription = "the month after", tint = if (latest) c.textFaint.copy(alpha = 0.4f) else c.textMuted)
         }
     }
     SectionCard(title = "Each day", subtitle = "Coloured by the mood tapped most. Tap a day for its entry") {

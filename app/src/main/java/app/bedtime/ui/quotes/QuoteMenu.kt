@@ -1,5 +1,6 @@
 package app.bedtime.ui.quotes
 
+import app.bedtime.ui.components.LineIcons
 import androidx.compose.material.icons.filled.Settings
 import android.widget.Toast
 import androidx.compose.foundation.layout.Box
@@ -77,7 +78,7 @@ fun QuoteMenu(
             )
             DropdownMenuItem(
                 text = { Text("Don't show again", color = c.textNormal) },
-                leadingIcon = { Icon(Icons.Default.Clear, contentDescription = null, tint = c.textMuted) },
+                leadingIcon = { Icon(LineIcons.Clear, contentDescription = null, tint = c.textMuted) },
                 onClick = {
                     onHide()
                     onDismiss()
@@ -85,7 +86,7 @@ fun QuoteMenu(
             )
             DropdownMenuItem(
                 text = { Text("Another one", color = c.textNormal) },
-                leadingIcon = { Icon(Icons.Default.Refresh, contentDescription = null, tint = c.textMuted) },
+                leadingIcon = { Icon(LineIcons.Refresh, contentDescription = null, tint = c.textMuted) },
                 onClick = {
                     onAnother()
                     onDismiss()
@@ -94,7 +95,7 @@ fun QuoteMenu(
             if (onWidget != null) {
                 DropdownMenuItem(
                     text = { Text("The quote widget…", color = c.textNormal) },
-                    leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null, tint = c.textMuted) },
+                    leadingIcon = { Icon(LineIcons.Settings, contentDescription = null, tint = c.textMuted) },
                     onClick = {
                         onWidget()
                         onDismiss()

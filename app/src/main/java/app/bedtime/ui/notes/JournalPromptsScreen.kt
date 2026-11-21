@@ -1,5 +1,6 @@
 package app.bedtime.ui.notes
 
+import app.bedtime.ui.components.LineIcons
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -119,7 +120,7 @@ internal fun JournalPromptsContent(sections: List<JournalSection>, onChange: (Li
                             if (name.isNotBlank()) onChange(Journal.renamed(sections, section.id, name.trim()))
                         }
                         Icon(
-                            Icons.Default.Delete,
+                            LineIcons.Delete,
                             contentDescription = "delete this section",
                             tint = c.textFaint,
                             modifier = Modifier.size(40.dp).clip(RoundedCornerShape(50)).clickable { deleting = section }.padding(10.dp),
@@ -137,7 +138,7 @@ internal fun JournalPromptsContent(sections: List<JournalSection>, onChange: (Li
                                 onChange(if (edited.isBlank()) Journal.withoutPrompt(sections, section.id, i) else Journal.editedPrompt(sections, section.id, i, edited.trim()))
                             }
                             Icon(
-                                Icons.Default.Clear,
+                                LineIcons.Clear,
                                 contentDescription = "delete this prompt",
                                 tint = c.textFaint,
                                 modifier = Modifier.size(40.dp).clip(RoundedCornerShape(50)).clickable { onChange(Journal.withoutPrompt(sections, section.id, i)) }.padding(10.dp),

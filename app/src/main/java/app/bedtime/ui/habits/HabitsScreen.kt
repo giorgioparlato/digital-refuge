@@ -1,5 +1,6 @@
 package app.bedtime.ui.habits
 
+import app.bedtime.ui.components.LineIcons
 import app.bedtime.data.Screen
 import androidx.compose.material.icons.filled.Lock
 import app.bedtime.ui.components.ObsidianToggle
@@ -132,7 +133,7 @@ internal fun HabitsContent(
             // At the foot, once they're set up: a tab of their own, as notes can have.
             onHabitsTab?.let { set ->
                 app.bedtime.ui.components.SectionCard {
-                    app.bedtime.ui.components.OptionRow(Icons.Default.CheckCircle, "A habits tab", description = "Your habits at refuge's foot, beside focus and insights") {
+                    app.bedtime.ui.components.OptionRow(LineIcons.CheckCircle, "A habits tab", description = "Your habits at refuge's foot, beside focus and insights") {
                         app.bedtime.ui.components.ObsidianToggle(habitsTab, set)
                     }
                 }
@@ -210,6 +211,7 @@ internal fun HabitsBody(
 @Composable
 private fun HabitCard(habit: Habit, marks: Map<Long, Int>, today: Long, onTick: () -> Unit, onStep: (HabitStep) -> Unit, onOpen: () -> Unit) {
     val c = Obsidian.colors
+    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
     val tint = habit.tint(c.accent)
     val state = Habits.day(habit, marks, today)
     val kept = state == HabitDay.DONE || state == HabitDay.MET
@@ -231,11 +233,19 @@ private fun HabitCard(habit: Habit, marks: Map<Long, Int>, today: Long, onTick: 
                             habit.kind == HabitKind.COUNT -> "one more"
                             else -> "tick ${habit.name}"
                         },
-                        onClick = { if (habit.isSet) unfolded = !unfolded else onTick() },
+                        onClick = {
+                            if (habit.isSet) {
+                                unfolded = !unfolded
+                            } else {
+                                // A light tick for a habit ticked.
+                                haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                                onTick()
+                            }
+                        },
                     ),
                 contentAlignment = Alignment.Center,
             ) {
-                if (state == HabitDay.DONE) Icon(Icons.Default.Check, contentDescription = null, tint = c.bgPrimary, modifier = Modifier.size(20.dp))
+                if (state == HabitDay.DONE) Icon(LineIcons.Check, contentDescription = null, tint = c.bgPrimary, modifier = Modifier.size(20.dp))
                 else if (habit.isSet) Text("${Habits.stepsTicked(habit, marks[today] ?: 0)}/${habit.steps.size}", style = MaterialTheme.typography.labelSmall, color = c.textMuted)
                 else if (habit.kind == HabitKind.COUNT) Text("+", style = MaterialTheme.typography.titleMedium, color = c.textMuted)
             }
@@ -361,7 +371,7 @@ private fun HabitEditDialog(habit: Habit, isNew: Boolean, onDismiss: () -> Unit,
                                 modifier = Modifier.weight(1f),
                             )
                             Icon(
-                                Icons.Default.Close,
+                                LineIcons.Close,
                                 contentDescription = "remove ${step.name}",
                                 tint = c.textFaint,
                                 modifier = Modifier.padding(start = 4.dp).clip(CircleShape).clickable { draft = draft.copy(steps = draft.steps.filterNot { it.bit == step.bit }) }.padding(8.dp),
@@ -384,7 +394,7 @@ private fun HabitEditDialog(habit: Habit, isNew: Boolean, onDismiss: () -> Unit,
                             keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Done),
                         )
                         Icon(
-                            Icons.Default.Add,
+                            LineIcons.Add,
                             contentDescription = "add the step",
                             tint = if (step.isNotBlank()) c.accent else c.textFaint,
                             modifier = Modifier.padding(start = 4.dp).clip(CircleShape).clickable(enabled = step.isNotBlank()) { addStep() }.padding(8.dp),
@@ -395,10 +405,10 @@ private fun HabitEditDialog(habit: Habit, isNew: Boolean, onDismiss: () -> Unit,
                     NumberStepper(draft.target, { draft = draft.copy(target = it, times = 1, days = 1) }, 1..1000, title = "aim", presets = listOf(5, 8, 10, 20, 30, 50, 100))
                     ObsidianTextField(draft.unit, { draft = draft.copy(unit = it.take(20)) }, placeholder = "reps, pages, glasses…")
                 }
-                OptionRow(Icons.Default.Home, "In the home screen's habits widget") {
+                OptionRow(LineIcons.Home, "In the home screen's habits widget") {
                     ObsidianToggle(draft.shownOn(Screen.HOME), { draft = draft.withShownOn(Screen.HOME, it) })
                 }
-                OptionRow(Icons.Default.Lock, "In the lock screen's habits widget") {
+                OptionRow(LineIcons.Lock, "In the lock screen's habits widget") {
                     ObsidianToggle(draft.shownOn(Screen.LOCK), { draft = draft.withShownOn(Screen.LOCK, it) })
                 }
                 Text("Its colour", style = MaterialTheme.typography.labelLarge, color = c.textMuted)

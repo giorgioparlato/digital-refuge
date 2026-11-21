@@ -1,5 +1,6 @@
 package app.bedtime.ui.notes
 
+import app.bedtime.ui.components.LineIcons
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -50,18 +51,18 @@ fun MicrojournalSettingsScreen(onBack: () -> Unit, onOpenToday: () -> Unit, onOp
             )
             Spacer(Modifier.height(16.dp))
             SectionCard {
-                OptionRow(Icons.Default.DateRange, "Microjournal", description = if (s.journalOn) "On" else "Off until you want it") {
+                OptionRow(LineIcons.DateRange, "Microjournal", description = if (s.journalOn) "On" else "Off until you want it") {
                     ObsidianToggle(s.journalOn, { on -> set { it.copy(journalOn = on) } })
                 }
                 if (s.journalOn) {
-                    OptionRow(Icons.Default.Edit, "Today's entry", onClick = onOpenToday) { Chevron() }
-                    OptionRow(Icons.Default.Edit, "Prompts while writing", description = "A button away, hidden until you ask; off, no button at all") {
+                    OptionRow(LineIcons.Edit, "Today's entry", onClick = onOpenToday) { Chevron() }
+                    OptionRow(LineIcons.Edit, "Prompts while writing", description = "A button away, hidden until you ask; off, no button at all") {
                         ObsidianToggle(s.journalPrompts, { on -> set { it.copy(journalPrompts = on) } })
                     }
                     if (s.journalPrompts) {
-                        OptionRow(Icons.Default.Edit, "Sections and prompts", description = "Start from the suggestions; change, delete or add your own", onClick = onOpenPrompts) { Chevron() }
+                        OptionRow(LineIcons.Edit, "Sections and prompts", description = "Start from the suggestions; change, delete or add your own", onClick = onOpenPrompts) { Chevron() }
                     }
-                    OptionRow(Icons.Default.Edit, "Moods", description = app.bedtime.ui.settings.moodsWords(s), onClick = onOpenMoods) { Chevron() }
+                    OptionRow(LineIcons.Edit, "Moods", description = app.bedtime.ui.settings.moodsWords(s), onClick = onOpenMoods) { Chevron() }
                 }
             }
             Spacer(Modifier.height(28.dp))

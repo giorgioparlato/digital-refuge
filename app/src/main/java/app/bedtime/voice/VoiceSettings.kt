@@ -1,5 +1,6 @@
 package app.bedtime.voice
 
+import app.bedtime.ui.components.LineIcons
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
@@ -81,7 +82,7 @@ fun VoiceSettingsCard() {
         OptionRow(BedtimeIcons.Mic, "Voice notes") { ObsidianToggle(s.voiceOn, { on -> scope.launch { repo.updateSettings { it.copy(voiceOn = on) } } }) }
         if (!s.voiceOn) return@SectionCard
         OptionRow(
-            Icons.Default.DateRange,
+            LineIcons.DateRange,
             "Folder for recordings",
             description = folderName ?: "None yet. Your Obsidian vault's attachments folder, for one: Obsidian plays them",
             onClick = { pickFolder.launch(null) },

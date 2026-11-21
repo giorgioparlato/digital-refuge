@@ -1,5 +1,6 @@
 package app.bedtime.ui.edit
 
+import app.bedtime.ui.components.LineIcons
 import androidx.compose.runtime.getValue
 
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -176,13 +177,13 @@ internal fun UnlockStepsEditor(
 private fun StepHeader(kind: StepKind, editable: Boolean, onRemove: () -> Unit) {
     val icon = when (kind) {
         StepKind.WAIT -> BedtimeIcons.Hourglass
-        StepKind.TYPE -> Icons.Default.Edit
-        StepKind.WRITE -> Icons.Default.Create
-        StepKind.PASSWORD -> Icons.Default.Lock
+        StepKind.TYPE -> LineIcons.Edit
+        StepKind.WRITE -> LineIcons.Create
+        StepKind.PASSWORD -> LineIcons.Lock
     }
     OptionRow(icon, kind.title, description = kind.description, enabled = editable) {
         if (editable) {
-            IconButton(onClick = onRemove) { Icon(Icons.Default.Close, contentDescription = "remove ${kind.title}", tint = Obsidian.colors.textFaint) }
+            IconButton(onClick = onRemove) { Icon(LineIcons.Close, contentDescription = "remove ${kind.title}", tint = Obsidian.colors.textFaint) }
         }
     }
 }
@@ -242,7 +243,7 @@ internal fun TypingSettings(length: Int, onLength: (Int) -> Unit, source: TextSo
 /** "Harder each time", and by how much, in tenths: 15 is 1.5× the time before. */
 @Composable
 internal fun HarderStep(on: Boolean, onToggle: (Boolean) -> Unit, tenths: Int, onTenths: (Int) -> Unit, editable: Boolean, description: String) {
-    OptionRow(Icons.Default.Refresh, "Harder each time", description = description, enabled = editable) {
+    OptionRow(LineIcons.Refresh, "Harder each time", description = description, enabled = editable) {
         ObsidianToggle(on, onToggle, enabled = editable)
     }
     AnimatedVisibility(on) {

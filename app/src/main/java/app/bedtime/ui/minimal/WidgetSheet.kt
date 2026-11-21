@@ -1,5 +1,6 @@
 package app.bedtime.ui.minimal
 
+import app.bedtime.ui.components.LineIcons
 import androidx.compose.runtime.setValue
 
 import androidx.compose.runtime.getValue
@@ -77,7 +78,7 @@ internal fun WidgetSheet(
     screen: app.bedtime.data.Screen = app.bedtime.data.Screen.HOME,
     habits: List<app.bedtime.data.Habit> = emptyList(),
 ) {
-    Dialog(onDismissRequest = onDismiss) { WidgetSheetContent(module, style, sessionOwned, handlers, onDismiss, notes, screen, habits) }
+    HomeSheetDialog(onDismiss) { WidgetSheetContent(module, style, sessionOwned, handlers, onDismiss, notes, screen, habits) }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -95,17 +96,17 @@ internal fun WidgetSheetContent(
     habits: List<app.bedtime.data.Habit> = emptyList(),
 ) {
     val p = style.palette()
+    // A sheet from the bottom, like everything a widget opens: the same shape whether you tap it or hold it.
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(24.dp))
-            .background(p.background)
-            .border(1.dp, p.faint.copy(alpha = 0.25f), RoundedCornerShape(24.dp))
-            .padding(vertical = 18.dp),
+            .sheetSurface(p.background, p.faint)
+            .padding(top = 10.dp, bottom = 18.dp),
     ) {
+        SheetHandle(p.faint)
         Text(module.label, style = MaterialTheme.typography.titleMedium, color = p.text, modifier = Modifier.padding(horizontal = 22.dp).padding(bottom = 6.dp))
-        handlers.openApp?.let { open -> Action(Icons.AutoMirrored.Filled.KeyboardArrowRight, "Open the ${module.label.lowercase()} app", p) { open(); onDone() } }
-        handlers.hideEvent?.takeIf { module == Module.EVENT }?.let { hide -> Action(Icons.Default.Clear, "Hide this event until it's over", p) { hide(); onDone() } }
+        handlers.openApp?.let { open -> Action(LineIcons.KeyboardArrowRight, "Open the ${module.label.lowercase()} app", p) { open(); onDone() } }
+        handlers.hideEvent?.takeIf { module == Module.EVENT }?.let { hide -> Action(LineIcons.Clear, "Hide this event until it's over", p) { hide(); onDone() } }
         // The same options, in the same order, as on the Widgets page; hints are left to that page.
         val options = WidgetOptions.of(module, style, screen, handlers.change, notes, habits, handlers.habitShown)
         Column(Modifier.heightIn(max = 460.dp).verticalScroll(rememberScrollState())) {
@@ -153,11 +154,11 @@ internal fun WidgetSheetContent(
                         if (option.items.isNotEmpty()) Label(if (screen == app.bedtime.data.Screen.HOME) "Show on the home screen" else "Show on the lock screen", p)
                         option.items.forEach { (id, name, on) -> Ticked(name, on, p, verbatim = true) { option.set(id, !on) } }
                     }
-                    is WidgetOption.Link -> Action(Icons.AutoMirrored.Filled.KeyboardArrowRight, option.label, p) { handlers.open(option.route); onDone() }
+                    is WidgetOption.Link -> Action(LineIcons.KeyboardArrowRight, option.label, p) { handlers.open(option.route); onDone() }
                 }
             }
         }
-        Action(Icons.Default.Clear, "Hide from this screen", p) { handlers.hide(); onDone() }
+        Action(LineIcons.Clear, "Hide from this screen", p) { handlers.hide(); onDone() }
         Text(
             if (sessionOwned) "This session has its own widgets; hiding takes it off its list. " else "Bring it back from Widgets in digital refuge's settings.",
             style = MaterialTheme.typography.bodySmall,
@@ -185,7 +186,7 @@ private fun Ticked(label: String, on: Boolean, p: HomePalette, enabled: Boolean 
         } else {
             Text(label, style = MaterialTheme.typography.bodyLarge, color = colour, modifier = Modifier.weight(1f))
         }
-        if (on) Icon(Icons.Default.Check, contentDescription = "on", tint = p.accent, modifier = Modifier.size(18.dp))
+        if (on) Icon(LineIcons.Check, contentDescription = "on", tint = p.accent, modifier = Modifier.size(18.dp))
     }
 }
 
