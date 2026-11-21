@@ -57,8 +57,8 @@ fun OnboardingScreen(onDone: () -> Unit) {
                 .padding(bottom = 20.dp),
         ) {
             Text(
-                "digital refuge sets aside hours when your phone asks less of you. here is what happens in one of " +
-                    "them, and how to leave if you need to.",
+                "digital refuge blocks your distracting apps when you want a break from them. here's what happens " +
+                    "during a session, and how to leave early if you need to.",
                 style = MaterialTheme.typography.bodyLarge,
                 color = c.textMuted,
             )
@@ -67,34 +67,32 @@ fun OnboardingScreen(onDone: () -> Unit) {
             Point(
                 BedtimeIcons.Moon,
                 "a session begins",
-                "at the times you set, or whenever you start a block. the apps you named stop opening. your home " +
-                    "screen can become a short list of what you chose, the screen can fade to grey, and notifications " +
-                    "wait. music and alarms are never silenced.",
+                "at the times you set, or when you start a block, the apps you chose stop opening. your home screen " +
+                    "can switch to a short list of apps, the screen can turn grey, and notifications can wait. music " +
+                    "and alarms always work.",
             )
             Point(
                 BedtimeIcons.Hourglass,
                 "leaving early takes the steps you chose",
-                "a wait, a passage to type, a password — as many as you want, in that order. enough of a pause for an " +
-                    "urge to pass. they can grow with each unlock on the same day, and start fresh each morning.",
+                "you choose what leaving early asks for: a wait, a passage to copy, a few words of why, or a " +
+                    "password. the steps can get longer each time that day, and reset every morning.",
             )
             Point(
                 BedtimeIcons.Refuge,
                 "it stays put while it runs",
-                "a session's own settings can't be changed while it is running. that one isn't a choice: without it, " +
-                    "the easiest way out would simply be to edit the block.",
+                "you can't change a session's settings while it runs, otherwise the easiest way out would be to edit it.",
             )
             Point(
                 BedtimeIcons.Contrast,
                 "an emergency break",
-                "if a block allows one, you can step out for a few minutes without ending the session — for whatever " +
-                    "genuinely can't wait. it counts as an escape, and a full screen brings you back when it is over.",
+                "for something that can't wait, take a minute with no steps, without ending the session. when it's " +
+                    "over, refuge brings you back.",
             )
             Point(
                 BedtimeIcons.Leaf,
                 "limits hold every day",
-                "outside any session too, a limit can ask for a few breaths before an app opens, give it so many " +
-                    "minutes a day, or so many opens. making one stricter takes effect at once; loosening it, or " +
-                    "deleting it, waits until the next day, so it can't be used to get round today.",
+                "limits work outside sessions too: a short pause before an app opens, or a daily time budget. making " +
+                    "one stricter works straight away; loosening or deleting it starts the next day.",
             )
 
             Spacer(Modifier.height(6.dp))
@@ -104,8 +102,8 @@ fun OnboardingScreen(onDone: () -> Unit) {
             Text("around the sessions", fontSize = 22.sp, fontWeight = FontWeight.Light, color = c.textNormal)
             Spacer(Modifier.height(10.dp))
             Text(
-                "the rest of the app is there to make the phone itself quieter, in a session or not. all of it is " +
-                    "optional, and set in settings.",
+                "the rest of refuge helps make your phone quieter, in a session or not. all of it is optional, and " +
+                    "you set it up in settings.",
                 style = MaterialTheme.typography.bodyLarge,
                 color = c.textMuted,
             )
@@ -113,27 +111,26 @@ fun OnboardingScreen(onDone: () -> Unit) {
             Point(
                 Icons.Default.Home,
                 "a quieter home screen",
-                "the clock, the few things you want to see, and your apps as words. during a session with minimal " +
-                    "mode it takes over; it can also be your everyday home screen, with a search that finds apps, " +
-                    "people and a few things to do.",
+                "use refuge as your home screen: the time, a few widgets and your apps as words. use it only during " +
+                    "sessions, or as your everyday launcher, with search for apps, people and more.",
             )
             Point(
                 Icons.Default.Lock,
                 "a lock screen of its own",
-                "over android's own: the time, what's next today, a quote, and only the notifications from the apps " +
-                    "and people you pick. a tap, or a swipe from the bottom, unlocks.",
+                "use refuge's lockscreen: the time, what's next today, and only the notifications from the apps and " +
+                    "people you choose. tap or swipe up to unlock.",
             )
             Point(
                 Icons.Default.Edit,
                 "notes and habits",
-                "a thought typed into the search lands in refuge's notes, or in a file of yours. habits are ticked " +
-                    "off here or on your screens.",
+                "jot a quick note from anywhere into refuge's notes or your own files, and tick off habits here or " +
+                    "from your screens.",
             )
             Point(
                 BedtimeIcons.Target,
                 "insights",
-                "what the phone took, how your sessions held and which habits you kept, with a look back at each " +
-                    "week. only which app was in front is ever counted, never what was in it.",
+                "see your screen time, how your sessions went and which habits you kept. refuge only counts which " +
+                    "app is open, never what's in it.",
             )
 
             Spacer(Modifier.height(6.dp))
@@ -143,9 +140,9 @@ fun OnboardingScreen(onDone: () -> Unit) {
             Text("how firm to make it", fontSize = 22.sp, fontWeight = FontWeight.Light, color = c.textNormal)
             Spacer(Modifier.height(10.dp))
             Text(
-                "two things are always true: while a session runs its settings can't be changed, and leaving early " +
-                    "takes the steps you chose. everything below is one switch on top of that, in each schedule and " +
-                    "block. turn them all on for the firmest it gets, or pick only the ones you want.",
+                "two things always apply: you can't change a session while it runs, and leaving early takes the " +
+                    "steps you chose. everything below is an extra switch in each schedule and block: turn on the " +
+                    "ones you want.",
                 style = MaterialTheme.typography.bodyLarge,
                 color = c.textMuted,
             )
@@ -154,40 +151,37 @@ fun OnboardingScreen(onDone: () -> Unit) {
             Switch(
                 "1",
                 "harder each time",
-                "each unlock on the same day makes the wait and the typing longer, by a multiplier you set. it starts " +
-                    "fresh each morning.",
+                "each time you leave early on the same day, the wait and the typing get longer. it resets every morning.",
                 "how hard to leave",
             )
             Switch(
                 "2",
                 "keep this shut after leaving early",
-                "leave a session early and it stays as it is for what would have been the rest of it, so leaving " +
-                    "can't be used to soften it.",
+                "if you leave a session early, its apps stay blocked until it would have ended.",
                 "the ways around it",
             )
             Switch(
                 "3",
                 "no emergency break",
-                "with the break switched off there is no short way out, and the unlock steps are the only way through.",
+                "turn the emergency break off, and the unlock steps are the only way out.",
                 "the ways around it",
             )
             Switch(
                 "4",
                 "cover android's off switches",
-                "covers the settings screens that would switch blocking off, and the prompt to uninstall the app.",
+                "refuge covers the android settings that would turn blocking off or uninstall the app.",
                 "the ways around it",
             )
             Switch(
                 "5",
                 "full-screen reminder",
-                "if blocking is switched off at all, a full screen stays with you until you switch it back on.",
+                "if blocking gets turned off, a full screen stays up until you turn it back on.",
                 "the ways around it",
             )
 
             Text(
-                "open a block or schedule to set each one, under the heading on its tag. the ⓘ at the top of it " +
-                    "brings you back here. everything stays on this phone: there's no account, and the app has no " +
-                    "internet permission at all.",
+                "open a block or schedule to set the first three. the last two are in settings › focus. everything stays " +
+                    "on your phone: there's no account, and the app can't use the internet.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = c.textFaint,
             )

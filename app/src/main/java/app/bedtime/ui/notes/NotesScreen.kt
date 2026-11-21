@@ -455,7 +455,7 @@ internal fun NotesContent(
     ) { padding ->
         if (notes.isEmpty() && onJournal == null) {
             Text(
-                "Nothing yet. Type in the minimal home's search and pick “save in refuge notes”, or start one with +.",
+                "No notes yet. Tap + to write one, or double tap the home or lock screen for a quick note.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = c.textMuted,
                 modifier = Modifier.padding(padding).padding(horizontal = PageGutter, vertical = 8.dp),

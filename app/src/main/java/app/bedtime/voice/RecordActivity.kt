@@ -197,7 +197,7 @@ class RecordActivity : ComponentActivity() {
         /** A new recording from a gesture, once voice notes are set up; until then, where to set them up. */
         fun startIfReady(context: Context, settings: app.bedtime.data.AppSettings) {
             if (app.bedtime.data.Voice.ready(settings)) context.startActivity(intent(context))
-            else android.widget.Toast.makeText(context, "set up voice notes first: settings › quick notes", android.widget.Toast.LENGTH_SHORT).show()
+            else android.widget.Toast.makeText(context, "set up voice notes first in settings › notes", android.widget.Toast.LENGTH_SHORT).show()
         }
 
         /**

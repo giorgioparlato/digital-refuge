@@ -194,11 +194,11 @@ fun calendarWeek(events: List<CalendarEvent>, today: LocalDate, zone: ZoneId, da
 
 private const val DAY_MS = 86_400_000L
 
-/** The next seven days of events, read when asked for; empty without calendar access. */
+/** The next seven days of events, today's finished ones included, read when asked for; empty without calendar access. */
 suspend fun loadCalendarWeek(context: Context, now: LocalDateTime): List<CalendarDay> {
     if (!CalendarSource.hasPermission(context)) return emptyList()
     val zone = ZoneId.systemDefault()
-    val start = now.atZone(zone).toInstant().toEpochMilli()
+    val start = now.toLocalDate().atStartOfDay(zone).toInstant().toEpochMilli()
     // A day's margin each side, so all-day events (kept in UTC) are caught whatever the time zone.
     val end = now.toLocalDate().plusDays(8).atStartOfDay(zone).toInstant().toEpochMilli()
     val events = withContext(Dispatchers.IO) { CalendarSource.upcoming(context, start - DAY_MS, end, allDay = true) }

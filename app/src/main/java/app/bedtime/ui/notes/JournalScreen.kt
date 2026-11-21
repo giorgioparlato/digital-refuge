@@ -288,7 +288,7 @@ internal fun JournalPrompts(
                 }
             }
         }
-        if (sections.isEmpty()) Text("No sections yet: add some under settings › notes › microjournal.", style = MaterialTheme.typography.bodySmall, color = faint)
+        if (sections.isEmpty()) Text("No sections yet. Add some in settings › microjournal.", style = MaterialTheme.typography.bodySmall, color = faint)
     }
 }
 

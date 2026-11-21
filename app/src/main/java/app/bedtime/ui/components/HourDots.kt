@@ -34,7 +34,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
+import androidx.compose.foundation.layout.ColumnScope
 import app.bedtime.data.HourState
 import app.bedtime.data.HourlyUse
 import app.bedtime.ui.formatMinuteOfDay
@@ -119,7 +119,7 @@ fun HourDetailDialog(hours: DayHours, rule: HourRule, background: Color, text: C
     val report = HourlyUse.report(hours, yesterday, rule, nowHour)
     val labels = remember(report.topApps) { report.topApps.associate { (pkg, _) -> pkg to AppCatalog.label(context, pkg) } }
     val today = rememberUseDays(2, live = true).days[HourlyUse.today()]
-    Dialog(onDismissRequest = onDismiss) {
+    app.bedtime.ui.minimal.HomeSheetDialog(onDismiss) {
         HourDetailContent(report, hours, rule, labels, background, text, faint, accent, unlocks = today?.unlocks, unlockHours = today?.unlockHours.orEmpty(), onStats = onStats?.let { { onDismiss(); it() } })
     }
 }
@@ -144,11 +144,11 @@ fun HourDetailContent(
 ) {
     val context = LocalContext.current
     fun time(seconds: Long) = formatMinutes(seconds / 60)
-    // Without padding it sits inside a card of its own, so no corners of its own to cut the text.
-    Column(Modifier.fillMaxWidth().then(if (padding > 0.dp) Modifier.clip(RoundedCornerShape(24.dp)).background(background) else Modifier).padding(padding)) {
+    // With padding it's a sheet from the bottom, like the calendar's; without, it sits inside a card of its own.
+    val body: @Composable ColumnScope.() -> Unit = {
         if (title != null) {
-            Text(title, style = MaterialTheme.typography.titleMedium, color = text)
-            Spacer(Modifier.height(14.dp))
+            Text(title, style = MaterialTheme.typography.labelMedium, color = faint)
+            Spacer(Modifier.height(10.dp))
         }
         Figure("In your distracting apps", time(report.inApps), report.inAppsVsYesterday?.let { HourlyUse.versus(it, ::formatMinutes) }, text, faint, accent)
         Figure("On the phone at all", time(report.overall), report.overallVsYesterday?.let { HourlyUse.versus(it, ::formatMinutes) }, text, faint, accent)
@@ -221,6 +221,7 @@ fun HourDetailContent(
             )
         }
     }
+    if (padding > 0.dp) app.bedtime.ui.minimal.HomeSheet(background, faint, body) else Column(Modifier.fillMaxWidth(), content = body)
 }
 
 @Composable

@@ -140,7 +140,7 @@ internal fun MoodStats(
     SectionCard(title = "How often", subtitle = "Each mood this month, and when in the day it came up most. Tap one for its lines") {
         val counts = Moods.counts(marks)
         if (counts.isEmpty()) {
-            Text("No moods yet this month: tap how you feel when answering “why”, or in the microjournal.", style = MaterialTheme.typography.bodyMedium, color = c.textMuted)
+            Text("No moods yet this month. Add how you feel when you journal.", style = MaterialTheme.typography.bodyMedium, color = c.textMuted)
         }
         counts.forEach { (mood, count) ->
             Row(

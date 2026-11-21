@@ -142,8 +142,8 @@ object Routes {
     const val MOODS = "settings/moods"
     const val LAUNCHER = "settings/launcher"
     const val CREDITS = "settings/credits"
-    /** What else refuge does, a card each: from setup's end and settings › about. */
-    const val TOUR = "settings/tour"
+    /** What refuge does, a page each with a short demo: from setup's end and settings › get started. */
+    const val DISCOVER = "settings/discover"
     const val JOURNAL_TODAY = "notes/journal"
 
     /** A day's microjournal entry, from the moods in insights. */
@@ -155,6 +155,7 @@ object Routes {
     const val SETTINGS_SHORTCUTS = "settings/shortcuts"
     const val SETTINGS_ABOUT = "settings/about"
     const val SETTINGS_FOCUS = "settings/focus"
+    const val SETTINGS_START = "settings/start"
     const val SETTINGS_JOURNAL = "settings/journal"
     const val APP_LIST = "settings/applist"
     const val COVER_MESSAGES = "settings/messages"
@@ -165,7 +166,7 @@ object Routes {
     /** Settings' own pages: each has the search icon at the top right. */
     val SETTINGS_PAGES by lazy {
         setOf(
-            SETTINGS_HOME, SETTINGS_LOCK, SETTINGS_APPS, SETTINGS_SHORTCUTS, SETTINGS_ABOUT, SETTINGS_FOCUS, APP_LIST, COVER_MESSAGES, PROBLEMS,
+            SETTINGS_HOME, SETTINGS_LOCK, SETTINGS_APPS, SETTINGS_SHORTCUTS, SETTINGS_ABOUT, SETTINGS_FOCUS, SETTINGS_START, APP_LIST, COVER_MESSAGES, PROBLEMS,
             HOME_STYLE, HOME_STYLE_LOCK, STYLE_SHOWN, STYLE_SHOWN_LOCK, STYLE_SWIPES, STYLE_NOTIFICATIONS, STYLE_GESTURES,
             SEARCH, DISTRACTION, GROUPS, ALWAYS_AVAILABLE, QUICK_NOTES, JOURNAL_PROMPTS, WHY, MOODS, LAUNCHER, QUOTES, SETUP,
         )
@@ -399,7 +400,14 @@ private fun BedtimeNavigation(pendingRoute: String?, onRouteConsumed: () -> Unit
             top == Routes.MOODS -> app.bedtime.ui.settings.MoodsScreen(onBack = ::pop)
             top == Routes.LAUNCHER -> app.bedtime.ui.settings.LauncherScreen(onBack = ::pop)
             top == Routes.CREDITS -> app.bedtime.ui.settings.CreditsScreen(onBack = ::pop)
-            top == Routes.TOUR -> app.bedtime.ui.onboarding.TourScreen(onBack = ::pop, onOpen = ::push)
+            top == Routes.DISCOVER -> app.bedtime.ui.onboarding.DiscoverScreen(
+                onBack = ::pop,
+                onOpen = ::push,
+                onTab = { route ->
+                    tab = route
+                    popToTab()
+                },
+            )
             top.startsWith(Routes.EDIT) -> ScheduleEditScreen(
                 scheduleId = top.removePrefix(Routes.EDIT).ifEmpty { null },
                 template = null,

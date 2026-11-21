@@ -63,9 +63,9 @@ internal fun unlockSteps(unlock: UnlockConfig, hasNewPassword: Boolean): List<St
 
 /** A step an unlock can take, in the order they run. */
 private enum class StepKind(val title: String, val description: String) {
-    WAIT("Wait it out", "Start a timer, come back when it's done"),
+    WAIT("Wait it out", "Wait until a timer runs out"),
     TYPE("Type random text", "No pasting, typos don't count"),
-    WRITE("Write a few lines", "Why you want to unlock, or from prompts you choose"),
+    WRITE("Write a few lines", "Write why you want to unlock, or answer a prompt"),
     PASSWORD("A password", "Tip: let someone else choose it"),
     ;
 
@@ -102,7 +102,7 @@ internal fun UnlockStepsEditor(
     val added = StepKind.entries.filter { it.isOn(unlock) }
     Column {
         if (added.isEmpty()) {
-            Text("No steps yet: unlocking takes a single tap.", style = MaterialTheme.typography.bodySmall, color = c.textFaint, modifier = Modifier.padding(vertical = 6.dp))
+            Text("No steps yet: leaving early takes one tap.", style = MaterialTheme.typography.bodySmall, color = c.textFaint, modifier = Modifier.padding(vertical = 6.dp))
         }
         added.forEach { kind ->
             StepHeader(kind, editable) { onChange(kind.set(unlock, false)) }
@@ -137,7 +137,7 @@ internal fun UnlockStepsEditor(
                 (unlock.escalateFactor * 10).roundToInt(),
                 { v -> setUnlock { it.copy(escalateFactor = v / 10f) } },
                 editable,
-                description = "Each time in a day makes the wait, the typing and the writing longer",
+                description = "Each time in a day, the wait, typing and writing get longer",
             )
         }
         val left = StepKind.entries - added.toSet()
@@ -229,9 +229,9 @@ internal fun TypingSettings(length: Int, onLength: (Int) -> Unit, source: TextSo
     SegmentedChoice(options = listOf("Letters", "Words", "Passages"), selected = source.ordinal, onSelect = { onSource(TextSource.entries[it]) }, enabled = editable)
     Text(
         when (source) {
-            TextSource.LETTERS -> "Random letters and digits. Nothing to read, only to copy."
-            TextSource.WORDS -> "Plain words, easier on the eyes at midnight."
-            TextSource.PASSAGES -> "Quotes and longer passages, worth reading while you type them."
+            TextSource.LETTERS -> "Random letters and numbers to copy."
+            TextSource.WORDS -> "Simple words, easier to read late at night."
+            TextSource.PASSAGES -> "Quotes and longer passages, worth reading as you type."
         },
         style = MaterialTheme.typography.bodySmall,
         color = c.textFaint,

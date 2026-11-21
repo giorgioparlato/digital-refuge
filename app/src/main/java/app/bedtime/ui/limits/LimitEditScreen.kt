@@ -432,11 +432,10 @@ internal fun LimitEditContent(
                     // Said before any change is made, not only once one loosens it.
                     Text(
                         if (isNew) {
-                            "Once it's saved, making it stricter takes effect at once, while loosening it or deleting it " +
-                                "waits until the next day. Until tonight, while it's new, you can still change it freely."
+                            "Once it's saved, making it stricter works straight away. Loosening or deleting it starts " +
+                                "tomorrow. Until tonight, while it's new, you can change it freely."
                         } else {
-                            "Making it stricter takes effect at once. Loosening it — fewer apps, a shorter pause, more " +
-                                "minutes, an easier way to get more — or deleting it waits until the next day."
+                            "Making it stricter works straight away. Loosening or deleting it starts tomorrow."
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = c.textFaint,
@@ -491,7 +490,7 @@ internal fun LimitEditContent(
                             )
                             PauseKind.ASK -> {
                                 Text(
-                                    "A question and a box to write in; going on is a tap. What you write goes to its note.",
+                                    "Asks why you're opening it. One tap to skip. What you write goes to its note.",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = c.textMuted,
                                     modifier = Modifier.padding(top = 10.dp),
@@ -520,7 +519,7 @@ internal fun LimitEditContent(
                                 10 + rules.pauseGrowth / 10,
                                 { v -> setRules { it.copy(pauseGrowth = (v - 10) * 10) } },
                                 editable,
-                                description = "Each open in a day makes it longer, up to 8× the wait or 3× the text. A new day starts over",
+                                description = "Each open makes it longer, up to 8× the wait or 3× the text. Resets every day",
                             )
                         }
                         SubOptionRow("After it, open for") {
@@ -553,9 +552,9 @@ internal fun LimitEditContent(
                                     "The pause comes each time you open one. Back within a minute is the same visit."
                                 }
                                 else -> if (all) {
-                                    "Getting through the pause once opens all of these apps for $openFor min, coming and going as you like. Then the pause again."
+                                    "One pause opens all these apps for $openFor min. Then the pause comes back."
                                 } else {
-                                    "Each app opens for $openFor min after its pause, coming and going as you like. Then the pause again."
+                                    "After the pause, each app stays open for $openFor min. Then the pause comes back."
                                 }
                             },
                             style = MaterialTheme.typography.bodySmall,
@@ -575,7 +574,7 @@ internal fun LimitEditContent(
                     open = open == FOLD_DAILY,
                     onToggle = { toggle(FOLD_DAILY) },
                 ) {
-                    OptionRow(Icons.Default.Refresh, "Minutes a day", description = "Once they're used, the apps step aside until tomorrow", enabled = editable) {
+                    OptionRow(Icons.Default.Refresh, "Minutes a day", description = "Once used up, the apps are blocked until tomorrow", enabled = editable) {
                         ObsidianToggle(rules.dailyMinutes != null, { on -> setRules { it.copy(dailyMinutes = if (on) 30 else null) } }, enabled = editable)
                     }
                     AnimatedVisibility(rules.dailyMinutes != null) {
@@ -586,7 +585,7 @@ internal fun LimitEditContent(
                             )
                         }
                     }
-                    OptionRow(BedtimeIcons.Target, "Opens a day", description = "How many times they can be opened; coming back within a minute isn't another", enabled = editable) {
+                    OptionRow(BedtimeIcons.Target, "Opens a day", description = "How many times a day they can open. Coming back within a minute doesn't count", enabled = editable) {
                         ObsidianToggle(rules.dailyOpens != null, { on -> setRules { it.copy(dailyOpens = if (on) 5 else null) } }, enabled = editable)
                     }
                     AnimatedVisibility(rules.dailyOpens != null) {
@@ -636,9 +635,9 @@ internal fun LimitEditContent(
                         }
                         Text(
                             when (rules.outOfTime) {
-                                OutOfTime.TOMORROW -> "No way to get more. The apps come back at midnight."
+                                OutOfTime.TOMORROW -> "There's no way to get more. The apps are back at midnight."
                                 OutOfTime.MORE_TIME -> "The steps below give you a set amount more, and get longer each time if you choose."
-                                OutOfTime.CHOOSE -> "When you need more, you first say how much — some minutes, or the rest of today — then do the steps below."
+                                OutOfTime.CHOOSE -> "To get more time, choose how much, then do the steps below."
                                 OutOfTime.REST_OF_DAY -> "The steps below lift the limit until midnight."
                             } + if (rules.dailyOpens != null && rules.outOfTime != OutOfTime.TOMORROW && rules.outOfTime != OutOfTime.REST_OF_DAY) {
                                 " Out of opens, each time gives one more."

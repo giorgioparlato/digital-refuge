@@ -37,7 +37,7 @@ limits
 
 - every day, not only in a session
 - new limit
-- No limits yet. A limit can ask for a few breaths before an app opens, give it a daily budget, or both — for the apps that pull hardest.
+- No limits yet. Add one to set a daily time budget or a pause before an app opens.
 - Create a limit
 - the whole phone
 - A nudge after time in a row
@@ -114,8 +114,8 @@ The steps for more use the same rows as a block's steps: see the editor in focus
 - Almost there
 - This loosens it, so it starts tomorrow
 - Today keeps the limit as it was. Making a limit stricter always takes effect at once.
-- Once it's saved, making it stricter takes effect at once, while loosening it or deleting it waits until the next day. Until tonight, while it's new, you can still change it freely.
-- Making it stricter takes effect at once. Loosening it — fewer apps, a shorter pause, more minutes, an easier way to get more — or deleting it waits until the next day.
+- Once it's saved, making it stricter works straight away. Loosening or deleting it starts tomorrow. Until tonight, while it's new, you can change it freely.
+- Making it stricter works straight away. Loosening or deleting it starts tomorrow.
 - Apps
 - None yet · tap to choose
 - Before it opens
@@ -124,11 +124,11 @@ The steps for more use the same rows as a block's steps: see the editor in focus
 - Typing
 - Journal
 - Wait
-- A question and a box to write in; going on is a tap. What you write goes to its note.
+- Asks why you're opening it. One tap to skip. What you write goes to its note.
 - Words, at least
 - The questions
 - Asked in turn, shared by every limit that asks
-- Each open in a day makes it longer, up to 8× the wait or 3× the text. A new day starts over
+- Each open makes it longer, up to 8× the wait or 3× the text. Resets every day
 - After it, open for
 - time open
 - until you leave
@@ -138,15 +138,15 @@ The steps for more use the same rows as a block's steps: see the editor in focus
 - All of them
 - Getting through the pause once opens all of these apps until you leave them. Back within a minute is the same visit.
 - The pause comes each time you open one. Back within a minute is the same visit.
-- Getting through the pause once opens all of these apps for {openFor} min, coming and going as you like. Then the pause again.
-- Each app opens for {openFor} min after its pause, coming and going as you like. Then the pause again.
+- One pause opens all these apps for {openFor} min. Then the pause comes back.
+- After the pause, each app stays open for {openFor} min. Then the pause comes back.
 - These apps open straight away.
 - Each day
 - Minutes a day
-- Once they're used, the apps step aside until tomorrow
+- Once used up, the apps are blocked until tomorrow
 - minutes a day
 - Opens a day
-- How many times they can be opened; coming back within a minute isn't another
+- How many times a day they can open. Coming back within a minute doesn't count
 - opens a day
 - Shared or each
 - Shared
@@ -159,9 +159,9 @@ The steps for more use the same rows as a block's steps: see the editor in focus
 - Set extra time
 - You choose
 - Rest of the day
-- No way to get more. The apps come back at midnight.
+- There's no way to get more. The apps are back at midnight.
 - The steps below give you a set amount more, and get longer each time if you choose.
-- When you need more, you first say how much — some minutes, or the rest of today — then do the steps below.
+- To get more time, choose how much, then do the steps below.
 - The steps below lift the limit until midnight.
 -  Out of opens, each time gives one more.
 - Each time

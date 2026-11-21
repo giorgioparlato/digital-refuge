@@ -174,7 +174,7 @@ fun SetupFlow(onDone: (List<String>) -> Unit) {
         scope.launch {
             val installed = Changelog.installedVersion(context)
             repo.updateSettings { it.copy(onboarded = true, lastSeenVersion = if (it.onboarded) it.lastSeenVersion else installed) }
-            onDone(listOfNotNull(Routes.TOUR.takeIf { tour }, Routes.LAUNCHER.takeIf { launcher && !s.homeScreen }))
+            onDone(listOfNotNull(Routes.DISCOVER.takeIf { tour }, Routes.LAUNCHER.takeIf { launcher && !s.homeScreen }))
         }
     }
     val next = {
@@ -271,7 +271,7 @@ private fun Title(title: String, body: String) {
 
 @Composable
 internal fun Apps(apps: List<SetupApp>, chosen: Set<String>, measured: Boolean, onToggle: (String) -> Unit) {
-    Title("Your distracting apps", "The ones that pull you in: what bedtime shuts, what limits hold, and what insights count.")
+    Title("Your distracting apps", "Pick distracting apps, useful for other features, including tracking screen time")
     UsageAccess(measured, "to see how long each app took this week")
     var everything by rememberSaveable { mutableStateOf(false) }
     val shown = if (everything) apps.sortedWith(compareByDescending<SetupApp> { it.weekSeconds }.thenBy { it.label.lowercase() }) else Onboarding.candidates(apps, chosen)
@@ -284,7 +284,7 @@ internal fun Apps(apps: List<SetupApp>, chosen: Set<String>, measured: Boolean, 
 @Composable
 internal fun Budget(measured: Boolean, all: Int, distracting: Int, budgetFor: Int, onFor: (Int) -> Unit, budget: Int, onBudget: (Int) -> Unit) {
     val c = Obsidian.colors
-    Title("A day's budget", "Insights and the tracker widget measure each day against it. It doesn't block anything: limits do that.")
+    Title("A day's budget", "Set how much phone time a day feels right. Only for tracking screen time")
     UsageAccess(measured, "to start from what you do now")
     if (measured) {
         Text(
@@ -318,7 +318,7 @@ internal fun Bedtime(
 ) {
     val context = LocalContext.current
     val c = Obsidian.colors
-    Title("A bedtime", "Hours when your distracting apps stay shut, on the nights you choose. Getting out early asks for a few steps first, so the urge can pass.")
+    Title("A bedtime", "Choose when your distracting apps get blocked at night. To open one early, you go through a few steps first.")
     SectionCard {
         var picking by rememberSaveable { mutableStateOf<String?>(null) }
         picking?.let { which ->
@@ -369,14 +369,14 @@ internal fun Bedtime(
 @Composable
 internal fun Limits(worst: List<SetupApp>, limited: Set<String>, choices: MutableMap<String, LimitChoice>) {
     val c = Obsidian.colors
-    Title("Limits for every day", "For your most used distracting apps, outside bedtime too: a pause asks for a few breaths before the app opens; minutes a day give it an allowance.")
+    Title("Limits for every day", "Set a daily time limit, or a short pause before opening, for the apps you use most. Limits work all day, not only at bedtime.")
     Text(
-        "Here each app gets a limit of its own. A limit can hold several apps too, sharing one allowance, say all your social apps together: make one on focus › limits.",
+        "Here each app gets its own limit. One limit can also cover several apps together, like all your social apps: set that up in focus › limits.",
         style = MaterialTheme.typography.bodyMedium,
         color = c.textMuted,
     )
     if (worst.isEmpty()) {
-        Text("No distracting apps chosen yet, so nothing to limit. Limits can be made any time on focus.", style = MaterialTheme.typography.bodyMedium, color = c.textFaint)
+        Text("No distracting apps chosen yet. You can add limits any time in focus.", style = MaterialTheme.typography.bodyMedium, color = c.textFaint)
         return
     }
     worst.forEach { app ->
@@ -403,7 +403,7 @@ internal fun Limits(worst: List<SetupApp>, limited: Set<String>, choices: Mutabl
 
 @Composable
 internal fun Always(apps: List<SetupApp>, chosen: Set<String>, onToggle: (String) -> Unit) {
-    Title("Always available", "Apps bedtime never shuts, a tap away from its emergency button: maps, rides, your authenticator, your bank.")
+    Title("Always available", "These apps are never blocked, like maps, rides, your bank or your authenticator.")
     var everything by rememberSaveable { mutableStateOf(false) }
     val suggested = SystemApps.ALWAYS_AVAILABLE_SUGGESTIONS.toSet()
     val shown = if (everything) apps.sortedBy { it.label.lowercase() } else apps.filter { it.pkg in suggested || it.pkg in chosen }.sortedBy { it.label.lowercase() }
@@ -425,7 +425,7 @@ private fun Permission(dndToo: Boolean) {
         dndOk = DndController.hasAccess(context)
         onPauseOrDispose { }
     }
-    Title("One permission", "What lets refuge notice a blocked app the moment it opens. It only learns which app is in front.")
+    Title("One permission", "Refuge needs this to notice when a blocked app opens. It only sees which app is open, never what's in it.")
     SectionCard {
         if (serviceOn) Text("On. That's all refuge needs.", style = MaterialTheme.typography.bodyMedium, color = c.accentText, modifier = Modifier.padding(bottom = 8.dp))
         AccessibilityHow(
@@ -441,12 +441,12 @@ private fun Permission(dndToo: Boolean) {
             PlainButton("Open do not disturb access", onClick = { context.tryStart(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)) }, modifier = Modifier.fillMaxWidth())
         }
     }
-    Text("The rest (notifications, battery, the full-screen reminder) is in settings › permissions & setup, whenever you like.", style = MaterialTheme.typography.bodySmall, color = c.textFaint)
+    Text("The other permissions (notifications, battery, full-screen reminder) are in settings › get started, whenever you want them.", style = MaterialTheme.typography.bodySmall, color = c.textFaint)
 }
 
 @Composable
 internal fun Home(on: Boolean, onOn: (Boolean) -> Unit) {
-    Title("A quieter home screen", "Refuge's own: the time, a few widgets you choose, your apps as words. It can be there all the time, not only at bedtime.")
+    Title("A quieter home screen", "Use refuge's calm home screen: the time, a few widgets and your apps as words. Use it all the time, or only at bedtime.")
     SectionCard {
         Line("Use it as my home screen", "Android asks once setup is done; switch back any time in settings › home screen", on, onOn)
     }
@@ -455,7 +455,7 @@ internal fun Home(on: Boolean, onOn: (Boolean) -> Unit) {
 @Composable
 internal fun Done(lines: List<Pair<String, String>>, onTour: () -> Unit) {
     val c = Obsidian.colors
-    Title("You're set", "All of it can be changed later in settings.")
+    Title("You're set", "You can change all of this later in settings.")
     SectionCard {
         lines.forEach { (what, value) ->
             Row(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
@@ -465,11 +465,11 @@ internal fun Done(lines: List<Pair<String, String>>, onTour: () -> Unit) {
         }
     }
     Text(
-        "There's more when you want it: habits, notes and the microjournal, voice notes, check-ins, Obsidian, widgets, search and gestures.",
+        "See what else refuge does when you want: the home and lock screens, widgets, search, notes, voice notes, Obsidian and more.",
         style = MaterialTheme.typography.bodySmall,
         color = c.textFaint,
     )
-    More("Show me around", onTour)
+    More("Discover features", onTour)
 }
 
 /** Usage access asked for with its reason, where it isn't given; refuge comes back here after. */
@@ -480,7 +480,7 @@ private fun UsageAccess(measured: Boolean, why: String) {
     val c = Obsidian.colors
     SectionCard {
         Text("Allow usage access $why", style = MaterialTheme.typography.bodyLarge, color = c.textNormal)
-        Text("Android's own record of which app was in front. It stays on the phone. Without it, refuge counts from now on.", style = MaterialTheme.typography.bodySmall, color = c.textMuted, modifier = Modifier.padding(bottom = 10.dp))
+        Text("Lets refuge see your past screen time, from Android's own records. It stays on the phone. Without it, refuge starts counting from now.", style = MaterialTheme.typography.bodySmall, color = c.textMuted, modifier = Modifier.padding(bottom = 10.dp))
         PlainButton("Allow usage access", onClick = { context.tryStart(UsageReader.accessIntent(context)) }, modifier = Modifier.fillMaxWidth())
     }
 }

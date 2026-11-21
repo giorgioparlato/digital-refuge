@@ -34,61 +34,74 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
+import androidx.compose.foundation.lazy.items
+import androidx.compose.ui.text.style.TextDecoration
 import app.bedtime.data.HomeStyle
 import app.bedtime.ui.components.Text
 import app.bedtime.ui.formatTime
 import app.bedtime.ui.homestyle.palette
 
 /**
- * The week ahead from the phone's calendar, opened from the calendar line, in the home's own colours.
- * A tap on an event shows its details, with a way into the calendar app.
+ * The week ahead from the phone's calendar, opened from the calendar line: a sheet from the bottom of
+ * the screen, in the home's own colours. A tap beside it or Back puts it away; a tap on an event shows
+ * its details, with a way into the calendar app.
  */
 @Composable
 internal fun CalendarWeekDialog(days: List<CalendarDay>, style: HomeStyle, onDismiss: () -> Unit, onOpenEvent: (CalendarEvent) -> Unit = {}) {
-    Dialog(onDismissRequest = onDismiss) { CalendarWeekContent(days, style, onOpenEvent) }
+    HomeSheetDialog(onDismiss) { CalendarWeekContent(days, style, onOpenEvent) }
 }
 
+/**
+ * Day by day: each event's start with its end under it, then its title. Today's finished events are struck through, and
+ * the one on now, or else the next, has its time in the accent colour.
+ */
 @Composable
-internal fun CalendarWeekContent(days: List<CalendarDay>, style: HomeStyle, onOpenEvent: (CalendarEvent) -> Unit = {}, initial: CalendarEvent? = null) {
+internal fun CalendarWeekContent(days: List<CalendarDay>, style: HomeStyle, onOpenEvent: (CalendarEvent) -> Unit = {}, initial: CalendarEvent? = null, now: Long = remember { System.currentTimeMillis() }) {
     val p = style.palette()
     val context = LocalContext.current
     var open by remember { mutableStateOf(initial) }
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(24.dp))
-            .background(p.background)
-            .padding(24.dp),
-    ) {
+    val current = remember(days) { lineEvent(days.flatMap { it.events }.filterNot { it.allDay }, now) }
+    HomeSheet(style) {
         open?.let { event ->
             EventDetail(event, style, onBack = { open = null }, onOpen = { onOpenEvent(event) })
-            return@Column
+            return@HomeSheet
         }
-        Text("The week ahead", style = MaterialTheme.typography.titleMedium, color = p.text)
         if (days.isEmpty()) {
-            Text("Nothing in the next seven days.", style = MaterialTheme.typography.bodyMedium, color = p.muted, modifier = Modifier.padding(top = 16.dp))
-            return@Column
+            Text("Nothing in the next seven days.", style = MaterialTheme.typography.bodyMedium, color = p.muted)
+            return@HomeSheet
         }
-        LazyColumn(Modifier.heightIn(max = 520.dp).padding(top = 8.dp)) {
-            days.forEach { day ->
+        LazyColumn(Modifier.heightIn(max = 480.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            days.forEachIndexed { index, day ->
                 item(key = day.label) {
-                    Column(Modifier.padding(top = 16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(day.label, style = MaterialTheme.typography.labelLarge, color = p.accent)
-                        day.events.forEach { event ->
-                            Row(
-                                Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable(onClickLabel = "details") { open = event }.padding(vertical = 4.dp),
-                                verticalAlignment = Alignment.Top,
-                            ) {
-                                Text(
-                                    if (event.allDay) "All day" else "${formatTime(context, event.begin)}–${formatTime(context, event.end)}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = p.faint,
-                                    modifier = Modifier.width(112.dp).padding(top = 2.dp),
-                                )
-                                VerbatimText(event.title.ifBlank { "Busy" }, style = MaterialTheme.typography.bodyMedium, color = p.text)
+                    Text(
+                        day.label,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = p.faint,
+                        modifier = Modifier.padding(top = if (index == 0) 0.dp else 12.dp, bottom = 4.dp),
+                    )
+                }
+                items(day.events, key = { "${day.label}/${it.key}" }) { event ->
+                    val past = !event.allDay && event.end <= now
+                    Row(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable(onClickLabel = "details") { open = event }.padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.Top,
+                    ) {
+                        // The start, and the end under it, so a 12-hour time still fits the column.
+                        Column(Modifier.width(76.dp)) {
+                            Text(
+                                if (event.allDay) "All day" else formatTime(context, event.begin),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (event == current) p.accent else p.faint,
+                            )
+                            if (!event.allDay) {
+                                Text("to ${formatTime(context, event.end)}", style = MaterialTheme.typography.labelSmall, color = if (event == current) p.accent.copy(alpha = 0.7f) else p.faint.copy(alpha = 0.8f))
                             }
                         }
+                        VerbatimText(
+                            event.title.ifBlank { "Busy" },
+                            style = MaterialTheme.typography.bodyMedium.copy(textDecoration = if (past) TextDecoration.LineThrough else null),
+                            color = if (past) p.faint else p.text,
+                        )
                     }
                 }
             }

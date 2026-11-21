@@ -120,7 +120,7 @@ object WidgetOptions {
         )
         Module.WEATHER -> listOf(
             WidgetOption.Hint(
-                "From Breezy Weather, a free app that does the fetching; this one never goes online. " +
+                "The weather comes from Breezy Weather, a free app. Refuge itself never goes online. " +
                     (weatherHeard ?: "Nothing from it yet."),
             ),
             WidgetOption.Choice(
@@ -137,7 +137,7 @@ object WidgetOptions {
             ),
         )
         Module.EVENT -> listOfNotNull(
-            WidgetOption.Hint("Read from the calendar already on this phone. Nothing is fetched."),
+            WidgetOption.Hint("Uses the calendar already on your phone. Nothing goes online."),
             WidgetOption.Switch("Tomorrow's first event, once today's are done", "In the evening, what the morning starts with", style.calendarTomorrow) {
                 change(style.copy(calendarTomorrow = it))
             },
@@ -259,7 +259,7 @@ object WidgetOptions {
             } else {
                 WidgetOption.Ticks("Which habits", habits.map { Triple(it.id, it.name, it.shownOn(screen)) }, habitShown)
             },
-            if (style.habitsDue) WidgetOption.Hint("Every habit today asks for to keep its run going: daily ones always, a few times a week until they're done.") else null,
+            if (style.habitsDue) WidgetOption.Hint("The habits still to do today to keep their streak going.") else null,
             if (style.habitsDots) {
                 WidgetOption.Choice(
                     "Where",
@@ -270,7 +270,7 @@ object WidgetOptions {
                 null
             },
             if (style.habitsDots && style.habitsPlace == HabitsPlace.BESIDE_CLOCK && !style.noteFitsBesideClock(screen)) {
-                WidgetOption.Hint("Beside the clock only with a small or very small clock, and the weather not beside it; until then, a row of their own.")
+                WidgetOption.Hint("Shows beside the clock only with a small clock and no weather beside it. Otherwise, in their own row.")
             } else {
                 null
             },

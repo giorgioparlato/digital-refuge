@@ -97,16 +97,16 @@ object VoiceFiling {
         val day = at.toLocalDate().toEpochDay()
         val journal = to == VoiceTo.Journal
         if (pending.file == null) {
-            val tree = settings.voiceFolder?.let(Uri::parse) ?: return@withLock stuck(context, pending, "there's no folder for voice notes yet: choose one in settings › quick notes")
+            val tree = settings.voiceFolder?.let(Uri::parse) ?: return@withLock stuck(context, pending, "choose a folder for voice notes first, in settings › notes")
             // The microjournal's in a folder of their own; a note's in yours.
             val folder = (if (journal) subfolder(context, tree, Voice.JOURNAL_FOLDER) else top(tree))
-                ?: return@withLock stuck(context, pending, "refuge can't write to the voice notes folder: choose it again in settings › quick notes")
+                ?: return@withLock stuck(context, pending, "refuge can't save to the voice notes folder. choose it again in settings › notes")
             val name = Voice.fileName(at, names(context, tree, folder))
             val encoded = File(context.cacheDir, "voice-$start.m4a")
             encode(samples, encoded)
             val copied = copyInto(context, folder, name, encoded)
             encoded.delete()
-            if (!copied) return@withLock stuck(context, pending, "refuge can't write to the voice notes folder: choose it again in settings › quick notes")
+            if (!copied) return@withLock stuck(context, pending, "refuge can't save to the voice notes folder. choose it again in settings › notes")
             val line = Voice.line(at.format(DateTimeFormatter.ofPattern("HH:mm")), pending.seconds, name)
             when (to) {
                 VoiceTo.Journal -> repo.addVoiceLine(day, line)

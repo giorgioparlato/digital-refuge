@@ -620,7 +620,7 @@ internal fun ScheduleEditContent(
                                 "otherwise unlocking would be a way to soften it and start again. You can change that under " +
                                 "\"the ways around it\"."
                         } else {
-                            "To keep you honest, it can't be changed or deleted until you unlock it or it ends."
+                            "You can't change or delete it until you leave early or it ends."
                         },
                         modifier = Modifier.padding(top = 14.dp),
                     )
@@ -694,13 +694,13 @@ internal fun ScheduleEditContent(
                     OptionRow(
                         BedtimeIcons.Contrast,
                         "Greyscale",
-                        description = if (greyscaleAvailable) "Everything in black and white, refuge too" else "Needs a one-time step (see Setup)",
+                        description = if (greyscaleAvailable) "Turns the whole screen black and white, refuge included" else "Needs a one-time step (see Setup)",
                         enabled = editable,
                     ) { ObsidianToggle(draft.greyscale, { onDraftChange(draft.copy(greyscale = it)) }, enabled = editable) }
                     OptionRow(
                         Icons.Default.Home,
                         "Quiet home screen",
-                        description = "Refuge's own while it runs: the time and a few apps as words",
+                        description = "Minimal homescreen, shows the apps and widgets you choose",
                         enabled = editable,
                     ) { ObsidianToggle(draft.minimalMode, { on -> onDraftChange(draft.copy(minimalMode = on)) }, enabled = editable) }
                     AnimatedVisibility(draft.minimalMode) {
@@ -710,8 +710,8 @@ internal fun ScheduleEditContent(
                             "On its home screen",
                             description = when {
                                 own != null -> "${pluralApps(own.size)}, plus the phone app"
-                                draft.allowsOnly -> "The apps it leaves open · tap to choose fewer"
-                                else -> "Your usual home apps, less the shut ones · tap to choose"
+                                draft.allowsOnly -> "The apps that stay open · tap to choose"
+                                else -> "Your usual home apps, minus the blocked ones · tap to choose"
                             },
                             enabled = editable,
                             onClick = onPickHome,
@@ -737,7 +737,7 @@ internal fun ScheduleEditContent(
                     Text(
                         when (draft.dnd) {
                             DndMode.OFF -> "Calls and notifications as usual."
-                            DndMode.PRIORITY -> "Only your priority contacts and apps, as set in Android, make a sound. Music, videos and alarms still play."
+                            DndMode.PRIORITY -> "Only your priority contacts and apps make a sound. Music, videos and alarms still play."
                             DndMode.SILENCE -> "Nothing rings or buzzes. Music, videos and alarms still play."
                         },
                         style = MaterialTheme.typography.bodySmall,
@@ -754,7 +754,7 @@ internal fun ScheduleEditContent(
                                 enabled = editable,
                             )
                             Text(
-                                if (draft.hideNotifications) "No banners or icons; they all come back when it ends." else "Silent, but still there to look at.",
+                                if (draft.hideNotifications) "No banners or icons. They all come back when it ends." else "Silent, but still there to look at.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = c.textMuted,
                                 modifier = Modifier.padding(top = 8.dp),
@@ -800,7 +800,7 @@ internal fun ScheduleEditContent(
                     Text(
                         when (draft.lockNotes) {
                             LockNotes.USUAL -> "The apps and circles you chose for the lock screen."
-                            LockNotes.OWN -> "Only these while it runs, whatever the lock screen usually shows."
+                            LockNotes.OWN -> "Show only these while it runs."
                             LockNotes.NONE -> "Nothing on refuge's lock screen while it runs."
                         },
                         style = MaterialTheme.typography.bodySmall,
@@ -826,7 +826,7 @@ internal fun ScheduleEditContent(
                     open = open == SECTION_LEAVING,
                     onToggle = { toggle(SECTION_LEAVING) },
                 ) {
-                    SectionLabel("Unlocking it, step by step")
+                    SectionLabel("How leaving early works")
                     StartFrom(Strictness.entries.map { it.label }, Strictness.of(unlock)?.ordinal, editable) { i ->
                         onDraftChange(draft.copy(unlock = Strictness.entries[i].applied(unlock)))
                     }
@@ -845,7 +845,7 @@ internal fun ScheduleEditContent(
                             UnlockMode.END_SESSION -> if (isBlock) "The block stops there." else "The schedule stays off until its next start."
                             UnlockMode.PAUSE -> "It switches itself back on after your break."
                             UnlockMode.CHOOSE ->
-                                "When you unlock, you first say how long: a few minutes, or the rest of " +
+                                "When you leave early, choose for how long: a few minutes, or the rest of " +
                                     (if (isBlock) "the block." else "the session.") + " The steps are the same either way."
                         },
                         style = MaterialTheme.typography.bodySmall,
@@ -919,7 +919,7 @@ internal fun ScheduleEditContent(
                     OptionRow(
                         BedtimeIcons.Hourglass,
                         "Emergency break",
-                        description = "For what can't wait, with no steps",
+                        description = "A minute with no steps, for what can't wait",
                         enabled = editable,
                     ) {
                         ObsidianToggle(
@@ -941,7 +941,7 @@ internal fun ScheduleEditContent(
                             )
                         }
                     }
-                    OptionRow(Icons.Default.Info, "Journal after each unlock", description = "While it runs: a question, a box to write in and how you feel; going on is a tap", enabled = editable) {
+                    OptionRow(Icons.Default.Info, "Journal after each unlock", description = "While it runs, asks why you unlocked and how you feel. One tap to skip", enabled = editable) {
                         ObsidianToggle(draft.askWhy, { on -> onDraftChange(draft.copy(askWhy = on)) }, enabled = editable)
                     }
                     AnimatedVisibility(draft.askWhy) {
@@ -988,7 +988,7 @@ internal fun ScheduleEditContent(
                     OptionRow(
                         Icons.Default.Lock,
                         "Keep this shut after leaving early",
-                        description = "Its settings stay as they are until it would have ended, so leaving early can't soften it",
+                        description = "If you leave early, it stays blocked until it would have ended",
                         enabled = editable,
                     ) {
                         ObsidianToggle(
@@ -1031,8 +1031,7 @@ internal fun ScheduleEditContent(
                                     )
                                 }
                                 Text(
-                                    "Outside these hours this page is read-only, and the schedule can't be switched " +
-                                        "off or deleted from the list either.",
+                                    "Outside these hours you can't edit, turn off or delete this schedule.",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = c.textMuted,
                                     modifier = Modifier.padding(top = 10.dp),

@@ -106,8 +106,7 @@ internal fun LimitsContent(
                 item(key = "empty") {
                     Column(Modifier.fillMaxWidth().padding(top = 8.dp)) {
                         Text(
-                            "No limits yet. A limit can ask for a few breaths before an app opens, give it a daily " +
-                                "budget, or both — for the apps that pull hardest.",
+                            "No limits yet. Add one to set a daily time budget or a pause before an app opens.",
                             style = MaterialTheme.typography.bodyLarge,
                             color = c.textMuted,
                         )

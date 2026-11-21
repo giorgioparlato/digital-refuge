@@ -132,7 +132,7 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 - Cards in two columns
 - Titles only
 - new note
-- Nothing yet. Type in the minimal home's search and pick “save in refuge notes”, or start one with +.
+- No notes yet. Tap + to write one, or double tap the home or lock screen for a quick note.
 - Words in any note
 - All
 - No note has “{query}”.
@@ -281,7 +281,7 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 - This schedule is on right now
 - You chose to let this one be changed only between … and …. Until then it can't be edited, switched off or deleted.
 - Its settings stay shut until …, when it would have ended — otherwise unlocking would be a way to soften it and start again. You can change that under "the ways around it".
-- To keep you honest, it can't be changed or deleted until you unlock it or it ends.
+- You can't change or delete it until you leave early or it ends.
 - Almost there
 - What it shuts
 - These apps
@@ -290,25 +290,25 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 - The phone app and your always-available apps stay open either way.
 - How the phone feels
 - Greyscale
-- Everything in black and white, refuge too
+- Turns the whole screen black and white, refuge included
 - Needs a one-time step (see Setup)
 - Quiet home screen
-- Refuge's own while it runs: the time and a few apps as words
+- Minimal homescreen, shows the apps and widgets you choose
 - …, plus the phone app
-- The apps it leaves open · tap to choose fewer
-- Your usual home apps, less the shut ones · tap to choose
+- The apps that stay open · tap to choose
+- Your usual home apps, minus the blocked ones · tap to choose
 - Notifications
 - Who can ring
 - Everyone
 - Priority
 - No one
 - Calls and notifications as usual.
-- Only your priority contacts and apps, as set in Android, make a sound. Music, videos and alarms still play.
+- Only your priority contacts and apps make a sound. Music, videos and alarms still play.
 - Nothing rings or buzzes. Music, videos and alarms still play.
 - What's silenced
 - Still shows
 - Out of sight
-- No banners or icons; they all come back when it ends.
+- No banners or icons. They all come back when it ends.
 - Silent, but still there to look at.
 - On refuge's lock screen
 - As usual
@@ -320,13 +320,13 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 - Nobody yet
 - And these circles
 - The apps and circles you chose for the lock screen.
-- Only these while it runs, whatever the lock screen usually shows.
+- Show only these while it runs.
 - Nothing on refuge's lock screen while it runs.
 - Needs Do Not Disturb access
 - Grant it once in Setup so digital refuge can quiet your phone.
 - Open setup
 - Leaving early
-- Unlocking it, step by step
+- How leaving early works
 - What unlocking gets you
 - End it
 - End today
@@ -335,7 +335,7 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 - The block stops there.
 - The schedule stays off until its next start.
 - It switches itself back on after your break.
-- When you unlock, you first say how long: a few minutes, or the rest of 
+- When you leave early, choose for how long: a few minutes, or the rest of 
 - the block.
 - the session.
 -  The steps are the same either way.
@@ -350,11 +350,11 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 - Keep it on
 - Turn it off
 - Emergency break
-- For what can't wait, with no steps
+- A minute with no steps, for what can't wait
 - How long it lasts
 - emergency break
 - Journal after each unlock
-- While it runs: a question, a box to write in and how you feel; going on is a tap
+- While it runs, asks why you unlocked and how you feel. One tap to skip
 - Words, at least
 - Its own widgets
 - Home screen
@@ -364,13 +364,13 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 - While it runs, these instead, in this order. If another session with its own starts later, its own win.
 - Changing it
 - Keep this shut after leaving early
-- Its settings stay as they are until it would have ended, so leaving early can't soften it
+- If you leave early, it stays blocked until it would have ended
 - Changeable only at certain hours
 - Outside them it can't be edited, switched off or deleted.
 - From
 - Until
 - next day
-- Outside these hours this page is read-only, and the schedule can't be switched off or deleted from the list either.
+- Outside these hours you can't edit, turn off or delete this schedule.
 - Duplicate block
 - Duplicate schedule
 - Delete block
@@ -396,18 +396,18 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 - write … words
 - a password
 - Wait it out
-- Start a timer, come back when it's done
+- Wait until a timer runs out
 - Type random text
 - No pasting, typos don't count
 - Write a few lines
-- Why you want to unlock, or from prompts you choose
+- Write why you want to unlock, or answer a prompt
 - A password
 - Tip: let someone else choose it
-- No steps yet: unlocking takes a single tap.
+- No steps yet: leaving early takes one tap.
 - Timer
 - New password (leave empty to keep)
 - Choose a password
-- Each time in a day makes the wait, the typing and the writing longer
+- Each time in a day, the wait, typing and writing get longer
 - + add a step
 - + add another step
 - Words, at least
@@ -419,9 +419,9 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 - Letters
 - Words
 - Passages
-- Random letters and digits. Nothing to read, only to copy.
-- Plain words, easier on the eyes at midnight.
-- Quotes and longer passages, worth reading while you type them.
+- Random letters and numbers to copy.
+- Simple words, easier to read late at night.
+- Quotes and longer passages, worth reading as you type.
 - Harder each time
 - How much
 - each time
@@ -649,9 +649,9 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 
 <sub>[CalendarWeek.kt](../../app/src/main/java/app/bedtime/ui/minimal/CalendarWeek.kt)</sub>
 
-- The week ahead
 - Nothing in the next seven days.
 - All day
+- to …
 - Busy
 - , all day
 - Open in calendar

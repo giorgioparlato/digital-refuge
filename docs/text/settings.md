@@ -59,18 +59,18 @@ Home screen, lock screen, apps, shortcuts and about & backup are lists of rows f
 - Cancel
 - Find a setting
 - set up once, then left alone
-- Nothing by that name.
+- No setting with that name.
 - Writing & habits
 - A nudge after time in a row
-- After so long on the phone without the screen going off, in any app, a full screen asks if it's still what you meant to do. Never during a call.
+- After a long stretch on the phone, a full screen asks if you still want to be on it. Never during a call.
 - {it} min
 - Off
 - digital refuge {version} · everything stays on this phone
 - github.com/giorgioparlato/digital-refuge ›
-- Permissions & setup
 - All set
 - 1 step left
 - {stepsLeft} steps left
+- Permissions & setup
 - permissions setup accessibility greyscale dnd do not disturb battery overlay notifications launcher
 - Home screen
 - Your launcher
@@ -90,42 +90,42 @@ Home screen, lock screen, apps, shortcuts and about & backup are lists of rows f
 - focus sessions check-ins checkins pause journal ask why mood moods how do you feel nudge cover
 -  · can't be changed while a session runs
 - Cover Android's off switches
-- While a session runs, covers the Settings screens that switch blocking off or uninstall refuge{locked}
+- During a session, blocks the Android settings that would turn refuge off or uninstall it{locked}
 - cover off switches settings uninstall accessibility guard sessions
 - Full-screen reminder
-- If blocking is switched off while a session runs, the screen is taken over until it's back on{locked}
+- If blocking is turned off during a session, a full screen stays up until you turn it back on{locked}
 - full screen reminder takeover overlay switched off sessions
 - Cover messages
-- What a blocked app's cover says · … messages
+- The messages you see when opening a blocked app · …
 - cover message messages words blocked
 - Everyday launcher
-- Off · only in minimal sessions
-- On · refuge's home screen all the time
+- Off · only during quiet sessions
+- On · refuge is your home screen
 - On, but not your home app yet
 - launcher home screen default home app everyday
 - The app list
 - Favourites, hidden apps, your own names, keywords, sizes
 - favourites favorites hidden hide apps rename names keyword icons app names size list
-- While a schedule or block runs
+- Show it while a schedule or block runs
 - lock screen sessions
 - Outside sessions too
 - All the time, as your launcher's
-- Only when refuge is your everyday launcher
+- Only when refuge is your launcher
 - lock screen always launcher
 - Notifications
 - From the apps and people you choose
 - notifications messages reply replies people contacts circles groups lock screen rain alert weather your week sunday note
-- After {it} min on the phone without a break
+- A reminder after {it} min on the phone without a break
 - nudge time in a row long stretch reminder minutes break
 - Moods
 - mood moods feeling feelings tag tags hungry angry lonely tired bored happy anxious how do you feel now
 - App groups
-- Tick many apps at once when choosing
+- Pick many apps at once with one tap
 - 1 group
 - … groups
 - groups apps
 - Always-available apps
-- None yet · maps, rides, authenticators…
+- None yet · like maps, rides or your authenticator
 - 1 app, never blocked, whichever session is on
 - … apps, never blocked, whichever session is on
 - always available emergency maps authenticator
@@ -134,32 +134,32 @@ Home screen, lock screen, apps, shortcuts and about & backup are lists of rows f
 - … apps
 -  · what counts as a distracted hour
 - distraction distracting tracker hours dots
-- Everything you set, with your history, notes, habits
-- , phone use and microjournal
--  and phone use
-- , in one file sealed with your passphrase
-- , in one file
+- Saves your settings, history, notes, habits
+- , screen time and microjournal
+-  and screen time
+-  in one file, sealed with your passphrase
+-  in one file
 - Export settings
 - export backup save file
 - Import settings
-- Replace everything with a saved file
+- Replaces everything with a saved file
 - import restore backup file
 - Weekly backup
-- Off · the same file as export, once a week, in a folder you choose; the newest … kept
+- Off · saves a backup every week to a folder you choose, keeping the last …
 - Can't write to … any more · tap to choose it again
 - To … · none written yet
 - To … · last on …
 - backup automatic weekly folder save
 - Back up now
-- Write this week's file straight away
+- Save this week's backup now
 - backup now
 - Backup passphrase
 - On · backups and exports open only with it
 - Off · anyone with the file can read it
 - backup passphrase password encrypt seal export
 - Microjournal in backups
-- Its lines, moods and why answers go in backups and exports
-- Off · its lines, moods and why answers stay on this phone
+- Journal lines, moods and why answers are included
+- Off · they stay on this phone
 - backup export journal microjournal moods why include
 - widget widgets weather calendar event date greeting clock clock size hours distraction tracker budget unlocks habits quote quotes now playing music note colours
 - home-screen widget
@@ -274,7 +274,7 @@ One file serves the look, widgets, gestures and notifications pages, for both sc
 - Two choices: one for the clock, date and apps, one for the quote
 - Clock, date and apps
 - Quote
-- Serifs set the quote in italics. Your own font is a .ttf or .otf file; it stays on this phone and isn't part of a backup.
+- Serif fonts show the quote in italics. You can add your own .ttf or .otf font. It stays on the phone and isn't backed up.
 - Reset to default
 - Show
 - Android's status bar
@@ -285,7 +285,7 @@ One file serves the look, widgets, gestures and notifications pages, for both sc
 - Tap one for its options; drag by the handle to change the order
 - Notifications
 - Notification access is off, so none can show. Switch this on again to allow it
-- Drag one down to read it, tap to unlock and open it, or swipe it aside: each way does what you choose below
+- Drag one down to read it, tap to open it, or swipe it away. Choose what each does below
 - From these apps
 - None yet. Pick the apps you want to hear from
 -  and … more
@@ -296,11 +296,11 @@ One file serves the look, widgets, gestures and notifications pages, for both sc
 - Your week
 - Time in refuge, how sessions held, the phone and habits, against the week before
 - A note on Sunday evening
-- Once the week is done; insights shows it too, until Monday ends
+- Shows once the week is over, and in insights until Monday ends
 - Rain today
 - From Breezy Weather's forecast (see the weather widget's options to set it up)
 - A rain alert
-- In the morning, when rain is likely today: how likely, and when
+- A morning heads-up when rain is likely, with the chance and the time
 - Rain alert at
 - At
 - When the chance is at least
@@ -322,15 +322,15 @@ One file serves the look, widgets, gestures and notifications pages, for both sc
 - Show notifications
 - Turn the screen off
 - Look
-- Colours, sizes and fonts, each screen its own. Changes save as you go.
+- Colours, sizes and fonts for each screen. Changes save as you go.
 - Widgets
-- What your home screen and lock screen show, each its own, in the order you like. Pick the screen here first. Changes save as you go.
+- Choose what your home and lock screen show, and in what order. Changes save as you go.
 - Lock-screen gestures
-- Swipes start around the clock; a double tap is anywhere, and one on the clock can do something else. Each can open an app once you've unlocked, or straight away the camera, a quick note (where one word looks it up) or your notifications. The middle is for swiping notifications away; from the bottom, any swipe just unlocks.
+- Swipe from around the clock, or double tap anywhere. Each can open the camera, a quick note or an app once you unlock.
 - Gestures
-- On your home screen, and the minimal one during sessions. Swipes start anywhere but the very top edge, which stays Android's; a double tap is on an empty spot, and one on the clock can do something else.
+- Swipe anywhere except the very top edge, or double tap an empty spot. Each can open an app or do an action.
 - Lock-screen notifications
-- Those the session lets through, from the apps you choose, as private as Android's own lock screen.
+- The notifications from the apps you choose, as private as Android's own lock screen.
 - Swipe down
 - Double tap
 - Double tap on the clock
@@ -401,7 +401,7 @@ One file serves the look, widgets, gestures and notifications pages, for both sc
 - Small
 - Medium
 - Large
-- From Breezy Weather, a free app that does the fetching; this one never goes online. 
+- The weather comes from Breezy Weather, a free app. Refuge itself never goes online. 
 - Nothing from it yet.
 - Show
 - Today
@@ -411,7 +411,7 @@ One file serves the look, widgets, gestures and notifications pages, for both sc
 - In
 - Automatic
 - Install Breezy Weather (it's on F-Droid). In its settings, under External modules, open “Send Gadgetbridge data” and tick digital refuge. It sends the weather each time it updates.
-- Read from the calendar already on this phone. Nothing is fetched.
+- Uses the calendar already on your phone. Nothing goes online.
 - Tomorrow's first event, once today's are done
 - In the evening, what the morning starts with
 - Event names
@@ -471,11 +471,11 @@ One file serves the look, widgets, gestures and notifications pages, for both sc
 - Keep the done ones
 - Off, each goes once it's done today
 - Which habits
-- Every habit today asks for to keep its run going: daily ones always, a few times a week until they're done.
+- The habits still to do today to keep their streak going.
 - Where
 - A row of their own
 - Under the date
-- Beside the clock only with a small or very small clock, and the weather not beside it; until then, a row of their own.
+- Shows beside the clock only with a small clock and no weather beside it. Otherwise, in their own row.
 - Their words
 - "habits · 2 of 5" after the dots
 - No habits yet.

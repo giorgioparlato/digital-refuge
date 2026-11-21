@@ -487,7 +487,7 @@ internal fun HomeStyleContent(
                     SizeLabel("Quote", Modifier.padding(top = 16.dp, bottom = 8.dp))
                     FontChoices(style.quoteFont, style.customFontName, onPick = { onChange(style.copy(quoteFont = it)) }, onAdd = { onAddFont(true) })
                     Text(
-                        "Serifs set the quote in italics. Your own font is a .ttf or .otf file; it stays on this phone and isn't part of a backup.",
+                        "Serif fonts show the quote in italics. You can add your own .ttf or .otf font. It stays on the phone and isn't backed up.",
                         style = MaterialTheme.typography.bodySmall,
                         color = c.textFaint,
                         modifier = Modifier.padding(top = 12.dp),
@@ -527,7 +527,7 @@ internal fun HomeStyleContent(
                         description = if (style.lockNotifications && !notificationAccess) {
                             "Notification access is off, so none can show. Switch this on again to allow it"
                         } else {
-                            "Drag one down to read it, tap to unlock and open it, or swipe it aside: each way does what you choose below"
+                            "Drag one down to read it, tap to open it, or swipe it away. Choose what each does below"
                         },
                     ) { ObsidianToggle(style.lockNotifications && notificationAccess, onLockNotifications) }
                     if (style.lockNotifications && notificationAccess) {
@@ -553,12 +553,12 @@ internal fun HomeStyleContent(
                     }
                 }
                 SectionCard(title = "Your week", subtitle = "Time in refuge, how sessions held, the phone and habits, against the week before") {
-                    OptionRow(Icons.Default.Notifications, "A note on Sunday evening", description = "Once the week is done; insights shows it too, until Monday ends") {
+                    OptionRow(Icons.Default.Notifications, "A note on Sunday evening", description = "Shows once the week is over, and in insights until Monday ends") {
                         ObsidianToggle(weeklyNote, onWeeklyNote)
                     }
                 }
                 SectionCard(title = "Rain today", subtitle = "From Breezy Weather's forecast (see the weather widget's options to set it up)") {
-                    OptionRow(Icons.Default.Notifications, "A rain alert", description = "In the morning, when rain is likely today: how likely, and when") {
+                    OptionRow(Icons.Default.Notifications, "A rain alert", description = "A morning heads-up when rain is likely, with the chance and the time") {
                         ObsidianToggle(style.rainAlert, { onChange(style.copy(rainAlert = it)) })
                     }
                     if (style.rainAlert) {
@@ -660,17 +660,17 @@ internal fun HomeStyleContent(
 
 /** The pages the home and lock screen's choices are split into, each reached from settings. */
 enum class StylePage(val title: String, val intro: String) {
-    LOOK("Look", "Colours, sizes and fonts, each screen its own. Changes save as you go."),
-    SHOWN("Widgets", "What your home screen and lock screen show, each its own, in the order you like. Pick the screen here first. Changes save as you go."),
+    LOOK("Look", "Colours, sizes and fonts for each screen. Changes save as you go."),
+    SHOWN("Widgets", "Choose what your home and lock screen show, and in what order. Changes save as you go."),
     SWIPES(
         "Lock-screen gestures",
-        "Swipes start around the clock; a double tap is anywhere, and one on the clock can do something else. Each can open an app once you've unlocked, or straight away the camera, a quick note (where one word looks it up) or your notifications. The middle is for swiping notifications away; from the bottom, any swipe just unlocks.",
+        "Swipe from around the clock, or double tap anywhere. Each can open the camera, a quick note or an app once you unlock.",
     ),
     GESTURES(
         "Gestures",
-        "On your home screen, and the minimal one during sessions. Swipes start anywhere but the very top edge, which stays Android's; a double tap is on an empty spot, and one on the clock can do something else.",
+        "Swipe anywhere except the very top edge, or double tap an empty spot. Each can open an app or do an action.",
     ),
-    NOTIFICATIONS("Lock-screen notifications", "Those the session lets through, from the apps you choose, as private as Android's own lock screen."),
+    NOTIFICATIONS("Lock-screen notifications", "The notifications from the apps you choose, as private as Android's own lock screen."),
 }
 
 private fun HomeGesture.icon(): ImageVector = when (this) {
