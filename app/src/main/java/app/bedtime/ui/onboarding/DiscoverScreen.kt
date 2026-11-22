@@ -34,6 +34,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.launch
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DateRange
@@ -78,39 +85,42 @@ import app.bedtime.ui.theme.Obsidian
 /** The groups features are listed in, in this order. */
 private enum class Group(val title: String) { CORE("core features"), PRODUCTIVITY("productivity"), OTHER("other") }
 
-/** A feature with a page of its own: its name, its line on the list, its group and its icon. */
-private enum class Feature(val title: String, val line: String, val group: Group, val icon: ImageVector) {
-    SESSION("when a session runs", "see what blocked apps show, and how to leave early", Group.CORE, BedtimeIcons.Block),
-    HOME_SCREEN("your home screen", "use refuge as your launcher", Group.CORE, LineIcons.Home),
-    LOCK_SCREEN("the lock screen", "use refuge's lockscreen, with the widgets you choose", Group.CORE, LineIcons.Lock),
-    WIDGETS("some widgets", "see what each widget does when you tap it", Group.CORE, BedtimeIcons.Grid),
-    INSIGHTS("insights", "see your screen time against your budget", Group.CORE, LineIcons.Insights),
-    SEARCH("search", "search anything, and do things, as you type", Group.PRODUCTIVITY, LineIcons.Search),
-    NOTES("notes", "notes in markdown, synced with obsidian if you like", Group.PRODUCTIVITY, LineIcons.Edit),
-    QUICK_NOTES("quick notes", "jot a note with a double tap, even locked", Group.PRODUCTIVITY, LineIcons.Edit),
-    VOICE("voice notes", "speak your notes instead of typing", Group.PRODUCTIVITY, BedtimeIcons.Mic),
-    OBSIDIAN("obsidian", "find, add to and save notes in your vault", Group.PRODUCTIVITY, LineIcons.Share),
-    HABITS("habits", "a simple habit tracker", Group.OTHER, LineIcons.CheckCircle),
-    MICROJOURNAL("the microjournal", "a journal, one line at a time", Group.OTHER, LineIcons.DateRange),
-    DICTIONARY("the dictionary", "look up a word without unlocking", Group.OTHER, BedtimeIcons.Book),
+/**
+ * A feature with a page of its own: its name, its short name (for previous and next), its line on the
+ * list, its group and its icon.
+ */
+private enum class Feature(val title: String, val short: String, val line: String, val group: Group, val icon: ImageVector) {
+    SESSION("when a session runs", "session", "see what blocked apps show, and how to leave early", Group.CORE, BedtimeIcons.Block),
+    HOME_SCREEN("home screen", "home screen", "use refuge as your launcher", Group.CORE, LineIcons.Home),
+    LOCK_SCREEN("the lock screen", "lock screen", "use refuge's lockscreen, with the widgets you choose", Group.CORE, LineIcons.Lock),
+    WIDGETS("some widgets", "widgets", "see what each widget does when you tap it", Group.CORE, BedtimeIcons.Grid),
+    INSIGHTS("insights", "insights", "see your screen time against your budget", Group.CORE, LineIcons.Insights),
+    SEARCH("search", "search", "search anything, and do things, as you type", Group.PRODUCTIVITY, LineIcons.Search),
+    NOTES("notes", "notes", "notes in markdown, synced with obsidian if you like", Group.PRODUCTIVITY, LineIcons.Edit),
+    QUICK_NOTES("quick notes", "quick notes", "jot a note with a double tap, even locked", Group.PRODUCTIVITY, LineIcons.Edit),
+    VOICE("voice notes", "voice notes", "speak your notes instead of typing", Group.PRODUCTIVITY, BedtimeIcons.Mic),
+    OBSIDIAN("obsidian", "obsidian", "find, add to and save notes in your vault", Group.PRODUCTIVITY, LineIcons.Share),
+    HABITS("habits", "habits", "a simple habit tracker", Group.OTHER, LineIcons.CheckCircle),
+    MICROJOURNAL("the microjournal", "microjournal", "a journal, one line at a time", Group.OTHER, LineIcons.DateRange),
+    DICTIONARY("the dictionary", "dictionary", "look up a word without unlocking", Group.OTHER, BedtimeIcons.Book),
 }
 
 /**
  * What refuge does beyond keeping apps shut: a list by group, and a page for each feature with a short
- * looping demo drawn here, a line or two about it, a way to the feature itself, and the next one.
- * [onOpen] pushes a page; [onTab] goes to one of the tabs (focus, insights).
+ * looping demo drawn here, a line or two about it, and a way to set it up. The pages swipe from one to
+ * the next, with previous and next at the foot too. [onOpen] pushes a page; [onTab] goes to one of the
+ * tabs (focus, insights).
  */
 @Composable
-fun DiscoverScreen(onBack: () -> Unit, onOpen: (String) -> Unit, onTab: (String) -> Unit) {
-    var open by rememberSaveable { mutableStateOf<String?>(null) }
+fun DiscoverScreen(onBack: () -> Unit, onOpen: (String) -> Unit, onTab: (String) -> Unit, startAt: String? = null) {
+    var open by rememberSaveable { mutableStateOf(startAt) }
     val feature = open?.let { name -> Feature.entries.firstOrNull { it.name == name } }
     BackHandler(enabled = feature != null) { open = null }
     if (feature == null) {
         FeatureList(onBack, onPick = { open = it.name })
         return
     }
-    val next = Feature.entries.getOrNull(feature.ordinal + 1)
-    FeaturePage(feature, onBack = { open = null }, next = next, onNext = { open = next?.name }, onOpen = onOpen, onTab = onTab)
+    FeaturePages(feature, onBack = { open = null }, onPage = { open = it.name }, onOpen = onOpen, onTab = onTab)
 }
 
 @Composable
@@ -148,32 +158,60 @@ private fun FeatureList(onBack: () -> Unit, onPick: (Feature) -> Unit) {
     }
 }
 
+/** The feature pages, side by side: swipe between them, or use previous and next at the foot. */
 @Composable
-private fun FeaturePage(f: Feature, onBack: () -> Unit, next: Feature?, onNext: () -> Unit, onOpen: (String) -> Unit, onTab: (String) -> Unit) {
+private fun FeaturePages(start: Feature, onBack: () -> Unit, onPage: (Feature) -> Unit, onOpen: (String) -> Unit, onTab: (String) -> Unit) {
     val c = Obsidian.colors
+    val pager = rememberPagerState(initialPage = start.ordinal) { Feature.entries.size }
+    val scope = rememberCoroutineScope()
+    // The page in view is the one open, so going back to the list and in again keeps your place.
+    LaunchedEffect(pager) { snapshotFlow { pager.currentPage }.collect { onPage(Feature.entries[it]) } }
+    val current = Feature.entries[pager.currentPage]
+    val previous = Feature.entries.getOrNull(current.ordinal - 1)
+    val next = Feature.entries.getOrNull(current.ordinal + 1)
+    fun go(f: Feature) = scope.launch { pager.animateScrollToPage(f.ordinal) }
+    Scaffold(
+        containerColor = c.bgPrimary,
+        topBar = { ObsidianTopBar(current.title, onBack = onBack, subtitle = "discover features") },
+        bottomBar = {
+            Row(
+                Modifier.fillMaxWidth().background(c.bgPrimary).navigationBarsPadding().padding(horizontal = PageGutter, vertical = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                PageButton(previous?.let { "‹ ${it.short}" } ?: "‹ the list", filled = false, modifier = Modifier.weight(1f)) { if (previous != null) go(previous) else onBack() }
+                Text("${current.ordinal + 1} of ${Feature.entries.size}", fontSize = 11.sp, color = c.textFaint)
+                PageButton(next?.let { "${it.short} ›" } ?: "the list ›", filled = false, modifier = Modifier.weight(1f)) { if (next != null) go(next) else onBack() }
+            }
+        },
+    ) { padding ->
+        HorizontalPager(pager, Modifier.fillMaxSize().padding(padding), verticalAlignment = Alignment.Top) { page ->
+            FeaturePage(Feature.entries[page], onOpen, onTab)
+        }
+    }
+}
+
+/** One feature's page: its demo and lines, then the way to set it up. */
+@Composable
+private fun FeaturePage(f: Feature, onOpen: (String) -> Unit, onTab: (String) -> Unit) {
     val context = LocalContext.current
     val settings by remember { Repository.get(context) }.settings.collectAsStateWithLifecycle(initialValue = null)
-    // The page's way into the feature itself.
-    val (label, go) = when (f) {
-        Feature.SESSION -> "open focus" to { onTab(Routes.HOME) }
-        Feature.HOME_SCREEN -> "home screen look" to { onOpen(Routes.HOME_STYLE) }
-        Feature.LOCK_SCREEN -> "lock screen settings" to { onOpen(Routes.SETTINGS_LOCK) }
-        Feature.WIDGETS -> "choose widgets" to { onOpen(Routes.STYLE_SHOWN) }
-        Feature.INSIGHTS -> "open insights" to { onOpen(Routes.STATS) }
-        Feature.SEARCH -> "search settings" to { onOpen(Routes.SEARCH) }
-        Feature.NOTES -> "open notes" to { onOpen(Routes.NOTES) }
-        Feature.QUICK_NOTES -> "where notes go" to { onOpen(Routes.QUICK_NOTES) }
-        Feature.VOICE -> "set it up" to { onOpen(Routes.QUICK_NOTES) }
-        Feature.OBSIDIAN -> "notes settings" to { onOpen(Routes.QUICK_NOTES) }
-        Feature.HABITS -> "your habits" to { onOpen(Routes.HABITS) }
-        Feature.MICROJOURNAL -> "today's page" to { onOpen(Routes.JOURNAL_TODAY) }
-        Feature.DICTIONARY -> "add a dictionary" to { onOpen(Routes.SEARCH) }
+    // Where it's set up: what the card says, and where it goes.
+    val (action, place, go) = when (f) {
+        Feature.SESSION -> Triple("set it up", "in the focus tab", { onTab(Routes.HOME) })
+        Feature.HOME_SCREEN -> Triple("set it up", "in home screen settings", { onOpen(Routes.SETTINGS_HOME) })
+        Feature.LOCK_SCREEN -> Triple("set it up", "in lock screen settings", { onOpen(Routes.SETTINGS_LOCK) })
+        Feature.WIDGETS -> Triple("set it up", "in widget settings", { onOpen(Routes.STYLE_SHOWN) })
+        Feature.INSIGHTS -> Triple("open it", "in insights", { onOpen(Routes.STATS) })
+        Feature.SEARCH, Feature.DICTIONARY -> Triple("set it up", "in search settings", { onOpen(Routes.SEARCH) })
+        Feature.NOTES, Feature.QUICK_NOTES, Feature.VOICE, Feature.OBSIDIAN -> Triple("set it up", "in notes settings", { onOpen(Routes.QUICK_NOTES) })
+        Feature.HABITS -> Triple("set it up", "in habits settings", { onOpen(Routes.HABITS) })
+        Feature.MICROJOURNAL -> Triple("set it up", "in microjournal settings", { onOpen(Routes.SETTINGS_JOURNAL) })
     }
-    Scaffold(containerColor = c.bgPrimary, topBar = { ObsidianTopBar(f.title, onBack = onBack, subtitle = "discover features") }) { padding ->
-        Column(
-            Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = PageGutter, vertical = 4.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = PageGutter, vertical = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
             when (f) {
                 Feature.SESSION -> SessionPage()
                 Feature.HOME_SCREEN -> HomeScreenPage(showLauncher = settings?.homeScreen == false) { onOpen(Routes.LAUNCHER) }
@@ -189,55 +227,86 @@ private fun FeaturePage(f: Feature, onBack: () -> Unit, next: Feature?, onNext: 
                 Feature.MICROJOURNAL -> MicrojournalPage()
                 Feature.DICTIONARY -> DictionaryPage()
             }
-            Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                PageButton(label, filled = false, modifier = Modifier.weight(1f), onClick = go)
-                PageButton(next?.let { "next: ${it.title} ›" } ?: "back to the list", filled = true, modifier = Modifier.weight(1f), onClick = if (next != null) onNext else onBack)
-            }
-            Spacer(Modifier.height(20.dp))
+            SetUpCard(action, place, go)
+            Spacer(Modifier.height(12.dp))
+    }
+}
+
+/** The way from a page to the feature itself: what to do, and where. */
+@Composable
+private fun SetUpCard(action: String, place: String, onClick: () -> Unit) {
+    val c = Obsidian.colors
+    val shape = RoundedCornerShape(14.dp)
+    Row(
+        Modifier.fillMaxWidth().clip(shape).background(c.accent.copy(alpha = 0.08f)).border(1.dp, c.accentFill, shape)
+            .clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(LineIcons.Settings, contentDescription = null, tint = c.accentText, modifier = Modifier.size(20.dp))
+        Column(Modifier.weight(1f).padding(start = 12.dp)) {
+            Text(action, fontSize = 14.sp, color = c.textNormal)
+            Text(place, fontSize = 12.sp, color = c.textMuted)
         }
+        Text("›", fontSize = 18.sp, color = c.accentText)
     }
 }
 
 // ---------------------------------------------------------------- the pages
 
 @Composable
-private fun SessionPage() {
+internal fun SessionPage() {
     val c = Obsidian.colors
     Intro("while a block, a schedule or a limit runs, the apps it shuts open to a cover instead.")
     val t = loop(14_000)
     Demo {
         Phone {
             when {
-                t < 0.15f -> Screen {
+                t < 0.12f -> Screen {
                     Small("bedtime · until 07:00")
                     Text("22:41", fontSize = 34.sp, color = c.textNormal)
                     Spacer(Modifier.height(22.dp))
-                    AppNames(listOf("phone", "messages", "instagram", "maps"), tapped = "instagram", t = t, at = 0.09f)
+                    AppNames(listOf("phone", "messages", "instagram", "maps"), tapped = "instagram", t = t, at = 0.07f)
                 }
-                t < 0.38f -> Screen(center = true) {
+                t < 0.50f -> Screen(center = true) {
                     Small("bedtime · until 07:00")
                     Spacer(Modifier.weight(1f))
-                    Text("about to open instagram", fontSize = 18.sp, color = c.textNormal, textAlign = TextAlign.Center)
-                    Text("is this what you came to the phone for?", fontSize = 11.sp, color = c.textMuted, textAlign = TextAlign.Center)
-                    Spacer(Modifier.weight(1f))
-                    MiniButton("never mind", filled = true)
-                    MiniButton("leave early", filled = false, t = t, tapAt = 0.31f)
-                }
-                t < 0.86f -> Screen(center = true) {
-                    Small("leaving early")
-                    Spacer(Modifier.weight(1f))
-                    Ring(ramp(t, 0.40f, 0.78f), Modifier.size(110.dp))
+                    val waited = ramp(t, 0.17f, 0.44f)
+                    Box(Modifier.size(110.dp), contentAlignment = Alignment.Center) {
+                        Ring(waited, Modifier.fillMaxSize())
+                        val left = kotlin.math.ceil(60 * (1f - waited)).toInt()
+                        Text("0:%02d".format(left).let { if (left == 60) "1:00" else it }, fontSize = 20.sp, color = c.textNormal)
+                    }
                     Spacer(Modifier.height(10.dp))
-                    Text("wait it out.\nit counts with the screen off too.", fontSize = 13.sp, color = c.textMuted, textAlign = TextAlign.Center)
+                    Text("wait a minute to open instagram", fontSize = 13.sp, color = c.textMuted, textAlign = TextAlign.Center)
                     Spacer(Modifier.weight(1f))
-                    MiniButton("open instagram", filled = true, alpha = if (t >= 0.79f) 1f else 0.35f, t = t, tapAt = 0.82f)
+                    MiniButton("continue", filled = true, alpha = if (t >= 0.44f) 1f else 0.35f, t = t, tapAt = 0.47f)
+                }
+                t < 0.86f -> Screen {
+                    Small("bedtime · until 07:00")
+                    Spacer(Modifier.height(18.dp))
+                    Text("why are you opening instagram?", fontSize = 15.sp, color = c.textNormal)
+                    Spacer(Modifier.height(4.dp))
+                    Typed("checking anna's message", ramp(t, 0.54f, 0.68f), caret = t < 0.70f, size = 13)
+                    Spacer(Modifier.height(14.dp))
+                    Text("how do you feel?", fontSize = 12.sp, color = c.textMuted)
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        listOf("tired", "bored", "calm").forEach { Chip(it, on = it == "tired" && t >= 0.74f, small = true) }
+                    }
+                    Spacer(Modifier.weight(1f))
+                    MiniButton("open instagram", filled = true, t = t, tapAt = 0.82f)
                 }
                 else -> FakeApp("instagram")
             }
         }
-        Caption(t, 0f to "open a shut app, and a cover asks if it's what you came for.", 0.38f to "to leave early, wait it out.", 0.86f to "then the app opens, for as long as you chose.")
+        Caption(
+            t,
+            0f to "open a blocked app, and refuge asks you to pause first.",
+            0.12f to "here, you wait a minute.",
+            0.50f to "then you write why you're opening it, and how you feel.",
+            0.86f to "then the app opens, for as long as you chose.",
+        )
     }
-    InfoCard("waiting is one option of several", "you set what leaving early asks for: a wait, a passage to copy, a few words of why, a password, or nothing.")
+    InfoCard("these are two options of several", "you set what opening a blocked app asks for: a wait, a passage to copy, a few words of why, a password, or nothing.")
 }
 
 @Composable
@@ -281,7 +350,7 @@ private fun HomeScreenPage(showLauncher: Boolean, onLauncher: () -> Unit) {
 }
 
 @Composable
-private fun LockScreenPage() {
+internal fun LockScreenPage() {
     val c = Obsidian.colors
     Intro("you can use refuge's lockscreen, only with what you choose, and the option of cool widgets")
     val t = loop(8_000)
@@ -298,10 +367,9 @@ private fun LockScreenPage() {
                 Spacer(Modifier.height(14.dp))
                 Box(Modifier.fillMaxWidth()) {
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Small("2 held until morning")
+                        Small("1 held until morning")
                         val away = ramp(t, 0.35f, 0.48f)
                         if (away < 1f) Notice("messages · anna", "are we still on for saturday?", Modifier.graphicsLayer { translationX = away * 160.dp.toPx(); alpha = 1f - away })
-                        Notice("mail · the bank", "your statement is ready")
                     }
                     if (t in 0.5f..0.92f) Text("later: back when bedtime ends", fontSize = 10.sp, color = c.accentText, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 22.dp))
                 }
@@ -319,8 +387,9 @@ private fun LockScreenPage() {
     )
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun WidgetsPage() {
+internal fun WidgetsPage() {
     val c = Obsidian.colors
     Intro("on the home screen or lock screen, each does a little more than it shows.")
     val t = loop(20_000)
@@ -328,45 +397,54 @@ private fun WidgetsPage() {
     val step = (t * 4).toInt().coerceAtMost(3)
     fun focus(i: Int) = Modifier.graphicsLayer { alpha = if (step == i) 1f else 0.28f; val s = if (step == i) 1.04f else 1f; scaleX = s; scaleY = s }
     Demo {
-        Phone(height = 470.dp) {
+        Phone(height = 400.dp) {
             Screen {
-                Small("bedtime · until 07:00", Modifier.align(Alignment.CenterHorizontally))
-                Text("22:41", fontSize = 42.sp, color = c.textNormal, modifier = Modifier.align(Alignment.CenterHorizontally))
-                Text("thursday 19 november", fontSize = 11.sp, color = c.textMuted, modifier = Modifier.align(Alignment.CenterHorizontally))
-                Spacer(Modifier.height(12.dp))
+                // The clock kept small, top left, so the widgets have the room.
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text("22:41", fontSize = 13.sp, color = c.textNormal)
+                    Small("  thu 19 nov · bedtime until 07:00", Modifier.padding(bottom = 1.dp))
+                }
+                Spacer(Modifier.height(6.dp))
                 Box(focus(3)) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        listOf("thu" to "9° 4°", "fri" to "8° 3°", "sat" to "11° 2°", "sun" to "12° 4°", "mon" to "7° 3°").forEach { (day, temps) ->
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        listOf(
+                            Triple("thu", app.bedtime.data.WeatherIcon.CLOUDY, "9° 4°"),
+                            Triple("fri", app.bedtime.data.WeatherIcon.RAIN, "8° 3°"),
+                            Triple("sat", app.bedtime.data.WeatherIcon.CLEAR, "11° 2°"),
+                            Triple("sun", app.bedtime.data.WeatherIcon.PARTLY, "12° 4°"),
+                            Triple("mon", app.bedtime.data.WeatherIcon.RAIN, "7° 3°"),
+                        ).forEach { (day, sky, temps) ->
+                            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                 Small(day)
-                                Text(temps, fontSize = 11.sp, color = c.textNormal)
+                                Icon(app.bedtime.ui.components.WeatherIcons.of(sky), contentDescription = null, tint = c.textMuted, modifier = Modifier.size(13.dp))
+                                Text(temps, fontSize = 9.sp, color = c.textNormal)
                             }
                         }
                     }
                     TapRing(t, 0.78f, Modifier.offset(x = 4.dp))
                 }
                 Box(focus(2)) {
-                    Column {
-                        Text("16:00 · team call", fontSize = 13.sp, color = c.textNormal)
-                        Small("in 1h 40m · 2 more today")
-                    }
-                    TapRing(t, 0.53f, Modifier.offset(x = 60.dp))
+                    Text("16:00 · team call", fontSize = 11.sp, color = c.textNormal, modifier = Modifier.padding(vertical = 2.dp))
+                    TapRing(t, 0.53f, Modifier.offset(x = 50.dp, y = (-6).dp))
                 }
-                Column(focus(0), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                    HabitDots("read", listOf(true, true, false, true, true, false), done = t >= 0.08f && t < 0.99f, t = t, at = 0.06f)
-                    HabitDots("stretch", listOf(false, true, true, true, false, true), done = t >= 0.16f && t < 0.99f, t = t, at = 0.14f)
+                Column(focus(0), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    HabitDots("read", listOf(true, true, false, true, true, false), done = t >= 0.08f && t < 0.99f, t = t, at = 0.06f, compact = true)
+                    HabitDots("stretch", listOf(false, true, true, true, false, true), done = t >= 0.16f && t < 0.99f, t = t, at = 0.14f, compact = true)
                 }
                 Box(focus(1)) {
                     val over = t >= 0.34f
-                    Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                    Column(Modifier.padding(top = 2.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                         Row(Modifier.fillMaxWidth()) {
-                            Text(if (over) "50 of 45 min on the phone" else "40 of 45 min on the phone", fontSize = 12.sp, color = c.textMuted, modifier = Modifier.weight(1f))
+                            Text(if (over) "50 of 45 min on the phone" else "40 of 45 min on the phone", fontSize = 10.sp, color = c.textMuted, modifier = Modifier.weight(1f))
                             Text(if (over) "5m over" else "5 min left", fontSize = 9.sp, color = if (over) c.orange else c.textFaint)
                         }
                         BudgetBar(over)
                     }
                     TapRing(t, 0.42f, Modifier.offset(x = 100.dp))
                 }
+                // The foot of a lock screen: a padlock, as if it's still locked.
+                Spacer(Modifier.weight(1f))
+                Icon(LineIcons.Lock, contentDescription = null, tint = c.textFaint, modifier = Modifier.size(16.dp).align(Alignment.CenterHorizontally))
             }
             Sheet(slide(t, 0.42f, 0.44f, 0.48f, 0.50f)) {
                 Row(Modifier.fillMaxWidth()) { Small("today · 50 min", Modifier.weight(1f)); Small("most first") }
@@ -394,6 +472,9 @@ private fun WidgetsPage() {
                 }
                 Text("open your weather app ›", fontSize = 11.sp, color = c.accentText)
             }
+        }
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally), verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            listOf("habits", "time on phone", "calendar", "weather").forEachIndexed { i, label -> Chip(label, on = i == step) }
         }
         Caption(
             t,
@@ -554,7 +635,7 @@ private fun NotesPage() {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun QuickNotesPage() {
+internal fun QuickNotesPage() {
     val c = Obsidian.colors
     Intro("jot a thought down in a second, even from your lockscreen, before the phone pulls you elsewhere.")
     Label("type a quick note, even from the lock screen")
@@ -574,7 +655,7 @@ private fun QuickNotesPage() {
                     Typed("book to read -", ramp(t, 0.28f, 0.40f), caret = t < 0.40f)
                     Typed("braiding sweetgrass", ramp(t, 0.40f, 0.58f), caret = t >= 0.40f)
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Chip("refuge notes", on = t >= 0.62f, small = true)
                     Chip("to-do", small = true)
                     Chip("microjournal", small = true)
@@ -662,14 +743,14 @@ private fun ObsidianPage() {
 }
 
 @Composable
-private fun HabitsPage() {
+internal fun HabitsPage() {
     val c = Obsidian.colors
     Intro("simple, but effective and accessible habit tracker")
     Label("today")
     val t = loop(8_000)
     Card(gap = 0.dp) {
         HabitRow("read", done = t >= 0.36f, strength = 0.54f + 0.08f * ramp(t, 0.4f, 0.6f), note = "strong-ish")
-        HabitRow("water, 8 glasses", done = true, strength = 0.82f, note = "8 of 8")
+        HabitRow("practice", done = true, strength = 0.82f, note = "strong")
         Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(26.dp).clip(CircleShape).border(2.dp, c.interactiveHover, CircleShape))
             Text("morning routine", fontSize = 15.sp, color = c.textNormal, modifier = Modifier.weight(1f).padding(start = 12.dp))
@@ -707,7 +788,7 @@ private fun MicrojournalPage() {
 }
 
 @Composable
-private fun DictionaryPage() {
+internal fun DictionaryPage() {
     val c = Obsidian.colors
     Intro("look up a word right from the lock screen, without unlocking the phone. the dictionaries are kept on the phone, so nothing else opens.")
     val t = loop(10_000)
@@ -723,13 +804,18 @@ private fun DictionaryPage() {
         Spacer(Modifier.height(if (t >= 0.2f) 40.dp else 200.dp))
     }
     Text("words can be saved to favorites, and they end up in one note.", fontSize = 12.sp, color = c.textFaint, lineHeight = 17.sp)
+    InfoCard("set it up first", "the dictionary works offline, so you need to download one before you can use it. you set it up in settings › search.")
 }
 
 // ---------------------------------------------------------------- what the pages are made of
 
+/** A fixed place in every loop, for pictures of a demo; null in the app, where they play. */
+internal val LocalDemoTime = androidx.compose.runtime.staticCompositionLocalOf<Float?> { null }
+
 /** A loop's place, 0 to 1, going round every [ms]. */
 @Composable
 private fun loop(ms: Int): Float {
+    LocalDemoTime.current?.let { return it }
     val loop = rememberInfiniteTransition(label = "demo")
     val t by loop.animateFloat(0f, 1f, infiniteRepeatable(tween(ms, easing = LinearEasing), RepeatMode.Restart), label = "t")
     return t
@@ -976,14 +1062,15 @@ private fun Notice(title: String, line: String, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun HabitDots(name: String, week: List<Boolean>, done: Boolean, t: Float, at: Float) {
+private fun HabitDots(name: String, week: List<Boolean>, done: Boolean, t: Float, at: Float, compact: Boolean = false) {
     val c = Obsidian.colors
+    val dot = if (compact) 11.dp else 13.dp
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(name, fontSize = 12.sp, color = c.textNormal, modifier = Modifier.width(52.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-            week.forEach { Box(Modifier.size(13.dp).clip(CircleShape).background(if (it) c.accent else c.interactive)) }
+        Text(name, fontSize = if (compact) 11.sp else 12.sp, color = c.textNormal, modifier = Modifier.width(52.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(if (compact) 5.dp else 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            week.forEach { Box(Modifier.size(dot).clip(CircleShape).background(if (it) c.accent else c.interactive)) }
             Box(contentAlignment = Alignment.Center) {
-                Box(Modifier.size(13.dp).clip(CircleShape).background(if (done) c.accent else Color.Transparent).border(2.dp, if (done) c.accent else c.accentText, CircleShape))
+                Box(Modifier.size(dot).clip(CircleShape).background(if (done) c.accent else Color.Transparent).border(2.dp, if (done) c.accent else c.accentText, CircleShape))
                 TapRing(t, at)
             }
         }

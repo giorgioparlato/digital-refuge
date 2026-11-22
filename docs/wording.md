@@ -176,7 +176,7 @@ The list:
 | Feature | Line |
 |---|---|
 | when a session runs | see what blocked apps show, and how to leave early |
-| your home screen | use refuge as your launcher |
+| home screen | use refuge as your launcher |
 | the lock screen | use refuge's lockscreen, with the widgets you choose |
 | some widgets | see what each widget does when you tap it |
 | insights | see your screen time against your budget |
@@ -194,7 +194,7 @@ Each page's intro, as you wrote it:
 | Page | Intro |
 |---|---|
 | when a session runs | while a block, a schedule or a limit runs, the apps it shuts open to a cover instead. |
-| your home screen | use refuge as your launcher: a calm home screen with only what you put on it. |
+| home screen | use refuge as your launcher: a calm home screen with only what you put on it. |
 | the lock screen | you can use refuge's lockscreen, only with what you choose, and the option of cool widgets |
 | some widgets | on the home screen or lock screen, each does a little more than it shows. |
 | insights | see your phone usage, overall and in distracting apps in relation to the budget you set for yourself |

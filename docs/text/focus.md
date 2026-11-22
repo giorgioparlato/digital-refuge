@@ -55,10 +55,10 @@ focus
 - … sessions are on
 - for another …, until …
 - undo …
-- leave early
 - … blocked
 - quiet home screen
 - do not disturb
+- leave early
 - taking a break
 - … picks up again at …
 - all clear for now
@@ -173,8 +173,8 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 - New note
 - Note
 - # A title  - a list - [ ] a to-do
-- closing bracket
 - heading: tap again for a smaller one
+- closing bracket
 
 <sub>[Markdown.kt](../../app/src/main/java/app/bedtime/ui/notes/Markdown.kt)</sub>
 
@@ -186,10 +186,10 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 
 - New
 - Start from scratch
-- Schedule
-- On set days and times
 - Block
 - Any time, for a set length
+- Schedule
+- On set days and times
 - Limit
 - Every day, for the apps that pull
 - Schedules
@@ -480,7 +480,6 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 - Enjoy your {minutes}-minute break. … switches back on afterwards.
 - Unlocking {scheduleName}
 - Never mind, let's keep still
-- step … of …
 - Unlocked
 - Time's up.
 - Take a breath.
