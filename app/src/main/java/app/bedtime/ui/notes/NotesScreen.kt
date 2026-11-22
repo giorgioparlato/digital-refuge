@@ -1,5 +1,7 @@
 package app.bedtime.ui.notes
 
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.consumeWindowInsets
 import app.bedtime.ui.components.LineIcons
 import app.bedtime.data.TrashedNote
 import androidx.compose.foundation.layout.height
@@ -961,7 +963,9 @@ internal fun NoteEditor(
             }
         },
     ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).imePadding()) {
+        // What the bars around the page already took is taken off the keyboard's height, so the key bar
+        // sits right on the keyboard rather than a tab bar's height above it.
+        Column(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).imePadding()) {
             panel?.invoke(value) { change -> edit(change(value), true) }
             var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
             // The note grows inside a scrolling page, so its boxes can be drawn where its lines are.
@@ -1049,6 +1053,10 @@ private fun MarkdownBar(canUndo: Boolean, canRedo: Boolean, onUndo: () -> Unit, 
         KeyGroup {
             BarKey("•", "list", icon = LineIcons.List) { onEdit { Markdown.toggleLine(it, "- ") } }
             BarKey("☐", "to-do", icon = LineIcons.Todo) { onEdit { Markdown.toggleLine(it, "- [ ] ") } }
+        }
+        KeyGroup {
+            BarKey("↑", "move the line up", icon = LineIcons.KeyboardArrowUp) { onEdit { Markdown.moveLine(it, up = true) } }
+            BarKey("↓", "move the line down", icon = LineIcons.KeyboardArrowDown) { onEdit { Markdown.moveLine(it, up = false) } }
         }
         KeyGroup {
             BarKey("→", "indent", icon = LineIcons.Indent) { onEdit { Markdown.indent(it, inward = true) } }

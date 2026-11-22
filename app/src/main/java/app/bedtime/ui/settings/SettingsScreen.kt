@@ -286,6 +286,10 @@ fun SettingsScreen(place: SettingsPlace? = null, onBack: (() -> Unit)? = null, o
         onBack = onBack,
         onOpen = onOpen,
         onNudge = { m -> scope.launch { repo.updateSettings { it.copy(runNudgeMinutes = m) } } },
+        onOffCover = { m ->
+            scope.launch { repo.updateSettings { it.copy(offCoverMinutes = m) } }
+            app.bedtime.service.OffCover.settingChanged(context, m)
+        },
         onLockScreen = { on -> style { it.copy(lockScreen = on) } },
         onLockAlways = { on -> style { it.copy(lockAlways = on) } },
         onTileBlock = { id -> scope.launch { repo.updateSettings { it.copy(tileBlockId = id) } } },
@@ -348,18 +352,39 @@ internal fun SettingsContent(
     onBackupJournal: (Boolean) -> Unit = {},
     /** Minutes in a row on the phone before a nudge, or null for none. */
     onNudge: (Int?) -> Unit = {},
+    /** Minutes blocking may stay off outside a session before a full screen, or null for never. */
+    onOffCover: (Int?) -> Unit = {},
 ) {
     val c = Obsidian.colors
     var query by rememberSaveable { mutableStateOf("") }
     var choosingNudge by remember { mutableStateOf(false) }
     if (choosingNudge) {
-        NudgeDialog(settings.runNudgeMinutes, onDismiss = { choosingNudge = false }) {
+        MinutesDialog(
+            "A nudge after time in a row",
+            "After a long stretch on the phone, a full screen asks if you still want to be on it. Never during a call.",
+            listOf(null, 5, 10, 15, 20, 30, 45),
+            settings.runNudgeMinutes,
+            onDismiss = { choosingNudge = false },
+        ) {
             choosingNudge = false
             onNudge(it)
         }
     }
+    var choosingOffCover by remember { mutableStateOf(false) }
+    if (choosingOffCover) {
+        MinutesDialog(
+            "When blocking stays off",
+            "If blocking stays switched off outside a session, a full screen asks you to switch it back on. Later asks again after the same time.",
+            listOf(null, 1, 5, 10, 15, 30),
+            settings.offCoverMinutes,
+            onDismiss = { choosingOffCover = false },
+        ) {
+            choosingOffCover = false
+            onOffCover(it)
+        }
+    }
     val backup = BackupRows(backupFolderName, backupWritable, onWeeklyBackup, onChooseBackupFolder, onBackUpNow, backupSealed, onBackupPassphrase, onBackupJournal)
-    val entries = settingsEntries(settings, setupStepsLeft, isDefaultHome, onOpen, onLockScreen, onLockAlways, onExport, onImport, backup, onChooseNudge = { choosingNudge = true }, schedules = schedules, onChange = onChange, inSession = inSession)
+    val entries = settingsEntries(settings, setupStepsLeft, isDefaultHome, onOpen, onLockScreen, onLockAlways, onExport, onImport, backup, onChooseNudge = { choosingNudge = true }, onChooseOffCover = { choosingOffCover = true }, schedules = schedules, onChange = onChange, inSession = inSession)
     Scaffold(
         containerColor = c.bgPrimary,
         topBar = {
@@ -410,23 +435,23 @@ internal fun SettingsContent(
     }
 }
 
-/** How long in a row on the phone, in any app, before a full screen asks if it's still what you meant to do. */
+/** A number of minutes to choose from [choices], or off (null): for the nudge and the cover when blocking stays off. */
 @Composable
-private fun NudgeDialog(current: Int?, onDismiss: () -> Unit, onPick: (Int?) -> Unit) {
+private fun MinutesDialog(title: String, body: String, choices: List<Int?>, current: Int?, onDismiss: () -> Unit, onPick: (Int?) -> Unit) {
     val c = Obsidian.colors
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = c.bgSecondary,
-        title = { Text("A nudge after time in a row", color = c.textNormal) },
+        title = { Text(title, color = c.textNormal) },
         text = {
             Column {
                 Text(
-                    "After a long stretch on the phone, a full screen asks if you still want to be on it. Never during a call.",
+                    body,
                     style = MaterialTheme.typography.bodySmall,
                     color = c.textMuted,
                     modifier = Modifier.padding(bottom = 8.dp),
                 )
-                listOf<Int?>(null, 5, 10, 15, 20, 30, 45).forEach { m ->
+                choices.forEach { m ->
                     Text(
                         m?.let { "$it min" } ?: "Off",
                         style = MaterialTheme.typography.bodyLarge,
@@ -491,6 +516,7 @@ private fun settingsEntries(
     onImport: () -> Unit,
     backup: BackupRows,
     onChooseNudge: () -> Unit = {},
+    onChooseOffCover: () -> Unit = {},
     schedules: List<Schedule> = emptyList(),
     onChange: ((AppSettings) -> AppSettings) -> Unit = {},
     inSession: Boolean = false,
@@ -588,6 +614,16 @@ private fun settingsEntries(
                 "If blocking is turned off during a session, a full screen stays up until you turn it back on$locked",
                 "full screen reminder takeover overlay switched off sessions",
                 trailing = { ObsidianToggle(s.remindsFullScreen, { on -> onChange { it.copy(fullScreenReminder = on) } }, enabled = !inSession) },
+            ),
+        )
+        add(
+            Entry(
+                SettingsPlace.FOCUS,
+                BedtimeIcons.Contrast,
+                "When blocking stays off",
+                s.offCoverMinutes?.let { "Outside a session, a full screen after $it min, until you switch it back on" } ?: "Off",
+                "blocking off accessibility switched off cover full screen reminder outside sessions later",
+                onChooseOffCover,
             ),
         )
         add(Entry(null, LineIcons.Edit, "Notes", "Where quick notes go · the to-do · words · voice notes", "notes note quick to-do todo obsidian daily file words voice", go(Routes.QUICK_NOTES), group = 2))

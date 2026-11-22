@@ -243,6 +243,10 @@
             android:exported="false" />
 
         <receiver
+            android:name=".service.OffCoverReceiver"
+            android:exported="false" />
+
+        <receiver
             android:name=".service.NoteReminderReceiver"
             android:exported="false" />
 

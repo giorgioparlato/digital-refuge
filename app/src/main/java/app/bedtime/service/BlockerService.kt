@@ -193,6 +193,8 @@ class BlockerService : AccessibilityService() {
 
     override fun onServiceConnected() {
         BlockingState.service = this
+        // Back on: the cover for it being left off, and its alarm, go.
+        OffCover.blockingOn(this)
         // Already unlocked as blocking comes on: the run counts from now.
         if (getSystemService(PowerManager::class.java)?.isInteractive == true && getSystemService(KeyguardManager::class.java)?.isKeyguardLocked == false) {
             runClock.start(System.currentTimeMillis())
@@ -553,6 +555,8 @@ class BlockerService : AccessibilityService() {
         // Being switched off is exactly when the alarm matters: nothing else will be left running
         // to notice the next session starting.
         releaseScope.launch { SessionAlarms.schedule(context) }
+        // Off outside a session: a full screen after a while, if you asked for one.
+        OffCover.blockingOff(context)
         if (state?.isActive != true) {
             releaseScope.launch {
                 GreyscaleController.apply(context, wanted = false)

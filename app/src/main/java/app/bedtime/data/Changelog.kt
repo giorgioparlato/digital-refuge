@@ -13,6 +13,16 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            103,
+            "0.9.57",
+            listOf(
+                "Habits show as a grid of the last seven days: tap any day to tick it. The button beside \"today\" switches to compact rows.",
+                "The week's summary sits under your habits, so ticking comes first.",
+                "Writing a note: the bar of keys sits right on the keyboard again. ↑ and ↓ move a line up or down, and numbered lists keep their order.",
+                "If you like, a full screen asks you to switch blocking back on when it's been off for a while outside a session. \"later\" asks again after the same time. It's in settings › focus › when blocking stays off.",
+            ),
+        ),
+        ChangelogEntry(
             102,
             "0.9.56",
             listOf(

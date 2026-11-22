@@ -57,6 +57,10 @@ data class HabitMark(val habit: String, val day: Long, val value: Int)
  */
 enum class HabitDay { DONE, PARTIAL, MET, OPEN }
 
+/** How the habits page shows them: a grid of the last seven days (the usual), or a compact row each. */
+@kotlinx.serialization.Serializable
+enum class HabitsView { GRID, ROWS }
+
 /** The ways of saying how often. */
 enum class HabitFrequency(val label: String, val days: Int) {
     DAILY("Every day", 1),

@@ -315,6 +315,39 @@ object Markdown {
     fun indent(value: TextFieldValue, inward: Boolean): TextFieldValue =
         changeLine(value) { line -> if (inward) "  $line" else line.removePrefix(line.take(2).takeWhile { it == ' ' }) }
 
+    /**
+     * The cursor's line swapped with the one above ([up]) or below, the cursor going with it to the
+     * same place in its words. At the top or the foot it stays where it is. A numbered list renumbers
+     * itself afterwards, as after any edit.
+     */
+    fun moveLine(value: TextFieldValue, up: Boolean): TextFieldValue {
+        val lines = value.text.split('\n').toMutableList()
+        val at = value.selection.min
+        val index = value.text.substring(0, at).count { it == '\n' }
+        val other = if (up) index - 1 else index + 1
+        if (other !in lines.indices) return value
+        var column = at - (value.text.lastIndexOf('\n', at - 1) + 1)
+        val mine = NUMBERED.find(lines[index])
+        val theirs = NUMBERED.find(lines[other])
+        if (mine != null && theirs != null && mine.groupValues[1] == theirs.groupValues[1]) {
+            // Two items of one numbered list: their words swap and each place keeps its number, so
+            // the list still starts where it did.
+            val myWords = lines[index].substring(mine.value.length)
+            val theirWords = lines[other].substring(theirs.value.length)
+            column += theirs.value.length - mine.value.length
+            lines[index] = mine.value + theirWords
+            lines[other] = theirs.value + myWords
+        } else {
+            lines[index] = lines[other].also { lines[other] = lines[index] }
+        }
+        val text = lines.joinToString("\n")
+        val start = lines.take(other).sumOf { it.length + 1 }
+        return TextFieldValue(text, TextRange(start + column.coerceIn(0, lines[other].length)))
+    }
+
+    /** A numbered list item's indent and number: "  2. ". */
+    private val NUMBERED = Regex("""^(\s*)\d+\.\s""")
+
     /** The line's heading one level smaller each time, # to ## to ###, then plain again. */
     fun cycleHeading(value: TextFieldValue): TextFieldValue = changeLine(value) { line ->
         when {

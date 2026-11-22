@@ -62,4 +62,27 @@ class MarkdownEditingTest {
         assertEquals("10. end", fixed.text.lines().last())
         assertEquals(fixed.text.length, fixed.selection.start)
     }
+
+    /** [before] with the cursor where "|" is, its line moved. */
+    private fun move(before: String, up: Boolean): String {
+        val at = before.indexOf('|')
+        return Markdown.renumbered(Markdown.moveLine(TextFieldValue(before.replace("|", ""), TextRange(at)), up)).shown()
+    }
+
+    @Test
+    fun aLineMovesWithTheCursor() {
+        assertEquals("b|ee\na\nc", move("a\nb|ee\nc", up = true))
+        assertEquals("a\nc\nb|ee", move("a\nb|ee\nc", up = false))
+    }
+
+    @Test
+    fun theFirstAndLastLinesStayPut() {
+        assertEquals("a|\nb", move("a|\nb", up = true))
+        assertEquals("a\nb|", move("a\nb|", up = false))
+    }
+
+    @Test
+    fun aNumberedListRenumbersAfterAMove() {
+        assertEquals("1. c|\n2. a\n3. b", move("1. a\n2. b\n3. c|", up = true).let { move(it, up = true) })
+    }
 }

@@ -1,5 +1,7 @@
 package app.bedtime
 
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.consumeWindowInsets
 import app.bedtime.ui.components.LineIcons
 import androidx.lifecycle.lifecycleScope
 import app.bedtime.ui.settings.DistractionScreen
@@ -476,7 +478,8 @@ private fun TabShell(tab: String, notesTab: Boolean, habitsTab: Boolean = false,
             }
         },
     ) { padding ->
-        Box(Modifier.fillMaxSize().padding(bottom = padding.calculateBottomPadding())) { content() }
+        // The tab bar's room counts as used, so a page lifting itself above the keyboard only adds the rest.
+        Box(Modifier.fillMaxSize().padding(bottom = padding.calculateBottomPadding()).consumeWindowInsets(PaddingValues(bottom = padding.calculateBottomPadding()))) { content() }
     }
 }
 

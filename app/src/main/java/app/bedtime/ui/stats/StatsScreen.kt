@@ -192,6 +192,8 @@ fun StatsScreen(onBack: (() -> Unit)?, initialSection: Int = 0, onOpen: (String)
                 onDelete = { habit -> scope.launch { repo.deleteHabit(habit.id) } },
                 weekShown = settings?.habitsWeekShown != false,
                 onWeekShown = { on -> scope.launch { repo.updateSettings { it.copy(habitsWeekShown = on) } } },
+                view = settings?.habitsView ?: app.bedtime.data.HabitsView.GRID,
+                onView = { v -> scope.launch { repo.updateSettings { it.copy(habitsView = v) } } },
             )
         }),
         onAddHabit = { editingHabit = Habit() },
@@ -291,12 +293,14 @@ internal fun StatsContent(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Spacer(Modifier.height(2.dp))
-            lookBack?.let { LookBackCard(it, { pkg -> labels[pkg] ?: pkg }, onPutAway = onPutAwayLookBack) }
+            // With habits, the week's look-back waits under them, so ticking comes first.
+            if (section != 2 || habits == null) lookBack?.let { LookBackCard(it, { pkg -> labels[pkg] ?: pkg }, onPutAway = onPutAwayLookBack) }
             if (sections.size > 1) {
                 SegmentedChoice(options = sections, selected = sections.indexOf(shown), onSelect = { picked = sections[it] })
             }
             if (section == 2 && habits != null) {
                 habits()
+                lookBack?.let { LookBackCard(it, { pkg -> labels[pkg] ?: pkg }, onPutAway = onPutAwayLookBack) }
                 Spacer(Modifier.height(96.dp))
                 return@Column
             }

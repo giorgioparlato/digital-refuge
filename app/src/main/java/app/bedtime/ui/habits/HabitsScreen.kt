@@ -90,6 +90,8 @@ fun HabitsScreen(onBack: (() -> Unit)?) {
         onHabitsTab = { on -> scope.launch { repo.updateSettings { it.copy(habitsTab = on) } } },
         weekShown = settings?.habitsWeekShown != false,
         onWeekShown = { on -> scope.launch { repo.updateSettings { it.copy(habitsWeekShown = on) } } },
+        view = settings?.habitsView ?: app.bedtime.data.HabitsView.GRID,
+        onView = { v -> scope.launch { repo.updateSettings { it.copy(habitsView = v) } } },
         habits = habits,
         marks = marks,
         today = HourlyUse.today(),
@@ -122,6 +124,8 @@ internal fun HabitsContent(
     onHabitsTab: ((Boolean) -> Unit)? = null,
     weekShown: Boolean = true,
     onWeekShown: (Boolean) -> Unit = {},
+    view: app.bedtime.data.HabitsView = app.bedtime.data.HabitsView.GRID,
+    onView: (app.bedtime.data.HabitsView) -> Unit = {},
 ) {
     val c = Obsidian.colors
     var editing by remember { mutableStateOf<Habit?>(null) }
@@ -134,7 +138,7 @@ internal fun HabitsContent(
             Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = PageGutter, vertical = 4.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            HabitsBody(habits, marks, today, editing, { editing = it }, onMark, onSave, onMove, onDelete, weekShown, onWeekShown)
+            HabitsBody(habits, marks, today, editing, { editing = it }, onMark, onSave, onMove, onDelete, weekShown, onWeekShown, view, onView)
             // At the foot, once they're set up: a tab of their own, as notes can have.
             onHabitsTab?.let { set ->
                 app.bedtime.ui.components.SectionCard {
@@ -166,6 +170,8 @@ internal fun HabitsBody(
     onDelete: (Habit) -> Unit = {},
     weekShown: Boolean = true,
     onWeekShown: (Boolean) -> Unit = {},
+    view: app.bedtime.data.HabitsView = app.bedtime.data.HabitsView.GRID,
+    onView: (app.bedtime.data.HabitsView) -> Unit = {},
 ) {
     val c = Obsidian.colors
     var open by remember { mutableStateOf<String?>(null) }
@@ -195,42 +201,130 @@ internal fun HabitsBody(
         )
         return
     }
-    WeekSummary(habits, marks, today, weekShown, onWeekShown)
-    Text("Today", style = MaterialTheme.typography.titleLarge, color = c.textNormal, modifier = Modifier.padding(top = 4.dp))
+    val grid = view == app.bedtime.data.HabitsView.GRID
+    Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text("Today", style = MaterialTheme.typography.titleLarge, color = c.textNormal, modifier = Modifier.weight(1f))
+        // The other look, a tap away: the week as a grid, or a compact row each.
+        Box(
+            Modifier.size(44.dp).clip(CircleShape)
+                .clickable(onClickLabel = if (grid) "show as rows" else "show as a week grid") {
+                    onView(if (grid) app.bedtime.data.HabitsView.ROWS else app.bedtime.data.HabitsView.GRID)
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(if (grid) LineIcons.Menu else app.bedtime.ui.components.BedtimeIcons.Grid, contentDescription = null, tint = c.textMuted, modifier = Modifier.size(20.dp))
+        }
+    }
     if (habits.size > 1) Text("Hold one and drag it to change the order", style = MaterialTheme.typography.bodySmall, color = c.textFaint)
-    Column {
+    val tick = { habit: Habit -> onMark(habit, today, Habits.tapped(habit, marks[habit.id]?.get(today) ?: 0)) }
+    val step = { habit: Habit, s: HabitStep -> onMark(habit, today, Habits.stepTapped(marks[habit.id]?.get(today) ?: 0, s)) }
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(CardRadius)).background(c.bgSecondary).padding(vertical = 6.dp)) {
+        if (grid) WeekHeader(today)
         DragList(habits, key = { it.id }, onMoved = onMove, wholeRow = true) { habit ->
             Box(Modifier.weight(1f)) {
-                HabitCard(habit, marks[habit.id].orEmpty(), today, onTick = {
-                    onMark(habit, today, Habits.tapped(habit, marks[habit.id]?.get(today) ?: 0))
-                }, onStep = { step ->
-                    onMark(habit, today, Habits.stepTapped(marks[habit.id]?.get(today) ?: 0, step))
-                }, onOpen = { open = habit.id })
+                if (grid) {
+                    HabitGridRow(
+                        habit, marks[habit.id].orEmpty(), today,
+                        onDay = { day ->
+                            // Counts and sets open, to change the right number or step; the rest tick in place.
+                            if (habit.isSet || habit.kind == HabitKind.COUNT) {
+                                open = habit.id
+                            } else {
+                                onMark(habit, day, Habits.tapped(habit, marks[habit.id]?.get(day) ?: 0))
+                            }
+                        },
+                        onOpen = { open = habit.id },
+                    )
+                } else {
+                    HabitRow(habit, marks[habit.id].orEmpty(), today, onTick = { tick(habit) }, onStep = { step(habit, it) }, onOpen = { open = habit.id })
+                }
+            }
+        }
+    }
+    // How the week went, under the habits: ticking comes first.
+    WeekSummary(habits, marks, today, weekShown, onWeekShown)
+}
+
+/** The grid's days along the top: the last seven, today brightest. */
+@Composable
+private fun WeekHeader(today: Long) {
+    val c = Obsidian.colors
+    Row(Modifier.fillMaxWidth().padding(start = 14.dp, end = 10.dp, top = 6.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text("the last seven days", style = MaterialTheme.typography.labelSmall, color = c.textMuted, modifier = Modifier.weight(1f))
+        ((today - 6)..today).forEach { day ->
+            Text(
+                DateTimeFormatter.ofPattern("EEEEE", Locale.getDefault()).format(LocalDate.ofEpochDay(day)),
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = if (day == today) FontWeight.SemiBold else FontWeight.Normal,
+                color = if (day == today) c.textNormal else c.textMuted,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                modifier = Modifier.width(34.dp),
+            )
+        }
+    }
+}
+
+/**
+ * A habit as one row of the week grid: its colour and name (a tap opens it), then a square a day,
+ * filled when done, half when part done, a ring when already covered; today's is outlined.
+ */
+@Composable
+private fun HabitGridRow(habit: Habit, marks: Map<Long, Int>, today: Long, onDay: (Long) -> Unit, onOpen: () -> Unit) {
+    val c = Obsidian.colors
+    val tint = habit.tint(c.accent)
+    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
+    Row(Modifier.fillMaxWidth().height(44.dp).padding(start = 14.dp, end = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            Modifier.weight(1f).clip(RoundedCornerShape(8.dp)).clickable(onClickLabel = "open ${habit.name}", onClick = onOpen).padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(Modifier.size(8.dp).clip(CircleShape).background(tint))
+            Spacer(Modifier.width(8.dp))
+            Text(habit.name, style = MaterialTheme.typography.bodyMedium, color = c.textNormal, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+        }
+        ((today - 6)..today).forEach { day ->
+            val state = Habits.day(habit, marks, day)
+            Box(Modifier.width(34.dp), contentAlignment = Alignment.Center) {
+                Box(
+                    Modifier
+                        .size(28.dp)
+                        .clip(RoundedCornerShape(9.dp))
+                        .background(
+                            when (state) {
+                                HabitDay.DONE -> tint
+                                HabitDay.PARTIAL -> tint.copy(alpha = 0.4f)
+                                else -> c.interactive
+                            },
+                        )
+                        .then(if (state == HabitDay.MET) Modifier.border(1.5.dp, tint, RoundedCornerShape(9.dp)) else Modifier)
+                        .then(if (day == today && state != HabitDay.DONE) Modifier.border(1.5.dp, c.textNormal, RoundedCornerShape(9.dp)) else Modifier)
+                        .clickable(onClickLabel = "${habit.name}, ${if (day == today) "today" else "${today - day} days ago"}") {
+                            haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                            onDay(day)
+                        },
+                )
             }
         }
     }
 }
 
 /**
- * A habit as a card: the circle to tick today (or count one more), its name and how often, its strength
- * and run, and the week as dots, in its colour. A tap anywhere else opens it.
+ * A habit as a compact row: the circle to tick today (or count one more, or a set's steps to unfold),
+ * its name with how it's going under it, and the week as small dots. A tap elsewhere opens it.
  */
 @Composable
-private fun HabitCard(habit: Habit, marks: Map<Long, Int>, today: Long, onTick: () -> Unit, onStep: (HabitStep) -> Unit, onOpen: () -> Unit) {
+private fun HabitRow(habit: Habit, marks: Map<Long, Int>, today: Long, onTick: () -> Unit, onStep: (HabitStep) -> Unit, onOpen: () -> Unit) {
     val c = Obsidian.colors
     val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
     val tint = habit.tint(c.accent)
     val state = Habits.day(habit, marks, today)
     val kept = state == HabitDay.DONE || state == HabitDay.MET
-    // A set's circle unfolds its steps, to tick each; folded again each time the page opens.
     var unfolded by remember(habit.id) { mutableStateOf(false) }
-    Column(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(CardRadius)).background(c.bgSecondary).clickable(onClickLabel = "open ${habit.name}", onClick = onOpen).padding(14.dp),
-    ) {
+    Column(Modifier.fillMaxWidth().clickable(onClickLabel = "open ${habit.name}", onClick = onOpen).padding(horizontal = 14.dp, vertical = 8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
                 Modifier
-                    .size(36.dp)
+                    .size(32.dp)
                     .clip(CircleShape)
                     .background(if (state == HabitDay.DONE) tint else if (state == HabitDay.PARTIAL) tint.copy(alpha = 0.35f) else Color.Transparent)
                     .border(2.dp, if (kept || state == HabitDay.PARTIAL) tint else c.textFaint, CircleShape)
@@ -240,50 +334,37 @@ private fun HabitCard(habit: Habit, marks: Map<Long, Int>, today: Long, onTick: 
                             habit.kind == HabitKind.COUNT -> "one more"
                             else -> "tick ${habit.name}"
                         },
-                        onClick = {
-                            if (habit.isSet) {
-                                unfolded = !unfolded
-                            } else {
-                                // A light tick for a habit ticked.
-                                haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
-                                onTick()
-                            }
-                        },
-                    ),
+                    ) {
+                        if (habit.isSet) {
+                            unfolded = !unfolded
+                        } else {
+                            haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                            onTick()
+                        }
+                    },
                 contentAlignment = Alignment.Center,
             ) {
-                if (state == HabitDay.DONE) Icon(LineIcons.Check, contentDescription = null, tint = c.bgPrimary, modifier = Modifier.size(20.dp))
+                if (state == HabitDay.DONE) Icon(LineIcons.Check, contentDescription = null, tint = c.bgPrimary, modifier = Modifier.size(17.dp))
                 else if (habit.isSet) Text("${Habits.stepsTicked(habit, marks[today] ?: 0)}/${habit.steps.size}", style = MaterialTheme.typography.labelSmall, color = c.textMuted)
-                else if (habit.kind == HabitKind.COUNT) Text("+", style = MaterialTheme.typography.titleMedium, color = c.textMuted)
+                else if (habit.kind == HabitKind.COUNT) Text("+", style = MaterialTheme.typography.titleSmall, color = c.textMuted)
             }
-            Spacer(Modifier.width(14.dp))
+            Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text(habit.name, style = MaterialTheme.typography.bodyLarge, color = c.textNormal)
+                Text(habit.name, style = MaterialTheme.typography.bodyMedium, color = c.textNormal, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                 Text(
-                    if (habit.kind == HabitKind.COUNT) "${marks[today] ?: 0} of ${habit.target}${if (habit.unit.isBlank()) "" else " ${habit.unit}"} today" else Habits.describe(habit),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = c.textFaint,
+                    (if (habit.kind == HabitKind.COUNT) "${marks[today] ?: 0} of ${habit.target}${if (habit.unit.isBlank()) "" else " ${habit.unit}"} today" else Habits.describe(habit)) +
+                        " · ${Habits.streak(habit, marks, today)} in a row",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = c.textMuted,
+                    maxLines = 1,
                 )
             }
-            Column(horizontalAlignment = Alignment.End) {
-                Text("${Habits.strength(habit, marks, today)}%", style = MaterialTheme.typography.titleMedium, color = tint)
-                Text("${Habits.streak(habit, marks, today)} in a row", style = MaterialTheme.typography.labelSmall, color = c.textFaint)
+            Spacer(Modifier.width(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                ((today - 6)..today).forEach { day -> HabitDot(Habits.day(habit, marks, day), day == today, c.textNormal, tint, 11) }
             }
         }
-        if (habit.isSet && unfolded) HabitStepRows(habit, marks[today] ?: 0, c.textNormal, c.textMuted, c.textFaint, tint, Modifier.padding(top = 8.dp), onStep)
-        Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-            ((today - 6)..today).forEach { day ->
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    HabitDot(Habits.day(habit, marks, day), day == today, c.textNormal, tint, 22)
-                    Text(
-                        DateTimeFormatter.ofPattern("EEEEE", Locale.getDefault()).format(LocalDate.ofEpochDay(day)),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (day == today) c.textNormal else c.textFaint,
-                        modifier = Modifier.padding(top = 2.dp),
-                    )
-                }
-            }
-        }
+        if (habit.isSet && unfolded) HabitStepRows(habit, marks[today] ?: 0, c.textNormal, c.textMuted, c.textFaint, tint, Modifier.padding(top = 8.dp, start = 44.dp), onStep)
     }
 }
 

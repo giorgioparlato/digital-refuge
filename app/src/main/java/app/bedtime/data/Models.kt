@@ -781,6 +781,8 @@ data class AppSettings(
     val habitsTab: Boolean = false,
     /** The week at the top of habits, as small bars; folded to its one line when you'd rather not see it. */
     val habitsWeekShown: Boolean = true,
+    /** The habits as a grid of the week (the usual) or as compact rows. */
+    val habitsView: HabitsView = HabitsView.GRID,
     /** Your notes as a tab of their own at refuge's foot, beside insights. */
     val notesTab: Boolean = false,
     /** How the notes page shows them; a list until you choose otherwise. */
@@ -813,6 +815,11 @@ data class AppSettings(
      */
     val coverOffSwitches: Boolean? = null,
     val fullScreenReminder: Boolean? = null,
+    /**
+     * Outside sessions: minutes blocking may stay switched off before a full screen asks you to switch it
+     * back on ("later" waits as long again). Null, never.
+     */
+    val offCoverMinutes: Int? = null,
 ) {
     /** Whether sessions cover Android's off switches: as set, or as any of [schedules] did before it was one switch. */
     fun coversOffSwitches(schedules: List<Schedule>): Boolean = coverOffSwitches ?: (schedules.isEmpty() || schedules.any { it.lockSettings })
