@@ -43,10 +43,15 @@ object ModeGreyscale {
         val manager = context.getSystemService(NotificationManager::class.java)
         runCatching {
             val id = ruleId(context, manager, create = on) ?: return
+            val active = runCatching { manager.getAutomaticZenRuleState(id) == Condition.STATE_TRUE }.getOrDefault(false)
+            if (on && active && !reassert) return
             // Our own false→true toggle broadcasts a "deactivated" status; ignore it for a moment so
             // it isn't mistaken for the user switching greyscale off, which would re-assert forever.
             selfChangeUntil = SystemClock.elapsedRealtime() + 2_000
-            if (on && reassert) manager.setAutomaticZenRuleState(id, condition(false))
+            // Not on when it should be: maybe switched off by hand while nothing was watching (during an
+            // emergency break, say). Android ignores a plain "on" for a mode the user switched off, so
+            // it's switched off and on again.
+            if (on) manager.setAutomaticZenRuleState(id, condition(false))
             manager.setAutomaticZenRuleState(id, condition(on))
         }
     }

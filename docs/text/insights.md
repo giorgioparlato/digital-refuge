@@ -171,12 +171,13 @@ insights
 - Habits you want to keep, ticked off each day: daily, a few times a week, or a count like pages or reps. Add one with the + below; your home and lock screen can show them too.
 - Today
 - Hold one and drag it to change the order
+- the last seven days
 - fold its steps
 - show its steps
 - one more
 - tick …
 - … of …… today
-- … in a row
+-  · … in a row
 - {kept} of {possible}
 - kept in the last seven days
 - A new habit

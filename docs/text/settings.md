@@ -57,12 +57,14 @@ Home screen, lock screen, apps, shortcuts and about & backup are lists of rows f
 - This replaces your schedules, blocks and settings with the ones in the file. Running sessions aren't affected.
 - Replace
 - Cancel
+- A nudge after time in a row
+- After a long stretch on the phone, a full screen asks if you still want to be on it. Never during a call.
+- When blocking stays off
+- If blocking stays switched off outside a session, a full screen asks you to switch it back on. Later asks again after the same time.
 - Find a setting
 - set up once, then left alone
 - No setting with that name.
 - Writing & habits
-- A nudge after time in a row
-- After a long stretch on the phone, a full screen asks if you still want to be on it. Never during a call.
 - {it} min
 - Off
 - digital refuge {version} · everything stays on this phone
@@ -95,6 +97,8 @@ Home screen, lock screen, apps, shortcuts and about & backup are lists of rows f
 - Full-screen reminder
 - If blocking is turned off during a session, a full screen stays up until you turn it back on{locked}
 - full screen reminder takeover overlay switched off sessions
+- Outside a session, a full screen after {it} min, until you switch it back on
+- blocking off accessibility switched off cover full screen reminder outside sessions later
 - Cover messages
 - The messages you see when opening a blocked app · …
 - cover message messages words blocked

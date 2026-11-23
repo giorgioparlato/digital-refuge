@@ -364,7 +364,18 @@ class BlockerService : AccessibilityService() {
         return true
     }
 
-    private fun applyGreyscale() = GreyscaleController.apply(this, wanted = state?.greyscale == true)
+    /**
+     * Whether greyscale has been taken back since blocking came on. While it was off (an emergency break,
+     * say) greyscale may have been switched off by hand with nothing here to see it, so the first time
+     * it's wanted it's switched off and on again, whatever Android says its state is.
+     */
+    private var greyscaleRetaken = false
+
+    private fun applyGreyscale() {
+        val wanted = state?.greyscale == true
+        GreyscaleController.apply(this, wanted = wanted, reassert = wanted && !greyscaleRetaken)
+        if (wanted) greyscaleRetaken = true
+    }
 
     /**
      * Screen just went off: put the clock over the lock screen for next time, mid-session, or always

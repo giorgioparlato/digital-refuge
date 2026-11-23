@@ -13,8 +13,8 @@ object GreyscaleController {
     /** Whether greyscale can be switched on at all (Android 15+ with Do Not Disturb access). */
     fun isAvailable(context: Context): Boolean = ModeGreyscale.isSupported(context)
 
-    /** Turns greyscale on or off: everywhere, refuge's own screens too. */
-    fun apply(context: Context, wanted: Boolean) {
-        ModeGreyscale.apply(context, on = wanted)
+    /** Turns greyscale on or off: everywhere, refuge's own screens too. [reassert]: see [ModeGreyscale.apply]. */
+    fun apply(context: Context, wanted: Boolean, reassert: Boolean = false) {
+        ModeGreyscale.apply(context, on = wanted, reassert = reassert)
     }
 }

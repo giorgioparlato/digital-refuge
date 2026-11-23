@@ -13,6 +13,13 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            104,
+            "0.9.58",
+            listOf(
+                "Greyscale comes back when blocking is on again, even if you switched it off during an emergency break.",
+            ),
+        ),
+        ChangelogEntry(
             103,
             "0.9.57",
             listOf(

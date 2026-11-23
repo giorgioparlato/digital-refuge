@@ -174,6 +174,8 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 - Note
 - # A title  - a list - [ ] a to-do
 - heading: tap again for a smaller one
+- move the line up
+- move the line down
 - closing bracket
 
 <sub>[Markdown.kt](../../app/src/main/java/app/bedtime/ui/notes/Markdown.kt)</sub>
@@ -743,6 +745,7 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 
 <sub>[TakeoverOverlay.kt](../../app/src/main/java/app/bedtime/service/TakeoverOverlay.kt)</sub>
 
+- it's been off for {minutes} …. your limits and blocks only work while it's on.
 - drawing the full-screen reminder
 - {scheduleName} is still running. switch blocking back on to carry on.
 - take {breakMinutes} more …
