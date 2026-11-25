@@ -13,6 +13,17 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            105,
+            "0.9.59",
+            listOf(
+                "Search can open a folder: tap it, or type its name with a / (books/), to see what's inside. Back goes up a level.",
+                "The rain popup shows each hour's temperature next to the chance of rain.",
+                "Today so far shows time in distracting apps and distracted hours in the distracted colour.",
+                "The calendar widget can stay on one line: switch on one line in its options.",
+                "The session notification names the running session, instead of sometimes saying none is running.",
+            ),
+        ),
+        ChangelogEntry(
             104,
             "0.9.58",
             listOf(

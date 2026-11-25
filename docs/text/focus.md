@@ -589,6 +589,8 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 - start … · …
 - settings: …
 - … · obsidian
+- ‹ back
+- open … in your files app
 - … · folder
 
 <sub>[AppActions.kt](../../app/src/main/java/app/bedtime/ui/minimal/AppActions.kt)</sub>

@@ -418,6 +418,8 @@ One file serves the look, widgets, gestures and notifications pages, for both sc
 - Uses the calendar already on your phone. Nothing goes online.
 - Tomorrow's first event, once today's are done
 - In the evening, what the morning starts with
+- One line
+- A long event is cut short with … instead of taking two lines
 - Event names
 - Off, the lock screen only says when the next one is
 - A calendar icon when nothing's coming

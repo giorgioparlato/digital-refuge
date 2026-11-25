@@ -55,6 +55,29 @@ object FolderIndex {
         }
     }.getOrNull() ?: tree.lastPathSegment?.substringAfterLast(':')?.substringAfterLast('/').orEmpty()
 
+    /**
+     * Words that walk into a folder: "books/", or "books/sci" to narrow it, when "books/" is one of
+     * [files]' folders. The folder and the words after it; null for words that don't.
+     */
+    fun browsing(files: List<IndexedFile>, words: String): Pair<IndexedFile, String>? {
+        val cut = words.lastIndexOf('/')
+        if (cut < 0) return null
+        val path = words.substring(0, cut + 1)
+        val folder = files.firstOrNull { it.isFolder && it.path.equals(path, ignoreCase = true) } ?: return null
+        return folder to words.substring(cut + 1).trim()
+    }
+
+    /** What's directly in [folder] among [files], folders first, then by name; only names with [words] in them. */
+    fun inside(files: List<IndexedFile>, folder: IndexedFile, words: String = ""): List<IndexedFile> =
+        files.filter { f ->
+            val rest = f.path.removePrefix(folder.path)
+            f.path.startsWith(folder.path) && rest.isNotEmpty() && '/' !in rest.removeSuffix("/") && f.name.contains(words, ignoreCase = true)
+        }.sortedWith(compareBy({ !it.isFolder }, { it.name.lowercase() }))
+
+    /** The folder above [folder], as words to search with ("books/"), or "" at the top. */
+    fun parentPath(folder: IndexedFile): String =
+        folder.path.removeSuffix("/").substringBeforeLast('/', "").let { if (it.isEmpty()) "" else "$it/" }
+
     /** A note's title: its name without ".md". */
     fun title(file: IndexedFile): String = file.name.removeSuffix(".md")
 

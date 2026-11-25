@@ -490,7 +490,7 @@ private fun LockScreen(
     }
     if (hoursDetail) {
         val p = lockStyle.palette()
-        HourDetailDialog(todayHours, HourlyUse.rule(settings), p.background, p.text, p.faint, p.accent, onDismiss = { hoursDetail = false }, onStats = {
+        HourDetailDialog(todayHours, HourlyUse.rule(settings), p.background, p.text, p.faint, p.accent, distracted = lockStyle.hourDistractedColor?.let { androidx.compose.ui.graphics.Color(it) }, onDismiss = { hoursDetail = false }, onStats = {
             onOpenRoute(app.bedtime.Routes.STATS)
         })
     }

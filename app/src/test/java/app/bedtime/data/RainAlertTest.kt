@@ -51,4 +51,13 @@ class RainAlertTest {
         // An impossible chance is left out, not the whole forecast.
         assertEquals(listOf(RainHour(1_761_800_400_000L, 70)), w.rainHours)
     }
+
+    @Test
+    fun eachHoursTemperatureComesWithItsRain() {
+        val json = """{"timestamp":1761800000,"currentTemp":285.4,"hourly":[{"timestamp":1761800400,"precipProbability":70,"temp":281.15},{"timestamp":1761804000,"precipProbability":20,"temp":9999}]}"""
+        val w = Weather.parse(json, receivedAt = 1_761_800_100_000L)!!
+        val zone = java.time.ZoneOffset.UTC
+        assertEquals(listOf(8, null), Weather.rainByHour(w.rainHours, 1_761_800_400_000L, zone).map { it.degrees })
+        assertEquals(46, Weather.rainByHour(w.rainHours, 1_761_800_400_000L, zone, fahrenheit = true).first().degrees)
+    }
 }

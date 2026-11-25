@@ -48,4 +48,24 @@ class SearchExtrasTest {
         assertEquals(listOf("Review notes", "Weekly review"), FolderIndex.match(files, "review", name = FolderIndex::title).map(FolderIndex::title))
         assertTrue(FolderIndex.match(files, "r").isEmpty())
     }
+
+    @Test
+    fun aFolderOpensRightInTheSearch() {
+        val dir = android.provider.DocumentsContract.Document.MIME_TYPE_DIR
+        fun folder(path: String) = IndexedFile(path.removeSuffix("/").substringAfterLast('/'), path, "content://$path", dir)
+        fun file(path: String) = IndexedFile(path.substringAfterLast('/'), path, "content://$path", "application/pdf")
+        val books = folder("books/")
+        val files = listOf(books, folder("books/science/"), file("books/science/cosmos.pdf"), file("books/walden.pdf"), file("books/braiding.pdf"), file("taxes.pdf"))
+        // "books/" walks in; the words after it narrow what's there.
+        assertEquals(books to "", FolderIndex.browsing(files, "Books/"))
+        assertEquals(books to "wal", FolderIndex.browsing(files, "books/wal"))
+        assertNull(FolderIndex.browsing(files, "books"))
+        assertNull(FolderIndex.browsing(files, "music/"))
+        // Only what's directly inside, folders first.
+        assertEquals(listOf("science", "braiding.pdf", "walden.pdf"), FolderIndex.inside(files, books).map { it.name })
+        assertEquals(listOf("walden.pdf"), FolderIndex.inside(files, books, "wal").map { it.name })
+        // Back up: the folder above, or nothing at the top.
+        assertEquals("books/", FolderIndex.parentPath(folder("books/science/")))
+        assertEquals("", FolderIndex.parentPath(books))
+    }
 }

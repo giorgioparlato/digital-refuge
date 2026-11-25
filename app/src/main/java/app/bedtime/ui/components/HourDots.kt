@@ -123,7 +123,18 @@ fun rememberUseToday(): Pair<DayHours, app.bedtime.data.UseToday> {
  * the distracted hours so far and the heaviest; the distracting apps used most; and each hour.
  */
 @Composable
-fun HourDetailDialog(hours: DayHours, rule: HourRule, background: Color, text: Color, faint: Color, accent: Color, onDismiss: () -> Unit, onStats: (() -> Unit)? = null) {
+fun HourDetailDialog(
+    hours: DayHours,
+    rule: HourRule,
+    background: Color,
+    text: Color,
+    faint: Color,
+    accent: Color,
+    onDismiss: () -> Unit,
+    onStats: (() -> Unit)? = null,
+    /** The colour you chose for distracted hours on the dots; without one, the app's own distracting colour. */
+    distracted: Color? = null,
+) {
     val context = LocalContext.current
     val yesterday = rememberDayHours(HourlyUse.today() - 1)
     val nowHour = remember { java.time.LocalTime.now().hour }
@@ -131,7 +142,11 @@ fun HourDetailDialog(hours: DayHours, rule: HourRule, background: Color, text: C
     val labels = remember(report.topApps) { report.topApps.associate { (pkg, _) -> pkg to AppCatalog.label(context, pkg) } }
     val today = rememberUseDays(2, live = true).days[HourlyUse.today()]
     app.bedtime.ui.minimal.HomeSheetDialog(onDismiss) {
-        HourDetailContent(report, hours, rule, labels, background, text, faint, accent, unlocks = today?.unlocks, unlockHours = today?.unlockHours.orEmpty(), onStats = onStats?.let { { onDismiss(); it() } })
+        HourDetailContent(
+            report, hours, rule, labels, background, text, faint, accent,
+            unlocks = today?.unlocks, unlockHours = today?.unlockHours.orEmpty(), onStats = onStats?.let { { onDismiss(); it() } },
+            distracted = distracted ?: app.bedtime.ui.theme.Obsidian.colors.distracting,
+        )
     }
 }
 
@@ -152,6 +167,8 @@ fun HourDetailContent(
     padding: androidx.compose.ui.unit.Dp = 24.dp,
     /** Opens the statistics, from a link at the foot. */
     onStats: (() -> Unit)? = null,
+    /** Time in distracting apps and distracted hours: their figures, bars and minutes. */
+    distracted: Color = accent,
 ) {
     val context = LocalContext.current
     fun time(seconds: Long) = formatMinutes(seconds / 60)
@@ -161,16 +178,16 @@ fun HourDetailContent(
             Text(title, style = MaterialTheme.typography.labelMedium, color = faint)
             Spacer(Modifier.height(10.dp))
         }
-        Figure("In your distracting apps", time(report.inApps), report.inAppsVsYesterday?.let { HourlyUse.versus(it, ::formatMinutes) }, text, faint, accent)
+        Figure("In your distracting apps", time(report.inApps), report.inAppsVsYesterday?.let { HourlyUse.versus(it, ::formatMinutes) }, distracted, faint, distracted)
         Figure("On the phone at all", time(report.overall), report.overallVsYesterday?.let { HourlyUse.versus(it, ::formatMinutes) }, text, faint, accent)
         if (unlocks != null) Figure("Unlocks", "$unlocks", null, text, faint, accent)
         Figure(
             "Distracted hours",
             "${report.distracted} of ${report.hoursSoFar}",
             if (rule.totalMinutes == null) "over ${rule.appMinutes} min in distracting apps" else "over ${rule.appMinutes} min in distracting apps, or ${rule.totalMinutes} at all",
-            text,
+            distracted,
             faint,
-            accent,
+            distracted,
         )
         report.peakHour?.let { hour ->
             Figure("The heaviest hour", formatMinuteOfDay(context, hour * 60), "${time(report.peakSeconds)} in it", text, faint, accent)
@@ -206,13 +223,13 @@ fun HourDetailContent(
                             // The whole hour on the phone, faint; the part in distracting apps over it.
                             Box(Modifier.weight(1f).height(8.dp)) {
                                 Box(Modifier.fillMaxWidth(inAll.toFloat() / most).height(8.dp).clip(RoundedCornerShape(4.dp)).background(text.copy(alpha = 0.14f)))
-                                Box(Modifier.fillMaxWidth(inApps.toFloat() / most).height(8.dp).clip(RoundedCornerShape(4.dp)).background(if (lit) accent else text.copy(alpha = 0.5f)))
+                                Box(Modifier.fillMaxWidth(inApps.toFloat() / most).height(8.dp).clip(RoundedCornerShape(4.dp)).background(if (lit) distracted else text.copy(alpha = 0.5f)))
                             }
                             // A fixed width, so every bar is drawn to the same scale.
                             Text(
                                 "${inApps / 60} · ${inAll / 60} min",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = if (lit) accent else text,
+                                color = if (lit) distracted else text,
                                 textAlign = TextAlign.End,
                                 modifier = Modifier.width(84.dp),
                             )

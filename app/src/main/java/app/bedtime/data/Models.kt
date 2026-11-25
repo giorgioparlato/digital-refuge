@@ -400,6 +400,8 @@ data class HomeStyle(
     val lockCalendarIconWhenEmpty: Boolean = true,
     /** Once today's events are done, tomorrow's first one in their place, to get ready for the morning. */
     val calendarTomorrow: Boolean = false,
+    /** The next event kept to one line, cut short with "…" rather than wrapping; on both screens. */
+    val calendarOneLine: Boolean = false,
     /** The habits widget as a row of dots, today's for each, rather than a line a habit. */
     val habitsDots: Boolean = false,
     /** The note beside the clock: its share of the width, in percent; 0 leaves the clock what it needs and the note the rest. */
@@ -519,7 +521,7 @@ data class HomeStyle(
         noteWidgetId = from.noteWidgetId, noteLines = from.noteLines, noteTextSize = from.noteTextSize, noteBackground = from.noteBackground,
         noteDarkText = from.noteDarkText, noteBesideClock = from.noteBesideClock, lockNoteBesideClock = from.lockNoteBesideClock,
         calendarIconWhenEmpty = from.calendarIconWhenEmpty, lockCalendarIconWhenEmpty = from.lockCalendarIconWhenEmpty,
-        calendarTomorrow = from.calendarTomorrow, habitsDots = from.habitsDots, noteBesideShare = from.noteBesideShare,
+        calendarTomorrow = from.calendarTomorrow, calendarOneLine = from.calendarOneLine, habitsDots = from.habitsDots, noteBesideShare = from.noteBesideShare,
         habitsDue = from.habitsDue, habitsKeepDone = from.habitsKeepDone, habitsLabel = from.habitsLabel, habitsPlace = from.habitsPlace, useWidget = from.useWidget, lockUseWidget = from.lockUseWidget,
         weatherUnit = from.weatherUnit, calendarNamesOnLock = from.calendarNamesOnLock,
         hourCalmColor = from.hourCalmColor, hourDistractedColor = from.hourDistractedColor,

@@ -30,9 +30,12 @@ data class WeatherNow(
     val rainHours: List<RainHour> = emptyList(),
 )
 
-/** One hour's chance of rain: the hour's start (epoch millis) and the chance, in percent. */
+/** One hour's chance of rain: the hour's start (epoch millis), the chance in percent, and its temperature (kelvin) when Breezy sends it. */
 @Serializable
-data class RainHour(val at: Long, val chance: Int)
+data class RainHour(val at: Long, val chance: Int, val kelvin: Double? = null)
+
+/** An hour as the rain sheet shows it: its hour of day, the chance of rain, and the temperature in your unit, if known. */
+data class HourRain(val hour: Int, val chance: Int, val degrees: Int? = null)
 
 /**
  * How much weather to show: today's low and high; three days with their skies; or five days, on a
@@ -83,7 +86,7 @@ private data class WeatherSpec(
 )
 
 @Serializable
-private data class HourlySpec(val timestamp: Long? = null, val precipProbability: Double? = null)
+private data class HourlySpec(val timestamp: Long? = null, val precipProbability: Double? = null, val temp: Double? = null)
 
 @Serializable
 private data class ForecastSpec(val conditionCode: Int? = null, val minTemp: Double? = null, val maxTemp: Double? = null)
@@ -140,7 +143,7 @@ object Weather {
             rainChance = spec.precipProbability?.roundToInt()?.takeIf { it in 0..100 },
             rainHours = spec.hourly.take(48).mapNotNull { h ->
                 val at = h.timestamp?.takeIf { it > 0 } ?: return@mapNotNull null
-                h.precipProbability?.roundToInt()?.takeIf { it in 0..100 }?.let { RainHour(at * 1000, it) }
+                h.precipProbability?.roundToInt()?.takeIf { it in 0..100 }?.let { RainHour(at * 1000, it, h.temp?.takeIf { t -> t in 180.0..335.0 }) }
             },
             days = spec.forecasts.take(4).map { WeatherDay(it.conditionCode, it.minTemp?.takeIf { t -> t in 180.0..335.0 }, it.maxTemp?.takeIf { t -> t in 180.0..335.0 }) },
         )
@@ -150,13 +153,13 @@ object Weather {
      * The chance of rain hour by hour, from the hour [now] is in to the end of the day; late in the
      * evening, on into the night, so there are always a few hours to see. Each with its hour of day.
      */
-    fun rainByHour(hours: List<RainHour>, now: Long, zone: java.time.ZoneId): List<Pair<Int, Int>> {
+    fun rainByHour(hours: List<RainHour>, now: Long, zone: java.time.ZoneId, fahrenheit: Boolean = false): List<HourRain> {
         val start = java.time.Instant.ofEpochMilli(now).atZone(zone).withMinute(0).withSecond(0).withNano(0)
         val endOfDay = start.toLocalDate().plusDays(1).atStartOfDay(zone)
         val end = maxOf(endOfDay, start.plusHours(6))
         return hours.filter { it.at >= start.toInstant().toEpochMilli() && it.at < end.toInstant().toEpochMilli() }
             .sortedBy { it.at }
-            .map { java.time.Instant.ofEpochMilli(it.at).atZone(zone).hour to it.chance }
+            .map { HourRain(java.time.Instant.ofEpochMilli(it.at).atZone(zone).hour, it.chance, it.kelvin?.let { k -> degrees(k, fahrenheit) }) }
     }
 
     /** The sky for an OpenWeatherMap condition code, as Gadgetbridge passes them on; else read from its words. */

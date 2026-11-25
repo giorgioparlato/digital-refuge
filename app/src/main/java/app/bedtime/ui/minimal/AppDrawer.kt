@@ -117,8 +117,13 @@ sealed interface DrawerResult {
     data class Setting(val page: SettingsPage) : DrawerResult
     /** A note in your Obsidian vault, found by its title. */
     data class VaultNote(val file: IndexedFile) : DrawerResult
-    /** A file in the folder you chose, found by its name. */
-    data class File(val file: IndexedFile) : DrawerResult
+    /**
+     * A file in the folder you chose, found by its name. A folder found opens right here, its contents
+     * in the results; inside one, [role] marks the row that opens it in your files app, and the one back up.
+     */
+    data class File(val file: IndexedFile, val role: FileRole = FileRole.FOUND) : DrawerResult
+
+    enum class FileRole { FOUND, OPEN_IN_FILES, UP }
 
     /** A word's meaning from one of your dictionaries; the whole entry a tap away. */
     data class Meaning(val definition: app.bedtime.data.Definition) : DrawerResult
@@ -299,9 +304,15 @@ private fun SearchField(query: String, onQuery: (String) -> Unit, p: HomePalette
     ) {
         Icon(LineIcons.Search, contentDescription = null, tint = p.faint, modifier = Modifier.size(20.dp))
         Spacer(Modifier.width(10.dp))
+        // Words put in from outside (into a folder, back up a level): the cursor goes to their end.
+        var field by remember { mutableStateOf(androidx.compose.ui.text.input.TextFieldValue(query, androidx.compose.ui.text.TextRange(query.length))) }
+        val shown = if (field.text == query) field else androidx.compose.ui.text.input.TextFieldValue(query, androidx.compose.ui.text.TextRange(query.length))
         BasicTextField(
-            value = query,
-            onValueChange = onQuery,
+            value = shown,
+            onValueChange = {
+                field = it
+                onQuery(it.text)
+            },
             singleLine = true,
             textStyle = MaterialTheme.typography.bodyLarge.copy(color = p.text),
             cursorBrush = SolidColor(p.accent),
@@ -456,7 +467,12 @@ private fun ResultRow(
             }
             is DrawerResult.Setting -> "settings: ${result.page.name.lowercase()}"
             is DrawerResult.VaultNote -> "${FolderIndex.title(result.file)} · obsidian"
-            is DrawerResult.File -> if (result.file.isFolder) "${result.file.name} · folder" else result.file.name
+            is DrawerResult.File -> when {
+                result.role == DrawerResult.FileRole.UP -> "‹ back"
+                result.role == DrawerResult.FileRole.OPEN_IN_FILES -> "open ${result.file.name} in your files app"
+                result.file.isFolder -> "${result.file.name} · folder"
+                else -> result.file.name
+            }
             is DrawerResult.Shortcut -> "${result.shortcut.label.lowercase()} · ${result.shortcut.app.lowercase()}"
             is DrawerResult.Meaning -> "${result.definition.word}: ${app.bedtime.data.StarDicts.preview(result.definition)}"
         }
@@ -475,7 +491,12 @@ private fun ResultRow(
             is DrawerResult.Clock -> LineIcons.Notifications
             is DrawerResult.Setting -> LineIcons.Settings
             is DrawerResult.VaultNote -> LineIcons.Create
-            is DrawerResult.File -> if (result.file.isFolder) app.bedtime.ui.components.BedtimeIcons.Folder else LineIcons.List
+            is DrawerResult.File -> when {
+                result.role == DrawerResult.FileRole.UP -> LineIcons.ArrowBack
+                result.role == DrawerResult.FileRole.OPEN_IN_FILES -> LineIcons.Share
+                result.file.isFolder -> app.bedtime.ui.components.BedtimeIcons.Folder
+                else -> LineIcons.List
+            }
             else -> LineIcons.Edit
         }
         Box(Modifier.size((30 * names).dp), contentAlignment = Alignment.Center) {

@@ -198,6 +198,8 @@ internal fun SessionHeader(
                         calendar,
                         style = MaterialTheme.typography.bodyMedium,
                         color = p.muted,
+                        maxLines = if (style.calendarOneLine) 1 else Int.MAX_VALUE,
+                        overflow = if (style.calendarOneLine) androidx.compose.ui.text.style.TextOverflow.Ellipsis else androidx.compose.ui.text.style.TextOverflow.Clip,
                         modifier = Modifier
                             .padding(top = 4.dp)
                             .clip(RoundedCornerShape(6.dp))

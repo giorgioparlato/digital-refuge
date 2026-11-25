@@ -461,6 +461,15 @@ private fun MinimalHomeScreen(
         put(SearchOrder.DICTIONARY, meanings.take(1).map { DrawerResult.Meaning(it) })
         put(SearchOrder.SHORTCUTS, Shortcuts.match(appShortcuts.filter { it.packageName in openablePackages }, words).map { DrawerResult.Shortcut(it) })
     }
+    // Inside a folder ("books/", or "books/sci" to narrow it): only what's in it, with the way back up
+    // and the way into your files app.
+    val browsing = FolderIndex.browsing(folderFiles, words)
+    val browseResults = browsing?.let { (folder, rest) ->
+        listOf(DrawerResult.File(folder, DrawerResult.FileRole.UP), DrawerResult.File(folder, DrawerResult.FileRole.OPEN_IN_FILES)) +
+            FolderIndex.inside(folderFiles, folder, rest).map { DrawerResult.File(it) }
+    }
+    // A folder's path into the search box, after the keyword if one was typed ("f books/").
+    val searchIn: (String) -> Unit = { path -> query = if (keyword != null) query.trimEnd().removeSuffix(words).trimEnd() + " " + path else path }
     val open: (Intent) -> Unit = { intent ->
         runCatching { context.startActivity(intent) }
             .onSuccess { closeDrawer() }
@@ -528,7 +537,11 @@ private fun MinimalHomeScreen(
                 .onFailure { Toast.makeText(context, "no clock app took it", Toast.LENGTH_SHORT).show() }
             is DrawerResult.Setting -> open(SettingsPages.intent(result.page))
             is DrawerResult.VaultNote -> open(FolderIndex.obsidianIntent(vault.first, result.file))
-            is DrawerResult.File -> open(FolderIndex.openIntent(result.file))
+            is DrawerResult.File -> when {
+                result.role == DrawerResult.FileRole.UP -> searchIn(FolderIndex.parentPath(result.file))
+                result.role == DrawerResult.FileRole.FOUND && result.file.isFolder -> searchIn(result.file.path)
+                else -> open(FolderIndex.openIntent(result.file))
+            }
             is DrawerResult.Meaning -> lookingUp = result.definition.word
             is DrawerResult.Shortcut -> if (Shortcuts.start(context, result.shortcut)) closeDrawer() else Toast.makeText(context, "couldn't run that", Toast.LENGTH_SHORT).show()
         }
@@ -551,7 +564,7 @@ private fun MinimalHomeScreen(
                 style = style,
                 query = query,
                 onQuery = { query = it },
-                results = AppDrawer.results(
+                results = browseResults ?: AppDrawer.results(
                     query,
                     openable,
                     SearchTargets.offered(searchTargets, openablePackages),
@@ -778,7 +791,7 @@ private fun MinimalHomeScreen(
     }
     if (hoursDetail) {
         val p = style.palette()
-        HourDetailDialog(todayHours, HourlyUse.rule(settings), p.background, p.text, p.faint, p.accent, onDismiss = { hoursDetail = false }, onStats = {
+        HourDetailDialog(todayHours, HourlyUse.rule(settings), p.background, p.text, p.faint, p.accent, distracted = style.hourDistractedColor?.let { androidx.compose.ui.graphics.Color(it) }, onDismiss = { hoursDetail = false }, onStats = {
             runCatching { context.startActivity(app.bedtime.MainActivity.intent(context, app.bedtime.Routes.STATS)) }
         })
     }

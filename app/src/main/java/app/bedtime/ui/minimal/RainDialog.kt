@@ -42,24 +42,27 @@ internal fun RainDialog(style: HomeStyle, onDismiss: () -> Unit, onOpenApp: (() 
     val context = LocalContext.current
     val repo = remember { Repository.get(context) }
     val weather by repo.weather.collectAsStateWithLifecycle(initialValue = null)
-    val hours = weather?.let { Weather.rainByHour(it.rainHours, System.currentTimeMillis(), java.time.ZoneId.systemDefault()) }.orEmpty()
+    val hours = weather?.let { Weather.rainByHour(it.rainHours, System.currentTimeMillis(), java.time.ZoneId.systemDefault(), Weather.fahrenheit(style.weatherUnit)) }.orEmpty()
     HomeSheetDialog(onDismiss) { RainContent(hours, style, onOpenApp) }
 }
 
-/** The sheet's contents: [hours] as (hour of the day, chance in percent). */
+/** The sheet's contents: each hour's time, its temperature when known, and its chance of rain. */
 @Composable
-internal fun RainContent(hours: List<Pair<Int, Int>>, style: HomeStyle, onOpenApp: (() -> Unit)?) {
+internal fun RainContent(hours: List<app.bedtime.data.HourRain>, style: HomeStyle, onOpenApp: (() -> Unit)?) {
     val context = LocalContext.current
     val p = style.palette()
+    // A column for the temperatures only if Breezy sent any, so older weather doesn't leave a gap.
+    val temps = hours.any { it.degrees != null }
     HomeSheet(style) {
         Text("Rain today", style = MaterialTheme.typography.labelMedium, color = p.faint, modifier = Modifier.padding(bottom = 10.dp))
         if (hours.isEmpty()) {
             Text("No hour-by-hour rain from your weather app yet.", style = MaterialTheme.typography.bodyMedium, color = p.muted)
         } else {
             Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                hours.forEach { (hour, chance) ->
+                hours.forEach { (hour, chance, degrees) ->
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(formatMinuteOfDay(context, hour * 60), style = MaterialTheme.typography.bodyMedium, color = p.faint, modifier = Modifier.width(64.dp))
+                        if (temps) Text(degrees?.let { "$it°" } ?: "", style = MaterialTheme.typography.bodyMedium, color = p.text, modifier = Modifier.width(40.dp))
                         Box(Modifier.weight(1f).height(10.dp).clip(RoundedCornerShape(50)).background(p.text.copy(alpha = 0.08f))) {
                             Box(Modifier.fillMaxWidth(chance / 100f).fillMaxHeight().clip(RoundedCornerShape(50)).background(p.accent.copy(alpha = 0.35f + 0.65f * chance / 100f)))
                         }

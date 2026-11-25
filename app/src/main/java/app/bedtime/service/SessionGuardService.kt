@@ -56,7 +56,10 @@ class SessionGuardService : Service() {
     override fun onCreate() {
         super.onCreate()
         blockingOn = BlockingState.isOn(this)
-        startForeground(NOTIFICATION_ID, SessionNotifier.build(this, null, blockingOn = blockingOn, breakEndsAt = 0))
+        // The session as the engine has it already, so the first notification names it rather than
+        // saying nothing is running.
+        state = Engine.state(this).value
+        startForeground(NOTIFICATION_ID, SessionNotifier.build(this, state, blockingOn = blockingOn, breakEndsAt = 0))
         contentResolver.registerContentObserver(
             Settings.Secure.getUriFor(Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES),
             false,
@@ -178,7 +181,11 @@ class SessionGuardService : Service() {
         }
         val overlayMissing = current?.isActive == true && current.fullScreenAlert && !overlayOk
         // Posted again only when what it says changes; checking each second costs nothing otherwise.
-        SessionNotifier.post(this, NOTIFICATION_ID, state, blockingOn, breakEndsAt, overlayMissing)
+        // This only runs while a session does. Its own state can be a moment behind (a session's alarm
+        // starts it before the engine looks again), so without a session in it, the engine's: the
+        // notification never says "no session running" over a session that is.
+        val shown = current?.takeIf { it.isActive } ?: Engine.state(this).value
+        SessionNotifier.post(this, NOTIFICATION_ID, shown, blockingOn, breakEndsAt, overlayMissing)
     }
 
     /**

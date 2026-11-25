@@ -142,6 +142,9 @@ object WidgetOptions {
             WidgetOption.Switch("Tomorrow's first event, once today's are done", "In the evening, what the morning starts with", style.calendarTomorrow) {
                 change(style.copy(calendarTomorrow = it))
             },
+            WidgetOption.Switch("One line", "A long event is cut short with … instead of taking two lines", style.calendarOneLine) {
+                change(style.copy(calendarOneLine = it))
+            },
             if (screen == Screen.LOCK) {
                 WidgetOption.Switch("Event names", "Off, the lock screen only says when the next one is", style.calendarNamesOnLock) {
                     change(style.copy(calendarNamesOnLock = it))
