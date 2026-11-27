@@ -179,7 +179,7 @@ private fun ordinal(n: Int): String {
 
 /**
  * How much of [limit] is gone today, for the line at the top of its covers: its minutes, else its
- * opens; with neither, just its name.
+ * opens; with neither, the time in it today beside its name.
  */
 internal fun limitWhere(limit: AppLimit, pkg: String, day: UsageDay): CoverWhere {
     val name = limit.name.ifBlank { "this limit" }
@@ -195,7 +195,12 @@ internal fun limitWhere(limit: AppLimit, pkg: String, day: UsageDay): CoverWhere
             val used = (opens - (Limits.opensLeft(limit, pkg, day) ?: opens)).coerceIn(0, opens)
             CoverWhere("$name · ${if (opens == 1) "1 open" else "$opens opens"} a day", "$used of $opens today", used.toFloat() / opens, distracting = true)
         }
-        else -> CoverWhere(name)
+        // No budget, only a pause or hours: the time in it today all the same, with nothing to fill.
+        else -> {
+            val counted = if (limit.rules.shared) limit.rules.apps else setOf(pkg)
+            val used = counted.sumOf { day.seconds[it] ?: 0L } / 60
+            CoverWhere(name, if (used > 0) "${formatMinutes(used)} today" else null)
+        }
     }
 }
 

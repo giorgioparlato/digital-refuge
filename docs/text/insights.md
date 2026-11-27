@@ -66,28 +66,30 @@ insights
 
 - Allow usage access
 - For every app's time and the days from before refuge, from Android's own record. It stays on the phone. The hour dots work without it
-- Day
-- Week
-- Month
 - the one before
 - the one after
 - this week
 - this month
-- A day on average
-- , {so} so far
-- on the phone
-- of … unlocks
 - In all: … on the phone · … distracting
 -  · {it} unlocks
 - against {against}
 -  · nothing to compare with
 - , so far
 - a day you pick…
-- The last six months
+- A day on average
+- , {so} so far
+- a day on the phone
+- on the phone
+- of … unlocks
+- No unlocks kept for these days.
+- Nothing kept for these days yet.
+- The last {count} months
 - A day on average in each month. Tap one for more
+- On average … a day
+-  · the lowest … in 
 - By the hour
 - By the day
-- Each day's time on the phone, the part in distracting apps in orange
+- Each day's time on the phone, with the part in distracting apps
 - Each day's time in distracting apps
 - All of it, and the part in distracting apps
 - ; outlined, {against}
@@ -115,19 +117,14 @@ insights
 - Unlocks in a day
 - A day on the phone
 - A day in distracting apps
-- Each day
-- Against a day's budget, the same in every month. Tap a day for its time and top apps
 - Unlocks
+- … budget
 -  on the phone
 -  in distracting apps
-- Budget: {budgetWords} a day{what}
-- , just to keep track
 - No budget chosen yet, so {budgetWords} a day{what} is suggested. Choose yours
-- … budget
 - Today so far: 
 - … of {budgetWords}
-- No unlocks kept for these days.
-- Nothing kept for these days yet.
+- Budget ›
 - {text} ›
 - Only the day's total is kept this far back.
 - your usual one of that weekday
@@ -144,6 +141,9 @@ insights
 - Save
 - Cancel
 - last week
+- Day
+- Week
+- Month
 - the day before
 - the week before
 - last month
@@ -161,7 +161,6 @@ insights
 - ↑ {it}%
 - Against 
 - a day distracting
-- a day on the phone
 - Darker, more time on the phone
 - Darker, more time in distracting apps
 - … in all

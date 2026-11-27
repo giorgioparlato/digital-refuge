@@ -18,4 +18,16 @@ class CoverProgressTest {
         assertEquals("15 of 45 min today", usedOf(15, 45))
         assertEquals("50 min of 1 h 30 min today", usedOf(50, 90))
     }
+
+    @Test
+    fun aLimitWithoutABudgetStillSaysTheTimeToday() {
+        val apps = setOf("ig", "yt")
+        val day = app.bedtime.data.UsageDay(1L, seconds = mapOf("ig" to 25 * 60L, "yt" to 10 * 60L))
+        val each = app.bedtime.data.AppLimit(name = "evenings", rules = app.bedtime.data.LimitRules(apps = apps, dailyMinutes = null, dailyOpens = null, shared = false))
+        assertEquals(CoverWhere("evenings", "25 min today"), limitWhere(each, "ig", day))
+        // Shared: the time in all of its apps.
+        assertEquals(CoverWhere("evenings", "35 min today"), limitWhere(each.copy(rules = each.rules.copy(shared = true)), "ig", day))
+        // Not opened yet today: the name alone.
+        assertEquals(CoverWhere("evenings"), limitWhere(each, "ig", app.bedtime.data.UsageDay(1L)))
+    }
 }

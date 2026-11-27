@@ -13,6 +13,17 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            110,
+            "0.9.64",
+            listOf(
+                "Insights opens with the whole month in view: day, week and month share a line with the month's name, the figures are slimmer, and the month's totals and what it's set against are under the days.",
+                "The last months grow from six to twelve as they're kept, with a faint line for the day on average and the lowest month. refuge now keeps Android's older months before Android lets them go.",
+                "The hours of a day are marked every two hours, as plain numbers.",
+                "A limit without a budget says on its cover how long you've spent in it today.",
+                "Gentler words in insights' sessions: when sessions end early, and how you felt in them.",
+            ),
+        ),
+        ChangelogEntry(
             109,
             "0.9.63",
             listOf(

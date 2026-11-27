@@ -398,6 +398,19 @@ class Repository private constructor(context: Context) {
         }
     }
 
+    /**
+     * Android's months from before refuge counted any of its own, kept so they stay after Android lets
+     * them go (it keeps about six). Never one refuge has days for, so nothing is counted twice.
+     */
+    suspend fun keepEarlierMonths(fromAndroid: Map<String, UsageMonth>, today: java.time.LocalDate) {
+        if (fromAndroid.isEmpty()) return
+        days.edit { prefs ->
+            val months = decode(prefs[USAGE_MONTHS], monthsSerializer, emptyList())
+            val usage = decode(prefs[USAGE], usageSerializer, emptyList())
+            earlier(months, usage, fromAndroid, today)?.let { prefs[USAGE_MONTHS] = AppJson.encodeToString(monthsSerializer, it) }
+        }
+    }
+
     /** Months from days no longer kept one by one: what refuge counted itself. */
     val usageMonths: Flow<List<UsageMonth>> = observe(USAGE_MONTHS, monthsSerializer, emptyList())
 
@@ -611,6 +624,18 @@ class Repository private constructor(context: Context) {
             val gone = all.dropLast(USAGE_DAYS)
             val kept = if (gone.isEmpty()) null else PhoneUsage.fromRecords(gone).values.sortedBy { it.day }.fold(months()) { m, d -> UseMonths.add(m, d) }.takeLast(MONTHS_KEPT)
             return all.takeLast(USAGE_DAYS) to kept
+        }
+
+        /**
+         * [months] with those of [fromAndroid] from before the first month refuge has anything of (its
+         * months, its [usage] days, or this one), the last [MONTHS_KEPT] kept; null if none are new.
+         */
+        internal fun earlier(months: List<UsageMonth>, usage: List<UsageDay>, fromAndroid: Map<String, UsageMonth>, today: java.time.LocalDate): List<UsageMonth>? {
+            val first = (months.map { it.month } + usage.map { UseMonths.key(it.day) } + UseMonths.key(today.toEpochDay())).min()
+            val have = months.map { it.month }.toSet()
+            val added = fromAndroid.values.filter { it.month < first && it.month !in have && it.days > 0 && it.total > 0 }
+            if (added.isEmpty()) return null
+            return (months + added).sortedBy { it.month }.takeLast(MONTHS_KEPT)
         }
 
         /** The file's days and this phone's together; a day in both keeps this phone's, which counted it live. */

@@ -5,6 +5,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LifecycleResumeEffect
@@ -88,10 +89,12 @@ fun rememberUseMonths(): Map<String, UsageMonth> {
         value = withContext(Dispatchers.IO) {
             val zone = ZoneId.systemDefault()
             val today = LocalDate.now(zone)
-            val from = today.minusMonths(6).withDayOfMonth(1).atStartOfDay(zone).toInstant().toEpochMilli()
+            val from = today.minusMonths(12).withDayOfMonth(1).atStartOfDay(zone).toInstant().toEpochMilli()
             UseMonths.fromBuckets(UsageReader.monthBuckets(context, from, System.currentTimeMillis()), zone, UsageReader.excludedMonths(context), distracting, today)
         }
     }
+    // Android's older months kept, as it lets them go after about six.
+    LaunchedEffect(android) { repo.keepEarlierMonths(android, LocalDate.now()) }
     val own = UseMonths.own(kept, PhoneUsage.fromRecords(usage).values)
     return UseMonths.merge(android, own)
 }

@@ -192,6 +192,7 @@ The steps for more use the same rows as a block's steps: see the editor in focus
 - this limit
 - {name} · … a day
 - {used} of {opens} today
+- … today
 - … of {b} today
 - {a} of {b} today
 - breathe in

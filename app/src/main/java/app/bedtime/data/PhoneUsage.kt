@@ -242,6 +242,22 @@ object UseMonths {
     fun merge(fromAndroid: Map<String, UsageMonth>, own: Map<String, UsageMonth>): Map<String, UsageMonth> =
         own + fromAndroid.mapValues { (key, month) -> own[key]?.let { month.copy(daily = it.daily, dailyDistracting = it.dailyDistracting) } ?: month }
 
+    /**
+     * How many months to show up to [current]: from the first with any use, at least [MIN] and at most
+     * [MAX], so the chart grows as months are kept.
+     */
+    fun span(months: Map<String, UsageMonth>, current: java.time.YearMonth): Int {
+        val first = months.values.filter { it.days > 0 && it.month <= current.toString() }.minOfOrNull { it.month } ?: return MIN
+        val since = java.time.temporal.ChronoUnit.MONTHS.between(java.time.YearMonth.parse(first), current).toInt() + 1
+        return since.coerceIn(MIN, MAX)
+    }
+
+    const val MIN = 6
+    const val MAX = 12
+
+    /** A day on average over the months with any use, each counted alike; null with none. */
+    fun average(months: List<UsageMonth>): Long? = months.mapNotNull { it.perDay }.takeIf { it.isNotEmpty() }?.average()?.toLong()
+
     /** The [count] months up to [current], oldest first, an empty one for any missing. */
     fun last(months: Map<String, UsageMonth>, current: java.time.YearMonth, count: Int = 6): List<UsageMonth> =
         (count - 1 downTo 0).map { back -> current.minusMonths(back.toLong()).let { "%04d-%02d".format(it.year, it.monthValue) } }

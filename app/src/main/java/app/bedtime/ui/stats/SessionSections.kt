@@ -122,7 +122,7 @@ internal fun SessionStats(
     // Kept, week by week.
     val weeks = SessionInsights.keptByWeek(picked, today, zone)
     if (weeks.any { it != null }) {
-        SectionCard(title = "Kept, week by week", subtitle = "The share of sessions with no way out taken, over the last eight weeks") {
+        SectionCard(title = "Kept, week by week", subtitle = "The share of sessions with no early unlock, break or pause, over the last eight weeks") {
             val now7 = picked.filter { !Instant.ofEpochMilli(it.start).atZone(zone).toLocalDate().isBefore(today.minusDays(6)) }
             Row(verticalAlignment = Alignment.Bottom) {
                 KeptBars(weeks, 44)
@@ -151,10 +151,10 @@ internal fun SessionStats(
         }
     }
 
-    // When you break.
+    // When sessions end early.
     val breaks = SessionInsights.breaks(picked, zone)
     if (breaks.total >= 3) {
-        SectionCard(title = "When you break", subtitle = "Ways out taken, by how far into a session; the last eight weeks") {
+        SectionCard(title = "When sessions end early", subtitle = "An early unlock, break or pause, by how far into a session; the last eight weeks") {
             val most = breaks.byMinutes.max().coerceAtLeast(1)
             listOf("first 15 min", "15 to 30 min", "30 to 60 min", "after an hour").zip(breaks.byMinutes).forEach { (label, n) ->
                 Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -177,9 +177,9 @@ internal fun SessionStats(
         }
     }
 
-    // Why you break.
+    // How you felt in them.
     SessionInsights.why(picked, marks)?.let { why ->
-        SectionCard(title = "Why you break", subtitle = "The moods “why?” heard inside sessions") {
+        SectionCard(title = "How you felt in sessions", subtitle = "The moods “why?” heard inside sessions") {
             if (why.moods.isNotEmpty()) Text(why.moods.joinToString(" · ") { (mood, n) -> "$mood $n" }, style = MaterialTheme.typography.bodyLarge, color = c.textNormal)
             if (why.answers > 0) {
                 Text("put the phone down ${why.putDown} of ${why.answers} times", style = MaterialTheme.typography.bodySmall, color = c.textMuted, modifier = Modifier.padding(top = 4.dp))
@@ -201,10 +201,10 @@ internal fun SessionStats(
         }
     }
 
-    // The apps used in them: let through, or after a way out; worth a thought for blocking too.
+    // The apps used in them: let through, or after an early unlock; worth a thought for blocking too.
     val apps = androidx.compose.runtime.remember(picked, events) { SessionInsights.apps(picked, events, zone, excluded) }
     if (apps.isNotEmpty()) {
-        SectionCard(title = "Apps used in them", subtitle = "The last days, as far back as Android keeps them: let through, or after a way out") {
+        SectionCard(title = "Apps used in them", subtitle = "The last days, as far back as Android keeps them: let through, or after an early unlock") {
             var all by rememberSaveable { mutableStateOf(false) }
             (if (all) apps else apps.take(6)).forEach { (pkg, seconds) ->
                 Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {

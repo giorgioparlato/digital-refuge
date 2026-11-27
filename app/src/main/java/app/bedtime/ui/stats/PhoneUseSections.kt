@@ -108,7 +108,7 @@ internal fun PhoneStats(
     nowHour: Int,
     labels: Map<String, String>,
     onAllowAccess: (() -> Unit)?,
-    /** Every month known, for the six-month bars and for comparing months beyond the days kept. */
+    /** Every month known, for the bars of the last months and for comparing months beyond the days kept. */
     months: Map<String, UsageMonth> = emptyMap(),
     /** Apps under one of your limits, marked in the list. */
     limitedApps: Set<String> = emptySet(),
@@ -158,14 +158,16 @@ internal fun PhoneStats(
         }
     }
 
-    SegmentedChoice(options = listOf("Day", "Week", "Month"), selected = period.ordinal, onSelect = {
-        fromMonth = null
-        go(UsePeriod.entries[it], today)
-    })
+    // The period's name, its arrows, and day, week or month, all on one line: a month's days fit on opening.
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Step(LineIcons.KeyboardArrowLeft, "the one before", enabled = true) { startDay = UsePeriods.shift(period, start, -1).toEpochDay() }
-        Text(periodLabel(period, start, today), style = MaterialTheme.typography.titleMedium, color = c.textNormal, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
+        Text(periodLabel(period, start, today, short = true), style = MaterialTheme.typography.titleMedium, color = c.textNormal, textAlign = TextAlign.Center, maxLines = 2, modifier = Modifier.weight(1f))
         Step(LineIcons.KeyboardArrowRight, "the one after", enabled = start < currentStart) { startDay = UsePeriods.shift(period, start, 1).toEpochDay() }
+        Spacer(Modifier.width(4.dp))
+        PeriodChoice(period) {
+            fromMonth = null
+            go(it, today)
+        }
     }
 
     // A day can be set against averages and a day you pick; a week or a month, against the one before when one of those is chosen.
@@ -212,24 +214,10 @@ internal fun PhoneStats(
     val perDay = period != UsePeriod.DAY
     val days = if (perDay) elapsed.coerceAtLeast(1) else 1
     val so = if (period == UsePeriod.WEEK) "this week" else "this month"
-    SectionCard(subtitle = if (perDay) "A day on average" + if (inProgress) ", $so so far" else "" else null) {
-        Row(Modifier.fillMaxWidth()) {
-            Figure(UseWords.short(totals.total / days), "on the phone", totals.total / days, comparison?.total?.let { it / days }, Modifier.weight(1f))
-            Figure(UseWords.short(totals.distracting / days), "distracting", totals.distracting / days, comparison?.distracting?.let { it / days }, Modifier.weight(1f))
-            // Against your unlock budget, over the days so far, where you've chosen one.
-            val unlocks = totals.unlocks?.let { it / days }
-            Figure(unlocks?.toString() ?: "–", unlockBudgetOf(homeStyle)?.let { "of ${if (perDay) it else it * elapsed} unlocks" } ?: "unlocks", unlocks?.toLong(), comparison?.unlocks?.let { it / days }?.toLong(), Modifier.weight(1f))
-        }
-        // And the whole of it, for its size: the time and unlocks of every day so far, added up.
-        if (perDay) {
-            Spacer(Modifier.height(10.dp))
-            Text(
-                "In all: ${UseWords.short(totals.total)} on the phone · ${UseWords.short(totals.distracting)} distracting" + (totals.unlocks?.let { " · $it unlocks" } ?: ""),
-                style = MaterialTheme.typography.labelMedium,
-                color = c.textMuted,
-            )
-        }
-        Spacer(Modifier.height(12.dp))
+    val month = period == UsePeriod.MONTH
+    // The whole of it, for its size: the time and unlocks of every day so far, added up.
+    val inAll = "In all: ${UseWords.short(totals.total)} on the phone · ${UseWords.short(totals.distracting)} distracting" + (totals.unlocks?.let { " · $it unlocks" } ?: "")
+    val againstLine: @Composable () -> Unit = {
         Box {
             Text(
                 "against $against" + (if (comparison == null) " · nothing to compare with" else "") + (if (inProgress) ", so far" else "") + "  ▾",
@@ -253,6 +241,24 @@ internal fun PhoneStats(
                     )
                 }
             }
+        }
+    }
+    // A month's figures in a slim card, so its days fit under them; the totals and the comparison wait under the days.
+    SectionCard(subtitle = if (perDay && !month) "A day on average" + if (inProgress) ", $so so far" else "" else null) {
+        Row(Modifier.fillMaxWidth()) {
+            Figure(UseWords.short(totals.total / days), if (month) "a day on the phone" else "on the phone", totals.total / days, comparison?.total?.let { it / days }, Modifier.weight(1f))
+            Figure(UseWords.short(totals.distracting / days), "distracting", totals.distracting / days, comparison?.distracting?.let { it / days }, Modifier.weight(1f))
+            // Against your unlock budget, over the days so far, where you've chosen one.
+            val unlocks = totals.unlocks?.let { it / days }
+            Figure(unlocks?.toString() ?: "–", unlockBudgetOf(homeStyle)?.let { "of ${if (perDay) it else it * elapsed} unlocks" } ?: "unlocks", unlocks?.toLong(), comparison?.unlocks?.let { it / days }?.toLong(), Modifier.weight(1f))
+        }
+        if (!month) {
+            if (perDay) {
+                Spacer(Modifier.height(10.dp))
+                Text(inAll, style = MaterialTheme.typography.labelMedium, color = c.textMuted)
+            }
+            Spacer(Modifier.height(12.dp))
+            againstLine()
         }
     }
 
@@ -291,14 +297,39 @@ internal fun PhoneStats(
             onUnlockBudget = onUnlockBudget,
             today = today,
         )
+        // Under the days: the month added up, its most, and what it's set against.
+        SectionCard {
+            Text(inAll, style = MaterialTheme.typography.labelMedium, color = c.textMuted)
+            val most = UseHeat.most(heat)
+            Text(
+                most?.let { "Most: ${if (heatOf == HeatOf.UNLOCKS) UseWords.unlocks((it.amount ?: 0).toInt()) else UseWords.short(it.amount ?: 0)}, " + it.date.format(DateTimeFormatter.ofPattern("EEEE d", Locale.getDefault())) }
+                    ?: if (heatOf == HeatOf.UNLOCKS) "No unlocks kept for these days." else "Nothing kept for these days yet.",
+                style = MaterialTheme.typography.labelMedium,
+                color = c.textMuted,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+            Spacer(Modifier.height(8.dp))
+            againstLine()
+        }
     }
 
     // A month's days are on the heatmap; under its figures, how it sits among the months before.
     if (period == UsePeriod.MONTH) {
-        SectionCard(title = "The last six months", subtitle = "A day on average in each month. Tap one for more") {
-            val six = UseMonths.last(months, YearMonth.from(start))
+        // Six months, and more as they're kept, up to twelve.
+        val count = UseMonths.span(months, YearMonth.from(start))
+        SectionCard(title = "The last $count months", subtitle = "A day on average in each month. Tap one for more") {
+            val six = UseMonths.last(months, YearMonth.from(start), count)
             var tapped by rememberSaveable { mutableStateOf<String?>(null) }
             MonthBars(six) { tapped = it.month }
+            UseMonths.average(six)?.let { avg ->
+                val low = six.filter { it.perDay != null }.takeIf { it.size >= 2 }?.minByOrNull { it.perDay ?: 0L }
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    "On average ${UseWords.short(avg)} a day" + (low?.let { " · the lowest ${UseWords.short(it.perDay ?: 0L)} in " + YearMonth.parse(it.month).month.getDisplayName(TextStyle.FULL, Locale.getDefault()) } ?: ""),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = c.textMuted,
+                )
+            }
             Spacer(Modifier.height(10.dp))
             ChartKey(all = true, distracting = true, outline = null)
             tapped?.let { key -> six.firstOrNull { it.month == key } }?.let { month ->
@@ -317,7 +348,7 @@ internal fun PhoneStats(
         title = if (period == UsePeriod.DAY) "By the hour" else "By the day",
         subtitle = buildString {
             if (period == UsePeriod.WEEK) {
-                append(if (weekWhole) "Each day's time on the phone, the part in distracting apps in orange" else "Each day's time in distracting apps")
+                append(if (weekWhole) "Each day's time on the phone, with the part in distracting apps" else "Each day's time in distracting apps")
             } else {
                 append("All of it, and the part in distracting apps")
             }
@@ -347,14 +378,14 @@ internal fun PhoneStats(
                 }
             },
             // Days of a month and hours of a day are too narrow for their numbers: every week's first day, and
-            // every sixth hour, go in a row of their own, the hours with a faint line to find them by.
+            // every second hour, go in a row of their own, every sixth hour with a faint line to find them by.
             axisEvery = when (period) {
                 UsePeriod.MONTH -> 7
-                UsePeriod.DAY -> 6
+                UsePeriod.DAY -> 2
                 UsePeriod.WEEK -> null
             },
-            groupLabel = if (period == UsePeriod.DAY) { i -> app.bedtime.ui.formatMinuteOfDay(context, i * 60) } else { i -> "${i + 1}" },
-            guides = period == UsePeriod.DAY,
+            groupLabel = if (period == UsePeriod.DAY) { i -> "$i" } else { i -> "${i + 1}" },
+            guideEvery = if (period == UsePeriod.DAY) 6 else null,
             marks = if (period == UsePeriod.DAY) totals.slots.map { it.third } else null,
             picked = if (period == UsePeriod.DAY) hour else todayIndex,
             onPick = when (period) {
@@ -560,8 +591,6 @@ private fun MonthHeat(
     // Each against its own budget: the phone's, the distracting apps', or the unlocks'.
     val budget = if (unlocks) (unlockBudget ?: UseWidget.SUGGESTED_UNLOCKS).toLong() else widget.allowance(wholePhone) * 60L
     val chosen = if (unlocks) unlockBudget != null else widget.chosen(wholePhone)
-    // The amounts in words: times, or unlocks.
-    fun amount(n: Long) = if (unlocks) UseWords.unlocks(n.toInt()) else UseWords.short(n)
     fun narrow(n: Long) = if (unlocks) "$n" else UseWords.compact((n / 60).toInt())
     val budgetWords = if (unlocks) "$budget unlocks" else formatMinutes(budget / 60)
     var settingBudget by remember { mutableStateOf(false) }
@@ -588,21 +617,10 @@ private fun MonthHeat(
     // The worst day of the month is the reddest; within your budget, nothing is red.
     val top = UseHeat.most(heat)?.amount ?: 0L
     fun colour(n: Long): Color = HeatColours.at(n, budget, top)
-    SectionCard(title = "Each day", subtitle = "Against a day's budget, the same in every month. Tap a day for its time and top apps") {
+    // No title: the days say what they are, and the whole month fits on opening.
+    SectionCard {
         SegmentedChoice(options = listOf("On the phone", "Distracting", "Unlocks"), selected = of.ordinal, onSelect = { onOf(HeatOf.entries[it]) })
-        Spacer(Modifier.height(8.dp))
-        // The budget it's set against, and a way to choose it; until you have, a nudge to.
-        val what = when (of) {
-            HeatOf.PHONE -> " on the phone"
-            HeatOf.DISTRACTING -> " in distracting apps"
-            HeatOf.UNLOCKS -> ""
-        }
-        LinkLine(
-            if (chosen) "Budget: $budgetWords a day$what" + (if (unlocks) ", just to keep track" else "")
-            else "No budget chosen yet, so $budgetWords a day$what is suggested. Choose yours",
-            strong = !chosen,
-        ) { settingBudget = true }
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(10.dp))
         // Monday first, as the weeks are.
         Row(Modifier.fillMaxWidth()) {
             java.time.DayOfWeek.entries.forEach { d ->
@@ -662,18 +680,33 @@ private fun MonthHeat(
             Spacer(Modifier.weight(1f - at))
             if (top > budget) Text(narrow(top), style = MaterialTheme.typography.labelSmall, color = c.textFaint)
         }
-        Spacer(Modifier.height(10.dp))
-        // Today, so far: a way into its page.
-        heat.firstOrNull { it.date == today }?.let { day ->
-            LinkLine("Today so far: " + if (unlocks) UseWords.unlocks((day.amount ?: 0).toInt(), budget.toInt()) else "${UseWords.short(day.amount ?: 0)} of $budgetWords", strong = true) { onDay(today) }
+        Spacer(Modifier.height(6.dp))
+        // The budget it's set against, and a way to choose it: until you have, a nudge to, on its own line.
+        val what = when (of) {
+            HeatOf.PHONE -> " on the phone"
+            HeatOf.DISTRACTING -> " in distracting apps"
+            HeatOf.UNLOCKS -> ""
         }
-        val most = UseHeat.most(heat)
-        Text(
-            most?.let { "Most: ${amount(it.amount ?: 0)}, " + it.date.format(DateTimeFormatter.ofPattern("EEEE d", Locale.getDefault())) }
-                ?: if (unlocks) "No unlocks kept for these days." else "Nothing kept for these days yet.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = c.textMuted,
-        )
+        if (!chosen) {
+            LinkLine("No budget chosen yet, so $budgetWords a day$what is suggested. Choose yours", strong = true) { settingBudget = true }
+        }
+        // Today, so far, a way into its page; beside it, the budget, to change it.
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            val day = heat.firstOrNull { it.date == today }
+            Box(Modifier.weight(1f)) {
+                day?.let {
+                    LinkLine("Today so far: " + if (unlocks) UseWords.unlocks((it.amount ?: 0).toInt(), budget.toInt()) else "${UseWords.short(it.amount ?: 0)} of $budgetWords", strong = true) { onDay(today) }
+                }
+            }
+            if (chosen) {
+                Text(
+                    "Budget ›",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = c.textMuted,
+                    modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClickLabel = "change the budget") { settingBudget = true }.padding(vertical = 6.dp, horizontal = 4.dp),
+                )
+            }
+        }
     }
 }
 
@@ -804,9 +837,9 @@ private fun DaySheet(
                     picked = hour,
                     height = 64,
                     onPick = { i -> hour = if (hour == i) null else i },
-                    axisEvery = 6,
-                    groupLabel = { i -> app.bedtime.ui.formatMinuteOfDay(context, i * 60) },
-                    guides = true,
+                    axisEvery = 2,
+                    groupLabel = { i -> "$i" },
+                    guideEvery = 6,
                     marks = totals.slots.map { it.third },
                 )
                 Spacer(Modifier.height(8.dp))
@@ -941,25 +974,57 @@ private fun BudgetDialog(
 }
 
 /** "today", "yesterday", "wednesday 21 october"; "this week", "last week", "19 – 25 october"; "october", "october 2025". */
-internal fun periodLabel(period: UsePeriod, start: LocalDate, today: LocalDate): String = when (period) {
-    UsePeriod.DAY -> when (start) {
-        today -> "today"
-        today.minusDays(1) -> "yesterday"
-        else -> start.format(DateTimeFormatter.ofPattern(if (start.year == today.year) "EEEE d MMMM" else "EEEE d MMMM yyyy", Locale.getDefault()))
+internal fun periodLabel(period: UsePeriod, start: LocalDate, today: LocalDate, short: Boolean = false): String {
+    // Short, for the line it shares with day, week and month: "wed 25 nov", "16–22 nov", "nov 2025".
+    val weekday = if (short) "EEE" else "EEEE"
+    val month = if (short) "MMM" else "MMMM"
+    return when (period) {
+        UsePeriod.DAY -> when (start) {
+            today -> "today"
+            today.minusDays(1) -> "yesterday"
+            else -> start.format(DateTimeFormatter.ofPattern(if (start.year == today.year) "$weekday d $month" else "$weekday d $month yyyy", Locale.getDefault()))
+        }
+        UsePeriod.WEEK -> {
+            val thisWeek = UsePeriods.start(UsePeriod.WEEK, today)
+            when (start) {
+                thisWeek -> "this week"
+                thisWeek.minusWeeks(1) -> "last week"
+                else -> {
+                    val end = start.plusDays(6)
+                    val from = if (start.month == end.month) start.dayOfMonth.toString() else start.format(DateTimeFormatter.ofPattern("d $month", Locale.getDefault()))
+                    "$from – " + end.format(DateTimeFormatter.ofPattern("d $month", Locale.getDefault()))
+                }
+            }
+        }
+        UsePeriod.MONTH -> start.format(DateTimeFormatter.ofPattern(if (start.year == today.year) "MMMM" else "$month yyyy", Locale.getDefault()))
     }
-    UsePeriod.WEEK -> {
-        val thisWeek = UsePeriods.start(UsePeriod.WEEK, today)
-        when (start) {
-            thisWeek -> "this week"
-            thisWeek.minusWeeks(1) -> "last week"
-            else -> {
-                val end = start.plusDays(6)
-                val from = if (start.month == end.month) start.dayOfMonth.toString() else start.format(DateTimeFormatter.ofPattern("d MMMM", Locale.getDefault()))
-                "$from – " + end.format(DateTimeFormatter.ofPattern("d MMMM", Locale.getDefault()))
+}
+
+/** Day, week or month, small enough to share a line with the period's name and arrows. */
+@Composable
+private fun PeriodChoice(period: UsePeriod, onPick: (UsePeriod) -> Unit) {
+    val c = Obsidian.colors
+    Row(Modifier.clip(RoundedCornerShape(12.dp)).background(c.bgSecondary).padding(3.dp)) {
+        listOf(UsePeriod.DAY to "Day", UsePeriod.WEEK to "Week", UsePeriod.MONTH to "Month").forEach { (p, label) ->
+            val on = p == period
+            Box(
+                Modifier
+                    .heightIn(min = 40.dp)
+                    .clip(RoundedCornerShape(9.dp))
+                    .background(if (on) c.interactive else Color.Transparent)
+                    .clickable(role = androidx.compose.ui.semantics.Role.Tab) { onPick(p) }
+                    .padding(horizontal = 10.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    label,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (on) c.textNormal else c.textMuted,
+                    fontWeight = if (on) androidx.compose.ui.text.font.FontWeight.SemiBold else null,
+                )
             }
         }
     }
-    UsePeriod.MONTH -> start.format(DateTimeFormatter.ofPattern(if (start.year == today.year) "MMMM" else "MMMM yyyy", Locale.getDefault()))
 }
 
 /** What the period is set against, in words: "yesterday", "your usual wednesday", "the month before", "a year back". */
@@ -1062,8 +1127,8 @@ private fun Bars(
     figures: ((Int) -> String?)? = null,
     /** With [axisEvery], each group's label, from its first slot; the day of the month by default. */
     groupLabel: (Int) -> String = { "${it + 1}" },
-    /** Faint lines where each [axisEvery] group starts, to find a slot by: a day's 6, 12 and 18. */
-    guides: Boolean = false,
+    /** Faint lines every so many slots, to find a slot by: a day's 6, 12 and 18. */
+    guideEvery: Int? = null,
     /** A dot over each slot as big as its count against the most: a day's unlocks by the hour. */
     marks: List<Int>? = null,
 ) {
@@ -1073,11 +1138,11 @@ private fun Bars(
     val mostMarks = marks?.maxOrNull()?.coerceAtLeast(1) ?: 1
     Row(
         Modifier.fillMaxWidth().then(
-            if (guides && axisEvery != null) {
+            if (guideEvery != null) {
                 Modifier.drawBehind {
                     val g = gap.toPx()
                     val slot = (size.width - g * (slots.size - 1)) / slots.size
-                    (axisEvery until slots.size step axisEvery).forEach { i ->
+                    (guideEvery until slots.size step guideEvery).forEach { i ->
                         val x = i * (slot + g) - g / 2
                         drawLine(c.border, androidx.compose.ui.geometry.Offset(x, 0f), androidx.compose.ui.geometry.Offset(x, size.height), strokeWidth = 1.dp.toPx())
                     }
@@ -1139,27 +1204,53 @@ private fun Bars(
 private fun MonthBars(months: List<UsageMonth>, onMonth: (UsageMonth) -> Unit) {
     val c = Obsidian.colors
     val most = months.maxOf { it.perDay ?: 0L }.coerceAtLeast(1)
-    Row(Modifier.fillMaxWidth().height(106.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Bottom) {
-        months.forEachIndexed { i, month ->
-            val current = i == months.lastIndex
-            Column(
-                Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(4.dp)).then(if (month.perDay != null) Modifier.clickable(onClickLabel = "this month at a glance") { onMonth(month) } else Modifier),
-                verticalArrangement = Arrangement.Bottom,
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                val all = month.perDay ?: 0L
-                // The day on average, over its bar.
-                if (all > 0) Text(barTime(all), style = MaterialTheme.typography.labelSmall, color = if (current) c.textNormal else c.textMuted, maxLines = 1, softWrap = false)
-                val bar = (64 * all.toFloat() / most).dp
-                Box(Modifier.fillMaxWidth().height(bar).clip(RoundedCornerShape(3.dp)).background(c.textNormal.copy(alpha = if (current) 0.3f else 0.16f))) {
-                    val part = if (all > 0) (month.distractingPerDay ?: 0L).toFloat() / all else 0f
-                    Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(bar * part).background(c.distracting.copy(alpha = if (current) 1f else 0.7f)))
+    // More than seven are too narrow for a time each and a short name: this month's and the highest's
+    // times alone, and each month's first letter.
+    val slim = months.size > 7
+    val highest = months.indices.maxByOrNull { months[it].perDay ?: 0L }
+    val average = UseMonths.average(months)
+    val gap = if (slim) 5.dp else 10.dp
+    val line = c.textFaint
+    Column(Modifier.fillMaxWidth()) {
+        // The bars from a shared foot, with the day on average across them as a faint dashed line behind.
+        Row(
+            Modifier.fillMaxWidth().height(86.dp).drawBehind {
+                average?.let { avg ->
+                    val y = size.height - 64.dp.toPx() * avg / most
+                    drawLine(line, androidx.compose.ui.geometry.Offset(0f, y), androidx.compose.ui.geometry.Offset(size.width, y), strokeWidth = 1.dp.toPx(), pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 4.dp.toPx())))
                 }
-                Spacer(Modifier.height(4.dp))
+            },
+            horizontalArrangement = Arrangement.spacedBy(gap),
+            verticalAlignment = Alignment.Bottom,
+        ) {
+            months.forEachIndexed { i, month ->
+                val current = i == months.lastIndex
+                Column(
+                    Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(4.dp)).then(if (month.perDay != null) Modifier.clickable(onClickLabel = "this month at a glance") { onMonth(month) } else Modifier),
+                    verticalArrangement = Arrangement.Bottom,
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    val all = month.perDay ?: 0L
+                    // The day on average, over its bar.
+                    if (all > 0 && (!slim || current || i == highest)) Text(barTime(all), style = MaterialTheme.typography.labelSmall, color = if (current) c.textNormal else c.textMuted, maxLines = 1, softWrap = false)
+                    val bar = (64 * all.toFloat() / most).dp
+                    Box(Modifier.fillMaxWidth().height(bar).clip(RoundedCornerShape(3.dp)).background(c.textNormal.copy(alpha = if (current) 0.3f else 0.16f))) {
+                        val part = if (all > 0) (month.distractingPerDay ?: 0L).toFloat() / all else 0f
+                        Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(bar * part).background(c.distracting.copy(alpha = if (current) 1f else 0.7f)))
+                    }
+                }
+            }
+        }
+        Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(gap)) {
+            months.forEachIndexed { i, month ->
+                val name = YearMonth.parse(month.month).month.getDisplayName(TextStyle.SHORT, Locale.getDefault())
                 Text(
-                    YearMonth.parse(month.month).month.getDisplayName(TextStyle.SHORT, Locale.getDefault()),
+                    if (slim) name.take(1) else name,
                     style = MaterialTheme.typography.labelSmall,
-                    color = if (current) c.textNormal else c.textFaint,
+                    color = if (i == months.lastIndex) c.textNormal else c.textFaint,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    modifier = Modifier.weight(1f),
                 )
             }
         }
@@ -1190,7 +1281,7 @@ private fun ChartKey(all: Boolean, distracting: Boolean, outline: String?) {
 }
 
 /**
- * A month from the six at a glance: its day on average, on the phone and in distracting apps, how
+ * A month from the last ones at a glance: its day on average, on the phone and in distracting apps, how
  * much of it was distracting, against the month before, its busiest day; then the month itself.
  */
 @Composable

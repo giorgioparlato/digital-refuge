@@ -24,4 +24,18 @@ class UsageRollTest {
         // The oldest day left the list, and its time is in its month.
         assertEquals(600L, months!!.single().total)
     }
+
+    @Test
+    fun androidsMonthsFromBeforeRefugeAreKept() {
+        val today = java.time.LocalDate.parse("2026-11-28")
+        val android = listOf("2026-05", "2026-06", "2026-09", "2026-10", "2026-11").associateWith { UsageMonth(it, 1_000, 100, 30) }
+        // refuge's own days begin in september: may and june are kept, the rest it counts itself.
+        val usage = listOf(UsageDay(java.time.LocalDate.parse("2026-09-20").toEpochDay()))
+        val kept = Repository.earlier(emptyList(), usage, android, today)
+        assertEquals(listOf("2026-05", "2026-06"), kept?.map { it.month })
+        // Kept already: nothing new.
+        assertNull(Repository.earlier(kept!!, usage, android, today))
+        // Nothing of refuge's own yet: everything before this month.
+        assertEquals(listOf("2026-05", "2026-06", "2026-09", "2026-10"), Repository.earlier(emptyList(), emptyList(), android, today)?.map { it.month })
+    }
 }

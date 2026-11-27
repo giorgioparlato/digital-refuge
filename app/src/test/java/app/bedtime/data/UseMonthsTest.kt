@@ -47,4 +47,27 @@ class UseMonthsTest {
         assertEquals(UsageMonth("2026-09", 1_000, 600, 30), months["2026-09"])
         assertEquals(UsageMonth("2026-10", 300, 300, 28), months["2026-10"])
     }
+
+    @Test
+    fun theChartGrowsFromSixToTwelveMonthsAsTheyAreKept() {
+        val now = YearMonth.parse("2026-11")
+        fun from(first: String) = mapOf(first to UsageMonth(first, 100, 10, 30), "2026-11" to UsageMonth("2026-11", 100, 10, 27))
+        // Nothing yet, or three months: six, as before.
+        assertEquals(6, UseMonths.span(emptyMap(), now))
+        assertEquals(6, UseMonths.span(from("2026-09"), now))
+        // Since february: ten.
+        assertEquals(10, UseMonths.span(from("2026-02"), now))
+        // Two years back: still twelve.
+        assertEquals(12, UseMonths.span(from("2024-11"), now))
+        // An empty month kept doesn't count, nor one after the month looked at.
+        assertEquals(6, UseMonths.span(mapOf("2025-01" to UsageMonth("2025-01")), now))
+        assertEquals(6, UseMonths.span(from("2026-02"), YearMonth.parse("2026-05")))
+    }
+
+    @Test
+    fun theAverageCountsOnlyMonthsWithUse() {
+        val months = listOf(UsageMonth("2026-09", 3_000, 0, 30), UsageMonth("2026-10"), UsageMonth("2026-11", 1_000, 0, 10))
+        assertEquals(100L, UseMonths.average(months))
+        assertEquals(null, UseMonths.average(listOf(UsageMonth("2026-10"))))
+    }
 }
