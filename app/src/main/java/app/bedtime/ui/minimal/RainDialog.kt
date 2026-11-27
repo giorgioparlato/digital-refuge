@@ -81,11 +81,11 @@ internal fun RainContent(weather: WeatherNow?, now: Long, style: HomeStyle, onOp
             // Now: the sky, the temperature, its words, today's low and high, and the sun.
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Weather.icon(weather.code, weather.condition)?.let { Icon(WeatherIcons.of(it), contentDescription = null, tint = p.text, modifier = Modifier.size(36.dp)) }
-                Text("${Weather.degrees(weather.kelvin, fahrenheit)}°", style = MaterialTheme.typography.headlineLarge, color = p.text, modifier = Modifier.padding(start = 10.dp))
+                Text(deg(Weather.degrees(weather.kelvin, fahrenheit)), style = MaterialTheme.typography.headlineLarge, color = p.text, modifier = Modifier.padding(start = 10.dp))
                 Column(Modifier.padding(start = 12.dp).weight(1f)) {
                     weather.condition?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = p.muted) }
                     if (weather.low != null && weather.high != null) {
-                        Text("low ${Weather.degrees(weather.low, fahrenheit)}° · high ${Weather.degrees(weather.high, fahrenheit)}°", style = MaterialTheme.typography.bodySmall, color = p.faint)
+                        Text("low ${deg(Weather.degrees(weather.low, fahrenheit))} · high ${deg(Weather.degrees(weather.high, fahrenheit))}", style = MaterialTheme.typography.bodySmall, color = p.faint)
                     }
                 }
                 Column(horizontalAlignment = Alignment.End) {
@@ -136,16 +136,16 @@ private fun HoursRow(hours: List<HourRain>, style: HomeStyle) {
                     Box(Modifier.size(20.dp), contentAlignment = Alignment.Center) {
                         hour.icon?.let { Icon(WeatherIcons.of(it), contentDescription = null, tint = p.text, modifier = Modifier.size(20.dp)) }
                     }
-                    Text(hour.degrees?.let { "$it°" } ?: "", style = MaterialTheme.typography.bodyMedium, color = p.text)
+                    Text(hour.degrees?.let(::deg) ?: "", style = MaterialTheme.typography.bodyMedium, color = p.text)
                     Text("${hour.chance}%", style = MaterialTheme.typography.labelSmall, color = if (hour.chance >= 50) p.accent else p.faint)
                 }
             }
         }
-        // A fade at the right edge, into the sheet's own shade: there's more to scroll to.
-        Box(
-            Modifier.align(Alignment.CenterEnd).width(28.dp).fillMaxHeight()
-                .background(Brush.horizontalGradient(listOf(androidx.compose.ui.graphics.Color.Transparent, p.chip.compositeOver(p.background)))),
-        )
+        // A fade at the right edge, into the sheet's own shade: there's more to scroll to. It takes the
+        // row's own size, so it never stretches the sheet.
+        Box(Modifier.matchParentSize(), contentAlignment = Alignment.CenterEnd) {
+            Box(Modifier.width(28.dp).fillMaxHeight().background(Brush.horizontalGradient(listOf(androidx.compose.ui.graphics.Color.Transparent, p.chip.compositeOver(p.background)))))
+        }
     }
 }
 
@@ -167,7 +167,7 @@ private fun DaysList(weather: WeatherNow, now: Long, fahrenheit: Boolean, style:
                 Box(Modifier.size(20.dp), contentAlignment = Alignment.Center) {
                     Weather.icon(day.code)?.let { Icon(WeatherIcons.of(it), contentDescription = null, tint = p.text, modifier = Modifier.size(20.dp)) }
                 }
-                Text(low?.let { "$it°" } ?: "", style = MaterialTheme.typography.bodyMedium, color = p.faint, textAlign = TextAlign.End, modifier = Modifier.width(40.dp))
+                Text(low?.let(::deg) ?: "", style = MaterialTheme.typography.bodyMedium, color = p.faint, textAlign = TextAlign.End, modifier = Modifier.width(40.dp))
                 Box(Modifier.weight(1f).padding(horizontal = 8.dp).height(6.dp).clip(RoundedCornerShape(50)).background(p.text.copy(alpha = 0.08f))) {
                     if (low != null && high != null) {
                         val from = (low - coldest).toFloat() / (warmest - coldest)
@@ -179,7 +179,7 @@ private fun DaysList(weather: WeatherNow, now: Long, fahrenheit: Boolean, style:
                         }
                     }
                 }
-                Text(high?.let { "$it°" } ?: "", style = MaterialTheme.typography.bodyMedium, color = p.text, modifier = Modifier.width(36.dp))
+                Text(high?.let(::deg) ?: "", style = MaterialTheme.typography.bodyMedium, color = p.text, modifier = Modifier.width(36.dp))
                 Text(
                     day.rainChance?.let { "$it%" } ?: "",
                     style = MaterialTheme.typography.labelSmall,
@@ -193,3 +193,6 @@ private fun DaysList(weather: WeatherNow, now: Long, fahrenheit: Boolean, style:
 }
 
 private fun dayName(date: LocalDate): String = DateTimeFormatter.ofPattern("EEE", Locale.getDefault()).format(date)
+
+/** "3°", or "−2°" with a true minus, which reads as one with its number where a hyphen leaves a gap. */
+private fun deg(degrees: Int): String = if (degrees < 0) "\u2212${-degrees}°" else "$degrees°"

@@ -193,6 +193,8 @@ fun HomeScreen(
         onUnlock = onUnlock,
         onUndo = { id -> scope.launch { repo.undoStart(id) } },
         onDismissWhatsNew = { scope.launch { repo.updateSettings { it.copy(lastSeenVersion = installed) } } },
+        folded = settings.focusFolded,
+        onFold = { section, fold -> scope.launch { repo.updateSettings { it.copy(focusFolded = if (fold) it.focusFolded + section else it.focusFolded - section) } } },
         onNotes = onNotes,
         notesShortcuts = notesShortcuts,
         notesButton = notesButton,
@@ -232,11 +234,11 @@ internal fun HomeContent(
     isInstalled: (String) -> Boolean = { false },
     onToggle: (Schedule, Boolean) -> Unit = { _, _ -> },
     onDelete: (Schedule) -> Unit = {},
+    /** Sections folded to their heading, remembered until you open them again; and folding or opening one. */
+    folded: Set<String> = emptySet(),
+    onFold: (section: String, fold: Boolean) -> Unit = { _, _ -> },
 ) {
     val c = Obsidian.colors
-    // Sections folded to their heading, for now only: each opens again the next time focus does.
-    var folded by remember { mutableStateOf(emptySet<String>()) }
-    val onFold = { section: String, fold: Boolean -> folded = if (fold) folded + section else folded - section }
     var editingLength by remember { mutableStateOf<Schedule?>(null) }
     editingLength?.let { block ->
         BlockLengthDialog(

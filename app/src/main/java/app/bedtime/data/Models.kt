@@ -783,6 +783,8 @@ data class AppSettings(
     val habitsTab: Boolean = false,
     /** The week at the top of habits, as small bars; folded to its one line when you'd rather not see it. */
     val habitsWeekShown: Boolean = true,
+    /** The focus page's sections folded to their heading (limits, blocks, schedules), kept until you open them again. */
+    val focusFolded: Set<String> = emptySet(),
     /** The habits as a grid of the week (the usual) or as compact rows. */
     val habitsView: HabitsView = HabitsView.GRID,
     /** Your notes as a tab of their own at refuge's foot, beside insights. */
