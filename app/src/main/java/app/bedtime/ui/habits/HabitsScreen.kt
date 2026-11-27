@@ -175,6 +175,15 @@ internal fun HabitsBody(
 ) {
     val c = Obsidian.colors
     var open by remember { mutableStateOf<String?>(null) }
+    // A habit's whole year, over the whole screen.
+    var yearOf by remember { mutableStateOf<String?>(null) }
+    habits.firstOrNull { it.id == yearOf }?.let { habit ->
+        HabitYearDialog(
+            habit, marks[habit.id].orEmpty(), today, c.bgPrimary, c.bgSecondary, c.textNormal, c.textMuted, c.accent,
+            onSet = { day, value -> onMark(habit, day, value) },
+            onDismiss = { yearOf = null },
+        )
+    }
     editing?.let { habit ->
         HabitEditDialog(
             habit = habit,
@@ -185,11 +194,15 @@ internal fun HabitsBody(
         )
     }
     habits.firstOrNull { it.id == open }?.let { habit ->
-        Dialog(onDismissRequest = { open = null }) {
+        app.bedtime.ui.minimal.HomeSheetDialog({ open = null }) {
             HabitDetailContent(
                 habit, marks[habit.id].orEmpty(), today, c.bgSecondary, c.textNormal, c.textMuted, c.accent,
                 onSet = { day, value -> onMark(habit, day, value) },
                 onEdit = { onEditing(habit) },
+                onYear = {
+                    open = null
+                    yearOf = habit.id
+                },
             )
         }
     }

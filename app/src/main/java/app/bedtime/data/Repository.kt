@@ -135,6 +135,9 @@ class Repository private constructor(context: Context) {
     /** A note moved into another, merged with others, pinned or labelled, as [NoteShelf] does it. */
     suspend fun moveNote(from: String, into: String) = update(NOTES, notesSerializer, emptyList()) { NoteShelf.movedInto(it, from, into, System.currentTimeMillis()) }
 
+    /** The notes in the order of [ids], after a card is dragged to a new place. */
+    suspend fun reorderNotes(ids: List<String>) = update(NOTES, notesSerializer, emptyList()) { NoteShelf.reordered(it, ids) }
+
     suspend fun mergeNotes(ids: List<String>) = update(NOTES, notesSerializer, emptyList()) { NoteShelf.merged(it, ids, System.currentTimeMillis()) }
 
     suspend fun pinNote(id: String, pinned: Boolean) = update(NOTES, notesSerializer, emptyList()) { NoteShelf.pinned(it, id, pinned) }

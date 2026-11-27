@@ -85,10 +85,15 @@ insights
 - Each day's time in distracting apps
 - All of it, and the part in distracting apps
 - ; outlined, {against}
-- . Unlocks by the hour under it
+- . A dot over an hour for its unlocks; tap an hour to see it
 - . Tap a day to see it against …
 - On the phone
 - Distracting
+- …–… · … on the phone, … distracting · 
+- 1 unlock
+- {unlocks} unlocks
+- {n} unlocks
+- , the most {it} in an hour
 - Most distracted
 - this day
 - The last eight weeks
@@ -118,14 +123,18 @@ insights
 - No unlocks kept for these days.
 - Nothing kept for these days yet.
 - {text} ›
-- … of it distracting
 - Only the day's total is kept this far back.
-- No app took a minute.
-- The whole day ›
-- Close
 - your usual one of that weekday
 - the same day a year back
 - the same day a week before
+- Against {it}
+- outlined, {it}
+- tap an hour to see it
+- Used most
+-  · … opens
+- More
+- The whole day ›
+- the same
 - Save
 - Cancel
 - this week
@@ -143,17 +152,17 @@ insights
 - your average day this year
 - Compare
 - ↑ {change}%
--  · {it}, the most … in an hour
 - in distracting apps
-- the same as the month before
-- ↓ …% on the month before
-- ↑ {it}% on the month before
-- … a day on the phone
-- … a day in distracting apps
-- , …% of it
-- … in all, over … days with any use
+- ↑ {it}%
+- Against 
+- a day distracting
+- a day on the phone
+- Darker, more time on the phone
+- Darker, more time in distracting apps
+- … in all
+- …% distracting
+- … days used
 - The month ›
-- the same
 
 <sub>[PhoneUse.kt](../../app/src/main/java/app/bedtime/ui/components/PhoneUse.kt)</sub>
 
@@ -209,12 +218,15 @@ insights
 <sub>[HabitViews.kt](../../app/src/main/java/app/bedtime/ui/habits/HabitViews.kt)</sub>
 
 - habits · {done} of …
-- … of … today · …
-- Open the habit
+- {ticked} of … today
+- Tick the rest
+- Open the habit ›
+- Change
 - days in a row
 - best run
 - {value} of ……
-- Tap a day to tick or untick it.
-- Tap a day to change its count above.
+- Tap a day to tick or untick it
+- Tap a day to change its count above
+- The whole year ›
 - All your habits
-- Change it
+- part done

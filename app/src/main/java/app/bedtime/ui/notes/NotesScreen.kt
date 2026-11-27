@@ -33,6 +33,13 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
+import androidx.compose.ui.zIndex
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 import kotlinx.coroutines.delay
 import app.bedtime.data.Notes
 import androidx.compose.ui.text.input.TextFieldValue
@@ -131,10 +138,13 @@ fun NotesScreen(onBack: (() -> Unit)?, initialOpen: String? = null, onSettings: 
         onRecord = settings?.takeIf { app.bedtime.data.Voice.ready(it) }?.let { { id -> context.startActivity(app.bedtime.voice.RecordActivity.intent(context, note = id)) } },
         view = settings?.notesView ?: app.bedtime.data.NotesView.LIST,
         onView = { v -> scope.launch { repo.updateSettings { it.copy(notesView = v) } } },
+        sort = settings?.notesSort ?: app.bedtime.data.NotesSort.CUSTOM,
+        onSort = { by -> scope.launch { repo.updateSettings { it.copy(notesSort = by) } } },
         shelf = ShelfHandlers(
             colour = { id, color -> scope.launch { repo.colourNote(id, color) } },
             move = { from, into -> scope.launch { repo.moveNote(from, into) } },
             merge = { ids -> scope.launch { repo.mergeNotes(ids) } },
+            reorder = { ids -> scope.launch { repo.reorderNotes(ids) } },
             pin = { id, pinned -> scope.launch { repo.pinNote(id, pinned) } },
             label = { id, labels -> scope.launch { repo.labelNote(id, labels) } },
             restore = { note, at -> scope.launch { repo.restoreNote(note, at) } },
@@ -154,6 +164,8 @@ internal class ShelfHandlers(
     val colour: (String, Long?) -> Unit = { _, _ -> },
     val move: (from: String, into: String) -> Unit = { _, _ -> },
     val merge: (List<String>) -> Unit = {},
+    /** Your own order, after a card is dragged to a new place. */
+    val reorder: (List<String>) -> Unit = {},
     val pin: (String, Boolean) -> Unit = { _, _ -> },
     val label: (String, List<String>) -> Unit = { _, _ -> },
     val restore: (Note, Int) -> Unit = { _, _ -> },
@@ -188,6 +200,9 @@ internal fun NotesContent(
     /** A list, cards in two columns, or titles alone; and choosing which. */
     view: app.bedtime.data.NotesView = app.bedtime.data.NotesView.LIST,
     onView: (app.bedtime.data.NotesView) -> Unit = {},
+    /** Your own order, or newest first by edit or by creation; and choosing which. */
+    sort: app.bedtime.data.NotesSort = app.bedtime.data.NotesSort.CUSTOM,
+    onSort: (app.bedtime.data.NotesSort) -> Unit = {},
 ) {
     // The note open to edit, by id; a new one gets its id as it opens.
     var open by rememberSaveable { mutableStateOf(initialOpen) }
@@ -325,9 +340,39 @@ internal fun NotesContent(
     // A note's colour, tinting its card over the usual one; none leaves it as it was.
     val cardColour = { note: Note -> note.color?.let { Color(it).copy(alpha = 0.22f).compositeOver(c.bgSecondary) } ?: c.bgSecondary }
     val titles = view == app.bedtime.data.NotesView.TITLES
-    // One note's card: tap to open (or pick, when merging), hold for its menu, swipe to the trash.
+    // The to-do first, then those pinned, then the rest, each part in the order you sort by.
+    val shown = NoteShelf.labelled(NoteShelf.sorted(notes, sort), filter).filter { query.isEmpty() || it.text.contains(query, ignoreCase = true) }
+    // Cards can be dragged to a new place in your own order, with every note in view (no label or search).
+    val grid = androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState()
+    val canDrag = view == app.bedtime.data.NotesView.CARDS && sort == app.bedtime.data.NotesSort.CUSTOM && selected == null && filter == null && query.isEmpty()
+    // While one is dragged: the order as it stands, which card, and how far it's been moved.
+    var dragOrder by remember { mutableStateOf<List<String>?>(null) }
+    var dragging by remember { mutableStateOf<String?>(null) }
+    var dragBy by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
+    // Held until the saved order comes back, so the cards don't jump back for a moment.
+    LaunchedEffect(notes) { if (dragging == null) dragOrder = null }
+    val listed = dragOrder?.let { order -> shown.sortedBy { order.indexOf(it.id) } } ?: shown
+    val latest = androidx.compose.runtime.rememberUpdatedState(listed)
+    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
+    // One note's card: tap to open (or pick, when merging), hold for its menu, swipe to the trash; in
+    // cards, hold and move to drag it somewhere else.
     val noteCard: @Composable (Note) -> Unit = { note ->
         val order = selected?.indexOf(note.id)?.takeIf { it >= 0 }
+        val lifted = dragging == note.id
+        Box(
+            Modifier
+                .zIndex(if (lifted) 1f else 0f)
+                .graphicsLayer {
+                    if (lifted) {
+                        translationX = dragBy.x
+                        translationY = dragBy.y
+                        scaleX = 1.04f
+                        scaleY = 1.04f
+                        shadowElevation = 12.dp.toPx()
+                        shape = RoundedCornerShape(CardRadius)
+                    }
+                },
+        ) {
         SwipeToDelete(onDelete = { deleteWithUndo(note) }, swipeAway = true) {
             Box {
                 Column(
@@ -338,7 +383,8 @@ internal fun NotesContent(
                         .combinedClickable(
                             onClickLabel = if (selected != null) "pick" else "edit",
                             onLongClickLabel = "more",
-                            onLongClick = { if (selected == null) menuFor = note.id },
+                            // Where cards can be dragged, the hold below opens the menu once you let go without moving.
+                            onLongClick = if (canDrag) null else ({ if (selected == null) menuFor = note.id }),
                         ) {
                             when {
                                 selected == null -> open = note.id
@@ -346,6 +392,61 @@ internal fun NotesContent(
                                 else -> picking = selected + note.id
                             }
                         }
+                        .then(
+                            if (!canDrag) {
+                                Modifier
+                            } else {
+                                Modifier.pointerInput(note.id) {
+                                    awaitEachGesture {
+                                        val down = awaitFirstDown(requireUnconsumed = false)
+                                        awaitLongPressOrCancellation(down.id) ?: return@awaitEachGesture
+                                        haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                        val before = latest.value.map { it.id }
+                                        dragOrder = before
+                                        dragging = note.id
+                                        dragBy = androidx.compose.ui.geometry.Offset.Zero
+                                        var moved = 0f
+                                        while (true) {
+                                            val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
+                                            // Every move and the lift are this drag's, so the tap underneath never opens the note.
+                                            change.consume()
+                                            if (!change.pressed) break
+                                            val delta = change.positionChange()
+                                            moved += delta.getDistance()
+                                            dragBy += delta
+                                            // The card under the dragged one's middle, in the same group, swaps places with it.
+                                            val items = grid.layoutInfo.visibleItemsInfo
+                                            val me = items.firstOrNull { it.key == note.id } ?: continue
+                                            val middle = androidx.compose.ui.geometry.Offset(me.offset.x + me.size.width / 2f, me.offset.y + me.size.height / 2f) + dragBy
+                                            val over = items.firstOrNull { o ->
+                                                o.key != note.id &&
+                                                    middle.x >= o.offset.x && middle.x <= o.offset.x + o.size.width &&
+                                                    middle.y >= o.offset.y && middle.y <= o.offset.y + o.size.height
+                                            } ?: continue
+                                            val target = latest.value.firstOrNull { it.id == over.key } ?: continue
+                                            if (NoteShelf.rank(target) != NoteShelf.rank(note)) continue
+                                            val now = dragOrder ?: before
+                                            dragOrder = now.toMutableList().apply {
+                                                remove(note.id)
+                                                add(now.indexOf(target.id), note.id)
+                                            }
+                                            // It takes the other's place, so it's moved by the difference to stay under your finger.
+                                            dragBy += androidx.compose.ui.geometry.Offset((me.offset.x - over.offset.x).toFloat(), (me.offset.y - over.offset.y).toFloat())
+                                        }
+                                        val after = dragOrder
+                                        dragging = null
+                                        when {
+                                            moved < viewConfiguration.touchSlop -> {
+                                                dragOrder = null
+                                                menuFor = note.id
+                                            }
+                                            after != null && after != before -> shelf.reorder(after)
+                                            else -> dragOrder = null
+                                        }
+                                    }
+                                }
+                            },
+                        )
                         .padding(if (titles) 12.dp else 16.dp),
                 ) {
                     val reminder = note.remindAt?.takeIf { it > System.currentTimeMillis() }
@@ -416,8 +517,10 @@ internal fun NotesContent(
                             if (snackbar.showSnackbar("done ones cleared", "undo", duration = SnackbarDuration.Short) == SnackbarResult.ActionPerformed) onSave(note.id, note.text)
                         }
                     }
+                    item("Delete") { deleteWithUndo(note) }
                 }
             }
+        }
         }
     }
     Scaffold(
@@ -433,6 +536,26 @@ internal fun NotesContent(
             } else {
                 ObsidianTopBar("Notes", onBack = onBack, subtitle = "Written in Markdown, kept on this phone") {
                     IconButton(onClick = { searching = if (searching == null) "" else null }) { Icon(LineIcons.Search, contentDescription = "search your notes", tint = c.textMuted) }
+                    // In what order: your own, or newest first by edit or by creation.
+                    Box {
+                        var sorting by remember { mutableStateOf(false) }
+                        IconButton(onClick = { sorting = true }) { Icon(LineIcons.Sort, contentDescription = "sort notes", tint = c.textMuted) }
+                        DropdownMenu(expanded = sorting, onDismissRequest = { sorting = false }, containerColor = c.bgSecondary) {
+                            listOf(
+                                app.bedtime.data.NotesSort.CUSTOM to "Your order",
+                                app.bedtime.data.NotesSort.EDITED to "Last edited",
+                                app.bedtime.data.NotesSort.CREATED to "Created",
+                            ).forEach { (by, label) ->
+                                DropdownMenuItem(
+                                    text = { Text(label, color = if (by == sort) c.accentText else c.textNormal) },
+                                    onClick = {
+                                        sorting = false
+                                        onSort(by)
+                                    },
+                                )
+                            }
+                        }
+                    }
                     // How they're shown: a list, cards in two columns, or titles alone.
                     Box {
                         var viewing by remember { mutableStateOf(false) }
@@ -468,6 +591,7 @@ internal fun NotesContent(
         // One lane for the list and titles, two for cards; everything but the notes spans the width.
         val wide = androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan.FullLine
         androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid(
+            state = grid,
             columns = androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells.Fixed(if (view == app.bedtime.data.NotesView.CARDS) 2 else 1),
             modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = PageGutter),
             verticalItemSpacing = if (titles) 6.dp else 10.dp,
@@ -497,12 +621,10 @@ internal fun NotesContent(
                     }
                 }
             }
-            // The to-do first, then those pinned, then the rest.
-            val shown = NoteShelf.labelled(NoteShelf.ordered(notes), filter).filter { query.isEmpty() || it.text.contains(query, ignoreCase = true) }
             if (query.isNotEmpty() && shown.isEmpty()) {
                 item(key = "none", span = wide) { Text("No note has “$query”.", style = MaterialTheme.typography.bodyMedium, color = c.textMuted) }
             }
-            items(shown, key = { it.id }, span = { note -> if (note.id == app.bedtime.data.Why.NOTE_ID && whyOnTop && journalRow != null) wide else androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan.SingleLane }) { note ->
+            items(listed, key = { it.id }, span = { note -> if (note.id == app.bedtime.data.Why.NOTE_ID && whyOnTop && journalRow != null) wide else androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan.SingleLane }) { note ->
                 if (note.id == app.bedtime.data.Why.NOTE_ID && whyOnTop && journalRow != null) {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         noteCard(note)

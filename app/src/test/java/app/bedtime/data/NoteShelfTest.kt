@@ -69,4 +69,17 @@ class NoteShelfTest {
         assertEquals(28L, NoteShelf.daysLeft(trash.first(), now))
         assertEquals(1L, NoteShelf.daysLeft(TrashedNote(books, now - 30 * day + 1), now))
     }
+
+    @Test
+    fun sortingByDateLeavesYourOwnOrderAsItWas() {
+        // Stored in your order: long, books, quick. Created 4, 2, 3; edited 5, 9, 7.
+        val notes = listOf(long.copy(editedAt = 5), books.copy(editedAt = 9), quick.copy(editedAt = 7), todo)
+        assertEquals(listOf(Notes.TODO_ID, "long", "books", "q"), NoteShelf.sorted(notes, NotesSort.CUSTOM).map { it.id })
+        assertEquals(listOf(Notes.TODO_ID, "books", "q", "long"), NoteShelf.sorted(notes, NotesSort.EDITED).map { it.id })
+        assertEquals(listOf(Notes.TODO_ID, "long", "q", "books"), NoteShelf.sorted(notes, NotesSort.CREATED).map { it.id })
+        // Pinned ones still come first, however they're sorted.
+        assertEquals("books", NoteShelf.sorted(notes.map { if (it.id == "books") it.copy(pinned = true) else it }, NotesSort.CREATED)[1].id)
+        // A card dragged to a new place saves that order; one left out of it stays at the end.
+        assertEquals(listOf("q", "long", "books", Notes.TODO_ID), NoteShelf.reordered(notes, listOf("q", "long", "books")).map { it.id })
+    }
 }

@@ -122,12 +122,16 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 - note copied
 - Clear done
 - done ones cleared
+- Delete
 - 1 picked
 - … picked
 - Tap notes in the order to merge them
 - Merge
 - Notes
 - Written in Markdown, kept on this phone
+- Your order
+- Last edited
+- Created
 - A list
 - Cards in two columns
 - Titles only

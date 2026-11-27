@@ -123,11 +123,12 @@ internal fun habitsSlot(
             onHold = onHold,
         )
         shown.firstOrNull { it.id == steps }?.let { habit ->
-            androidx.compose.ui.window.Dialog(onDismissRequest = { steps = null }) {
+            HomeSheetDialog({ steps = null }) {
                 val value = marks[habit.id]?.get(today) ?: 0
                 HabitStepsCard(
                     habit, value, p.background, p.text, p.faint, p.accent,
                     onStep = { step -> onMark(habit, today, Habits.stepTapped(value, step)) },
+                    onAll = { onMark(habit, today, habit.allSteps) },
                     // The lock screen has no habit of its own to open: all of them, after the unlock.
                     onOpen = { steps = null; if (screen == Screen.LOCK) onOpenAll() else onOpen(habit) },
                 )

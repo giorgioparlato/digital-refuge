@@ -53,6 +53,7 @@ object LineIcons {
     /** Four bars of different heights, for insights. */
     val Insights by lazy { line("Insights", "M5,20 V12 M10,20 V6 M15,20 V14 M20,20 V9") }
     val Menu by lazy { line("Menu", "M4,7 H20 M4,12 H20 M4,17 H20") }
+    val Sort by lazy { line("Sort", "M4,7 H20 M4,12 H15 M4,17 H10") }
     val LocationOn by lazy { line("LocationOn", "M12,21 C12,21 5,14.5 5,9.5 A7,7 0 0,1 19,9.5 C19,14.5 12,21 12,21 Z M12,7 A2.5,2.5 0 1,1 12,12 A2.5,2.5 0 1,1 12,7 Z") }
     val List by lazy { line("List", "M9,7 H20 M9,12 H20 M9,17 H20 M4.5,7 V7.1 M4.5,12 V12.1 M4.5,17 V17.1", mirrored = true) }
 

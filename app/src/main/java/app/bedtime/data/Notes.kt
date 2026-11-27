@@ -33,6 +33,10 @@ data class Note(
 @kotlinx.serialization.Serializable
 enum class NotesView { LIST, CARDS, TITLES }
 
+/** How the notes page orders them: your own order, or newest first by last edit or by creation. */
+@kotlinx.serialization.Serializable
+enum class NotesSort { CUSTOM, EDITED, CREATED }
+
 /** A note in the trash: when it went, and where it was, to go back there. */
 @Serializable
 data class TrashedNote(val note: Note, val deletedAt: Long, val at: Int = 0)
@@ -49,14 +53,31 @@ object NoteShelf {
     fun daysLeft(item: TrashedNote, now: Long): Long = (TRASH_DAYS - (now - item.deletedAt) / 86_400_000L).coerceAtLeast(1)
 
     /** The "why" answers first while pinned, then the to-do, then those pinned, then the rest, each in the order they were. */
-    fun ordered(notes: List<Note>): List<Note> = notes.sortedBy {
-        when {
-            it.id == Why.NOTE_ID && it.pinned -> 0
-            it.id == Notes.TODO_ID -> 1
-            it.pinned -> 2
-            else -> 3
-        }
+    fun ordered(notes: List<Note>): List<Note> = notes.sortedBy(::rank)
+
+    /**
+     * As the page shows them for [sort], each group ([rank]) kept together. Sorting by date leaves the
+     * saved order alone, so your own order is there again when you go back to it.
+     */
+    fun sorted(notes: List<Note>, sort: NotesSort): List<Note> = ordered(
+        when (sort) {
+            NotesSort.CUSTOM -> notes
+            NotesSort.EDITED -> notes.sortedByDescending { it.editedAt }
+            NotesSort.CREATED -> notes.sortedByDescending { it.createdAt }
+        },
+    )
+
+    /** Where a note's group comes on the page: your pinned "why" answers, the to-do, those pinned, then the rest. */
+    fun rank(note: Note): Int = when {
+        note.id == Why.NOTE_ID && note.pinned -> 0
+        note.id == Notes.TODO_ID -> 1
+        note.pinned -> 2
+        else -> 3
     }
+
+    /** [notes] in the order of [ids], as a card dragged to a new place leaves them; any not in [ids] after, as they were. */
+    fun reordered(notes: List<Note>, ids: List<String>): List<Note> =
+        notes.sortedBy { n -> ids.indexOf(n.id).let { if (it < 0) Int.MAX_VALUE else it } }
 
     /** Only those with [label]; all of them with none. */
     fun labelled(notes: List<Note>, label: String?): List<Note> = if (label == null) notes else notes.filter { n -> labelsOf(n).any { it.equals(label, ignoreCase = true) } }

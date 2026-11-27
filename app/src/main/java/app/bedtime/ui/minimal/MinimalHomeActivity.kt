@@ -1,5 +1,6 @@
 package app.bedtime.ui.minimal
 
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.border
 import app.bedtime.ui.components.LineIcons
@@ -258,7 +259,6 @@ private fun MinimalHomeScreen(
     }
     var rainOpen by remember { mutableStateOf(false) }
     var hoursDetail by remember { mutableStateOf(false) }
-    var appsDetail by remember { mutableStateOf(false) }
     val (todayHours, useToday) = rememberUseToday()
     val (habitList, habitMarks) = rememberHabits()
     // Your blocks, to start from the refuge mark, a gesture or the search.
@@ -678,7 +678,8 @@ private fun MinimalHomeScreen(
                 ?.let { HourlyUse.states(it, now.hour, HourlyUse.rule(settings)) },
             useToday = useToday.takeIf { Modules.isOn(style, Screen.HOME, Module.HOURS) },
             // The dots open today by the hour; the other looks, today by app.
-            onHours = { if (style.useWidgetFor(Screen.HOME).look == app.bedtime.data.UseLook.DOTS) hoursDetail = true else appsDetail = true },
+            // The dots and every other look open the same: the day, hour by hour, and the apps used most.
+            onHours = { hoursDetail = true },
             weather = rememberWeather(style, now),
             // A tap: today's rain, hour by hour; held, the widget's options and the weather app.
             onWeather = { rainOpen = true },
@@ -695,14 +696,27 @@ private fun MinimalHomeScreen(
             week = null
         })
     }
+    // A habit's whole year, from its detail, over the whole screen.
+    var habitYear by remember { mutableStateOf<String?>(null) }
+    habitList.firstOrNull { it.id == habitYear }?.let { habit ->
+        val p = style.palette()
+        app.bedtime.ui.habits.HabitYearDialog(
+            habit, habitMarks[habit.id].orEmpty(), HourlyUse.today(), p.background, p.chip.compositeOver(p.background), p.text, p.faint, p.accent,
+            onSet = { day, value -> scope.launch { repo.markHabit(habit.id, day, value) } },
+            onDismiss = { habitYear = null },
+        )
+    }
     habitList.firstOrNull { it.id == openHabit }?.let { habit ->
         val p = style.palette()
-        androidx.compose.ui.window.Dialog(onDismissRequest = { openHabit = null }) {
+        HomeSheetDialog({ openHabit = null }) {
             HabitDetailContent(habit, habitMarks[habit.id].orEmpty(), HourlyUse.today(), p.background, p.text, p.faint, p.accent, onSet = { day, value ->
                 scope.launch { repo.markHabit(habit.id, day, value) }
             }, onOpenAll = {
                 openHabit = null
                 runCatching { context.startActivity(app.bedtime.MainActivity.intent(context, app.bedtime.Routes.HABITS)) }
+            }, onYear = {
+                openHabit = null
+                habitYear = habit.id
             })
         }
     }
@@ -785,9 +799,6 @@ private fun MinimalHomeScreen(
             journal = app.bedtime.ui.minimal.journalWith(context, repo, scope, settings),
             onRecord = if (app.bedtime.data.Voice.ready(settings)) ({ context.startActivity(app.bedtime.voice.RecordActivity.intent(context)) }) else null,
         )
-    }
-    if (appsDetail) {
-        app.bedtime.ui.components.UseAppsDialog(useToday, style, onDismiss = { appsDetail = false }, onStats = { runCatching { context.startActivity(app.bedtime.MainActivity.intent(context, app.bedtime.Routes.STATS)) } })
     }
     if (hoursDetail) {
         val p = style.palette()

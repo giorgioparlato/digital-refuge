@@ -1,5 +1,6 @@
 package app.bedtime.ui.habits
 
+import androidx.compose.foundation.layout.heightIn
 import app.bedtime.ui.components.LineIcons
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -175,24 +176,79 @@ fun HabitStepRows(habit: Habit, value: Int, text: Color, muted: Color, faint: Co
 }
 
 /**
- * A set from a widget: its steps to tick for today, and a way on to the habit itself. Ticking goes
- * through [onStep], so the lock screen can ask for its unlock first, as for any tick there.
+ * A set from a widget, as a sheet: how many of its steps are done today, each step to tick, all of the
+ * rest at once ([onAll]), and a way on to the habit itself. Ticking goes through [onStep], so the lock
+ * screen can ask for its unlock first, as for any tick there.
  */
 @Composable
-fun HabitStepsCard(habit: Habit, value: Int, background: Color, text: Color, faint: Color, accent: Color, onStep: (HabitStep) -> Unit, onOpen: () -> Unit) {
+fun HabitStepsCard(
+    habit: Habit,
+    value: Int,
+    background: Color,
+    text: Color,
+    faint: Color,
+    accent: Color,
+    onStep: (HabitStep) -> Unit,
+    onOpen: () -> Unit,
+    onAll: (() -> Unit)? = null,
+) {
     val accent = habit.tint(accent)
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(background).padding(22.dp)) {
-        Text(habit.name, style = MaterialTheme.typography.titleMedium, color = text)
-        Text("${Habits.stepsTicked(habit, value)} of ${habit.steps.size} today · ${Habits.describe(habit)}", style = MaterialTheme.typography.bodySmall, color = faint)
-        HabitStepRows(habit, value, text, faint, faint, accent, Modifier.padding(top = 10.dp), onStep)
-        Text(
-            "Open the habit",
-            style = MaterialTheme.typography.labelLarge,
-            color = accent,
-            modifier = Modifier.padding(top = 14.dp).clip(RoundedCornerShape(50)).border(1.dp, accent.copy(alpha = 0.5f), RoundedCornerShape(50))
-                .clickable(onClick = onOpen).padding(horizontal = 16.dp, vertical = 10.dp),
-        )
+    val ticked = Habits.stepsTicked(habit, value)
+    app.bedtime.ui.minimal.HomeSheet(background, faint) {
+        Text(habit.name, style = MaterialTheme.typography.titleLarge, color = text)
+        Text(Habits.describe(habit), style = MaterialTheme.typography.bodySmall, color = faint)
+        // How far today: a segment a step, and the count.
+        Row(Modifier.padding(top = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                habit.steps.forEach { step ->
+                    val on = value and (1 shl step.bit) != 0
+                    Box(Modifier.weight(1f).height(6.dp).clip(RoundedCornerShape(50)).background(if (on) accent else text.copy(alpha = 0.12f)))
+                }
+            }
+            Text("$ticked of ${habit.steps.size} today", style = MaterialTheme.typography.bodySmall, color = faint, modifier = Modifier.padding(start = 10.dp))
+        }
+        // The steps, on a card of their own, a line between each.
+        Column(Modifier.padding(top = 14.dp).fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(text.copy(alpha = 0.06f))) {
+            habit.steps.forEachIndexed { i, step ->
+                val on = value and (1 shl step.bit) != 0
+                if (i > 0) Box(Modifier.fillMaxWidth().height(1.dp).background(text.copy(alpha = 0.06f)))
+                Row(
+                    Modifier.fillMaxWidth().heightIn(min = 54.dp).clickable(onClickLabel = if (on) "untick ${step.name}" else "tick ${step.name}") { onStep(step) }.padding(horizontal = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(
+                        Modifier.size(26.dp).clip(CircleShape).background(if (on) accent else Color.Transparent).border(1.5.dp, if (on) accent else faint, CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) { if (on) Icon(LineIcons.Check, contentDescription = null, tint = background(accent), modifier = Modifier.size(16.dp)) }
+                    Spacer(Modifier.width(14.dp))
+                    Text(
+                        step.name,
+                        style = MaterialTheme.typography.bodyLarge.copy(textDecoration = if (on) androidx.compose.ui.text.style.TextDecoration.LineThrough else null),
+                        color = if (on) faint else text,
+                    )
+                }
+            }
+        }
+        Row(Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            if (onAll != null && ticked < habit.steps.size) {
+                Box(
+                    Modifier.weight(1f).heightIn(min = 44.dp).clip(RoundedCornerShape(50)).background(accent).clickable(onClick = onAll),
+                    contentAlignment = Alignment.Center,
+                ) { Text("Tick the rest", style = MaterialTheme.typography.labelLarge, color = background(accent)) }
+            }
+            SheetButton("Open the habit ›", text, Modifier.weight(1f), onOpen)
+        }
     }
+}
+
+/** A pill at a sheet's foot, outlined in [colour]; [tinted] fills it faintly too. */
+@Composable
+private fun SheetButton(label: String, colour: Color, modifier: Modifier, onClick: () -> Unit, tinted: Boolean = false) {
+    Box(
+        modifier.heightIn(min = 44.dp).clip(RoundedCornerShape(50)).background(if (tinted) colour.copy(alpha = 0.1f) else Color.Transparent)
+            .border(1.dp, colour.copy(alpha = if (tinted) 0.5f else 0.25f), RoundedCornerShape(50)).clickable(onClick = onClick).padding(horizontal = 14.dp),
+        contentAlignment = Alignment.Center,
+    ) { Text(label, style = MaterialTheme.typography.labelLarge, color = colour) }
 }
 
 /** The habit's own colour, or [accent] if it has none. */
@@ -214,8 +270,8 @@ internal fun HabitDot(state: HabitDay, ringed: Boolean, text: Color, accent: Col
 }
 
 /**
- * One habit up close: its strength and streaks, today's count to change, and a month of days to tick
- * or untick.
+ * One habit up close, as a sheet: its strength and runs, today's count to change, and a month of days
+ * to tick or untick, in the year page's colours; the whole year and all your habits a tap away.
  */
 @Composable
 fun HabitDetailContent(
@@ -228,19 +284,35 @@ fun HabitDetailContent(
     accent: Color,
     onSet: (day: Long, value: Int) -> Unit,
     onEdit: (() -> Unit)? = null,
-    /** Opens all your habits, from a link at the foot. */
+    /** Opens all your habits, from a button at the foot. */
     onOpenAll: (() -> Unit)? = null,
+    /** The whole year of it, on a page of its own. */
+    onYear: (() -> Unit)? = null,
+    /** How many months back it opens on: 0 for this one. */
+    monthsBack: Int = 0,
 ) {
     val accent = habit.tint(accent)
-    var shown by remember { mutableIntStateOf(0) }
+    var shown by remember { mutableIntStateOf(monthsBack) }
     val month = YearMonth.from(LocalDate.ofEpochDay(today)).minusMonths(shown.toLong())
     // A count's day to change: today, or one picked on the month below.
     var picked by remember(habit.id) { androidx.compose.runtime.mutableLongStateOf(today) }
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(background).padding(22.dp)) {
-        Text(habit.name, style = MaterialTheme.typography.titleMedium, color = text)
-        Text(Habits.describe(habit), style = MaterialTheme.typography.bodySmall, color = faint)
-        Spacer(Modifier.height(14.dp))
-        Row(Modifier.fillMaxWidth()) {
+    app.bedtime.ui.minimal.HomeSheet(background, faint) {
+        Row(verticalAlignment = Alignment.Top) {
+            Column(Modifier.weight(1f)) {
+                Text(habit.name, style = MaterialTheme.typography.titleLarge, color = text)
+                Text(Habits.describe(habit), style = MaterialTheme.typography.bodySmall, color = faint)
+            }
+            if (onEdit != null) {
+                Text(
+                    "Change",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = text.copy(alpha = 0.75f),
+                    modifier = Modifier.clip(RoundedCornerShape(50)).border(1.dp, text.copy(alpha = 0.2f), RoundedCornerShape(50)).clickable(onClick = onEdit)
+                        .padding(horizontal = 12.dp, vertical = 7.dp),
+                )
+            }
+        }
+        Row(Modifier.fillMaxWidth().padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Figure("${Habits.strength(habit, marks, today)}%", "strength", text, faint, Modifier.weight(1f))
             Figure("${Habits.streak(habit, marks, today)}", "days in a row", text, faint, Modifier.weight(1f))
             Figure("${Habits.bestStreak(habit, marks, today)}", "best run", text, faint, Modifier.weight(1f))
@@ -259,46 +331,58 @@ fun HabitDetailContent(
                 Step("+", text) { onSet(picked, value + 1) }
             }
         }
-        Row(Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(LineIcons.KeyboardArrowLeft, contentDescription = "the month before", tint = faint, modifier = Modifier.clip(CircleShape).clickable { shown++ }.padding(4.dp))
+        Row(Modifier.fillMaxWidth().padding(top = 14.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(LineIcons.KeyboardArrowLeft, contentDescription = "the month before", tint = faint, modifier = Modifier.clip(CircleShape).clickable { shown++ }.padding(6.dp))
             Text(
                 DateTimeFormatter.ofPattern("MMMM yyyy", Locale.getDefault()).format(month),
                 style = MaterialTheme.typography.labelLarge,
                 color = text,
-                modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                modifier = Modifier.weight(1f),
             )
-            if (shown > 0) {
-                Icon(LineIcons.KeyboardArrowRight, contentDescription = "the month after", tint = faint, modifier = Modifier.clip(CircleShape).clickable { shown-- }.padding(4.dp))
+            Box(Modifier.size(36.dp), contentAlignment = Alignment.Center) {
+                if (shown > 0) Icon(LineIcons.KeyboardArrowRight, contentDescription = "the month after", tint = faint, modifier = Modifier.clip(CircleShape).clickable { shown-- }.padding(6.dp))
             }
         }
         MonthGrid(habit, marks, month, today, text, faint, accent, onSet, picked = picked.takeIf { habit.kind == HabitKind.COUNT }, onPick = { picked = it })
+        HabitLegend(text, faint, accent, Modifier.padding(top = 10.dp))
         Text(
-            if (habit.kind == HabitKind.YES_NO) "Tap a day to tick or untick it." else "Tap a day to change its count above.",
+            if (habit.kind == HabitKind.YES_NO) "Tap a day to tick or untick it" else "Tap a day to change its count above",
             style = MaterialTheme.typography.labelSmall,
             color = faint,
-            modifier = Modifier.padding(top = 6.dp),
+            modifier = Modifier.padding(top = 4.dp),
         )
-        if (onOpenAll != null) {
-            Text(
-                "All your habits",
-                style = MaterialTheme.typography.labelLarge,
-                color = accent,
-                modifier = Modifier.padding(top = 16.dp).clip(RoundedCornerShape(50)).border(1.dp, accent.copy(alpha = 0.5f), RoundedCornerShape(50))
-                    .clickable(onClick = onOpenAll).padding(horizontal = 16.dp, vertical = 10.dp),
-            )
-        }
-        if (onEdit != null) {
-            Text(
-                "Change it",
-                style = MaterialTheme.typography.labelLarge,
-                color = accent,
-                modifier = Modifier.padding(top = 12.dp).clip(RoundedCornerShape(8.dp)).clickable(onClick = onEdit).padding(vertical = 6.dp),
-            )
+        if (onYear != null || onOpenAll != null) {
+            Row(Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (onYear != null) SheetButton("The whole year ›", accent, Modifier.weight(1f), onYear, tinted = true)
+                if (onOpenAll != null) SheetButton("All your habits", text, Modifier.weight(1f), onOpenAll)
+            }
         }
     }
 }
 
-/** The month's days in weeks, Monday first; days to come are faint and can't be marked. */
+/** What a day's look means, as on the year page: done, part done, covered by how often, missed. */
+@Composable
+internal fun HabitLegend(text: Color, faint: Color, accent: Color, modifier: Modifier = Modifier) {
+    Row(modifier, horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
+        listOf(
+            Modifier.background(accent) to "done",
+            Modifier.background(accent.copy(alpha = 0.4f)) to "part done",
+            Modifier.border(1.5.dp, accent, CircleShape) to "covered",
+            Modifier.background(text.copy(alpha = 0.14f)) to "missed",
+        ).forEach { (look, label) ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(8.dp).clip(CircleShape).then(look))
+                Text(label, style = MaterialTheme.typography.labelSmall, color = faint, modifier = Modifier.padding(start = 5.dp))
+            }
+        }
+    }
+}
+
+/**
+ * The month's days in weeks, Monday first: done filled in the habit's colour, part done lighter,
+ * covered ringed, missed faintly shaded, today ringed apart; days to come faint and can't be marked.
+ */
 @Composable
 private fun MonthGrid(
     habit: Habit,
@@ -316,7 +400,7 @@ private fun MonthGrid(
     val first = month.atDay(1)
     val lead = first.dayOfWeek.value - 1
     val cells = List(lead) { null } + (1..month.lengthOfMonth()).map { first.withDayOfMonth(it).toEpochDay() }
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Row(Modifier.fillMaxWidth()) {
             listOf("M", "T", "W", "T", "F", "S", "S").forEach {
                 Text(it, style = MaterialTheme.typography.labelSmall, color = faint, modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
@@ -325,23 +409,13 @@ private fun MonthGrid(
         cells.chunked(7).forEach { week ->
             Row(Modifier.fillMaxWidth()) {
                 week.forEach { day ->
-                    Box(Modifier.weight(1f).height(32.dp), contentAlignment = Alignment.Center) {
+                    Box(Modifier.weight(1f).height(40.dp), contentAlignment = Alignment.Center) {
                         if (day != null) {
                             val ahead = day > today
                             val state = Habits.day(habit, marks, day)
                             Box(
                                 Modifier
-                                    .size(30.dp)
-                                    .clip(CircleShape)
-                                    .background(
-                                        when {
-                                            ahead -> Color.Transparent
-                                            state == HabitDay.DONE -> accent.copy(alpha = 0.38f)
-                                            state == HabitDay.PARTIAL -> accent.copy(alpha = 0.16f)
-                                            else -> Color.Transparent
-                                        },
-                                    )
-                                    .then(if (state == HabitDay.MET && !ahead) Modifier.border(1.5.dp, accent, CircleShape) else Modifier)
+                                    .size(36.dp)
                                     .then(
                                         when (day) {
                                             picked -> Modifier.border(2.dp, accent, CircleShape)
@@ -349,6 +423,18 @@ private fun MonthGrid(
                                             else -> Modifier
                                         },
                                     )
+                                    .padding(3.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        when {
+                                            ahead -> Color.Transparent
+                                            state == HabitDay.DONE -> accent
+                                            state == HabitDay.PARTIAL -> accent.copy(alpha = 0.4f)
+                                            state == HabitDay.MET -> Color.Transparent
+                                            else -> text.copy(alpha = 0.08f)
+                                        },
+                                    )
+                                    .then(if (state == HabitDay.MET && !ahead) Modifier.border(1.5.dp, accent, CircleShape) else Modifier)
                                     // A tick habit's day ticks; a count's is picked, to change it above.
                                     .clickable(enabled = !ahead) {
                                         if (habit.kind == HabitKind.COUNT) onPick(day) else onSet(day, Habits.tapped(habit, marks[day] ?: 0))
@@ -360,6 +446,7 @@ private fun MonthGrid(
                                     style = MaterialTheme.typography.labelMedium,
                                     color = when {
                                         ahead -> faint.copy(alpha = 0.5f)
+                                        state == HabitDay.DONE -> background(accent)
                                         else -> text
                                     },
                                 )
@@ -379,7 +466,7 @@ private fun background(accent: Color): Color =
 
 @Composable
 private fun Figure(value: String, label: String, text: Color, faint: Color, modifier: Modifier) {
-    Column(modifier) {
+    Column(modifier.clip(RoundedCornerShape(14.dp)).background(text.copy(alpha = 0.06f)).padding(horizontal = 12.dp, vertical = 10.dp)) {
         Text(value, style = MaterialTheme.typography.titleLarge, color = text)
         Text(label, style = MaterialTheme.typography.labelSmall, color = faint)
     }

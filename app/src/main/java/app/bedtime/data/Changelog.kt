@@ -13,6 +13,17 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            106,
+            "0.9.60",
+            listOf(
+                "Notes: delete from a note's menu, sort by your order, last edited or created, and in cards, hold and drag one to move it.",
+                "Habits: a whole year for each habit, with the share of your goal, month by month, its strength through the year, and its runs. From the widget, a habit and a set's steps open as sheets.",
+                "The dots and the budget line open the same sheet: today's time, the day hour by hour, and the apps used most, with more a tap away.",
+                "The weather sheet shows the rain in a line, the weather now, the next hours to scroll through, and the next days.",
+                "Insights: the hours are easier to read, with a dot for unlocks and an hour's numbers a tap away. A day or a month tapped opens as a sheet.",
+            ),
+        ),
+        ChangelogEntry(
             105,
             "0.9.59",
             listOf(

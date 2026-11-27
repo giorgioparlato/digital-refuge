@@ -7,7 +7,7 @@ import kotlin.math.roundToInt
 
 /** One coming day's forecast: its sky (an OpenWeatherMap code) and its low and high, in kelvin. */
 @Serializable
-data class WeatherDay(val code: Int? = null, val low: Double? = null, val high: Double? = null)
+data class WeatherDay(val code: Int? = null, val low: Double? = null, val high: Double? = null, val rainChance: Int? = null)
 
 /**
  * The weather as Breezy Weather last sent it: now (kelvin, its words for the sky and their code),
@@ -28,14 +28,17 @@ data class WeatherNow(
     val rainChance: Int? = null,
     /** The chance of rain hour by hour, from the hour it was sent, when Breezy says. */
     val rainHours: List<RainHour> = emptyList(),
+    /** Today's sunrise and sunset, epoch millis, when Breezy says. */
+    val sunrise: Long? = null,
+    val sunset: Long? = null,
 )
 
 /** One hour's chance of rain: the hour's start (epoch millis), the chance in percent, and its temperature (kelvin) when Breezy sends it. */
 @Serializable
-data class RainHour(val at: Long, val chance: Int, val kelvin: Double? = null)
+data class RainHour(val at: Long, val chance: Int, val kelvin: Double? = null, val code: Int? = null)
 
 /** An hour as the rain sheet shows it: its hour of day, the chance of rain, and the temperature in your unit, if known. */
-data class HourRain(val hour: Int, val chance: Int, val degrees: Int? = null)
+data class HourRain(val hour: Int, val chance: Int, val degrees: Int? = null, val icon: WeatherIcon? = null)
 
 /**
  * How much weather to show: today's low and high; three days with their skies; or five days, on a
@@ -83,13 +86,16 @@ private data class WeatherSpec(
     /** Percent; a number, read leniently, as apps send it as whole or not. */
     val precipProbability: Double? = null,
     val hourly: List<HourlySpec> = emptyList(),
+    /** Epoch seconds. */
+    val sunRise: Long? = null,
+    val sunSet: Long? = null,
 )
 
 @Serializable
-private data class HourlySpec(val timestamp: Long? = null, val precipProbability: Double? = null, val temp: Double? = null)
+private data class HourlySpec(val timestamp: Long? = null, val precipProbability: Double? = null, val temp: Double? = null, val conditionCode: Int? = null)
 
 @Serializable
-private data class ForecastSpec(val conditionCode: Int? = null, val minTemp: Double? = null, val maxTemp: Double? = null)
+private data class ForecastSpec(val conditionCode: Int? = null, val minTemp: Double? = null, val maxTemp: Double? = null, val precipProbability: Double? = null)
 
 /**
  * Weather from Breezy Weather, which sends it to apps you tick under "Send Gadgetbridge data". The app
@@ -143,23 +149,49 @@ object Weather {
             rainChance = spec.precipProbability?.roundToInt()?.takeIf { it in 0..100 },
             rainHours = spec.hourly.take(48).mapNotNull { h ->
                 val at = h.timestamp?.takeIf { it > 0 } ?: return@mapNotNull null
-                h.precipProbability?.roundToInt()?.takeIf { it in 0..100 }?.let { RainHour(at * 1000, it, h.temp?.takeIf { t -> t in 180.0..335.0 }) }
+                h.precipProbability?.roundToInt()?.takeIf { it in 0..100 }?.let { RainHour(at * 1000, it, h.temp?.takeIf { t -> t in 180.0..335.0 }, h.conditionCode) }
             },
-            days = spec.forecasts.take(4).map { WeatherDay(it.conditionCode, it.minTemp?.takeIf { t -> t in 180.0..335.0 }, it.maxTemp?.takeIf { t -> t in 180.0..335.0 }) },
+            days = spec.forecasts.take(4).map {
+                WeatherDay(it.conditionCode, it.minTemp?.takeIf { t -> t in 180.0..335.0 }, it.maxTemp?.takeIf { t -> t in 180.0..335.0 }, it.precipProbability?.roundToInt()?.takeIf { c -> c in 0..100 })
+            },
+            sunrise = spec.sunRise?.takeIf { it > 0 }?.let { it * 1000 },
+            sunset = spec.sunSet?.takeIf { it > 0 }?.let { it * 1000 },
         )
     }
 
     /**
-     * The chance of rain hour by hour, from the hour [now] is in to the end of the day; late in the
-     * evening, on into the night, so there are always a few hours to see. Each with its hour of day.
+     * The chance of rain hour by hour, from the hour [now] is in, for the next [count] hours: on into the
+     * night and tomorrow morning, to scroll through. Each with its hour of day, temperature and sky.
      */
-    fun rainByHour(hours: List<RainHour>, now: Long, zone: java.time.ZoneId, fahrenheit: Boolean = false): List<HourRain> {
+    fun rainByHour(hours: List<RainHour>, now: Long, zone: java.time.ZoneId, fahrenheit: Boolean = false, count: Int = 24): List<HourRain> {
         val start = java.time.Instant.ofEpochMilli(now).atZone(zone).withMinute(0).withSecond(0).withNano(0)
-        val endOfDay = start.toLocalDate().plusDays(1).atStartOfDay(zone)
-        val end = maxOf(endOfDay, start.plusHours(6))
+        val end = start.plusHours(count.toLong())
         return hours.filter { it.at >= start.toInstant().toEpochMilli() && it.at < end.toInstant().toEpochMilli() }
             .sortedBy { it.at }
-            .map { HourRain(java.time.Instant.ofEpochMilli(it.at).atZone(zone).hour, it.chance, it.kelvin?.let { k -> degrees(k, fahrenheit) }) }
+            .map { HourRain(java.time.Instant.ofEpochMilli(it.at).atZone(zone).hour, it.chance, it.kelvin?.let { k -> degrees(k, fahrenheit) }, icon(it.code)) }
+    }
+
+    /**
+     * The rain in a line: "rain from 19:00, the most at 20:00 (80%)", "rain around 20:00 (80%)" or "no
+     * rain likely in the next hours"; then tomorrow's: "dry tomorrow", "maybe rain tomorrow (40%)" or
+     * "rain likely tomorrow (70%)". An hour or a day counts as rainy from [likely] percent.
+     */
+    fun rainWords(hours: List<HourRain>, tomorrow: Int?, time: (Int) -> String, likely: Int = 50): String {
+        val wet = hours.filter { it.chance >= likely }
+        val soon = if (wet.isEmpty()) {
+            "no rain likely in the next hours"
+        } else {
+            val peak = wet.maxBy { it.chance }
+            if (wet.first() == peak) "rain around ${time(peak.hour)} (${peak.chance}%)" else "rain from ${time(wet.first().hour)}, the most at ${time(peak.hour)} (${peak.chance}%)"
+        }
+        val next = tomorrow?.let {
+            when {
+                it >= likely -> "rain likely tomorrow ($it%)"
+                it >= 20 -> "maybe rain tomorrow ($it%)"
+                else -> "dry tomorrow"
+            }
+        }
+        return listOfNotNull(soon, next).joinToString(" · ")
     }
 
     /** The sky for an OpenWeatherMap condition code, as Gadgetbridge passes them on; else read from its words. */
@@ -185,7 +217,7 @@ object Weather {
         }
     }
 
-    private fun degrees(kelvin: Double, fahrenheit: Boolean): Int {
+    fun degrees(kelvin: Double, fahrenheit: Boolean): Int {
         val celsius = kelvin - 273.15
         return (if (fahrenheit) celsius * 9 / 5 + 32 else celsius).roundToInt()
     }

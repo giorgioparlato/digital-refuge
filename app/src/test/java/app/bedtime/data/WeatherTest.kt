@@ -115,9 +115,31 @@ class WeatherTest {
         val zone = java.time.ZoneOffset.UTC
         fun at(day: Int, hour: Int) = java.time.LocalDateTime.of(2026, 11, day, hour, 0).toInstant(zone).toEpochMilli()
         val hours = (0..47).map { RainHour(at(2 + it / 24, it % 24), it) }
-        // From the hour now, to midnight.
-        assertEquals((14..23).map { it to it }, Weather.rainByHour(hours, at(2, 14) + 25 * 60_000, zone).map { it.hour to it.chance })
-        // Late in the evening, at least six hours ahead.
-        assertEquals(listOf(22 to 22, 23 to 23, 0 to 24, 1 to 25, 2 to 26, 3 to 27), Weather.rainByHour(hours, at(2, 22), zone).map { it.hour to it.chance })
+        // From the hour now, the next 24 hours: on into tomorrow.
+        assertEquals((14..37).map { it % 24 to it }, Weather.rainByHour(hours, at(2, 14) + 25 * 60_000, zone).map { it.hour to it.chance })
+        // Late in the evening, as many as there are, to the end of what was sent.
+        assertEquals((22..45).map { it % 24 to it }, Weather.rainByHour(hours, at(2, 22), zone).map { it.hour to it.chance })
+    }
+
+    @Test
+    fun theRainInALine() {
+        val time = { h: Int -> "%02d:00".format(h) }
+        val evening = listOf(17 to 20, 18 to 55, 19 to 80, 20 to 70, 21 to 40).map { (h, c) -> HourRain(h, c) }
+        assertEquals("rain from 18:00, the most at 19:00 (80%) · dry tomorrow", Weather.rainWords(evening, tomorrow = 10, time = time))
+        assertEquals("rain around 19:00 (80%) · rain likely tomorrow (70%)", Weather.rainWords(evening.drop(2), tomorrow = 70, time = time))
+        assertEquals("no rain likely in the next hours · maybe rain tomorrow (40%)", Weather.rainWords(listOf(HourRain(9, 10)), tomorrow = 40, time = time))
+        assertEquals("no rain likely in the next hours", Weather.rainWords(emptyList(), tomorrow = null, time = time))
+    }
+
+    @Test
+    fun eachHoursSkyTheSunAndEachDaysRainAreRead() {
+        val json = """{"timestamp":1761800000,"currentTemp":285.4,"sunRise":1761795000,"sunSet":1761830000,""" +
+            """"hourly":[{"timestamp":1761800400,"precipProbability":70,"temp":281.15,"conditionCode":500}],""" +
+            """"forecasts":[{"conditionCode":800,"minTemp":275.0,"maxTemp":283.0,"precipProbability":30}]}"""
+        val w = Weather.parse(json, receivedAt = 1_761_800_100_000L)!!
+        assertEquals(1_761_795_000_000L, w.sunrise)
+        assertEquals(1_761_830_000_000L, w.sunset)
+        assertEquals(30, w.days.first().rainChance)
+        assertEquals(WeatherIcon.RAIN, Weather.rainByHour(w.rainHours, 1_761_800_400_000L, java.time.ZoneOffset.UTC).first().icon)
     }
 }

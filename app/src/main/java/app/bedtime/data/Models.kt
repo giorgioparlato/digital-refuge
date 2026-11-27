@@ -789,6 +789,8 @@ data class AppSettings(
     val notesTab: Boolean = false,
     /** How the notes page shows them; a list until you choose otherwise. */
     val notesView: NotesView = NotesView.LIST,
+    /** The notes in your own order (kept as you drag them, whatever else you sort by meanwhile), or newest first by edit or by creation. */
+    val notesSort: NotesSort = NotesSort.CUSTOM,
     /** Insights' habits and moods sections, for those who use them. */
     val insightsSessions: Boolean = true,
     val insightsHabits: Boolean = true,

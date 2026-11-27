@@ -484,10 +484,6 @@ private fun LockScreen(
     if (rainOpen) {
         app.bedtime.ui.minimal.RainDialog(lockStyle, onDismiss = { rainOpen = false }, onOpenApp = breezy?.let { app -> { rainOpen = false; onOpenApp(app) } })
     }
-    var appsDetail by remember { mutableStateOf(false) }
-    if (appsDetail) {
-        app.bedtime.ui.components.UseAppsDialog(useToday, lockStyle, onDismiss = { appsDetail = false }, onStats = { onOpenRoute(app.bedtime.Routes.STATS) })
-    }
     if (hoursDetail) {
         val p = lockStyle.palette()
         HourDetailDialog(todayHours, HourlyUse.rule(settings), p.background, p.text, p.faint, p.accent, distracted = lockStyle.hourDistractedColor?.let { androidx.compose.ui.graphics.Color(it) }, onDismiss = { hoursDetail = false }, onStats = {
@@ -651,7 +647,8 @@ private fun LockScreen(
         onCalendar = { scope.launch { week = loadCalendarWeek(context, LocalDateTime.now()) } },
         // The distraction tracker's tap: today's detail right here, as at home; only the statistics ask for the unlock.
         // The dots open today by the hour; the other looks, today by app.
-        onHours = { if (style.useWidgetFor(Screen.LOCK).look == app.bedtime.data.UseLook.DOTS) hoursDetail = true else appsDetail = true },
+        // The dots and every other look open the same: the day, hour by hour, and the apps used most.
+        onHours = { hoursDetail = true },
         weather = rememberWeather(style, now, Screen.LOCK),
         // A tap: today's rain right here; held, the widget's options and the weather app, once unlocked.
         onWeather = { rainOpen = true },
