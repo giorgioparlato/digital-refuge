@@ -189,6 +189,11 @@ The steps for more use the same rows as a block's steps: see the editor in focus
 - type this first · the … time today
 - type this first
 - Never mind
+- this limit
+- {name} · … a day
+- {used} of {opens} today
+- … of {b} today
+- {a} of {b} today
 - breathe in
 - breathe out
 - the … time today
@@ -196,7 +201,7 @@ The steps for more use the same rows as a block's steps: see the editor in focus
 - Is this what you came to the phone for?
 - Open {appLabel}
 - Open {appLabel} in a moment
-- this limit
+- {label} is done for today
 - the rest of today
 - This lifts {name} for the rest of today.
 - This gives you one more open today.
@@ -207,6 +212,7 @@ The steps for more use the same rows as a block's steps: see the editor in focus
 - 1 open
 - {dailyOpens} opens
 - {limitName} · {allowance} a day
+- {dailyOpens} of {dailyOpens} today
 - {appLabel} is done for today
 - That was today's {allowance}. It'll be back tomorrow.
 - That was today's {allowance}. If it really can't wait, you can lift the limit for the rest of today.
@@ -226,8 +232,10 @@ The steps for more use the same rows as a block's steps: see the editor in focus
 
 <sub>[NudgeActivity.kt](../../app/src/main/java/app/bedtime/ui/blocked/NudgeActivity.kt)</sub>
 
-- {minutes} minutes in a row
 - A moment to look up
-- You've been on your phone for {minutes} minutes without a break. Is this still what you meant to do?
+- since {since}
+- {minutes} minutes in a row
+- You've been on your phone for {minutes} minutes without a break.
+- Is this still what you meant to do?
 - Lock the phone
 - Keep going

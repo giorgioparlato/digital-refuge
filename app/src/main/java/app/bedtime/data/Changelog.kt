@@ -13,6 +13,18 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            108,
+            "0.9.62",
+            listOf(
+                "Every cover has one frame: where you are and how far along at the top, a ring, the words, and the way on at the foot. A session's covers have a faint green light at the top; a limit's are plain.",
+                "The pause before opening shows how much of the limit is gone, with a ring around the breathing circle. \"The 4th time today\" is plain text after a small dot.",
+                "Typing to open an app or to unlock happens in one box: type over the passage, and the letters turn from faint to cream. The wait shows the time left small, inside the ring.",
+                "Covers that send you home offer a line in the microjournal instead. When an emergency break ends, the full screen says so, and can ask how you feel on the same screen.",
+                "Asking why, \"not now\" is the main button. Each mood has a colour, green, cream, tan or rose: a new mood asks for one, and in settings a tap on a mood's dot changes it.",
+                "Page titles are set in Literata. Section labels are muted, so green is left for what you can tap. The insights heatmap runs from green through cream to clay rose.",
+            ),
+        ),
+        ChangelogEntry(
             107,
             "0.9.61",
             listOf(

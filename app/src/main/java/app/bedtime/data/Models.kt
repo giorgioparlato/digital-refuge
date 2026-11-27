@@ -761,8 +761,8 @@ data class AppSettings(
     val lookBackPutAway: Long = 0L,
     /** The dictionary looked in when you have several, by name; null for all of them. */
     val lookUpDictionary: String? = null,
-    /** The microjournal in refuge notes, and in the quick note: only once you switch it on. */
-    val journalOn: Boolean = false,
+    /** The microjournal in refuge notes, and in the quick note: on to start with (new installs), off if you'd rather. */
+    val journalOn: Boolean = true,
     /** Your journalling sections; null until you change one, so the suggested ones ([Journal.SUGGESTED]). */
     val journalSections: List<JournalSection>? = null,
     /** "How do you feel now?" after this many minutes on the phone in one go; 0 never. Schedules and limits have their own. */
@@ -815,6 +815,8 @@ data class AppSettings(
     /** Moods to tap when answering and in the microjournal, for the mood tracker; null keeps the suggested ones. */
     val moodsOn: Boolean = true,
     val moodTags: List<String>? = null,
+    /** Each mood's colour, one of [Why.TONES], picked when the mood is made; moods not in it take [Why.toneOf]'s. */
+    val moodColours: Map<String, String>? = null,
     /**
      * Every session covers Android's screens that switch blocking off, and takes over the screen if
      * blocking is switched off anyway. Null until set here: before, each schedule had its own.

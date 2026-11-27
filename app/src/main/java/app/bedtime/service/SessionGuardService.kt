@@ -168,8 +168,19 @@ class SessionGuardService : Service() {
             !BlockingState.isOnBreak() &&
             !BlockingState.isOverlaySuppressed()
         if (takeover) {
-            val schedule = current.active.maxByOrNull { it.end }?.schedule
-            TakeoverOverlay.show(this, schedule?.name ?: "your session", schedule?.breakMinutes ?: 1, schedule?.pauseEnabled == true)
+            val occurrence = current.active.maxByOrNull { it.end }
+            val schedule = occurrence?.schedule
+            TakeoverOverlay.show(
+                this,
+                schedule?.name ?: "your session",
+                schedule?.breakMinutes ?: 1,
+                schedule?.pauseEnabled == true,
+                start = occurrence?.start ?: 0L,
+                end = occurrence?.end ?: 0L,
+                // A break was taken and blocking hasn't come back on since: the break has run out.
+                afterBreak = BlockingState.breakEndsAt() > 0L,
+                askMood = schedule?.moodAfterUnlock == true,
+            )
         } else {
             TakeoverOverlay.hide(this)
         }

@@ -27,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.lifecycleScope
 import app.bedtime.data.Repository
 import app.bedtime.data.Why
@@ -49,12 +50,15 @@ class MoodAfterActivity : ComponentActivity() {
         val what = intent.getStringExtra(EXTRA_WHAT).orEmpty()
         val repo = Repository.get(this)
         lifecycleScope.launch {
-            val moods = Why.moods(repo.settings.first())
+            val settings = repo.settings.first()
+            val moods = Why.moods(settings)
             if (moods.isEmpty()) return@launch finish()
             setContent {
                 BedtimeTheme {
                     val c = Obsidian.colors
                     var picked by remember { mutableStateOf(emptyList<String>()) }
+                    // Moods of your own made here, with their colours, until settings carry them.
+                    var added by remember { mutableStateOf(emptyMap<String, String>()) }
                     Box(
                         Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.4f)).clickable(onClickLabel = "skip") { finish() }.safeDrawingPadding(),
                         contentAlignment = Alignment.BottomCenter,
@@ -70,9 +74,18 @@ class MoodAfterActivity : ComponentActivity() {
                             verticalArrangement = Arrangement.spacedBy(14.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
-                            Text("How do you feel now?", style = MaterialTheme.typography.titleMedium, color = c.textNormal)
+                            Text("How do you feel now?", fontSize = 22.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Light, color = c.textNormal)
                             if (what.isNotEmpty()) Text(what, style = MaterialTheme.typography.bodyMedium, color = c.textMuted)
-                            MoodChips(moods, picked) { mood -> picked = if (mood in picked) picked - mood else picked + mood }
+                            MoodChips(
+                                (moods + picked).distinct(),
+                                picked,
+                                toneOf = { added[it] ?: Why.toneOf(settings, it) },
+                                onAdd = { mood, tone ->
+                                    added = added + (mood to tone)
+                                    if (mood !in picked) picked = picked + mood
+                                    lifecycleScope.launch { repo.addMoodTag(mood, tone) }
+                                },
+                            ) { mood -> picked = if (mood in picked) picked - mood else picked + mood }
                             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                                 Text(
                                     "Skip",

@@ -34,6 +34,7 @@ import app.bedtime.ui.formatTime
 import app.bedtime.ui.theme.BedtimeTheme
 import app.bedtime.ui.theme.Obsidian
 import app.bedtime.unlock.UnlockFlow
+import kotlinx.coroutines.launch
 
 /** Full-screen cover shown on top of a blocked app. */
 class BlockedActivity : ComponentActivity() {
@@ -155,6 +156,7 @@ private fun BlockedScreen(pkg: String?, guardingSettings: Boolean, onHome: () ->
     // Guarding Settings, the session to leave is the longest-running one; otherwise, whichever blocks this app.
     val blocker = if (guardingSettings) state?.active?.maxByOrNull { it.end } else pkg?.let { state?.blockerOf(it) }
     var unlocking by rememberSaveable { mutableStateOf(false) }
+    var writing by rememberSaveable { mutableStateOf(false) }
     val appLabel = remember(pkg) { pkg?.let { AppCatalog.label(context, it) }.orEmpty() }
     val settings by Repository.get(context).settings.collectAsStateWithLifecycle(initialValue = null)
     // Drawn once each time the cover comes up, so "a different one each time" doesn't change as you read.
@@ -170,7 +172,10 @@ private fun BlockedScreen(pkg: String?, guardingSettings: Boolean, onHome: () ->
 
     Surface(Modifier.fillMaxSize(), color = c.bgPrimary) {
         if (blocker == null) return@Surface
-        if (unlocking) {
+        val progress = sessionProgress(blocker.start, blocker.end)
+        if (writing) {
+            CoverJournalLine(about = "$appLabel can wait", onKept = onHome, onBack = { writing = false })
+        } else if (unlocking) {
             // Keyed so a second blocking schedule gets a fresh flow instead of this one's finished state.
             key(blocker.schedule.id) {
                 UnlockFlow(
@@ -188,6 +193,7 @@ private fun BlockedScreen(pkg: String?, guardingSettings: Boolean, onHome: () ->
                 scheduleName = blocker.schedule.name,
                 until = formatTime(context, blocker.end),
                 breakMinutes = blocker.schedule.breakMinutes,
+                progress = progress,
                 onPause = if (blocker.schedule.pauseEnabled) {
                     { if (BlockingState.pause(blocker.schedule.breakMinutes)) onFinish() }
                 } else {
@@ -204,9 +210,39 @@ private fun BlockedScreen(pkg: String?, guardingSettings: Boolean, onHome: () ->
                 onHome = onHome,
                 onUnlock = { unlocking = true },
                 message = message,
+                progress = progress,
+                onWrite = { writing = true },
             )
         }
     }
+}
+
+/** How far a session from [start] to [end] has come, now: 0 to 1. */
+internal fun sessionProgress(start: Long, end: Long, now: Long = System.currentTimeMillis()): Float =
+    if (end <= start) 0f else ((now - start).toFloat() / (end - start)).coerceIn(0f, 1f)
+
+/** A line for today's microjournal, written from a cover instead of the app: kept, then home; or back to the cover. */
+@Composable
+internal fun CoverJournalLine(about: String, onKept: () -> Unit, onBack: () -> Unit) {
+    val context = LocalContext.current
+    val repo = remember { Repository.get(context) }
+    val settings by repo.settings.collectAsStateWithLifecycle(initialValue = null)
+    val loaded = settings ?: return
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    WhyScreen(
+        question = "A line for today",
+        about = about,
+        moods = app.bedtime.data.Why.moods(loaded),
+        toneOf = { app.bedtime.data.Why.toneOf(loaded, it) },
+        keeping = true,
+        onPutDown = { _, _ -> onBack() },
+        onGoOn = { words, moods ->
+            scope.launch {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) { repo.addJournalLine(words.trim(), moods) }
+                onKept()
+            }
+        },
+    )
 }
 
 @Composable
@@ -217,14 +253,20 @@ internal fun BlockedContent(
     onHome: () -> Unit,
     onUnlock: () -> Unit,
     message: String? = null,
+    /** How far the session has come, for the line at the top and the ring. */
+    progress: Float = 0f,
+    /** Something to do instead: a line in the microjournal, while it's on. */
+    onWrite: (() -> Unit)? = null,
 ) {
+    val c = Obsidian.colors
     CoverLayout(
-        emblem = { CoverEmblem(BedtimeIcons.Moon) },
-        pill = "$scheduleName is on",
+        where = CoverWhere("$scheduleName is on", "until $until", progress, session = true),
+        emblem = { CoverRing(BedtimeIcons.Moon, progress, c.accentText) },
         title = "$appLabel can wait",
         // With words of its own, the cover says only when; the words say the rest.
         body = if (message == null) "You'll have it back at $until. Until then, maybe put the phone down for a bit." else "You'll have it back at $until.",
         message = message,
+        extra = onWrite?.let { write -> { InsteadRow(write) } },
         primary = CoverAction("Go to home screen", onHome),
         secondary = listOf(CoverAction("I really need it", onUnlock)),
     )
@@ -239,21 +281,18 @@ internal fun SettingsGuardContent(
     onPause: (() -> Unit)?,
     onUnlock: () -> Unit,
     onBack: () -> Unit,
+    progress: Float = 0f,
 ) {
+    val c = Obsidian.colors
     val minutes = "$breakMinutes ${if (breakMinutes == 1) "minute" else "minutes"}"
-    val end = CoverAction("End $scheduleName early", onUnlock)
+    // Going back is the main way on; the two ways out sit quietly under it.
     CoverLayout(
-        emblem = { CoverEmblem(BedtimeIcons.Refuge) },
-        pill = "$scheduleName is on",
+        where = CoverWhere("$scheduleName is on", "until $until", progress, session = true),
+        emblem = { CoverRing(app.bedtime.ui.components.LineIcons.Lock, progress, c.accentText) },
         title = "This stays locked until $until",
-        body = if (onPause != null) {
-            "Switching blocking off and uninstalling are locked while $scheduleName runs. If something truly can't " +
-                "wait, take an emergency break; otherwise end the session with the unlock steps."
-        } else {
-            "Switching blocking off and uninstalling are locked while $scheduleName runs. To do either, end the session " +
-                "first — the unlock steps still work."
-        },
-        primary = if (onPause != null) CoverAction("Pause blocking for $minutes", onPause) else end,
-        secondary = listOfNotNull(end.takeIf { onPause != null }, CoverAction("Go back", onBack)),
+        body = "Switching blocking off and uninstalling are locked while $scheduleName runs.",
+        question = if (onPause != null) "If something truly can't wait, take an emergency break." else "To do either, end the session first. The unlock steps still work.",
+        primary = CoverAction("Go back", onBack),
+        secondary = listOfNotNull(onPause?.let { CoverAction("Pause blocking for $minutes", it) }, CoverAction("End $scheduleName early", onUnlock)),
     )
 }

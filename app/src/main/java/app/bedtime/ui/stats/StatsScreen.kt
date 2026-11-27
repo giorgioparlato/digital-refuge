@@ -174,7 +174,7 @@ fun StatsScreen(onBack: (() -> Unit)?, initialSection: Int = 0, onOpen: (String)
         onOpen = onOpen,
         moods = settings?.takeIf { it.moodsOn && it.insightsMoods }?.let { s ->
             {
-                MoodStats(journal, app.bedtime.data.Why.moods(s), java.time.LocalDate.now(), onDay = { day -> onOpen(app.bedtime.Routes.journalDay(day.toEpochDay())) }, onMoods = { onOpen(app.bedtime.Routes.MOODS) }, days = use.days, habits = habits, habitMarks = habitMarks)
+                MoodStats(journal, app.bedtime.data.Why.moods(s), java.time.LocalDate.now(), onDay = { day -> onOpen(app.bedtime.Routes.journalDay(day.toEpochDay())) }, onMoods = { onOpen(app.bedtime.Routes.MOODS) }, days = use.days, habits = habits, habitMarks = habitMarks, toneOf = { app.bedtime.data.Why.toneOf(s, it) })
             }
         },
         habits = if (settings?.insightsHabits == false) null else ({

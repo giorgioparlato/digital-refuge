@@ -459,9 +459,10 @@ private fun HoursLine(whose: String, hours: List<Int>) {
  * so the reddest is always the worst there was. Mixed in Oklab, so the steps between look even.
  */
 internal object HeatColours {
-    private val GREEN = Color(0xFF5FA87E)
-    private val CREAM = Color(0xFFF2E6C9)
-    private val RED = Color(0xFFD7263D)
+    // The app's own sage, cream and clay rose, so the worst day is the colour distracting time always is.
+    private val GREEN = Color(0xFF58A87C)
+    private val CREAM = Color(0xFFD7C0A3)
+    private val RED = Color(0xFFD9826F)
 
     /** [seconds] on the month's scale: [budget] at cream, [most] (the month's worst) at red; red only past the budget. */
     fun at(seconds: Long, budget: Long, most: Long): Color {

@@ -73,4 +73,21 @@ class WhyTest {
         assertFalse(Why.typed("", "I want to check my mail and see what's new"))
         assertFalse(Why.typed("so ", "so here is a whole pasted line of words"))
     }
+
+    @Test
+    fun eachMoodHasOneOfTheFourColours() {
+        val plain = AppSettings()
+        // The suggested moods start with a colour each; one of your own without a pick is cream.
+        assertEquals("sage", Why.toneOf(plain, "happy"))
+        assertEquals("rose", Why.toneOf(plain, "anxious"))
+        assertEquals("tan", Why.toneOf(plain, "bored"))
+        assertEquals("cream", Why.toneOf(plain, "restless"))
+        // A pick wins, and one that isn't among the four is ignored.
+        val picked = plain.copy(moodColours = mapOf("restless" to "rose", "happy" to "tan", "calm" to "purple"))
+        assertEquals("rose", Why.toneOf(picked, "restless"))
+        assertEquals("tan", Why.toneOf(picked, "happy"))
+        assertEquals("cream", Why.toneOf(picked, "calm"))
+        // Every suggested mood has one of the four.
+        Why.MOODS.forEach { assertTrue(Why.toneOf(plain, it) in Why.TONES) }
+    }
 }

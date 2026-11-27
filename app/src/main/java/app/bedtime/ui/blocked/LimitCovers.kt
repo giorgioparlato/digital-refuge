@@ -12,6 +12,14 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
+import app.bedtime.ui.components.ProgressRing
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.TextButton
@@ -81,6 +89,7 @@ internal fun PauseScreen(
             question = question,
             about = "About to open $label",
             moods = app.bedtime.data.Why.moods(loaded),
+            toneOf = { app.bedtime.data.Why.toneOf(loaded, it) },
             minWords = askWords,
             onPutDown = { words, moods ->
                 keep(words, moods, false)
@@ -95,14 +104,19 @@ internal fun PauseScreen(
         )
         return
     }
-    // The words of the limit whose pause this is: the one asking the longest, as the pause itself is.
+    // The limit whose pause this is: the one asking the longest, as the pause itself is.
+    val usage by Repository.get(context).usage.collectAsStateWithLifecycle(initialValue = null)
+    val today = LocalDate.now().toEpochDay()
+    val limit = settings?.let { loaded ->
+        Limits.covering(loaded.limits, pkg, today).filter { (it.rules.pauseSeconds ?: 0) > 0 }.maxByOrNull { it.rules.pauseSeconds ?: 0 }
+    }
+    // Its words, drawn once as the pause comes up.
     val message = remember(pkg, opens, settings == null) {
         val loaded = settings ?: return@remember null
-        Limits.covering(loaded.limits, pkg, LocalDate.now().toEpochDay())
-            .filter { (it.rules.pauseSeconds ?: 0) > 0 }
-            .maxByOrNull { it.rules.pauseSeconds ?: 0 }
-            ?.let { CoverMessages.pick(it.message, CoverMessages.all(loaded)) }
+        limit?.let { CoverMessages.pick(it.message, CoverMessages.all(loaded)) }
     }
+    // How much of the limit is gone today, at the top.
+    val where = limit?.let { limitWhere(it, pkg, usage?.lastOrNull { d -> d.day == today } ?: UsageDay(today)) }
     var left by rememberSaveable(pkg, opens) { mutableIntStateOf(if (typing > 0) 0 else seconds) }
     var typed by rememberSaveable(pkg, opens) { mutableStateOf(typing <= 0) }
     LaunchedEffect(pkg, opens) {
@@ -113,25 +127,33 @@ internal fun PauseScreen(
     }
     // Typing first, when the limit asks for it; the way to open appears once it's done.
     if (!typed) {
+        val c = Obsidian.colors
         Column(
-            Modifier.fillMaxSize().background(Obsidian.colors.bgPrimary).safeDrawingPadding().imePadding().padding(horizontal = 24.dp, vertical = 16.dp),
+            Modifier.fillMaxSize().background(c.bgPrimary).safeDrawingPadding().imePadding().padding(horizontal = 28.dp, vertical = 24.dp),
         ) {
-            Text("About to open $label", style = MaterialTheme.typography.titleLarge, color = Obsidian.colors.textNormal)
-            Text(
-                if (opens > 1) "type this first · the ${ordinal(opens)} time today" else "type this first",
-                style = MaterialTheme.typography.bodyMedium,
-                color = Obsidian.colors.textMuted,
-                modifier = Modifier.padding(top = 4.dp, bottom = 16.dp),
-            )
-            TypingChallenge(length = typing, source = source, onPassed = { typed = true })
-            Spacer(Modifier.weight(1f))
-            TextButton(onClick = onHome, modifier = Modifier.align(Alignment.CenterHorizontally)) { Text("Never mind", color = Obsidian.colors.textMuted) }
+            where?.let {
+                CoverWhereLine(it)
+                Spacer(Modifier.height(24.dp))
+            }
+            Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+                if (opens > 1) CoverCount("type this first · the ${ordinal(opens)} time today")
+                else Text("type this first", style = MaterialTheme.typography.bodySmall, color = c.textMuted)
+                Spacer(Modifier.height(10.dp))
+                Text("About to open $label", fontSize = 26.sp, fontWeight = FontWeight.Light, color = c.textNormal)
+                Spacer(Modifier.height(18.dp))
+                TypingChallenge(length = typing, source = source, onPassed = { typed = true })
+            }
+            // Never mind as a whole button above the keyboard, not small print under the box.
+            Spacer(Modifier.height(12.dp))
+            PlainPillButton("Never mind", onClick = onHome)
         }
         return
     }
     PauseContent(
         appLabel = label,
         secondsLeft = left,
+        totalSeconds = seconds,
+        where = where,
         opens = opens,
         onOpen = {
             LimitPasses.grant(passKey, System.currentTimeMillis())
@@ -155,29 +177,78 @@ private fun ordinal(n: Int): String {
     return "$n$suffix"
 }
 
+/**
+ * How much of [limit] is gone today, for the line at the top of its covers: its minutes, else its
+ * opens; with neither, just its name.
+ */
+internal fun limitWhere(limit: AppLimit, pkg: String, day: UsageDay): CoverWhere {
+    val name = limit.name.ifBlank { "this limit" }
+    val minutes = limit.rules.dailyMinutes
+    val opens = limit.rules.dailyOpens
+    return when {
+        minutes != null && minutes > 0 -> {
+            val budget = minutes * 60L
+            val used = (budget - (Limits.secondsLeft(limit, pkg, day) ?: budget)).coerceIn(0L, budget)
+            CoverWhere("$name · ${formatMinutes(minutes.toLong())} a day", usedOf(used / 60, minutes.toLong()), used.toFloat() / budget, distracting = true)
+        }
+        opens != null && opens > 0 -> {
+            val used = (opens - (Limits.opensLeft(limit, pkg, day) ?: opens)).coerceIn(0, opens)
+            CoverWhere("$name · ${if (opens == 1) "1 open" else "$opens opens"} a day", "$used of $opens today", used.toFloat() / opens, distracting = true)
+        }
+        else -> CoverWhere(name)
+    }
+}
+
+/** "15 of 45 min today", "50 min of 1 h 30 today": the unit once, when both have the same one. */
+internal fun usedOf(used: Long, budget: Long): String {
+    val a = formatMinutes(used)
+    val b = formatMinutes(budget)
+    return if (used < 60 && budget < 60) "${a.removeSuffix(" min")} of $b today" else "$a of $b today"
+}
+
 @Composable
-internal fun PauseContent(appLabel: String, secondsLeft: Int, opens: Int, onOpen: () -> Unit, onHome: () -> Unit, message: String? = null) {
+internal fun PauseContent(
+    appLabel: String,
+    secondsLeft: Int,
+    opens: Int,
+    onOpen: () -> Unit,
+    onHome: () -> Unit,
+    message: String? = null,
+    /** The whole pause, for the ring around the breathing disc. */
+    totalSeconds: Int = 0,
+    where: CoverWhere? = null,
+) {
     val c = Obsidian.colors
     val done = secondsLeft <= 0
     CoverLayout(
+        where = where,
         emblem = {
-            Breathing(running = !done, color = c.accent, modifier = Modifier.size(180.dp)) { inhaling ->
-                // Once the breaths are done the disc rests empty: the choice is yours, nothing to read.
-                if (!done) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(if (inhaling) "breathe in" else "breathe out", style = MaterialTheme.typography.titleMedium, color = c.textNormal)
-                        Text("$secondsLeft", style = MaterialTheme.typography.labelLarge, color = c.textFaint)
+            // The ring is the pause gone by; the disc inside it breathes.
+            Box(Modifier.size(220.dp), contentAlignment = Alignment.Center) {
+                ProgressRing(
+                    progress = if (done || totalSeconds <= 0) 1f else 1f - secondsLeft.toFloat() / totalSeconds,
+                    modifier = Modifier.fillMaxSize(),
+                    stroke = 2.dp,
+                    color = c.accentText,
+                    track = c.interactive,
+                )
+                Breathing(running = !done, color = c.accent, modifier = Modifier.size(184.dp)) { inhaling ->
+                    // Once the breaths are done the disc rests empty: the choice is yours, nothing to read.
+                    if (!done) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(if (inhaling) "breathe in" else "breathe out", style = MaterialTheme.typography.titleMedium, color = c.textNormal)
+                            Text("$secondsLeft", style = MaterialTheme.typography.labelLarge, color = c.textMuted)
+                        }
                     }
                 }
             }
         },
-        pill = if (opens > 1) "the ${ordinal(opens)} time today" else null,
-        pillColor = c.orange,
+        emblemCentered = true,
+        count = if (opens > 1) "the ${ordinal(opens)} time today" else null,
         title = "About to open $appLabel",
         body = message ?: "Is this what you came to the phone for?",
         primary = CoverAction("Never mind", onHome),
         secondary = listOf(CoverAction(if (done) "Open $appLabel" else "Open $appLabel in a moment", onOpen, enabled = done)),
-        centered = true,
     )
 }
 
@@ -197,6 +268,7 @@ internal fun LimitScreen(pkg: String, limitId: String, onHome: () -> Unit, onFin
     /** With "choose then": minutes picked, [REST] for the rest of today, or -1 before choosing. */
     var chosen by rememberSaveable { mutableIntStateOf(-1) }
     var granted by remember { mutableStateOf(false) }
+    var writing by rememberSaveable { mutableStateOf(false) }
     val today = LocalDate.now().toEpochDay()
     val day = usage?.lastOrNull { it.day == today } ?: UsageDay(today)
     val limit: AppLimit? = settings?.let { s -> Limits.settle(s.limits, today).firstOrNull { it.id == limitId } }
@@ -221,7 +293,9 @@ internal fun LimitScreen(pkg: String, limitId: String, onHome: () -> Unit, onFin
         val name = limit.name.ifBlank { "this limit" }
         // Opens have no length to choose: more is one more open.
         val choosing = rules.outOfTime == OutOfTime.CHOOSE && !opens
-        if (unlocking && choosing && chosen < 0) {
+        if (writing) {
+            CoverJournalLine(about = "$label is done for today", onKept = onHome, onBack = { writing = false })
+        } else if (unlocking && choosing && chosen < 0) {
             val untilMidnight = Duration.between(LocalDateTime.now(), LocalDate.now().plusDays(1).atStartOfDay()).toMinutes().toInt()
             UnlockLengthChoice(
                 name = name,
@@ -277,6 +351,8 @@ internal fun LimitScreen(pkg: String, limitId: String, onHome: () -> Unit, onFin
                 onHome = onHome,
                 onMore = { unlocking = true },
                 message = message,
+                where = limitWhere(limit, pkg, day),
+                onWrite = { writing = true },
             )
         }
     }
@@ -294,13 +370,21 @@ internal fun LimitContent(
     message: String? = null,
     /** The day's opens, when it's they that are gone rather than the minutes. */
     dailyOpens: Int? = null,
+    /** The line at the top; by default the whole day's allowance, gone. */
+    where: CoverWhere? = null,
+    /** Something to do instead: a line in the microjournal, while it's on. */
+    onWrite: (() -> Unit)? = null,
 ) {
+    val c = Obsidian.colors
+    val emblem = @Composable { CoverRing(BedtimeIcons.Hourglass, 1f, c.distracting) }
+    val instead = onWrite?.let { write -> @Composable { InsteadRow(write) } }
     if (dailyOpens != null) {
         val allowance = if (dailyOpens == 1) "1 open" else "$dailyOpens opens"
         CoverLayout(
             message = message,
-            emblem = { CoverEmblem(BedtimeIcons.Hourglass) },
-            pill = "$limitName · $allowance a day",
+            where = where ?: CoverWhere("$limitName · $allowance a day", "$dailyOpens of $dailyOpens today", 1f, distracting = true),
+            emblem = emblem,
+            extra = instead,
             title = "$appLabel is done for today",
             body = when (outOfTime) {
                 OutOfTime.TOMORROW -> "That was today's $allowance. It'll be back tomorrow."
@@ -319,8 +403,9 @@ internal fun LimitContent(
     val budget = formatMinutes(dailyMinutes.toLong())
     CoverLayout(
         message = message,
-        emblem = { CoverEmblem(BedtimeIcons.Hourglass) },
-        pill = "$limitName · $budget a day",
+        where = where ?: CoverWhere("$limitName · $budget a day", usedOf(dailyMinutes.toLong(), dailyMinutes.toLong()), 1f, distracting = true),
+        emblem = emblem,
+        extra = instead,
         title = "$appLabel is done for today",
         body = when (outOfTime) {
             OutOfTime.TOMORROW -> "That was today's $budget. It'll be back tomorrow."

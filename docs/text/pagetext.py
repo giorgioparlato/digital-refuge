@@ -118,7 +118,7 @@ focus
     ("while a session runs: the covers", ["ui/blocked/BlockedActivity.kt", "ui/blocked/CoverLayout.kt"]),
     ("while a session runs: the minimal home screen", ["ui/minimal/MinimalHomeActivity.kt", "ui/minimal/SessionHeader.kt", "ui/minimal/EmergencyContent.kt", "ui/minimal/AppDrawer.kt", "ui/minimal/AppActions.kt", "ui/minimal/BlockSheet.kt", "ui/minimal/WidgetSheet.kt", "ui/minimal/ScreenSheet.kt", "ui/minimal/CalendarLine.kt", "ui/minimal/CalendarWeek.kt", "ui/minimal/WeatherLine.kt", "ui/minimal/LookUp.kt", "ui/notes/NoteWidgetView.kt", "ui/quotes/QuoteMenu.kt"]),
     ("while a session runs: the lock screen", ["ui/lock/LockScreenActivity.kt", "ui/lock/LockNotificationViews.kt"]),
-    ("while a session runs: notification, reminder, tile and widget", ["service/SessionNotifier.kt", "service/TakeoverOverlay.kt", "service/FocusTileService.kt", "ui/widget/BlockWidget.kt", "ui/widget/BlockWidgetConfigActivity.kt"]),
+    ("while a session runs: notification, reminder, tile and widget", ["service/SessionNotifier.kt", "service/TakeoverOverlay.kt", "ui/blocked/TakeoverScreen.kt", "service/FocusTileService.kt", "ui/widget/BlockWidget.kt", "ui/widget/BlockWidgetConfigActivity.kt"]),
 ])
 
 doc("limits", "limits — the second tab", """

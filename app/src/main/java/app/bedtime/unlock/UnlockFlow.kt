@@ -50,6 +50,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.text.SpanStyle
@@ -299,7 +306,8 @@ internal fun UnlockLayout(
     content: @Composable () -> Unit,
 ) {
     val c = Obsidian.colors
-    val deep = c.fade
+    // The faint sage light of a session's covers, seen this time: the old fade was too close to the page to show.
+    val deep = c.accent.copy(alpha = 0.11f).compositeOver(c.bgPrimary)
     Column(
         modifier
             .fillMaxSize()
@@ -307,7 +315,7 @@ internal fun UnlockLayout(
                 if (bloom) {
                     Brush.radialGradient(listOf(deep, c.bgPrimary))
                 } else {
-                    Brush.verticalGradient(listOf(deep, c.bgPrimary))
+                    Brush.verticalGradient(0f to deep, 0.55f to c.bgPrimary)
                 },
             )
             .padding(horizontal = 24.dp, vertical = 18.dp),
@@ -326,7 +334,7 @@ internal fun UnlockLayout(
         }
         if (note != null) {
             Spacer(Modifier.height(12.dp))
-            Box(Modifier.fillMaxWidth()) { EscalationPill(note) }
+            Box(Modifier.fillMaxWidth()) { app.bedtime.ui.blocked.CoverCount(note) }
         }
         // The middle scrolls on its own, so the button and the small print stay at the foot of the
         // page instead of being pushed off it by a long passage or the keyboard.
@@ -376,7 +384,7 @@ private fun StepTrack(labels: List<String>, current: Int) {
             val here = index == current
             Column(Modifier.weight(1f)) {
                 Box(
-                    Modifier.fillMaxWidth().height(3.dp).clip(RoundedCornerShape(50))
+                    Modifier.fillMaxWidth().height(2.dp).clip(RoundedCornerShape(50))
                         .background(
                             when {
                                 here -> c.accentText
@@ -394,23 +402,6 @@ private fun StepTrack(labels: List<String>, current: Int) {
                 )
             }
         }
-    }
-}
-
-/** How many times you have been here today. Warm enough to notice, quiet enough not to scold. */
-@Composable
-private fun EscalationPill(text: String) {
-    val c = Obsidian.colors
-    Row(
-        Modifier
-            .clip(RoundedCornerShape(50))
-            .background(c.orange.copy(alpha = 0.14f))
-            .padding(horizontal = 14.dp, vertical = 7.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(Modifier.size(6.dp).clip(CircleShape).background(c.orange))
-        Spacer(Modifier.width(9.dp))
-        Text(text, style = MaterialTheme.typography.labelMedium, color = c.orange)
     }
 }
 
@@ -503,29 +494,32 @@ internal fun WaitChallengeContent(remaining: Long?, total: Long) {
         Spacer(Modifier.height(30.dp))
         // The ring is the time left; the disc inside it breathes. The words for the breath go in the
         // disc, the minutes under the ring, so the two never compete inside one circle.
-        Box(Modifier.size(240.dp), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(256.dp), contentAlignment = Alignment.Center) {
             ProgressRing(
                 progress = if (remaining == null || total <= 0) 0f else 1f - remaining.toFloat() / total,
                 modifier = Modifier.fillMaxSize(),
-                stroke = 3.dp,
-                color = ring,
+                stroke = 2.dp,
+                color = if (done) c.green else c.accentText,
+                track = c.interactive,
             )
-            // Something to do with the wait besides watching it: breathe with the disc.
-            Breathing(running = remaining != null && !done, color = ring, modifier = Modifier.size(204.dp)) { inhaling ->
-                Text(
-                    if (done) "" else if (inhaling) "breathe in" else "breathe out",
-                    fontSize = 17.sp,
-                    color = c.textNormal,
-                )
+            // Something to do with the wait besides watching it: breathe with the disc. The time left
+            // sits small under the breath, so the breath is what you watch, not the clock.
+            Breathing(running = remaining != null && !done, color = ring, modifier = Modifier.size(214.dp)) { inhaling ->
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        if (done) "" else if (inhaling) "breathe in" else "breathe out",
+                        fontSize = 18.sp,
+                        color = c.textNormal,
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        remaining?.let { if (done) "" else formatCountdown(it) + " left" } ?: "\u2026",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = c.textMuted,
+                    )
+                }
             }
         }
-        Spacer(Modifier.height(26.dp))
-        Text(
-            remaining?.let(::formatCountdown) ?: "\u2026",
-            fontSize = 34.sp,
-            fontWeight = FontWeight.Light,
-            color = if (done) c.green else c.textNormal,
-        )
     }
 }
 
@@ -584,63 +578,62 @@ internal fun TextChallengeContent(
         val end = display.text.length
         buildAnnotatedString {
             append(display.text)
-            if (cursor > 0) addStyle(SpanStyle(color = c.textFaint), 0, cursor)
+            if (cursor > 0) addStyle(SpanStyle(color = c.textNormal), 0, cursor)
             if (cursor < end) {
                 addStyle(SpanStyle(color = c.textNormal, background = c.accent.copy(alpha = 0.35f)), cursor, cursor + 1)
-                if (cursor + 1 < end) addStyle(SpanStyle(color = c.textNormal), cursor + 1, end)
+                if (cursor + 1 < end) addStyle(SpanStyle(color = c.textFaint), cursor + 1, end)
             }
         }
     }
 
-    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Text(
-            annotated,
-            fontFamily = if (natural) FontFamily.Default else FontFamily.Monospace,
-            fontSize = 17.sp,
-            lineHeight = if (natural) 26.sp else 28.sp,
-            modifier = Modifier
+    // One box: you type over the passage itself, and what's done turns from faint to cream. The field
+    // that takes the keys lies on top of it, invisible, so a tap anywhere on the passage brings the keyboard.
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Box(
+            Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-                .background(c.bgPrimaryAlt)
-                .border(1.dp, c.border, RoundedCornerShape(12.dp))
-                .padding(16.dp),
-        )
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            LinearProgressIndicator(
-                progress = { typed.length / target.length.toFloat() },
-                modifier = Modifier.weight(1f).height(6.dp).clip(RoundedCornerShape(50)),
-                color = c.accent,
-                trackColor = c.interactive,
-                strokeCap = StrokeCap.Round,
-            )
-            Spacer(Modifier.width(12.dp))
-            Text("${typed.length}/${target.length}", style = MaterialTheme.typography.labelLarge, color = c.textMuted)
-        }
-        if (rejected > 0) {
+                .offset { IntOffset(shakeOffset().roundToInt(), 0) }
+                .clip(RoundedCornerShape(18.dp))
+                .background(c.bgSecondary)
+                .padding(18.dp),
+        ) {
             Text(
-                "$rejected ${if (rejected == 1) "typo" else "typos"} caught. No worries, just keep going.",
-                style = MaterialTheme.typography.labelMedium,
-                color = c.textFaint,
+                annotated,
+                fontFamily = if (natural) FontFamily.Default else FontFamily.Monospace,
+                fontSize = 18.sp,
+                lineHeight = if (natural) 28.sp else 30.sp,
+                modifier = Modifier.fillMaxWidth(),
             )
+            // The field holds the cursor as well as the text, and the cursor is always put back at the end:
+            // accepting a letter can fill a space in with it, and a cursor left in front of that space
+            // would drop the next letter into the middle of the word.
+            var field by remember { mutableStateOf(TextFieldValue(typed, TextRange(typed.length))) }
+            if (field.text != typed) field = TextFieldValue(typed, TextRange(typed.length))
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.ui.platform.LocalTextToolbar provides NoPasting,
+                androidx.compose.foundation.text.selection.LocalTextSelectionColors provides
+                    androidx.compose.foundation.text.selection.TextSelectionColors(Color.Transparent, Color.Transparent),
+            ) {
+                BasicTextField(
+                    value = field,
+                    onValueChange = { value ->
+                        field = value.copy(selection = TextRange(value.text.length))
+                        onValueChange(value.text)
+                    },
+                    textStyle = TextStyle(color = Color.Transparent, fontSize = 18.sp),
+                    cursorBrush = SolidColor(Color.Transparent),
+                    // Password keyboards turn off suggestions and autocorrect, which would otherwise insert whole words.
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, keyboardType = KeyboardType.Password),
+                    modifier = Modifier.matchParentSize().focusRequester(focus).semantics { contentDescription = "type the passage" },
+                )
+            }
         }
-        // The field holds the cursor as well as the text, and the cursor is always put back at the end:
-        // accepting a letter can fill a space in with it, and a cursor left in front of that space
-        // would drop the next letter into the middle of the word.
-        var field by remember { mutableStateOf(TextFieldValue(typed, TextRange(typed.length))) }
-        if (field.text != typed) field = TextFieldValue(typed, TextRange(typed.length))
-        ObsidianTextField(
-            value = field,
-            onValueChange = { value ->
-                field = value.copy(selection = TextRange(value.text.length))
-                onValueChange(value.text)
-            },
-            modifier = Modifier.offset { IntOffset(shakeOffset().roundToInt(), 0) },
-            placeholder = "Start typing here…",
-            singleLine = false,
-            maxLines = 3,
-            // Password keyboards turn off suggestions and autocorrect, which would otherwise insert whole words.
-            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, keyboardType = KeyboardType.Password),
-            textStyle = TextStyle(fontFamily = FontFamily.Monospace, fontSize = 16.sp),
+        Text(
+            "${typed.length} of ${target.length}" + if (rejected > 0) " · $rejected ${if (rejected == 1) "typo" else "typos"} caught. No worries, just keep going." else "",
+            style = MaterialTheme.typography.labelMedium,
+            color = c.textMuted,
         )
     }
 }

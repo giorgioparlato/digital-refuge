@@ -186,14 +186,23 @@ class Repository private constructor(context: Context) {
     }
 
     /** A mood of your own among those to tap, from now on. */
-    suspend fun addMoodTag(mood: String) = updateSettings { s ->
+    suspend fun addMoodTag(mood: String, tone: String? = null) = updateSettings { s ->
         val moods = s.moodTags ?: Why.MOODS
-        if (mood in moods) s else s.copy(moodTags = moods + mood)
+        val coloured = if (tone == null) s else s.copy(moodColours = (s.moodColours ?: emptyMap()) + (mood to tone))
+        if (mood in moods) coloured else coloured.copy(moodTags = moods + mood)
     }
 
-    /** A mood renamed, in the moods to tap and in every entry that has it. */
+    /** A mood's colour changed, one of [Why.TONES]. */
+    suspend fun setMoodTone(mood: String, tone: String) = updateSettings { s -> s.copy(moodColours = (s.moodColours ?: emptyMap()) + (mood to tone)) }
+
+    /** A mood renamed, in the moods to tap and in every entry that has it; its colour goes with it. */
     suspend fun renameMoodTag(old: String, new: String) {
-        updateSettings { s -> s.copy(moodTags = (s.moodTags ?: Why.MOODS).map { if (it == old) new else it }.distinct()) }
+        updateSettings { s ->
+            s.copy(
+                moodTags = (s.moodTags ?: Why.MOODS).map { if (it == old) new else it }.distinct(),
+                moodColours = (s.moodColours ?: emptyMap()) - old + (new to Why.toneOf(s, old)),
+            )
+        }
         update(JOURNAL, journalSerializer, emptyList()) { Journal.moodRenamed(it, old, new) }
     }
 

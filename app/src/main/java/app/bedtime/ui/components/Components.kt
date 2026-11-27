@@ -136,7 +136,7 @@ fun ObsidianTopBar(
                 )
                 Spacer(Modifier.width(12.dp))
             }
-            Text(title, fontSize = 26.sp, fontWeight = FontWeight.Light, color = c.textNormal, modifier = Modifier.weight(1f))
+            Text(title, fontSize = 26.sp, fontFamily = app.bedtime.ui.theme.AppFonts.Serif, color = c.textNormal, modifier = Modifier.weight(1f))
             actions()
             LocalSettingsSearch.current?.let { search ->
                 Icon(
@@ -156,8 +156,9 @@ fun ObsidianTopBar(
 }
 
 /**
- * A small green heading over a group of rows or controls. The one section label the app uses: 13 sp
- * semibold, with more room above it than below, so it reads as belonging to what follows.
+ * A small muted heading over a group of rows or controls. The one section label the app uses: 13 sp
+ * semibold, with more room above it than below, so it reads as belonging to what follows. Muted
+ * rather than green, so green is left for what you can tap, and what you kept.
  */
 @Composable
 fun SectionLabel(text: String, modifier: Modifier = Modifier) {
@@ -165,7 +166,7 @@ fun SectionLabel(text: String, modifier: Modifier = Modifier) {
         text,
         fontSize = 13.sp,
         fontWeight = FontWeight.SemiBold,
-        color = Obsidian.colors.accentText,
+        color = Obsidian.colors.textMuted,
         modifier = modifier.padding(top = 22.dp, bottom = 10.dp),
     )
 }

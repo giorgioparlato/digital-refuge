@@ -461,7 +461,7 @@ private fun HomeHeader(
                     ProgressRing(progress, Modifier.size(60.dp))
                     Spacer(Modifier.width(16.dp))
                     Column(Modifier.weight(1f)) {
-                        Text(title, fontSize = 28.sp, fontWeight = FontWeight.Light, color = c.textNormal)
+                        Text(title, fontSize = 28.sp, fontFamily = app.bedtime.ui.theme.AppFonts.Serif, color = c.textNormal)
                         Spacer(Modifier.height(4.dp))
                         Text(
                             "for another ${formatDuration(current.end - ui.now)}, until ${formatTime(context, current.end)}",
@@ -517,7 +517,7 @@ private fun HomeHeader(
                     ui.schedules.any { it.isBlock } -> "all clear" to "start a block whenever you need one"
                     else -> "all clear" to "none of your schedules are switched on"
                 }
-                Text(title, fontSize = 28.sp, fontWeight = FontWeight.Light, color = c.textNormal)
+                Text(title, fontSize = 28.sp, fontFamily = app.bedtime.ui.theme.AppFonts.Serif, color = c.textNormal)
                 Spacer(Modifier.height(8.dp))
                 Text(body, style = MaterialTheme.typography.bodyLarge, color = c.textMuted)
             }

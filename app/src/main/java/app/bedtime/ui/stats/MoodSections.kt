@@ -49,13 +49,6 @@ import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
 
-/** A colour for each mood, in the order of your moods; one no longer among them is grey. */
-private val MoodColours = listOf(
-    Color(0xFFE0B243), Color(0xFFE47B8A), Color(0xFF4DB2D1), Color(0xFFA99BEA),
-    Color(0xFF86BC9F), Color(0xFFD9762B), Color(0xFF6C8EBF), Color(0xFFC9A0DC),
-)
-
-private fun colourOf(mood: String, moods: List<String>): Color = MoodColours.getOrNull(moods.indexOf(mood).takeIf { it >= 0 } ?: -1) ?: Color(0xFF8A8A8A)
 
 /**
  * Moods over a month: each day coloured by the one tapped most, a tap on a day opening its
@@ -72,8 +65,18 @@ internal fun MoodStats(
     days: Map<Long, app.bedtime.data.UseDay> = emptyMap(),
     habits: List<app.bedtime.data.Habit> = emptyList(),
     habitMarks: Map<String, Map<Long, Int>> = emptyMap(),
+    /** Each mood's colour, one of [app.bedtime.data.Why.TONES]: the one picked for it. */
+    toneOf: (String) -> String = { "cream" },
 ) {
     val c = Obsidian.colors
+    // A mood no longer among yours is grey.
+    val sage = c.accent; val cream = c.textNormal; val tan = c.textMuted; val rose = c.distracting; val gone = c.textFaint
+    fun colourOf(mood: String, moods: List<String>): Color = if (mood !in moods) gone else when (toneOf(mood)) {
+        "sage" -> sage
+        "tan" -> tan
+        "rose" -> rose
+        else -> cream
+    }
     val zone = ZoneId.systemDefault()
     var monthDay by rememberSaveable { mutableLongStateOf(today.withDayOfMonth(1).toEpochDay()) }
     val month = YearMonth.from(LocalDate.ofEpochDay(monthDay))

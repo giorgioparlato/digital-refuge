@@ -491,8 +491,8 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 - Take a breath.
 - breathe in
 - breathe out
-- {rejected} … caught. No worries, just keep going.
-- Start typing here…
+- … of …
+-  · {rejected} … caught. No worries, just keep going.
 - Enter the password for this schedule.
 - That's not it. Try again.
 - Checking…
@@ -511,23 +511,27 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 
 <sub>[BlockedActivity.kt](../../app/src/main/java/app/bedtime/ui/blocked/BlockedActivity.kt)</sub>
 
-- {scheduleName} is on
 - {appLabel} can wait
+- A line for today
+- {scheduleName} is on
+- until {until}
 - You'll have it back at {until}. Until then, maybe put the phone down for a bit.
 - You'll have it back at {until}.
 - Go to home screen
 - I really need it
 - {breakMinutes} …
-- End {scheduleName} early
 - This stays locked until {until}
-- Switching blocking off and uninstalling are locked while {scheduleName} runs. If something truly can't wait, take an emergency break; otherwise end the session with the unlock steps.
-- Switching blocking off and uninstalling are locked while {scheduleName} runs. To do either, end the session first — the unlock steps still work.
-- Pause blocking for {minutes}
+- Switching blocking off and uninstalling are locked while {scheduleName} runs.
+- If something truly can't wait, take an emergency break.
+- To do either, end the session first. The unlock steps still work.
 - Go back
+- Pause blocking for {minutes}
+- End {scheduleName} early
 
 <sub>[CoverLayout.kt](../../app/src/main/java/app/bedtime/ui/blocked/CoverLayout.kt)</sub>
 
-- (no text of its own)
+- Instead
+- Write a line
 
 ## while a session runs: the minimal home screen
 
@@ -751,10 +755,23 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 
 <sub>[TakeoverOverlay.kt](../../app/src/main/java/app/bedtime/service/TakeoverOverlay.kt)</sub>
 
-- it's been off for {minutes} …. your limits and blocks only work while it's on.
 - drawing the full-screen reminder
-- {scheduleName} is still running. switch blocking back on to carry on.
-- take {breakMinutes} more …
+
+<sub>[TakeoverScreen.kt](../../app/src/main/java/app/bedtime/ui/blocked/TakeoverScreen.kt)</sub>
+
+- Blocking is off
+- since …
+- Blocking has been off for … …
+- Your limits and blocks only work while it's on.
+- Switch blocking back on
+- Later · asks again at …
+- after an emergency break
+- … is on
+- until {it}
+- Your break is over
+- … is still running. Switch blocking back on to carry on.
+- How do you feel now?
+- Take … more …
 
 <sub>[FocusTileService.kt](../../app/src/main/java/app/bedtime/service/FocusTileService.kt)</sub>
 

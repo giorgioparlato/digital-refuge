@@ -27,6 +27,8 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -85,6 +87,7 @@ class WhyActivity : ComponentActivity() {
                     WhyScreen(
                         question = question,
                         moods = Why.moods(settings),
+                        toneOf = { Why.toneOf(settings, it) },
                         minWords = intent.getIntExtra(EXTRA_WORDS, 0),
                         onPutDown = { words, moods ->
                             keep(question, words, moods, wentOn = false)
@@ -133,8 +136,9 @@ class WhyActivity : ComponentActivity() {
 
 /**
  * The question and a box to write in, and how you feel ([moods]), if you like: then put it down, or go
- * on. [about] sits above the question ("about to open Instagram"), when there's an app to name. With
- * [minWords], going on waits for that many words, typed here: pasting doesn't count.
+ * on. [about] sits at the top ("about to open Instagram"), when there's an app to name. With
+ * [minWords], going on waits for that many words, typed here: pasting doesn't count. Laid out like the
+ * covers: where you are at the top, the words, then "not now" as the main way on and going on quieter.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -144,118 +148,136 @@ internal fun WhyScreen(
     onGoOn: (String, List<String>) -> Unit,
     about: String? = null,
     moods: List<String> = emptyList(),
+    /** Each mood's colour, one of [Why.TONES]. */
+    toneOf: (String) -> String = { "cream" },
     minWords: Int = 0,
+    /** A line for the microjournal rather than an answer before going on: keep it, or never mind. */
+    keeping: Boolean = false,
 ) {
     val c = Obsidian.colors
+    val context = androidx.compose.ui.platform.LocalContext.current
     var words by rememberSaveable { mutableStateOf("") }
     var picked by rememberSaveable { mutableStateOf(emptyList<String>()) }
+    // Moods of your own made here, with their colours, until settings carry them.
+    var added by remember { mutableStateOf(emptyMap<String, String>()) }
     val written = Why.words(words)
     // With the keyboard up, the question moves up and gets smaller, so the box and its count stay in view.
     val typing = WindowInsets.isImeVisible
+    val now = remember { app.bedtime.ui.formatTime(context, System.currentTimeMillis()) }
     Column(
         Modifier
             .fillMaxSize()
-            .background(Brush.verticalGradient(listOf(c.fade, c.bgPrimary)))
+            .background(c.bgPrimary)
             .safeDrawingPadding()
             .imePadding()
-            .verticalScroll(rememberScrollState())
             .padding(horizontal = 28.dp, vertical = 24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Spacer(Modifier.height(if (typing) 0.dp else 40.dp))
-        about?.let {
-            Text(it, style = MaterialTheme.typography.labelLarge, color = c.textMuted)
-            Spacer(Modifier.height(10.dp))
-        }
-        Text(question, fontSize = if (typing) 19.sp else 26.sp, color = c.textNormal, textAlign = TextAlign.Center)
-        if (moods.isNotEmpty()) {
-            Spacer(Modifier.height(if (typing) 10.dp else 18.dp))
-            // Open to start with; folded into a line saying how you feel once the keyboard comes up, a tap to open again.
-            var moodsOpen by remember { mutableStateOf(true) }
-            androidx.compose.runtime.LaunchedEffect(typing) { if (typing) moodsOpen = false }
-            Text(
-                (if (picked.isEmpty()) "how do you feel?" else "feeling " + picked.joinToString(", ")) + if (moodsOpen) " ‹" else " ›",
-                style = MaterialTheme.typography.labelLarge,
-                color = if (picked.isEmpty()) c.textMuted else c.accentText,
-                modifier = Modifier.clip(RoundedCornerShape(50)).clickable { moodsOpen = !moodsOpen }.padding(horizontal = 12.dp, vertical = 6.dp),
-            )
-            if (moodsOpen) {
-                Spacer(Modifier.height(8.dp))
-                // A mood of your own joins the others for next time, and is picked now.
-                val context = androidx.compose.ui.platform.LocalContext.current
-                val scope = androidx.compose.runtime.rememberCoroutineScope()
-                MoodChips(
-                    (moods + picked).distinct(),
-                    picked,
-                    onAdd = { mood ->
-                        if (mood !in picked) picked = picked + mood
-                        scope.launch { Repository.get(context).addMoodTag(mood) }
-                    },
-                ) { mood -> picked = if (mood in picked) picked - mood else picked + mood }
-            }
-        }
-        Spacer(Modifier.height(if (typing) 12.dp else 20.dp))
-        // Room to write it out: as much as you like, or nothing; with a minimum, typed rather than pasted.
-        androidx.compose.runtime.CompositionLocalProvider(
-            androidx.compose.ui.platform.LocalTextToolbar provides if (minWords > 0) app.bedtime.unlock.NoPasting else androidx.compose.ui.platform.LocalTextToolbar.current,
-        ) {
-            BasicTextField(
-                value = words,
-                onValueChange = { if (minWords <= 0 || Why.typed(words, it)) words = it },
-                textStyle = MaterialTheme.typography.bodyLarge.copy(color = c.textNormal),
-                cursorBrush = SolidColor(c.accent),
-                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = if (typing) 120.dp else 180.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(c.bgSecondary)
-                    .border(1.dp, c.border, RoundedCornerShape(14.dp))
-                    .padding(16.dp),
-                decorationBox = { field ->
-                    Column {
-                        // The count at the top of the box, where it stays in view above the keyboard.
-                        if (minWords > 0) WordCount(written, minWords, Modifier.align(Alignment.End).padding(bottom = 6.dp))
-                        androidx.compose.foundation.layout.Box {
-                            if (words.isEmpty()) Text(if (minWords > 0) "At least $minWords words…" else "Write it down, if you want…", style = MaterialTheme.typography.bodyLarge, color = c.textFaint)
-                            field()
-                        }
-                    }
-                },
-            )
-        }
-        Spacer(Modifier.height(32.dp))
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                "Not now",
-                style = MaterialTheme.typography.labelLarge,
-                color = c.textMuted,
-                modifier = Modifier.clip(RoundedCornerShape(50)).clickable { onPutDown(words, picked) }.padding(horizontal = 16.dp, vertical = 12.dp),
-            )
-            Spacer(Modifier.weight(1f))
-            SoftPillButton("Yes, go on", onClick = { onGoOn(words, picked) }, enabled = written >= minWords)
+            Text(about ?: "Journal", style = MaterialTheme.typography.bodyMedium, color = c.textMuted, modifier = Modifier.weight(1f))
+            Text(now, style = MaterialTheme.typography.bodySmall, color = c.textMuted)
+        }
+        Column(
+            Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Spacer(Modifier.height(if (typing) 12.dp else 24.dp))
+            Text(question, fontSize = if (typing) 19.sp else 28.sp, fontWeight = FontWeight.Light, lineHeight = if (typing) 25.sp else 35.sp, color = c.textNormal)
+            Spacer(Modifier.height(if (typing) 12.dp else 20.dp))
+            // Room to write it out between two hairlines: as much as you like, or nothing; with a minimum, typed rather than pasted.
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.ui.platform.LocalTextToolbar provides if (minWords > 0) app.bedtime.unlock.NoPasting else androidx.compose.ui.platform.LocalTextToolbar.current,
+            ) {
+                BasicTextField(
+                    value = words,
+                    onValueChange = { if (minWords <= 0 || Why.typed(words, it)) words = it },
+                    textStyle = MaterialTheme.typography.bodyLarge.copy(color = c.textNormal, fontSize = 17.sp, lineHeight = 26.sp),
+                    cursorBrush = SolidColor(c.accent),
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None),
+                    modifier = Modifier.fillMaxWidth(),
+                    decorationBox = { field ->
+                        Column {
+                            androidx.compose.material3.HorizontalDivider(color = c.border)
+                            Column(Modifier.fillMaxWidth().heightIn(min = if (typing) 96.dp else 132.dp).padding(vertical = 14.dp)) {
+                                androidx.compose.foundation.layout.Box(Modifier.weight(1f, fill = false)) {
+                                    if (words.isEmpty()) Text(if (minWords > 0) "At least $minWords words…" else "Write it down, if you want…", style = MaterialTheme.typography.bodyLarge, color = c.textFaint)
+                                    field()
+                                }
+                            }
+                            if (minWords > 0) WordCount(written, minWords, Modifier.align(Alignment.End).padding(bottom = 8.dp))
+                            androidx.compose.material3.HorizontalDivider(color = c.border)
+                        }
+                    },
+                )
+            }
+            if (moods.isNotEmpty()) {
+                Spacer(Modifier.height(14.dp))
+                // Open to start with; folded into a line saying how you feel once the keyboard comes up, a tap to open again.
+                var moodsOpen by remember { mutableStateOf(true) }
+                androidx.compose.runtime.LaunchedEffect(typing) { if (typing) moodsOpen = false }
+                Text(
+                    (if (picked.isEmpty()) "how do you feel?" else "feeling " + picked.joinToString(", ")) + if (moodsOpen) " ‹" else " ›",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = if (picked.isEmpty()) c.textMuted else c.textNormal,
+                    modifier = Modifier.clip(RoundedCornerShape(50)).clickable(onClickLabel = if (moodsOpen) "fold the moods" else "show the moods") { moodsOpen = !moodsOpen }.padding(vertical = 6.dp),
+                )
+                if (moodsOpen) {
+                    Spacer(Modifier.height(8.dp))
+                    val scope = androidx.compose.runtime.rememberCoroutineScope()
+                    // A mood of your own joins the others for next time, in the colour picked for it, and is picked now.
+                    MoodChips(
+                        (moods + picked).distinct(),
+                        picked,
+                        toneOf = { added[it] ?: toneOf(it) },
+                        centered = false,
+                        onAdd = { mood, tone ->
+                            added = added + (mood to tone)
+                            if (mood !in picked) picked = picked + mood
+                            scope.launch { Repository.get(context).addMoodTag(mood, tone) }
+                        },
+                    ) { mood -> picked = if (mood in picked) picked - mood else picked + mood }
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+        }
+        if (keeping) {
+            SoftPillButton("Keep it", onClick = { onGoOn(words, picked) }, enabled = words.isNotBlank() || picked.isNotEmpty(), modifier = Modifier.fillMaxWidth())
+            QuietButton("Never mind") { onPutDown(words, picked) }
+        } else {
+            SoftPillButton("Not now", onClick = { onPutDown(words, picked) }, modifier = Modifier.fillMaxWidth())
+            QuietButton("Yes, go on", enabled = written >= minWords) { onGoOn(words, picked) }
         }
     }
 }
 
 /**
- * Moods to tap, one or several: the ones picked filled. With [onAdd], a "+" to type a mood of your
- * own, which stays among them from then on.
+ * Moods to tap, one or several, each with a dot in its colour ([toneOf]): the ones picked outlined in
+ * it. With [onAdd], a "+" to type a mood of your own and pick its colour; it stays among them from then on.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun MoodChips(moods: List<String>, picked: List<String>, onAdd: ((String) -> Unit)? = null, onTap: (String) -> Unit) {
+internal fun MoodChips(
+    moods: List<String>,
+    picked: List<String>,
+    toneOf: (String) -> String = { "cream" },
+    onAdd: ((String, String) -> Unit)? = null,
+    centered: Boolean = true,
+    onTap: (String) -> Unit,
+) {
     val c = Obsidian.colors
     var adding by remember { mutableStateOf(false) }
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            moods.forEach { mood -> MoodChip(mood, mood in picked) { onTap(mood) } }
-            if (onAdd != null && !adding) MoodChip("+", false) { adding = true }
+    Column(horizontalAlignment = if (centered) Alignment.CenterHorizontally else Alignment.Start) {
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp, if (centered) Alignment.CenterHorizontally else Alignment.Start),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            moods.forEach { mood -> MoodChip(mood, app.bedtime.ui.components.toneColour(toneOf(mood)), mood in picked) { onTap(mood) } }
+            if (onAdd != null && !adding) MoodChip("+", null, false) { adding = true }
         }
         if (onAdd != null && adding) {
             var name by remember { mutableStateOf("") }
+            var tone by remember { mutableStateOf("cream") }
             val done = {
-                name.trim().lowercase().takeIf { it.isNotEmpty() }?.let(onAdd)
+                name.trim().lowercase().takeIf { it.isNotEmpty() }?.let { onAdd(it, tone) }
                 adding = false
             }
             Spacer(Modifier.height(10.dp))
@@ -268,7 +290,9 @@ internal fun MoodChips(moods: List<String>, picked: List<String>, onAdd: ((Strin
                 keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = { done() }),
                 modifier = Modifier.fillMaxWidth(),
             )
-            Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.End) {
+            Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                // Its colour, from the app's four, picked as it's made.
+                app.bedtime.ui.components.ToneSwatches(tone, onPick = { tone = it }, modifier = Modifier.weight(1f))
                 Text("Cancel", style = MaterialTheme.typography.labelLarge, color = c.textMuted, modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { adding = false }.padding(10.dp))
                 Text("Add", style = MaterialTheme.typography.labelLarge, color = c.accentText, modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = done).padding(10.dp))
             }
@@ -277,19 +301,24 @@ internal fun MoodChips(moods: List<String>, picked: List<String>, onAdd: ((Strin
 }
 
 @Composable
-private fun MoodChip(label: String, on: Boolean, onClick: () -> Unit) {
+private fun MoodChip(label: String, colour: androidx.compose.ui.graphics.Color?, on: Boolean, onClick: () -> Unit) {
     val c = Obsidian.colors
-    Text(
-        label,
-        style = MaterialTheme.typography.labelLarge,
-        color = if (on) c.bgPrimary else c.textMuted,
-        modifier = Modifier
+    Row(
+        Modifier
             .clip(RoundedCornerShape(50))
-            .background(if (on) c.accent else androidx.compose.ui.graphics.Color.Transparent)
-            .border(1.dp, if (on) c.accent else c.border, RoundedCornerShape(50))
+            .background(if (on) c.interactive else androidx.compose.ui.graphics.Color.Transparent)
+            .border(1.dp, if (on && colour != null) colour else c.border, RoundedCornerShape(50))
             .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 7.dp),
-    )
+            .heightIn(min = 40.dp)
+            .padding(horizontal = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (colour != null) {
+            androidx.compose.foundation.layout.Box(Modifier.size(9.dp).clip(androidx.compose.foundation.shape.CircleShape).background(colour))
+            Spacer(Modifier.width(8.dp))
+        }
+        Text(label, style = MaterialTheme.typography.labelLarge, color = if (on) c.textNormal else c.textMuted)
+    }
 }
 
 /** "12 of 30 words", or "31 words · enough" once there are; shared by every box that asks for a few. */

@@ -28,6 +28,9 @@ object AppFonts {
         Font(R.font.literata_600, FontWeight.SemiBold),
         Font(R.font.literata_italic, style = FontStyle.Italic),
     )
+
+    /** Literata, for the app's page titles: refuge's own voice. Everything else, and every cover, stays Inter. */
+    val Serif: FontFamily get() = literata
     private val fraunces = FontFamily(
         Font(R.font.fraunces_400),
         Font(R.font.fraunces_600, FontWeight.SemiBold),

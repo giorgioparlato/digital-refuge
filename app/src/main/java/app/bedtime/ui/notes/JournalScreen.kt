@@ -85,7 +85,8 @@ internal fun JournalContent(onBack: () -> Unit, openToday: Boolean = false, open
             prompts = settings?.journalPrompts != false,
             moods = app.bedtime.data.Why.moods(settings ?: app.bedtime.data.AppSettings()),
             onMood = { mood, on -> scope.launch { if (on) repo.addMood(day, mood) else repo.removeLatestMood(day, mood) } },
-            onAddMood = { mood -> scope.launch { repo.addMoodTag(mood) } },
+            onAddMood = { mood, tone -> scope.launch { repo.addMoodTag(mood, tone) } },
+            toneOf = { mood -> app.bedtime.data.Why.toneOf(settings ?: app.bedtime.data.AppSettings(), mood) },
             onRecord = settings?.takeIf { app.bedtime.data.Voice.ready(it) }?.let { { context.startActivity(app.bedtime.voice.RecordActivity.intent(context, journal = true)) } },
             // Its recordings, a tap from your player: wherever they were kept, even with voice notes off since.
             // Folded each time the page opens, a tap away; not remembered.
@@ -144,7 +145,9 @@ private fun JournalEditor(
     moods: List<String> = emptyList(),
     onMood: (String, Boolean) -> Unit = { _, _ -> },
     /** A mood of your own, kept among them from now on. */
-    onAddMood: (String) -> Unit = {},
+    onAddMood: (String, String) -> Unit = { _, _ -> },
+    /** Each mood's colour, one of [app.bedtime.data.Why.TONES]. */
+    toneOf: (String) -> String = { "cream" },
     /** A voice note, once they're set up: its line, and then its words, come in below. */
     onRecord: (() -> Unit)? = null,
     /** One of the entry's recordings, by file, opened in your audio player. */
@@ -206,8 +209,9 @@ private fun JournalEditor(
                     app.bedtime.ui.blocked.MoodChips(
                         moods,
                         Journal.moodsAt(value.text, value.selection.start, moods),
-                        onAdd = { mood ->
-                            onAddMood(mood)
+                        toneOf = toneOf,
+                        onAdd = { mood, tone ->
+                            onAddMood(mood, tone)
                             tap(mood, moods + mood)
                         },
                         onTap = { mood -> tap(mood, moods) },

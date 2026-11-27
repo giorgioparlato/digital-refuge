@@ -44,6 +44,19 @@ object Why {
 
     fun moods(settings: AppSettings): List<String> = if (!settings.moodsOn) emptyList() else settings.moodTags ?: MOODS
 
+    /** The colours a mood can have, from the app's own four: sage, cream, tan and clay rose. */
+    val TONES = listOf("sage", "cream", "tan", "rose")
+
+    /** What the suggested moods start with; a mood of your own picks one when it's made. */
+    private val SUGGESTED_TONES = mapOf(
+        "happy" to "sage", "tired" to "cream", "hungry" to "tan", "lonely" to "tan", "bored" to "tan",
+        "angry" to "rose", "anxious" to "rose",
+    )
+
+    /** [mood]'s colour: the one picked for it, else the suggested one, else cream. */
+    fun toneOf(settings: AppSettings, mood: String): String =
+        settings.moodColours?.get(mood)?.takeIf { it in TONES } ?: SUGGESTED_TONES[mood] ?: "cream"
+
     /** Not asked again for the same app this soon after, nor again after an unlock. */
     const val APP_AGAIN_MS = 10 * 60_000L
     const val UNLOCK_AGAIN_MS = 3 * 60_000L

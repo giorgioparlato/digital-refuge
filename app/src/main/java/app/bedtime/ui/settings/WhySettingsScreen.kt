@@ -4,6 +4,7 @@ import app.bedtime.ui.components.LineIcons
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -153,10 +154,12 @@ fun MoodsScreen(onBack: () -> Unit) {
                         modifier = Modifier.padding(top = 6.dp),
                     )
                 }
-                SectionCard(title = "Your moods", subtitle = "Tap one to rename it; the days it was tapped follow. × takes it out") {
+                SectionCard(title = "Your moods", subtitle = "Tap one to rename it; the days it was tapped follow. Tap its dot for another colour. × takes it out") {
                     MoodList(
                         Why.moods(s),
                         changed = s.moodTags != null,
+                        toneOf = { Why.toneOf(s, it) },
+                        onTone = { mood, tone -> scope.launch { repo.setMoodTone(mood, tone) } },
                         onChange = { list -> change { it.copy(moodTags = list) } },
                         onRename = { old, new -> scope.launch { repo.renameMoodTag(old, new) } },
                         onReset = { change { it.copy(moodTags = null) } },
@@ -207,8 +210,17 @@ fun WhyAppQuestionsScreen(onBack: () -> Unit) {
  */
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
-private fun MoodList(moods: List<String>, changed: Boolean, onChange: (List<String>) -> Unit, onRename: (String, String) -> Unit, onReset: () -> Unit) {
+private fun MoodList(
+    moods: List<String>,
+    changed: Boolean,
+    toneOf: (String) -> String,
+    onTone: (String, String) -> Unit,
+    onChange: (List<String>) -> Unit,
+    onRename: (String, String) -> Unit,
+    onReset: () -> Unit,
+) {
     val c = Obsidian.colors
+    var newTone by remember { mutableStateOf("cream") }
     var renaming by remember { mutableStateOf<String?>(null) }
     renaming?.let { old ->
         var name by remember(old) { mutableStateOf(old) }
@@ -238,9 +250,16 @@ private fun MoodList(moods: List<String>, changed: Boolean, onChange: (List<Stri
         androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             moods.forEach { mood ->
                 Row(
-                    Modifier.clip(RoundedCornerShape(50)).border(1.dp, c.border, RoundedCornerShape(50)).padding(start = 12.dp),
+                    Modifier.clip(RoundedCornerShape(50)).border(1.dp, c.border, RoundedCornerShape(50)).padding(start = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
+                    // Its colour: a tap goes on to the next of the four.
+                    val tone = toneOf(mood)
+                    androidx.compose.foundation.layout.Box(
+                        Modifier.size(32.dp).clip(RoundedCornerShape(50))
+                            .clickable(onClickLabel = "another colour for $mood") { onTone(mood, Why.TONES[(Why.TONES.indexOf(tone) + 1) % Why.TONES.size]) },
+                        contentAlignment = Alignment.Center,
+                    ) { androidx.compose.foundation.layout.Box(Modifier.size(10.dp).clip(RoundedCornerShape(50)).background(app.bedtime.ui.components.toneColour(tone))) }
                     Text(mood, style = MaterialTheme.typography.labelLarge, color = c.textNormal, modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClickLabel = "rename $mood") { renaming = mood }.padding(vertical = 6.dp))
                     Icon(
                         LineIcons.Clear,
@@ -251,7 +270,16 @@ private fun MoodList(moods: List<String>, changed: Boolean, onChange: (List<Stri
                 }
             }
         }
-        Committed("", "Add a mood", clearAfter = true) { typed -> typed.trim().lowercase().takeIf { it.isNotEmpty() && it !in moods }?.let { onChange(moods + it) } }
+        // A new mood picks its colour as it's added.
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Committed("", "Add a mood", modifier = Modifier.weight(1f), clearAfter = true) { typed ->
+                typed.trim().lowercase().takeIf { it.isNotEmpty() && it !in moods }?.let {
+                    onTone(it, newTone)
+                    onChange(moods + it)
+                }
+            }
+            app.bedtime.ui.components.ToneSwatches(newTone, onPick = { newTone = it })
+        }
         if (changed) {
             Text(
                 "Back to the suggested moods",
