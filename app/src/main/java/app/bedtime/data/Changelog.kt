@@ -13,6 +13,18 @@ data class ChangelogEntry(val versionCode: Int, val versionName: String, val lin
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            109,
+            "0.9.63",
+            listOf(
+                "Was it worth it? After a while in a distracting app, a small question once you leave it: once a day for each app, three times a day at most. The nudge asks it too, without leaving the app. Switch it on in settings › focus; the answers show beside the apps in insights.",
+                "Insights: a week and a month show a day on average, with the totals in a line under them. Moods run from good to hard in four colours you can tell apart; tap a mood in settings to change its name or colour, and the mood calendar has a key.",
+                "Habits show how many of the last 7 days were kept, and sessions how many of the last 10, instead of days in a row.",
+                "Permissions are asked where they're needed: an allow button in the schedule, and the full-screen reminder asking for its own. Setup counts only the steps that something you use needs.",
+                "The Sunday note is in settings › focus, and the rain alert in the weather widget's options.",
+                "Writing in the journal moves up with the keyboard, and you can scroll back through what you wrote. Gentler words after taking more time, and in your week.",
+            ),
+        ),
+        ChangelogEntry(
             108,
             "0.9.62",
             listOf(

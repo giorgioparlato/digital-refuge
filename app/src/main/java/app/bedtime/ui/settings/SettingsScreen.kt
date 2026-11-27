@@ -267,7 +267,10 @@ fun SettingsScreen(place: SettingsPlace? = null, onBack: (() -> Unit)? = null, o
         resumes++
         onPauseOrDispose { }
     }
-    val stepsLeft = remember(resumes, settings.alwaysAvailable.size) { SetupSteps.left(context, settings.alwaysAvailable.size) }
+    val missing = remember(resumes, schedules, settings.fullScreenReminder, settings.offCoverMinutes) {
+        SetupSteps.missing(context, SetupSteps.needsDnd(schedules), SetupSteps.needsOverlay(settings))
+    }
+    val stepsLeft = missing.size
     val isDefaultHome = remember(resumes) { HomeRole.isDefault(context) }
     val backupWritable = remember(resumes, settings.backupFolder) { settings.backupFolder?.let { AutoBackup.canWrite(context, it) } ?: false }
 
@@ -280,12 +283,20 @@ fun SettingsScreen(place: SettingsPlace? = null, onBack: (() -> Unit)? = null, o
         onChange = { change -> scope.launch { repo.updateSettings(change) } },
         inSession = engineState?.isActive == true,
         setupStepsLeft = stepsLeft,
+        nextStep = missing.firstOrNull(),
+        onNeedOverlay = {
+            // Switching a full screen on asks for what it needs right there, not in setup.
+            if (!android.provider.Settings.canDrawOverlays(context)) {
+                runCatching { context.startActivity(Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${context.packageName}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+            }
+        },
         isDefaultHome = isDefaultHome,
         version = version,
         canPinWidget = canPinWidget,
         onBack = onBack,
         onOpen = onOpen,
         onNudge = { m -> scope.launch { repo.updateSettings { it.copy(runNudgeMinutes = m) } } },
+        onWorth = { m -> scope.launch { repo.updateSettings { it.copy(worthMinutes = m) } } },
         onOffCover = { m ->
             scope.launch { repo.updateSettings { it.copy(offCoverMinutes = m) } }
             app.bedtime.service.OffCover.settingChanged(context, m)
@@ -329,6 +340,9 @@ internal fun SettingsContent(
     /** A session running now: what guards every session can't be changed until it's over. */
     inSession: Boolean = false,
     setupStepsLeft: Int,
+    /** What the first step left is for, said beside the count. */
+    nextStep: String? = null,
+    onNeedOverlay: () -> Unit = {},
     isDefaultHome: Boolean = false,
     version: String = "0.9.20",
     canPinWidget: Boolean = true,
@@ -352,6 +366,8 @@ internal fun SettingsContent(
     onBackupJournal: (Boolean) -> Unit = {},
     /** Minutes in a row on the phone before a nudge, or null for none. */
     onNudge: (Int?) -> Unit = {},
+    /** Minutes in a distracting app before "was it worth it?", or null for never. */
+    onWorth: (Int?) -> Unit = {},
     /** Minutes blocking may stay off outside a session before a full screen, or null for never. */
     onOffCover: (Int?) -> Unit = {},
 ) {
@@ -370,6 +386,19 @@ internal fun SettingsContent(
             onNudge(it)
         }
     }
+    var choosingWorth by remember { mutableStateOf(false) }
+    if (choosingWorth) {
+        MinutesDialog(
+            "Was it worth it?",
+            "After a while in one of your distracting apps, a small sheet asks if the time was worth it, once the app is left: once a day for each app, three times a day at most. The nudge after time in a row asks it too. The answers show beside the apps in insights.",
+            listOf(null, 5, 10, 15, 30),
+            settings.worthMinutes,
+            onDismiss = { choosingWorth = false },
+        ) {
+            choosingWorth = false
+            onWorth(it)
+        }
+    }
     var choosingOffCover by remember { mutableStateOf(false) }
     if (choosingOffCover) {
         MinutesDialog(
@@ -384,7 +413,7 @@ internal fun SettingsContent(
         }
     }
     val backup = BackupRows(backupFolderName, backupWritable, onWeeklyBackup, onChooseBackupFolder, onBackUpNow, backupSealed, onBackupPassphrase, onBackupJournal)
-    val entries = settingsEntries(settings, setupStepsLeft, isDefaultHome, onOpen, onLockScreen, onLockAlways, onExport, onImport, backup, onChooseNudge = { choosingNudge = true }, onChooseOffCover = { choosingOffCover = true }, schedules = schedules, onChange = onChange, inSession = inSession)
+    val entries = settingsEntries(settings, setupStepsLeft, nextStep, onNeedOverlay, isDefaultHome, onOpen, onLockScreen, onLockAlways, onExport, onImport, backup, onChooseNudge = { choosingNudge = true }, onChooseWorth = { choosingWorth = true }, onChooseOffCover = { choosingOffCover = true }, schedules = schedules, onChange = onChange, inSession = inSession)
     Scaffold(
         containerColor = c.bgPrimary,
         topBar = {
@@ -508,6 +537,8 @@ private fun Footer(version: String) {
 private fun settingsEntries(
     s: AppSettings,
     stepsLeft: Int,
+    nextStep: String?,
+    onNeedOverlay: () -> Unit,
     isDefaultHome: Boolean,
     onOpen: (String) -> Unit,
     onLockScreen: (Boolean) -> Unit,
@@ -516,6 +547,7 @@ private fun settingsEntries(
     onImport: () -> Unit,
     backup: BackupRows,
     onChooseNudge: () -> Unit = {},
+    onChooseWorth: () -> Unit = {},
     onChooseOffCover: () -> Unit = {},
     schedules: List<Schedule> = emptyList(),
     onChange: ((AppSettings) -> AppSettings) -> Unit = {},
@@ -527,7 +559,7 @@ private fun settingsEntries(
         // ---------------------------------------------------------------- the first page
         val steps = when (stepsLeft) {
             0 -> "All set"
-            1 -> "1 step left"
+            1 -> "1 step left" + (nextStep?.let { " · $it" } ?: "")
             else -> "$stepsLeft steps left"
         }
         // Alone at the top: the one row that can be wrong, so its steps left show here too.
@@ -613,7 +645,7 @@ private fun settingsEntries(
                 "Full-screen reminder",
                 "If blocking is turned off during a session, a full screen stays up until you turn it back on$locked",
                 "full screen reminder takeover overlay switched off sessions",
-                trailing = { ObsidianToggle(s.remindsFullScreen, { on -> onChange { it.copy(fullScreenReminder = on) } }, enabled = !inSession) },
+                trailing = { ObsidianToggle(s.remindsFullScreen, { on -> onChange { it.copy(fullScreenReminder = on) }; if (on) onNeedOverlay() }, enabled = !inSession) },
             ),
         )
         add(
@@ -714,6 +746,27 @@ private fun settingsEntries(
                 s.runNudgeMinutes?.let { "A reminder after $it min on the phone without a break" } ?: "Off",
                 "nudge time in a row long stretch reminder minutes break",
                 onChooseNudge,
+            ),
+        )
+        add(
+            Entry(
+                checkins,
+                LineIcons.CheckCircle,
+                "Was it worth it?",
+                s.worthMinutes?.let { "Asked after $it min or more in a distracting app" } ?: "Off",
+                "worth it worth regret time well spent distracting apps ask after",
+                onChooseWorth,
+            ),
+        )
+        // The look back on the week: something refuge tells you on its own, so with the check-ins.
+        add(
+            Entry(
+                checkins,
+                LineIcons.Notifications,
+                "A note on Sunday evening",
+                "Your week, once it's over; and in insights until Monday ends",
+                "week weekly note sunday look back summary notification",
+                trailing = { ObsidianToggle(s.weeklyNote, { on -> onChange { it.copy(weeklyNote = on) } }) },
             ),
         )
         // Last of the check-ins.

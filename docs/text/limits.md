@@ -207,8 +207,8 @@ The steps for more use the same rows as a block's steps: see the editor in focus
 - This gives you one more open today.
 - This gives you {minutes} more minutes today.
 - {name} is lifted until tomorrow.
-- One more open. Make it count.
-- {minutes} more minutes. Spend them well.
+- One more open today.
+- {minutes} more minutes today.
 - 1 open
 - {dailyOpens} opens
 - {limitName} · {allowance} a day
@@ -237,5 +237,6 @@ The steps for more use the same rows as a block's steps: see the editor in focus
 - {minutes} minutes in a row
 - You've been on your phone for {minutes} minutes without a break.
 - Is this still what you meant to do?
+- Was it worth it, so far?
 - Lock the phone
 - Keep going

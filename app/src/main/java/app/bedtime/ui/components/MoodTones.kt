@@ -19,16 +19,31 @@ import androidx.compose.ui.unit.dp
 import app.bedtime.data.Why
 import app.bedtime.ui.theme.Obsidian
 
-/** A mood's colour ([Why.TONES]) as the app draws it: sage, cream, tan or clay rose. */
+/**
+ * A mood's colour ([Why.TONES]) as the app draws it, from good to hard: sage, a pale sage, a light
+ * amber, and clay rose. The two in the middle differ in hue as well as from the ends in lightness, so
+ * all four tell apart at a glance. (Their keys, "cream" and "tan", are kept from before, as moods store them.)
+ */
 @Composable
 fun toneColour(tone: String): Color {
     val c = Obsidian.colors
     return when (tone) {
         "sage" -> c.accent
-        "tan" -> c.textMuted
+        "tan" -> FairlyLow
         "rose" -> c.distracting
-        else -> c.textNormal
+        else -> FairlyGood
     }
+}
+
+private val FairlyGood = Color(0xFFA6CDB2)
+private val FairlyLow = Color(0xFFDDB46E)
+
+/** What each colour stands for, for screen readers and the colour's own label. */
+fun toneLabel(tone: String): String = when (tone) {
+    "sage" -> "good"
+    "tan" -> "fairly low"
+    "rose" -> "hard"
+    else -> "fairly good"
 }
 
 /** The four colours a mood can have, the [picked] one ringed. */
@@ -42,7 +57,7 @@ fun ToneSwatches(picked: String, onPick: (String) -> Unit, modifier: Modifier = 
                     .size(36.dp)
                     .clip(CircleShape)
                     .border(2.dp, if (tone == picked) c.textNormal else Color.Transparent, CircleShape)
-                    .clickable(onClickLabel = tone, role = Role.RadioButton) { onPick(tone) }
+                    .clickable(onClickLabel = toneLabel(tone), role = Role.RadioButton) { onPick(tone) }
                     .padding(6.dp)
                     .clip(CircleShape)
                     .background(toneColour(tone)),

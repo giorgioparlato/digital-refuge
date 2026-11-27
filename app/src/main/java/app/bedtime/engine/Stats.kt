@@ -62,6 +62,12 @@ object Stats {
         )
     }
 
+    /** Of the last [count] finished sessions (fewer if there aren't as many yet), how many were kept: no early unlock, break or pause. */
+    fun keptOfLast(history: List<SessionLog>, now: Long, count: Int = 10): Pair<Int, Int> {
+        val last = history.filter { it.isFinished(now) }.sortedByDescending { it.start }.take(count)
+        return last.count { it.escapes == 0 } to last.size
+    }
+
     /** Most recent finished sessions in a row that ended without an early unlock, a break or a pause. */
     fun streak(history: List<SessionLog>, now: Long): Int =
         history.filter { it.isFinished(now) }

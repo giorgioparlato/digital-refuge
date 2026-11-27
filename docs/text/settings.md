@@ -59,6 +59,8 @@ Home screen, lock screen, apps, shortcuts and about & backup are lists of rows f
 - Cancel
 - A nudge after time in a row
 - After a long stretch on the phone, a full screen asks if you still want to be on it. Never during a call.
+- Was it worth it?
+- After a while in one of your distracting apps, a small sheet asks if the time was worth it, once the app is left: once a day for each app, three times a day at most. The nudge after time in a row asks it too. The answers show beside the apps in insights.
 - When blocking stays off
 - If blocking stays switched off outside a session, a full screen asks you to switch it back on. Later asks again after the same time.
 - Find a setting
@@ -71,6 +73,7 @@ Home screen, lock screen, apps, shortcuts and about & backup are lists of rows f
 - github.com/giorgioparlato/digital-refuge ›
 - All set
 - 1 step left
+-  · {it}
 - {stepsLeft} steps left
 - Permissions & setup
 - permissions setup accessibility greyscale dnd do not disturb battery overlay notifications launcher
@@ -121,6 +124,11 @@ Home screen, lock screen, apps, shortcuts and about & backup are lists of rows f
 - notifications messages reply replies people contacts circles groups lock screen rain alert weather your week sunday note
 - A reminder after {it} min on the phone without a break
 - nudge time in a row long stretch reminder minutes break
+- Asked after {it} min or more in a distracting app
+- worth it worth regret time well spent distracting apps ask after
+- A note on Sunday evening
+- Your week, once it's over; and in insights until Monday ends
+- week weekly note sunday look back summary notification
 - Moods
 - mood moods feeling feelings tag tags hungry angry lonely tired bored happy anxious how do you feel now
 - App groups
@@ -246,6 +254,10 @@ Home screen, lock screen, apps, shortcuts and about & backup are lists of rows f
 - What refuge actually gets: a word when a different app comes to the front, and the name of that app or Settings page. It can't read what's on the screen or what you type, and it can't tap or swipe for you.
 - Refuge has no internet access at all: Android doesn't let it go online, so nothing from it can leave your phone.
 - What it's used for: blocking an app the moment it opens, keeping blocking from being switched off in Settings during a session, turning the screen off from refuge's lock screen, and noticing when you unlock.
+- blocking, so apps can be blocked
+- do not disturb, for quiet sessions
+- notifications, for the session's lotus
+- display over other apps, for the full-screen reminder
 
 ## look, widgets, gestures and lock-screen notifications
 
@@ -297,17 +309,6 @@ One file serves the look, widgets, gestures and notifications pages, for both sc
 - … ready to send with a tap. Typing your own works too
 - Swipe left
 - Swipe right
-- Your week
-- Time in refuge, how sessions held, the phone and habits, against the week before
-- A note on Sunday evening
-- Shows once the week is over, and in insights until Monday ends
-- Rain today
-- From Breezy Weather's forecast (see the weather widget's options to set it up)
-- A rain alert
-- A morning heads-up when rain is likely, with the chance and the time
-- Rain alert at
-- At
-- When the chance is at least
 - Circles
 - People and group chats whose notifications show from any app, first, in their colour
 - … people
@@ -414,6 +415,10 @@ One file serves the look, widgets, gestures and notifications pages, for both sc
 - 5 days
 - In
 - Automatic
+- A rain alert
+- A heads-up when rain is likely, with the chance and the time
+- Rain alert at
+- When the chance is at least
 - Install Breezy Weather (it's on F-Droid). In its settings, under External modules, open “Send Gadgetbridge data” and tick digital refuge. It sends the weather each time it updates.
 - Uses the calendar already on your phone. Nothing goes online.
 - Tomorrow's first event, once today's are done

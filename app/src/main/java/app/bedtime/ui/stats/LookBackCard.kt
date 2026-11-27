@@ -68,7 +68,7 @@ internal object LookBackLines {
         if (week.finished > 0 || week.escapes > 0) {
             add(
                 "Sessions" to "${week.kept} of ${week.finished} kept" +
-                    if (week.escapes > 0) " · ${week.escapes} ${if (week.escapes == 1) "way" else "ways"} out" else "",
+                    if (week.escapes > 0) " · ${week.escapes} ended early" else "",
             )
         }
         week.phone?.let { add("On the phone" to formatMinutes(it / 60) + versus(it, week.phoneBefore)) }

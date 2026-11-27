@@ -178,9 +178,10 @@ internal fun WhyScreen(
         }
         Column(
             Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.Center,
+            // Writing, everything sits at the top, so more of what's written shows above the keyboard.
+            verticalArrangement = if (typing) Arrangement.Top else Arrangement.Center,
         ) {
-            Spacer(Modifier.height(if (typing) 12.dp else 24.dp))
+            Spacer(Modifier.height(if (typing) 8.dp else 24.dp))
             Text(question, fontSize = if (typing) 19.sp else 28.sp, fontWeight = FontWeight.Light, lineHeight = if (typing) 25.sp else 35.sp, color = c.textNormal)
             Spacer(Modifier.height(if (typing) 12.dp else 20.dp))
             // Room to write it out between two hairlines: as much as you like, or nothing; with a minimum, typed rather than pasted.
@@ -198,7 +199,7 @@ internal fun WhyScreen(
                         Column {
                             androidx.compose.material3.HorizontalDivider(color = c.border)
                             Column(Modifier.fillMaxWidth().heightIn(min = if (typing) 96.dp else 132.dp).padding(vertical = 14.dp)) {
-                                androidx.compose.foundation.layout.Box(Modifier.weight(1f, fill = false)) {
+                                androidx.compose.foundation.layout.Box {
                                     if (words.isEmpty()) Text(if (minWords > 0) "At least $minWords words…" else "Write it down, if you want…", style = MaterialTheme.typography.bodyLarge, color = c.textFaint)
                                     field()
                                 }
@@ -239,7 +240,18 @@ internal fun WhyScreen(
             }
             Spacer(Modifier.height(16.dp))
         }
-        if (keeping) {
+        // With the keyboard up, the two ways on share a line, leaving the room to the words.
+        if (typing) {
+            Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (keeping) {
+                    QuietButton("Never mind", Modifier.weight(1f)) { onPutDown(words, picked) }
+                    SoftPillButton("Keep it", onClick = { onGoOn(words, picked) }, enabled = words.isNotBlank() || picked.isNotEmpty(), modifier = Modifier.weight(1f))
+                } else {
+                    SoftPillButton("Not now", onClick = { onPutDown(words, picked) }, modifier = Modifier.weight(1f))
+                    QuietButton("Yes, go on", Modifier.weight(1f), enabled = written >= minWords) { onGoOn(words, picked) }
+                }
+            }
+        } else if (keeping) {
             SoftPillButton("Keep it", onClick = { onGoOn(words, picked) }, enabled = words.isNotBlank() || picked.isNotEmpty(), modifier = Modifier.fillMaxWidth())
             QuietButton("Never mind") { onPutDown(words, picked) }
         } else {

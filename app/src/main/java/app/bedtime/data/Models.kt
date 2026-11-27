@@ -524,6 +524,7 @@ data class HomeStyle(
         calendarTomorrow = from.calendarTomorrow, calendarOneLine = from.calendarOneLine, habitsDots = from.habitsDots, noteBesideShare = from.noteBesideShare,
         habitsDue = from.habitsDue, habitsKeepDone = from.habitsKeepDone, habitsLabel = from.habitsLabel, habitsPlace = from.habitsPlace, useWidget = from.useWidget, lockUseWidget = from.lockUseWidget,
         weatherUnit = from.weatherUnit, calendarNamesOnLock = from.calendarNamesOnLock,
+        rainAlert = from.rainAlert, rainAlertMinute = from.rainAlertMinute, rainAlertFrom = from.rainAlertFrom,
         hourCalmColor = from.hourCalmColor, hourDistractedColor = from.hourDistractedColor,
     )
 
@@ -767,6 +768,8 @@ data class AppSettings(
     val journalSections: List<JournalSection>? = null,
     /** "How do you feel now?" after this many minutes on the phone in one go; 0 never. Schedules and limits have their own. */
     val moodAfterMinutes: Int = 0,
+    /** "Was it worth it?" after this many minutes in a distracting app, once a day for each; null never. The nudge asks it too. */
+    val worthMinutes: Int? = null,
     /** Voice notes, off until switched on; they show anywhere only once a folder and a model are chosen too ([Voice.ready]). */
     val voiceOn: Boolean = false,
     /** Voice notes: the folder their files go in (a document tree); none until chosen, and none means no recording. */

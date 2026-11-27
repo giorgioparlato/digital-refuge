@@ -147,6 +147,10 @@ object Habits {
         return n
     }
 
+    /** How many of the last [days] days, today among them, were kept: forgiving where a run isn't, as one day missed takes nothing away from the rest. */
+    fun keptOf(habit: Habit, marks: Map<Long, Int>, today: Long, days: Int): Int =
+        ((today - days + 1)..today).count { kept(day(habit, marks, it)) }
+
     /** The longest run of kept days since the first mark. */
     fun bestStreak(habit: Habit, marks: Map<Long, Int>, today: Long): Int {
         val first = marks.keys.minOrNull() ?: return 0

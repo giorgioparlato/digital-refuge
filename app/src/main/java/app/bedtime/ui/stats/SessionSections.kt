@@ -279,12 +279,12 @@ private fun KeptBars(weeks: List<Float?>, height: Int) {
     }
 }
 
-/** The figures as they were, in one quiet line at the foot: time in refuge, kept in a row, the best run. */
+/** The figures as they were, in one quiet line at the foot: time in refuge, and how many of the last sessions were kept. */
 @Composable
-internal fun SessionTotals(protectedMinutes: Long, streak: Int, best: Int) {
+internal fun SessionTotals(protectedMinutes: Long, kept: Int, of: Int) {
     val c = Obsidian.colors
     Text(
-        "in refuge this week ${formatMinutes(protectedMinutes)} · kept in a row $streak · best run $best",
+        "in refuge this week ${formatMinutes(protectedMinutes)}" + if (of > 0) " · kept $kept of the last $of" else "",
         style = MaterialTheme.typography.bodySmall,
         color = c.textFaint,
         modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp),

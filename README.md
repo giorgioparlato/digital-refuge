@@ -25,7 +25,7 @@ Two things are always true: while a session runs its settings can't be changed, 
 | **Lock changes during sessions** | Covers the Settings screens that switch blocking off, and the prompt to uninstall. | Settings → staying blocked |
 | **Full-screen reminder** | If blocking is switched off at all, a full screen stays until you switch it back on. | Settings → staying blocked |
 
-An **emergency break** steps out for a few minutes without ending the session, for whatever genuinely can't wait. It counts as an escape, and the full screen brings you back when it's over.
+An **emergency break** steps out for a few minutes without ending the session, for whatever genuinely can't wait. It's counted, like leaving early, and the full screen brings you back when it's over.
 
 Nothing here can be made impossible, and the app doesn't pretend otherwise — Android always lets you withdraw an app's permissions, and safe mode always works. What it can do is make leaving a decision rather than a reflex, and count it when you do. Each block's ⓘ button opens the same explanation inside the app.
 
@@ -78,7 +78,8 @@ Nothing here can be made impossible, and the app doesn't pretend otherwise — A
 - **Easy number picking:** tap − or + for one step, hold to keep going faster, or tap the number to type a value or pick a preset.
 - **Safer defaults:** Settings, Phone and Messages start out allowed in minimal mode, and the app picker explains why.
 - **App groups** ("Social & feeds", "Essentials", or your own) let you tick many apps in one tap.
-- **Your refuge**: the week in one line at the foot of home, and a tap away the full picture: time in refuge, the current and best run of kept sessions, a bar for each of the last fourteen days (green when kept, orange when a way out was taken; tap one for its figures), each schedule's record, and time in limited apps. Early unlocks, emergency breaks and blocking switched off are each counted on their own line, and all of them end a run.
+- **Was it worth it?** If you switch it on (settings › focus), leaving a distracting app after a while asks one small question: worth it, or not really. Once a day for each app, three times a day at most, never during a call; the nudge after time in a row asks it too. The answers show beside the apps in insights, and stay on the phone like everything else.
+- **Your refuge**: the week in one line at the foot of home, and a tap away the full picture: time in refuge, how many of the last ten sessions were kept, the share kept week by week, when in a session you leave early, and why, and time in limited apps. Early unlocks, emergency breaks and blocking switched off are each counted on their own line, and any of them means a session wasn't kept.
 - **What's new** after each update, once, on the home screen.
 - **Quick Settings tile** that starts your favourite focus block.
 - **Home-screen widget** that starts a chosen block with one tap, and shows how long is left while it runs. Add one from settings → home-screen widget, or long-press your home screen → widgets → digital refuge.

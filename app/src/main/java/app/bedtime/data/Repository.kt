@@ -124,6 +124,11 @@ class Repository private constructor(context: Context) {
         update(HABIT_MARKS, habitMarksSerializer, emptyList()) { marks -> marks.filterNot { it.habit == id } }
     }
 
+    /** Answers to "was it worth it?", oldest first. */
+    val worth: Flow<List<WorthAnswer>> = observe(WORTH, worthSerializer, emptyList())
+
+    suspend fun addWorth(answer: WorthAnswer) = update(WORTH, worthSerializer, emptyList()) { Worth.added(it, answer) }
+
     /** The microjournal's entries, a day each. */
     val journal: Flow<List<JournalEntry>> = observe(JOURNAL, journalSerializer, emptyList())
 
@@ -195,12 +200,12 @@ class Repository private constructor(context: Context) {
     /** A mood's colour changed, one of [Why.TONES]. */
     suspend fun setMoodTone(mood: String, tone: String) = updateSettings { s -> s.copy(moodColours = (s.moodColours ?: emptyMap()) + (mood to tone)) }
 
-    /** A mood renamed, in the moods to tap and in every entry that has it; its colour goes with it. */
-    suspend fun renameMoodTag(old: String, new: String) {
+    /** A mood renamed, in the moods to tap and in every entry that has it; its colour goes with it, or [tone] if given. */
+    suspend fun renameMoodTag(old: String, new: String, tone: String? = null) {
         updateSettings { s ->
             s.copy(
                 moodTags = (s.moodTags ?: Why.MOODS).map { if (it == old) new else it }.distinct(),
-                moodColours = (s.moodColours ?: emptyMap()) - old + (new to Why.toneOf(s, old)),
+                moodColours = (s.moodColours ?: emptyMap()) - old + (new to (tone ?: Why.toneOf(s, old))),
             )
         }
         update(JOURNAL, journalSerializer, emptyList()) { Journal.moodRenamed(it, old, new) }
@@ -496,6 +501,7 @@ class Repository private constructor(context: Context) {
         notes = notes.first(),
         journal = if (settings.first().backupJournal) journal.first() else emptyList(),
         habitMarks = habitMarks.first(),
+        worth = worth.first(),
         usage = usage.first(),
         usageMonths = usageMonths.first(),
     )
@@ -532,6 +538,11 @@ class Repository private constructor(context: Context) {
                 prefs[JOURNAL] = AppJson.encodeToString(journalSerializer, (backup.journal.associateBy { it.day } + here.associateBy { it.day }).values.sortedBy { it.day })
             }
             if (backup.habitMarks.isNotEmpty()) prefs[HABIT_MARKS] = AppJson.encodeToString(habitMarksSerializer, backup.habitMarks)
+            // "Was it worth it?", joined with this phone's answers.
+            if (backup.worth.isNotEmpty()) {
+                val here = decode(prefs[WORTH], worthSerializer, emptyList())
+                prefs[WORTH] = AppJson.encodeToString(worthSerializer, (backup.worth + here).distinctBy { it.at to it.app }.sortedBy { it.at }.takeLast(Worth.KEPT))
+            }
             // Phone use, only from files that have it, joined with what this phone has counted since.
             if (backup.usage.isNotEmpty()) {
                 val here = decode(prefs[USAGE], usageSerializer, emptyList())
@@ -569,6 +580,8 @@ class Repository private constructor(context: Context) {
         private const val MONTHS_KEPT = 24
         private val NOTES = stringPreferencesKey("notes")
         private val JOURNAL = stringPreferencesKey("journal")
+        private val WORTH = stringPreferencesKey("worth")
+        private val worthSerializer = ListSerializer(WorthAnswer.serializer())
         private val NOTES_TRASH = stringPreferencesKey("notes_trash")
         private val trashSerializer = ListSerializer(TrashedNote.serializer())
         private val journalSerializer = ListSerializer(JournalEntry.serializer())
@@ -579,7 +592,7 @@ class Repository private constructor(context: Context) {
         private val habitMarksSerializer = ListSerializer(HabitMark.serializer())
 
         /** The keys kept in the day-to-day file rather than with the settings. */
-        internal val DAY_KEYS: Set<Preferences.Key<String>> by lazy { setOf(USAGE, USAGE_MONTHS, NOTES, NOTES_TRASH, JOURNAL, HABIT_MARKS, WEATHER, TIMERS, LOCK_QUIET) }
+        internal val DAY_KEYS: Set<Preferences.Key<String>> by lazy { setOf(USAGE, USAGE_MONTHS, NOTES, NOTES_TRASH, JOURNAL, HABIT_MARKS, WEATHER, TIMERS, LOCK_QUIET, WORTH) }
         private val quietSerializer = MapSerializer(String.serializer(), Long.serializer())
         private val timersSerializer = ListSerializer(Long.serializer())
         /** About three years of nightly sessions, or several months of a busy mix: still a small file. */

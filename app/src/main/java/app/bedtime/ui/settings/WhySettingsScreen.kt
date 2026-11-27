@@ -154,14 +154,14 @@ fun MoodsScreen(onBack: () -> Unit) {
                         modifier = Modifier.padding(top = 6.dp),
                     )
                 }
-                SectionCard(title = "Your moods", subtitle = "Tap one to rename it; the days it was tapped follow. Tap its dot for another colour. × takes it out") {
+                SectionCard(title = "Your moods", subtitle = "Tap one to rename it or change its colour; the days it was tapped follow. × takes it out") {
                     MoodList(
                         Why.moods(s),
                         changed = s.moodTags != null,
                         toneOf = { Why.toneOf(s, it) },
                         onTone = { mood, tone -> scope.launch { repo.setMoodTone(mood, tone) } },
                         onChange = { list -> change { it.copy(moodTags = list) } },
-                        onRename = { old, new -> scope.launch { repo.renameMoodTag(old, new) } },
+                        onRename = { old, new, tone -> scope.launch { repo.renameMoodTag(old, new, tone) } },
                         onReset = { change { it.copy(moodTags = null) } },
                     )
                 }
@@ -216,32 +216,39 @@ private fun MoodList(
     toneOf: (String) -> String,
     onTone: (String, String) -> Unit,
     onChange: (List<String>) -> Unit,
-    onRename: (String, String) -> Unit,
+    onRename: (String, String, String) -> Unit,
     onReset: () -> Unit,
 ) {
     val c = Obsidian.colors
     var newTone by remember { mutableStateOf("cream") }
     var renaming by remember { mutableStateOf<String?>(null) }
+    // A mood's name and colour, changed together.
     renaming?.let { old ->
         var name by remember(old) { mutableStateOf(old) }
+        var tone by remember(old) { mutableStateOf(toneOf(old)) }
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { renaming = null },
             containerColor = c.bgSecondary,
-            title = { Text("Rename $old", color = c.textNormal) },
+            title = { Text(old, color = c.textNormal) },
             text = {
-                ObsidianTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    placeholder = old,
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, imeAction = ImeAction.Done),
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    ObsidianTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        placeholder = old,
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, imeAction = ImeAction.Done),
+                    )
+                    Text("Its colour", style = MaterialTheme.typography.labelLarge, color = c.textMuted)
+                    app.bedtime.ui.components.ToneSwatches(tone, onPick = { tone = it })
+                }
             },
             confirmButton = {
                 androidx.compose.material3.TextButton(onClick = {
-                    name.trim().lowercase().takeIf { it.isNotEmpty() && it != old }?.let { onRename(old, it) }
+                    val new = name.trim().lowercase().takeIf { it.isNotEmpty() } ?: old
+                    if (new != old) onRename(old, new, tone) else if (tone != toneOf(old)) onTone(old, tone)
                     renaming = null
-                }) { Text("Rename", color = c.accentText) }
+                }) { Text("Save", color = c.accentText) }
             },
             dismissButton = { androidx.compose.material3.TextButton(onClick = { renaming = null }) { Text("Cancel", color = c.textMuted) } },
         )
@@ -250,17 +257,18 @@ private fun MoodList(
         androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             moods.forEach { mood ->
                 Row(
-                    Modifier.clip(RoundedCornerShape(50)).border(1.dp, c.border, RoundedCornerShape(50)).padding(start = 4.dp),
+                    Modifier.clip(RoundedCornerShape(50)).border(1.dp, c.border, RoundedCornerShape(50)),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    // Its colour: a tap goes on to the next of the four.
-                    val tone = toneOf(mood)
-                    androidx.compose.foundation.layout.Box(
-                        Modifier.size(32.dp).clip(RoundedCornerShape(50))
-                            .clickable(onClickLabel = "another colour for $mood") { onTone(mood, Why.TONES[(Why.TONES.indexOf(tone) + 1) % Why.TONES.size]) },
-                        contentAlignment = Alignment.Center,
-                    ) { androidx.compose.foundation.layout.Box(Modifier.size(10.dp).clip(RoundedCornerShape(50)).background(app.bedtime.ui.components.toneColour(tone))) }
-                    Text(mood, style = MaterialTheme.typography.labelLarge, color = c.textNormal, modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClickLabel = "rename $mood") { renaming = mood }.padding(vertical = 6.dp))
+                    // Its colour and name, a tap from changing either.
+                    Row(
+                        Modifier.clip(RoundedCornerShape(50)).clickable(onClickLabel = "rename $mood or change its colour") { renaming = mood }.padding(start = 12.dp, top = 6.dp, bottom = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        androidx.compose.foundation.layout.Box(Modifier.size(10.dp).clip(RoundedCornerShape(50)).background(app.bedtime.ui.components.toneColour(toneOf(mood))))
+                        androidx.compose.foundation.layout.Spacer(Modifier.size(8.dp))
+                        Text(mood, style = MaterialTheme.typography.labelLarge, color = c.textNormal)
+                    }
                     Icon(
                         LineIcons.Clear,
                         contentDescription = "take $mood out",

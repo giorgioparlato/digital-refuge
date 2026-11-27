@@ -325,8 +325,8 @@ internal fun LimitScreen(pkg: String, limitId: String, onHome: () -> Unit, onFin
                 },
                 success = when {
                     minutes == null -> "$name is lifted until tomorrow."
-                    opens -> "One more open. Make it count."
-                    else -> "$minutes more minutes. Spend them well."
+                    opens -> "One more open today."
+                    else -> "$minutes more minutes today."
                 },
                 onComplete = {
                     granted = true

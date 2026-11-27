@@ -411,15 +411,22 @@ object SetupSteps {
         context.getSystemService(PowerManager::class.java)?.isIgnoringBatteryOptimizations(context.packageName) == true
 
     /**
-     * The six steps not yet done. Greyscale comes with do not disturb access, so it's no step of its own;
-     * using refuge as your launcher is a choice, not a step left.
+     * The steps not yet done that something you use needs, each with what it's for: blocking always;
+     * do not disturb once a schedule quiets the phone or holds notifications back;
+     * notifications for the session's lotus; display over other apps once a full screen can come up.
+     * Battery and always-available apps are worth doing but never "left": nothing stops without them.
+     * Using refuge as your launcher is a choice, not a step left.
      */
-    fun left(context: Context, alwaysAvailableCount: Int): Int = listOf(
-        SystemApps.isAccessibilityServiceEnabled(context),
-        DndController.hasAccess(context),
-        NotificationManagerCompat.from(context).areNotificationsEnabled(),
-        Settings.canDrawOverlays(context),
-        alwaysAvailableCount > 0,
-        batteryUnrestricted(context),
-    ).count { !it }
+    fun missing(context: Context, needsDnd: Boolean, needsOverlay: Boolean): List<String> = listOfNotNull(
+        "blocking, so apps can be blocked".takeIf { !SystemApps.isAccessibilityServiceEnabled(context) },
+        "do not disturb, for quiet sessions".takeIf { needsDnd && !DndController.hasAccess(context) },
+        "notifications, for the session's lotus".takeIf { !NotificationManagerCompat.from(context).areNotificationsEnabled() },
+        "display over other apps, for the full-screen reminder".takeIf { needsOverlay && !Settings.canDrawOverlays(context) },
+    )
+
+    /** Whether any of [schedules] needs do not disturb access: to quiet the phone, or to hold notifications back (as focus counts it). */
+    fun needsDnd(schedules: List<app.bedtime.data.Schedule>): Boolean = schedules.any { it.dnd != app.bedtime.data.DndMode.OFF || it.hideNotifications }
+
+    /** Whether a full screen can come up: the reminder during sessions, or the one when blocking stays off. */
+    fun needsOverlay(settings: app.bedtime.data.AppSettings): Boolean = settings.remindsFullScreen || settings.offCoverMinutes != null
 }

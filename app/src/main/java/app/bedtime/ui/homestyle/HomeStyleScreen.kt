@@ -553,38 +553,7 @@ internal fun HomeStyleContent(
                         SwipeChoiceRow("Swipe right", style.lockSwipeRight) { onChange(style.copy(lockSwipeRight = it)) }
                     }
                 }
-                SectionCard(title = "Your week", subtitle = "Time in refuge, how sessions held, the phone and habits, against the week before") {
-                    OptionRow(LineIcons.Notifications, "A note on Sunday evening", description = "Shows once the week is over, and in insights until Monday ends") {
-                        ObsidianToggle(weeklyNote, onWeeklyNote)
-                    }
-                }
-                SectionCard(title = "Rain today", subtitle = "From Breezy Weather's forecast (see the weather widget's options to set it up)") {
-                    OptionRow(LineIcons.Notifications, "A rain alert", description = "A morning heads-up when rain is likely, with the chance and the time") {
-                        ObsidianToggle(style.rainAlert, { onChange(style.copy(rainAlert = it)) })
-                    }
-                    if (style.rainAlert) {
-                        var pickingTime by rememberSaveable { mutableStateOf(false) }
-                        if (pickingTime) {
-                            TimePickerDialog(
-                                "Rain alert at",
-                                style.rainAlertMinute,
-                                onDismiss = { pickingTime = false },
-                                onConfirm = { minute ->
-                                    onChange(style.copy(rainAlertMinute = minute))
-                                    pickingTime = false
-                                },
-                            )
-                        }
-                        // Any time of day; it covers the hours left from then.
-                        TimeTile("At", formatMinuteOfDay(context, style.rainAlertMinute), Modifier.fillMaxWidth().padding(top = 12.dp)) { pickingTime = true }
-                        SizeLabel("When the chance is at least", Modifier.padding(top = 16.dp, bottom = 8.dp))
-                        SegmentedChoice(
-                            options = RainAlert.THRESHOLDS.map { "$it%" },
-                            selected = RainAlert.THRESHOLDS.indexOf(style.rainAlertFrom).coerceAtLeast(0),
-                            onSelect = { onChange(style.copy(rainAlertFrom = RainAlert.THRESHOLDS[it])) },
-                        )
-                    }
-                }
+                // The note on sunday evening is in settings › focus now, and the rain alert in the weather widget's options.
                 if (style.lockNotifications && notificationAccess) {
                     SectionCard(title = "Circles", subtitle = "People and group chats whose notifications show from any app, first, in their colour") {
                         circles.forEach { circle ->

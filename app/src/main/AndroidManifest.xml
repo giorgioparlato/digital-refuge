@@ -159,6 +159,15 @@
             android:taskAffinity="app.bedtime.mood"
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
 
+        <!-- "Was it worth it?" after a stretch in a distracting app, when asked for. -->
+        <activity
+            android:name=".ui.blocked.WorthActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity="app.bedtime.mood"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
         <activity
             android:name=".ui.blocked.NudgeActivity"
             android:excludeFromRecents="true"

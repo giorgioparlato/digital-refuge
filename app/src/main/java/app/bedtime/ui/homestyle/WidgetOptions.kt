@@ -132,6 +132,25 @@ object WidgetOptions {
             WidgetOption.Choice("In", listOf("Automatic" to TempUnit.AUTO, "°C" to TempUnit.CELSIUS, "°F" to TempUnit.FAHRENHEIT), style.weatherUnit) {
                 change(style.copy(weatherUnit = it))
             },
+            // The rain alert, beside the weather it comes from; one alert, whichever screen's widget it's set from.
+            WidgetOption.Switch("A rain alert", "A heads-up when rain is likely, with the chance and the time", style.rainAlert) {
+                change(style.copy(rainAlert = it))
+            },
+        ) + (
+            if (!style.rainAlert) emptyList() else listOf(
+                WidgetOption.Minutes(
+                    "Rain alert at",
+                    style.rainAlertMinute,
+                    presets = listOf(6 * 60, 7 * 60, 7 * 60 + 30, 8 * 60),
+                    range = 0..(23 * 60 + 45),
+                    step = 15,
+                    format = { "%d:%02d".format(it / 60, it % 60) },
+                ) { change(style.copy(rainAlertMinute = it)) },
+                WidgetOption.Choice("When the chance is at least", app.bedtime.data.RainAlert.THRESHOLDS.map { "$it%" to it }, style.rainAlertFrom) {
+                    change(style.copy(rainAlertFrom = it))
+                },
+            )
+        ) + listOf(
             WidgetOption.Hint(
                 "Install Breezy Weather (it's on F-Droid). In its settings, under External modules, open “Send Gadgetbridge data” and tick digital refuge. " +
                     "It sends the weather each time it updates.",

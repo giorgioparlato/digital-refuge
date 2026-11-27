@@ -160,6 +160,8 @@ class BlockerService : AccessibilityService() {
                 limitTracker.moveTo(null)
                 limitTracker.flush()
                 distractionClock.moveTo(null)
+                // Put down, not left for something else: "was it worth it?" waits for the next stretch.
+                worthApp = null
                 // Put down in Obsidian: its sync waits for the next unlock, as one from the lock screen does.
                 if (lastPackage == FolderIndex.OBSIDIAN) syncAfterObsidian(locked = true)
                 // The weekly backup, when one is due: the phone is put down, so nothing is waiting on it.
@@ -399,11 +401,52 @@ class BlockerService : AccessibilityService() {
         handler.postDelayed({
             val now = System.currentTimeMillis()
             val awake = getSystemService(android.os.PowerManager::class.java)?.isInteractive == true
-            if (Why.moods(settings).isNotEmpty() && awake && Why.due(moodAskedAt, now, MOOD_AGAIN_MS)) {
+            if (Why.moods(settings).isNotEmpty() && awake && Why.due(maxOf(moodAskedAt, worthAskedAt), now, MOOD_AGAIN_MS)) {
                 moodAskedAt = now
                 Problems.attempt("asking how you feel") { startActivity(app.bedtime.ui.blocked.MoodAfterActivity.intent(this, what)) }
             }
         }, delayMs)
+    }
+
+    /** The distracting app in front, and since when, for "was it worth it?" once it's left. */
+    private var worthApp: String? = null
+    private var worthSince = 0L
+    /** When it was last asked, and which apps today (and how many), so it's rare. */
+    private var worthAskedAt = 0L
+    private var worthDay = -1L
+    private val worthAskedToday = mutableSetOf<String>()
+
+    /**
+     * [pkg] in front now. Leaving a distracting app for anything else after a while may ask "was it
+     * worth it?". One of refuge's own covers or sheets coming up over it isn't leaving: the stretch
+     * goes on until you're somewhere else.
+     */
+    private fun worthMove(pkg: String?) {
+        val own = pkg == packageName && (ownScreen?.contains(".ui.blocked.") == true || ownScreen?.endsWith("LockScreenActivity") == true)
+        if (own) return
+        val from = worthApp
+        val now = System.currentTimeMillis()
+        if (from != null && pkg != from) askWorth(from, (now - worthSince) / 1000)
+        if (pkg != from) {
+            worthApp = pkg?.takeIf { it in settings.distractingApps }
+            worthSince = now
+        }
+    }
+
+    private fun askWorth(left: String, seconds: Long) {
+        val today = java.time.LocalDate.now().toEpochDay()
+        if (today != worthDay) {
+            worthDay = today
+            worthAskedToday.clear()
+        }
+        val now = System.currentTimeMillis()
+        if (!app.bedtime.data.Worth.due(settings.worthMinutes, seconds, left, worthAskedToday, worthAskedToday.size, maxOf(moodAskedAt, worthAskedAt), now)) return
+        worthAskedAt = now
+        worthAskedToday += left
+        handler.postDelayed({
+            val awake = getSystemService(android.os.PowerManager::class.java)?.isInteractive == true
+            if (awake && !inCall()) Problems.attempt("asking if it was worth it") { startActivity(app.bedtime.ui.blocked.WorthActivity.intent(this, left, seconds)) }
+        }, 700)
     }
 
     private fun notice(message: String) {
@@ -449,6 +492,7 @@ class BlockerService : AccessibilityService() {
         // Counted first, before anything below can return: our own covers stop the clock too.
         val arrived = limitTracker.moveTo(pkg)
         distractionClock.moveTo(pkg?.let { app.bedtime.data.OwnScreens.marked(it, ownScreen, packageName) })
+        worthMove(pkg)
         if (pkg == null) return
         when (Enforcement.decide(pkg, packageName, state, alwaysAllowed, settings.alwaysAvailable, recentsInFront, ::opensAsApp, homePackages)) {
             Verdict.LET_THROUGH -> Unit
@@ -528,7 +572,9 @@ class BlockerService : AccessibilityService() {
         nudgeJob = scope.launch {
             delay((due - System.currentTimeMillis()).coerceAtLeast(0))
             while (inCall()) delay(60_000)
-            runCatching { startActivity(NudgeActivity.intent(this@BlockerService, minutes)) }
+            // "Was it worth it?" on the nudge too, when it's asked at all: answered there, without leaving the app.
+            val about = lastPackage?.takeIf { it != packageName && it !in homePackages }
+            runCatching { startActivity(NudgeActivity.intent(this@BlockerService, minutes, ask = settings.worthMinutes != null, app = about)) }
             restartRun()
         }
     }

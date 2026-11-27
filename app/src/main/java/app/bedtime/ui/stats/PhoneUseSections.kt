@@ -62,6 +62,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.style.TextAlign
@@ -207,6 +208,54 @@ internal fun PhoneStats(
     var weekWhole by rememberSaveable { mutableStateOf(true) }
     var weekGlance by rememberSaveable { mutableStateOf<Long?>(null) }
 
+    // A week or a month opens with a day on average over its days so far, against the same days before; a day with its own.
+    val perDay = period != UsePeriod.DAY
+    val days = if (perDay) elapsed.coerceAtLeast(1) else 1
+    val so = if (period == UsePeriod.WEEK) "this week" else "this month"
+    SectionCard(subtitle = if (perDay) "A day on average" + if (inProgress) ", $so so far" else "" else null) {
+        Row(Modifier.fillMaxWidth()) {
+            Figure(UseWords.short(totals.total / days), "on the phone", totals.total / days, comparison?.total?.let { it / days }, Modifier.weight(1f))
+            Figure(UseWords.short(totals.distracting / days), "distracting", totals.distracting / days, comparison?.distracting?.let { it / days }, Modifier.weight(1f))
+            // Against your unlock budget, over the days so far, where you've chosen one.
+            val unlocks = totals.unlocks?.let { it / days }
+            Figure(unlocks?.toString() ?: "–", unlockBudgetOf(homeStyle)?.let { "of ${if (perDay) it else it * elapsed} unlocks" } ?: "unlocks", unlocks?.toLong(), comparison?.unlocks?.let { it / days }?.toLong(), Modifier.weight(1f))
+        }
+        // And the whole of it, for its size: the time and unlocks of every day so far, added up.
+        if (perDay) {
+            Spacer(Modifier.height(10.dp))
+            Text(
+                "In all: ${UseWords.short(totals.total)} on the phone · ${UseWords.short(totals.distracting)} distracting" + (totals.unlocks?.let { " · $it unlocks" } ?: ""),
+                style = MaterialTheme.typography.labelMedium,
+                color = c.textMuted,
+            )
+        }
+        Spacer(Modifier.height(12.dp))
+        Box {
+            Text(
+                "against $against" + (if (comparison == null) " · nothing to compare with" else "") + (if (inProgress) ", so far" else "") + "  ▾",
+                style = MaterialTheme.typography.labelMedium,
+                color = c.accentText,
+                modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClickLabel = "choose what to compare with") { choosing = true }.padding(vertical = 6.dp),
+            )
+            DropdownMenu(expanded = choosing, onDismissRequest = { choosing = false }, containerColor = c.bgSecondary) {
+                Versus.options(period).forEach { option ->
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                if (option == Versus.PICKED) "a day you pick…" else versusWords(period, option, start == currentStart, start, null),
+                                color = if (option == versus) c.accentText else c.textNormal,
+                            )
+                        },
+                        onClick = {
+                            choosing = false
+                            if (option == Versus.PICKED) picking = true else onVersus(option)
+                        },
+                    )
+                }
+            }
+        }
+    }
+
     if (period == UsePeriod.MONTH) {
         // The whole phone first; distracting apps and unlocks a tap away.
         var heatOf by rememberSaveable { mutableStateOf(HeatOf.PHONE) }
@@ -242,40 +291,6 @@ internal fun PhoneStats(
             onUnlockBudget = onUnlockBudget,
             today = today,
         )
-    }
-
-    SectionCard {
-        Row(Modifier.fillMaxWidth()) {
-            Figure(UseWords.short(totals.total), "on the phone", totals.total, comparison?.total, Modifier.weight(1f))
-            Figure(UseWords.short(totals.distracting), "distracting", totals.distracting, comparison?.distracting, Modifier.weight(1f))
-            // Against your unlock budget, over the days so far, where you've chosen one.
-            Figure(totals.unlocks?.toString() ?: "–", unlockBudgetOf(homeStyle)?.let { "of ${it * elapsed} unlocks" } ?: "unlocks", totals.unlocks?.toLong(), comparison?.unlocks?.toLong(), Modifier.weight(1f))
-        }
-        Spacer(Modifier.height(12.dp))
-        Box {
-            Text(
-                "against $against" + (if (comparison == null) " · nothing to compare with" else "") + (if (inProgress) ", so far" else "") + "  ▾",
-                style = MaterialTheme.typography.labelMedium,
-                color = c.accentText,
-                modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClickLabel = "choose what to compare with") { choosing = true }.padding(vertical = 6.dp),
-            )
-            DropdownMenu(expanded = choosing, onDismissRequest = { choosing = false }, containerColor = c.bgSecondary) {
-                Versus.options(period).forEach { option ->
-                    DropdownMenuItem(
-                        text = {
-                            Text(
-                                if (option == Versus.PICKED) "a day you pick…" else versusWords(period, option, start == currentStart, start, null),
-                                color = if (option == versus) c.accentText else c.textNormal,
-                            )
-                        },
-                        onClick = {
-                            choosing = false
-                            if (option == Versus.PICKED) picking = true else onVersus(option)
-                        },
-                    )
-                }
-            }
-        }
     }
 
     // A month's days are on the heatmap; under its figures, how it sits among the months before.
@@ -413,6 +428,10 @@ internal fun PhoneStats(
 
     var everything by rememberSaveable { mutableStateOf(false) }
     val ranked = totals.apps.filterValues { it >= 60 }.toList().sortedByDescending { it.second }
+    // "Was it worth it?" over the period, beside each app with enough answers.
+    val worthAnswers by app.bedtime.data.Repository.get(LocalContext.current).worth.collectAsStateWithLifecycle(initialValue = emptyList())
+    val periodDays = remember(dates) { dates.map { it.toEpochDay() }.toSet() }
+    val worthOf = remember(worthAnswers, periodDays) { worthAnswers.filter { it.day in periodDays && it.app != null }.groupBy { it.app!! } }
     SectionCard(
         title = "Apps",
         subtitle = if (use.fromAndroid) "Time and opens, and the change against $against; distracting ones marked" else "Only your distracting apps are counted without usage access",
@@ -425,6 +444,7 @@ internal fun PhoneStats(
                 then = comparison?.let { it.apps[pkg] ?: 0L },
                 distracting = pkg in use.distractingApps,
                 limited = pkg in limitedApps,
+                worth = worthOf[pkg]?.let { app.bedtime.data.Worth.words(it) },
             )
         }
         if (ranked.isEmpty()) Text("Nothing here.", style = MaterialTheme.typography.bodyMedium, color = c.textFaint, modifier = Modifier.padding(top = 4.dp))
@@ -1256,14 +1276,16 @@ private fun MonthGlance(month: UsageMonth, before: UsageMonth?, onOpen: () -> Un
 
 /** An app over the period: its time and opens, and how it moved against the comparison ("+20 min", "new"). */
 @Composable
-private fun AppRow(label: String, seconds: Long, opens: Int, then: Long?, distracting: Boolean, limited: Boolean) {
+private fun AppRow(label: String, seconds: Long, opens: Int, then: Long?, distracting: Boolean, limited: Boolean, worth: String? = null) {
     val c = Obsidian.colors
     Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(8.dp).clip(CircleShape).background(if (distracting) c.distracting else Color.Transparent))
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
             VerbatimText(label, style = MaterialTheme.typography.bodyMedium, color = c.textNormal)
-            if (limited) Text("limited", style = MaterialTheme.typography.labelSmall, color = c.textFaint)
+            listOfNotNull("limited".takeIf { limited }, worth).takeIf { it.isNotEmpty() }?.let {
+                Text(it.joinToString(" · "), style = MaterialTheme.typography.labelSmall, color = c.textFaint)
+            }
         }
         Column(horizontalAlignment = Alignment.End) {
             Text(time(seconds) + if (opens > 0) " · ${opens}×" else "", style = MaterialTheme.typography.bodySmall, color = c.textMuted)

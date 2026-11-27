@@ -51,6 +51,20 @@ class StatsTest {
     }
 
     @Test
+    fun keptOfTheLastSessionsForgivesOneEndedEarly() {
+        val history = listOf(
+            log(now - 4 * day, now - 4 * day + hour),
+            log(now - 3 * day, now - 3 * day + hour, unlocks = listOf(now - 3 * day + 1)),
+            log(now - 2 * day, now - 2 * day + hour),
+            log(now - day, now - day + hour),
+            // Still running: not counted yet.
+            log(now - hour, now + hour),
+        )
+        assertEquals(3 to 4, Stats.keptOfLast(history, now))
+        assertEquals(2 to 2, Stats.keptOfLast(history, now, count = 2))
+    }
+
+    @Test
     fun runningSessionDoesNotCountYet() {
         val history = listOf(log(now - day, now - day + hour), log(now - hour, now + hour))
         assertEquals(1, Stats.streak(history, now))

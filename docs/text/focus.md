@@ -328,9 +328,9 @@ Each update's lines are in [Changelog.kt](../../app/src/main/java/app/bedtime/da
 - The apps and circles you chose for the lock screen.
 - Show only these while it runs.
 - Nothing on refuge's lock screen while it runs.
-- Needs Do Not Disturb access
-- Grant it once in Setup so digital refuge can quiet your phone.
-- Open setup
+- Needs do not disturb access
+- So refuge can quiet your phone while this runs. Android's page for it opens; come back when it's on.
+- Allow
 - Leaving early
 - How leaving early works
 - What unlocking gets you

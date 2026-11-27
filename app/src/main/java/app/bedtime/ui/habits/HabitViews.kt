@@ -314,8 +314,8 @@ fun HabitDetailContent(
         }
         Row(Modifier.fillMaxWidth().padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Figure("${Habits.strength(habit, marks, today)}%", "strength", text, faint, Modifier.weight(1f))
-            Figure("${Habits.streak(habit, marks, today)}", "days in a row", text, faint, Modifier.weight(1f))
-            Figure("${Habits.bestStreak(habit, marks, today)}", "best run", text, faint, Modifier.weight(1f))
+            Figure("${Habits.keptOf(habit, marks, today, 7)}", "of the last 7 days", text, faint, Modifier.weight(1f))
+            Figure("${Habits.keptOf(habit, marks, today, 30)}", "of the last 30 days", text, faint, Modifier.weight(1f))
         }
         if (habit.kind == HabitKind.COUNT) {
             val value = marks[picked] ?: 0

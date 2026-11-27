@@ -54,6 +54,7 @@ import java.util.Locale
  * Moods over a month: each day coloured by the one tapped most, a tap on a day opening its
  * microjournal entry; then how often each came up, and when in the day.
  */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 internal fun MoodStats(
     entries: List<JournalEntry>,
@@ -70,7 +71,8 @@ internal fun MoodStats(
 ) {
     val c = Obsidian.colors
     // A mood no longer among yours is grey.
-    val sage = c.accent; val cream = c.textNormal; val tan = c.textMuted; val rose = c.distracting; val gone = c.textFaint
+    val sage = app.bedtime.ui.components.toneColour("sage"); val cream = app.bedtime.ui.components.toneColour("cream")
+    val tan = app.bedtime.ui.components.toneColour("tan"); val rose = app.bedtime.ui.components.toneColour("rose"); val gone = c.textFaint
     fun colourOf(mood: String, moods: List<String>): Color = if (mood !in moods) gone else when (toneOf(mood)) {
         "sage" -> sage
         "tan" -> tan
@@ -138,6 +140,22 @@ internal fun MoodStats(
                     }
                 }
             }
+        }
+        // The key: each of your moods in its colour, and a tap to where they're named and coloured.
+        Spacer(Modifier.height(10.dp))
+        androidx.compose.foundation.layout.FlowRow(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable(onClickLabel = "your moods and their colours", onClick = onMoods).padding(vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            moods.forEach { mood ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(9.dp).clip(CircleShape).background(colourOf(mood, moods)))
+                    Spacer(Modifier.width(6.dp))
+                    Text(mood, style = MaterialTheme.typography.labelMedium, color = c.textMuted)
+                }
+            }
+            Text("colours ›", style = MaterialTheme.typography.labelMedium, color = c.accentText)
         }
     }
     var chosen by rememberSaveable { mutableStateOf<String?>(null) }

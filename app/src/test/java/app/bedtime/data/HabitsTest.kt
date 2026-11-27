@@ -9,6 +9,15 @@ class HabitsTest {
     private val daily = Habit(id = "walk", name = "Walk")
 
     @Test
+    fun keptOfTheLastDaysForgivesAMissedOne() {
+        // Kept 4 of the last 7: the day missed in the middle takes nothing from the others.
+        val marks = mapOf(today - 6 to 1, today - 5 to 1, today - 2 to 1, today to 1, today - 9 to 1)
+        assertEquals(4, Habits.keptOf(daily, marks, today, 7))
+        assertEquals(5, Habits.keptOf(daily, marks, today, 30))
+        assertEquals(0, Habits.keptOf(daily, emptyMap(), today, 7))
+    }
+
+    @Test
     fun aDailyHabitsRunsAndToday() {
         val marks = mapOf(today - 3 to 1, today - 2 to 1, today - 1 to 1)
         // Today still open doesn't break the run yet; ticked, it adds to it.

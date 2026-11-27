@@ -26,6 +26,8 @@ data class Backup(
     /** The microjournal's entries. Empty in older files, and in those written without it. */
     val journal: List<JournalEntry> = emptyList(),
     val habitMarks: List<HabitMark> = emptyList(),
+    /** Answers to "was it worth it?". Empty in older files. */
+    val worth: List<WorthAnswer> = emptyList(),
     /** Phone use, a day per entry, and the months the oldest days were folded into. Empty in older files. */
     val usage: List<UsageDay> = emptyList(),
     val usageMonths: List<UsageMonth> = emptyList(),

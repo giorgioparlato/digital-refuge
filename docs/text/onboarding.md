@@ -169,7 +169,7 @@ uses `—`.
 **the half circle · an emergency break**
 
 > if a block allows one, you can step out for a few minutes without ending the session — for whatever genuinely
-> can't wait. it counts as an escape, and a full screen brings you back when it is over.
+> can't wait. it's counted, like leaving early, and a full screen brings you back when it is over.
 
 **the leaf · limits hold every day**
 

@@ -813,11 +813,12 @@ internal fun ScheduleEditContent(
                     )
                     AnimatedVisibility(draft.dnd != DndMode.OFF && !dndAvailable) {
                         Callout(
-                            title = "Needs Do Not Disturb access",
+                            title = "Needs do not disturb access",
                             kind = CalloutKind.INFO,
-                            body = "Grant it once in Setup so digital refuge can quiet your phone.",
-                            actionLabel = "Open setup",
-                            onAction = onOpenSetup,
+                            body = "So refuge can quiet your phone while this runs. Android's page for it opens; come back when it's on.",
+                            actionLabel = "Allow",
+                            // Straight to Android's page for it, not to setup; back here, the note goes once it's on.
+                            onAction = { runCatching { context.startActivity(android.content.Intent(android.provider.Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)) } },
                             modifier = Modifier.padding(top = 8.dp),
                         )
                     }

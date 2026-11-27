@@ -30,7 +30,7 @@ insights
 - In refuge
 - Sessions
 - … of … kept
--  · … … out
+-  · … ended early
 - On the phone
 - In distracting apps
 - Most of that
@@ -71,8 +71,14 @@ insights
 - Month
 - the one before
 - the one after
+- this week
+- this month
+- A day on average
+- , {so} so far
 - on the phone
 - of … unlocks
+- In all: … on the phone · … distracting
+-  · {it} unlocks
 - against {against}
 -  · nothing to compare with
 - , so far
@@ -137,7 +143,6 @@ insights
 - the same
 - Save
 - Cancel
-- this week
 - last week
 - the day before
 - the week before
@@ -186,7 +191,7 @@ insights
 - one more
 - tick …
 - … of …… today
--  · … in a row
+-  · … of the last 7
 - {kept} of {possible}
 - kept in the last seven days
 - A new habit
@@ -222,8 +227,8 @@ insights
 - Tick the rest
 - Open the habit ›
 - Change
-- days in a row
-- best run
+- of the last 7 days
+- of the last 30 days
 - {value} of ……
 - Tap a day to tick or untick it
 - Tap a day to change its count above

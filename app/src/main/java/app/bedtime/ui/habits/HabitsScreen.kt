@@ -366,7 +366,7 @@ private fun HabitRow(habit: Habit, marks: Map<Long, Int>, today: Long, onTick: (
                 Text(habit.name, style = MaterialTheme.typography.bodyMedium, color = c.textNormal, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                 Text(
                     (if (habit.kind == HabitKind.COUNT) "${marks[today] ?: 0} of ${habit.target}${if (habit.unit.isBlank()) "" else " ${habit.unit}"} today" else Habits.describe(habit)) +
-                        " · ${Habits.streak(habit, marks, today)} in a row",
+                        " · ${Habits.keptOf(habit, marks, today, 7)} of the last 7",
                     style = MaterialTheme.typography.labelSmall,
                     color = c.textMuted,
                     maxLines = 1,

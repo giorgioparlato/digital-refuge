@@ -44,12 +44,12 @@ object Why {
 
     fun moods(settings: AppSettings): List<String> = if (!settings.moodsOn) emptyList() else settings.moodTags ?: MOODS
 
-    /** The colours a mood can have, from the app's own four: sage, cream, tan and clay rose. */
+    /** The colours a mood can have, from good to hard: sage, a pale sage, a light amber, clay rose (keys kept from before). */
     val TONES = listOf("sage", "cream", "tan", "rose")
 
     /** What the suggested moods start with; a mood of your own picks one when it's made. */
     private val SUGGESTED_TONES = mapOf(
-        "happy" to "sage", "tired" to "cream", "hungry" to "tan", "lonely" to "tan", "bored" to "tan",
+        "happy" to "sage", "hungry" to "cream", "tired" to "tan", "lonely" to "tan", "bored" to "tan",
         "angry" to "rose", "anxious" to "rose",
     )
 

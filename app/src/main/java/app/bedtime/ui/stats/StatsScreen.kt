@@ -257,8 +257,7 @@ internal fun StatsContent(
 ) {
     val c = Obsidian.colors
     val week = Stats.week(history, now)
-    val streak = Stats.streak(history, now)
-    val best = Stats.bestStreak(history, now)
+    val (kept, lastOf) = Stats.keptOfLast(history, now)
     val today = java.time.Instant.ofEpochMilli(now).atZone(zone).toLocalDate().toEpochDay()
     // Phone use, sessions and habits, one at a time: what the phone took, how your sessions held, what you kept.
     // Sessions off, unless nothing else would be left to show.
@@ -350,7 +349,7 @@ internal fun StatsContent(
                     }
                 }
             }
-            SessionTotals(week.protectedMinutes, streak, best)
+            SessionTotals(week.protectedMinutes, kept, lastOf)
             Spacer(Modifier.height(16.dp))
         }
     }
